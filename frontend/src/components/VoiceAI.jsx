@@ -8,6 +8,28 @@ function getApiBase() {
   );
 }
 
+// Try common token keys (we don't know which one your app uses)
+function readAuthToken() {
+  try {
+    const candidates = [
+      "token",
+      "jwt",
+      "JWT",
+      "access_token",
+      "accessToken",
+      "auth_token",
+      "authToken",
+      "autoshield_token",
+      "autoshield_jwt",
+    ];
+    for (const k of candidates) {
+      const v = window.localStorage.getItem(k);
+      if (v && v.length > 20) return v;
+    }
+  } catch {}
+  return "";
+}
+
 export default function VoiceAI({
   endpoint = "/api/ai/chat",
   title = "Voice AI",
@@ -99,9 +121,7 @@ export default function VoiceAI({
       u.onend = () => setStatus("Reply ready");
 
       window.speechSynthesis.speak(u);
-    } catch {
-      // If speech fails, we still show text.
-    }
+    } catch {}
   }
 
   async function sendToAI(message) {
@@ -116,7 +136,15 @@ export default function VoiceAI({
       }
     })();
 
-    // send multiple keys so backend accepts whichever it expects
+    const token = readAuthToken();
+
+    // If token is missing, we can tell you immediately
+    if (!token) {
+      setStatus("Auth token not found (login token missing in localStorage).");
+      setReply("missing token");
+      return;
+    }
+
     const payload = {
       message,
       prompt: message,
@@ -128,7 +156,10 @@ export default function VoiceAI({
     try {
       const res = await fetch(API_BASE + endpoint, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
         credentials: "include",
         body: JSON.stringify(payload),
       });
@@ -157,7 +188,7 @@ export default function VoiceAI({
 
       if (!text) {
         setStatus("AI returned empty reply (backend mismatch)");
-        setReply("(No reply returned. Backend may use a different field.)");
+        setReply("(No reply returned.)");
         return;
       }
 
@@ -243,7 +274,7 @@ export default function VoiceAI({
       </div>
 
       <div style={{ fontSize: 12, opacity: 0.75, marginTop: 8 }}>
-        If “AI says” stays empty, the status line will show the backend error.
+        If it still says “missing token”, the app isn’t storing your JWT in localStorage under the common keys.
       </div>
     </div>
   );
