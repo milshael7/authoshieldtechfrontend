@@ -8,81 +8,171 @@ function getApiBase() {
   );
 }
 
-// Try common token keys (we don't know which one your app uses)
-function readAuthToken() {
-  try {
-    const candidates = [
-      "token",
-      "jwt",
-      "JWT",
-      "access_token",
-      "accessToken",
-      "auth_token",
-      "authToken",
-      "autoshield_token",
-      "autoshield_jwt",
-    ];
-    for (const k of candidates) {
-      const v = window.localStorage.getItem(k);
-      if (v && v.length > 20) return v;
-    }
-  } catch {}
-  return "";
+function safeJsonParse(str) {
+  try { return JSON.parse(str); } catch { return null; }
+}
+
+function pickProfessionalVoices(voices) {
+  // We don't show raw voice names; we map to professional labels.
+  // We'll pick best matches available on the device.
+  const list = voices || [];
+  const by = (pred) => list.find(pred);
+
+  const candidates = [
+    {
+      id: "pro_us_female",
+      label: "Professional US (Female)",
+      match: (v) =>
+        /en-US/i.test(v.lang) && /Samantha|Aria|Jenny|Zira|Google US English/i.test(v.name),
+    },
+    {
+      id: "pro_us_male",
+      label: "Professional US (Male)",
+      match: (v) =>
+        /en-US/i.test(v.lang) && /Guy|Davis|Matthew|Google US English/i.test(v.name) && /Male|Guy|Davis|Matthew/i.test(v.name),
+    },
+    {
+      id: "pro_uk",
+      label: "Professional UK",
+      match: (v) => /en-GB/i.test(v.lang),
+    },
+    {
+      id: "neutral_en",
+      label: "Neutral English",
+      match: (v) => /^en/i.test(v.lang),
+    },
+    {
+      id: "accessibility",
+      label: "Accessibility Voice",
+      match: (v) => /en/i.test(v.lang) && /compact|enhanced|premium/i.test(v.name),
+    },
+  ];
+
+  const resolved = candidates
+    .map((c) => {
+      const v = by(c.match);
+      return v ? { ...c, voiceName: v.name, lang: v.lang } : null;
+    })
+    .filter(Boolean);
+
+  // Always include a fallback option
+  if (resolved.length === 0 && list.length) {
+    resolved.push({
+      id: "fallback",
+      label: "Standard Voice",
+      voiceName: list[0].name,
+      lang: list[0].lang,
+    });
+  }
+
+  return resolved;
 }
 
 export default function VoiceAI({
   endpoint = "/api/ai/chat",
-  title = "Voice AI",
+  title = "AutoProtect Voice",
   getContext,
 }) {
   const API_BASE = useMemo(() => getApiBase(), []);
   const [supported, setSupported] = useState(true);
+
+  // Modes
+  const [conversationMode, setConversationMode] = useState(false); // hands-free
+  const [voiceReply, setVoiceReply] = useState(true);
+
+  // Voice selection (professional labels)
+  const [voiceOptions, setVoiceOptions] = useState([]);
+  const [voiceChoice, setVoiceChoice] = useState(() => {
+    return window.localStorage.getItem("autoprotect_voice_choice") || "pro_us_female";
+  });
+
+  // SpeechRecognition states
   const [listening, setListening] = useState(false);
-  const [conversation, setConversation] = useState(false);
-  const [speechOn, setSpeechOn] = useState(true);
   const [status, setStatus] = useState("Idle");
-  const [transcript, setTranscript] = useState("");
-  const [reply, setReply] = useState("");
+  const [youSaid, setYouSaid] = useState("");
+  const [aiSays, setAiSays] = useState("");
 
   const recRef = useRef(null);
-  const bufferRef = useRef("");
+  const bufferFinalRef = useRef("");     // final text buffer
+  const interimRef = useRef("");         // interim text buffer
+  const silenceTimerRef = useRef(null);  // detects "you stopped talking"
+  const lastSendRef = useRef("");        // prevent duplicate sends
+  const busyRef = useRef(false);         // avoid overlapping requests
 
   const SpeechRecognition =
     window.SpeechRecognition || window.webkitSpeechRecognition;
 
+  // Load speech synthesis voices & map to professional choices
+  useEffect(() => {
+    if (!("speechSynthesis" in window)) return;
+
+    const load = () => {
+      const v = window.speechSynthesis.getVoices?.() || [];
+      const opts = pickProfessionalVoices(v);
+      setVoiceOptions(opts);
+
+      // If saved choice isn't available, pick the first available.
+      if (opts.length && !opts.some(o => o.id === voiceChoice)) {
+        setVoiceChoice(opts[0].id);
+      }
+    };
+
+    load();
+    // Some browsers fire this when voices become available
+    window.speechSynthesis.onvoiceschanged = load;
+
+    return () => {
+      try { window.speechSynthesis.onvoiceschanged = null; } catch {}
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Create recognition instance
   useEffect(() => {
     if (!SpeechRecognition) {
       setSupported(false);
-      setStatus("SpeechRecognition not supported in this browser.");
+      setStatus("SpeechRecognition not supported on this device/browser.");
       return;
     }
 
     const rec = new SpeechRecognition();
     rec.lang = "en-US";
     rec.interimResults = true;
-    rec.continuous = true;
+    rec.continuous = true; // required for conversation mode
 
     rec.onstart = () => {
       setListening(true);
-      setStatus("Listening…");
-    };
-
-    rec.onend = () => {
-      setListening(false);
-      const msg = (bufferRef.current || "").trim();
-      bufferRef.current = "";
-      if (msg) void sendToAI(msg);
-      setStatus(conversation ? "Paused (tap mic to resume)" : "Idle");
+      setStatus(conversationMode ? "Conversation listening…" : "Listening…");
     };
 
     rec.onerror = (e) => {
       setListening(false);
       setStatus("Mic error: " + (e?.error || "unknown"));
+      clearTimeout(silenceTimerRef.current);
+    };
+
+    rec.onend = () => {
+      setListening(false);
+      clearTimeout(silenceTimerRef.current);
+
+      // In push-to-talk mode, end means send whatever we have.
+      if (!conversationMode) {
+        const finalText = (bufferFinalRef.current + " " + interimRef.current).trim();
+        bufferFinalRef.current = "";
+        interimRef.current = "";
+        setYouSaid(finalText || "");
+        if (finalText) void sendToAI(finalText);
+        setStatus("Idle");
+      } else {
+        // In conversation mode, browser might stop unexpectedly (mobile).
+        // We keep it "armed", user can hit Stop/Start again if needed.
+        setStatus("Conversation paused (tap Start to resume)");
+      }
     };
 
     rec.onresult = (event) => {
+      let finalText = bufferFinalRef.current || "";
       let interim = "";
-      let finalText = bufferRef.current || "";
 
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const r = event.results[i];
@@ -91,75 +181,91 @@ export default function VoiceAI({
         else interim += text;
       }
 
-      bufferRef.current = finalText;
-      setTranscript((finalText + interim).trim());
+      bufferFinalRef.current = finalText;
+      interimRef.current = interim;
+
+      const combined = (finalText + interim).trim();
+      setYouSaid(combined);
+
+      // Hands-free: send after silence
+      if (conversationMode) {
+        clearTimeout(silenceTimerRef.current);
+        silenceTimerRef.current = setTimeout(() => {
+          const msg = (bufferFinalRef.current + " " + interimRef.current).trim();
+          if (!msg) return;
+
+          // Avoid double-sending the same line
+          if (msg === lastSendRef.current) return;
+          lastSendRef.current = msg;
+
+          // Clear buffers so new speech starts fresh
+          bufferFinalRef.current = "";
+          interimRef.current = "";
+          setYouSaid(msg);
+
+          void sendToAI(msg);
+        }, 900); // silence window (ms). Can tune later.
+      }
     };
 
     recRef.current = rec;
+
     return () => {
       try { rec.stop(); } catch {}
+      clearTimeout(silenceTimerRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [conversationMode]);
+
+  // Save voice choice
+  useEffect(() => {
+    try {
+      window.localStorage.setItem("autoprotect_voice_choice", voiceChoice);
+    } catch {}
+  }, [voiceChoice]);
 
   function speak(text) {
-    if (!speechOn) return;
+    if (!voiceReply) return;
     if (!("speechSynthesis" in window)) return;
 
     try {
       window.speechSynthesis.cancel();
       const u = new SpeechSynthesisUtterance(text);
 
-      const voices = window.speechSynthesis.getVoices?.() || [];
-      const preferred =
-        voices.find(v => /en-US/i.test(v.lang) && /Samantha|Aria|Zira|Google/i.test(v.name)) ||
-        voices.find(v => /en/i.test(v.lang)) ||
-        voices[0];
-      if (preferred) u.voice = preferred;
+      const all = window.speechSynthesis.getVoices?.() || [];
+      const opt = voiceOptions.find(o => o.id === voiceChoice);
+      const chosen = opt ? all.find(v => v.name === opt.voiceName) : null;
+      if (chosen) u.voice = chosen;
 
       u.onstart = () => setStatus("Speaking…");
-      u.onend = () => setStatus("Reply ready");
+      u.onend = () => setStatus(conversationMode ? "Conversation listening…" : "Reply ready");
 
       window.speechSynthesis.speak(u);
-    } catch {}
+    } catch {
+      // If speaking fails, we still show text.
+    }
   }
 
   async function sendToAI(message) {
+    const clean = (message || "").trim();
+    if (!clean) return;
+    if (busyRef.current) return;
+
+    busyRef.current = true;
     setStatus("Thinking…");
-    setReply("");
+    setAiSays("");
 
     const ctx = (() => {
-      try {
-        return typeof getContext === "function" ? (getContext() || {}) : {};
-      } catch {
-        return {};
-      }
+      try { return typeof getContext === "function" ? (getContext() || {}) : {}; }
+      catch { return {}; }
     })();
 
-    const token = readAuthToken();
-
-    // If token is missing, we can tell you immediately
-    if (!token) {
-      setStatus("Auth token not found (login token missing in localStorage).");
-      setReply("missing token");
-      return;
-    }
-
-    const payload = {
-      message,
-      prompt: message,
-      input: message,
-      text: message,
-      context: ctx,
-    };
+    const payload = { message: clean, context: ctx };
 
     try {
       const res = await fetch(API_BASE + endpoint, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify(payload),
       });
@@ -167,13 +273,12 @@ export default function VoiceAI({
       const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        const msg =
-          data?.error ||
-          data?.message ||
-          data?.detail ||
-          `HTTP ${res.status}`;
-        setStatus("AI error: " + msg);
-        setReply(String(msg));
+        const msg = data?.error || data?.message || data?.detail || `HTTP ${res.status}`;
+        setAiSays(String(msg));
+        setStatus("AI error");
+        // Speak errors too (so you hear something)
+        speak("AI error. " + String(msg));
+        busyRef.current = false;
         return;
       }
 
@@ -183,98 +288,128 @@ export default function VoiceAI({
         data?.message ??
         data?.output ??
         data?.result ??
-        data?.answer ??
         "";
 
       if (!text) {
-        setStatus("AI returned empty reply (backend mismatch)");
-        setReply("(No reply returned.)");
+        setAiSays("(No reply from AI)");
+        setStatus("Reply empty");
+        speak("I did not receive a reply.");
+        busyRef.current = false;
         return;
       }
 
-      setReply(text);
+      setAiSays(text);
       setStatus("Reply ready");
       speak(text);
     } catch {
-      setStatus("Network error calling AI");
-      setReply("Network error calling AI");
+      setAiSays("Network error calling AI");
+      setStatus("Network error");
+      speak("Network error calling the AI.");
+    } finally {
+      busyRef.current = false;
     }
   }
 
-  function startMic() {
+  function start() {
     if (!recRef.current) return;
     try {
-      bufferRef.current = "";
-      setTranscript("");
+      bufferFinalRef.current = "";
+      interimRef.current = "";
+      lastSendRef.current = "";
+      setYouSaid("");
+      setAiSays("");
       recRef.current.start();
     } catch {}
   }
 
-  function stopMic() {
+  function stop() {
     if (!recRef.current) return;
     try { recRef.current.stop(); } catch {}
-  }
-
-  function toggleMic() {
-    if (!supported) return;
-    if (listening) stopMic();
-    else startMic();
   }
 
   if (!supported) {
     return (
       <div style={card}>
-        <div style={titleStyle}>{title}</div>
-        <div style={{ opacity: 0.85 }}>
-          Voice input isn’t supported in this browser.
+        <div style={rowTop}>
+          <div style={titleStyle}>{title}</div>
         </div>
+        <div style={{ opacity: 0.85 }}>{status}</div>
       </div>
     );
   }
 
   return (
     <div style={card}>
-      <div style={topRow}>
+      <div style={rowTop}>
         <div style={titleStyle}>{title}</div>
         <div style={{ fontSize: 12, opacity: 0.85 }}>{status}</div>
       </div>
 
       <div style={controls}>
-        <button onClick={toggleMic} style={btnPrimary}>
-          {listening ? "Stop Mic" : "Push to Talk"}
+        {/* Conversation = hands-free mic */}
+        <button
+          onClick={() => {
+            if (listening) stop();
+            else start();
+          }}
+          style={btnPrimary}
+        >
+          {listening ? "Stop" : (conversationMode ? "Start Conversation" : "Push to Talk")}
         </button>
 
         <label style={toggle}>
           <input
             type="checkbox"
-            checked={conversation}
-            onChange={() => setConversation(v => !v)}
+            checked={conversationMode}
+            onChange={() => setConversationMode(v => !v)}
           />
-          Conversation mode
+          Conversation mode (hands-free)
         </label>
 
         <label style={toggle}>
           <input
             type="checkbox"
-            checked={speechOn}
-            onChange={() => setSpeechOn(v => !v)}
+            checked={voiceReply}
+            onChange={() => setVoiceReply(v => !v)}
           />
           Voice reply
         </label>
+
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 12, opacity: 0.8 }}>Voice</span>
+          <select
+            value={voiceChoice}
+            onChange={(e) => setVoiceChoice(e.target.value)}
+            style={selectStyle}
+          >
+            {voiceOptions.length === 0 && <option value="fallback">Standard Voice</option>}
+            {voiceOptions.map(v => (
+              <option key={v.id} value={v.id}>{v.label}</option>
+            ))}
+          </select>
+
+          <button
+            style={btnSmall}
+            onClick={() => speak("Voice preview. AutoProtect is ready.")}
+            type="button"
+          >
+            Preview
+          </button>
+        </div>
       </div>
 
       <div style={box}>
         <div style={boxLabel}>You said</div>
-        <div style={boxText}>{transcript || "…"}</div>
+        <div style={boxText}>{youSaid || "…"}</div>
       </div>
 
       <div style={box}>
         <div style={boxLabel}>AI says</div>
-        <div style={boxText}>{reply || "…"}</div>
+        <div style={boxText}>{aiSays || "…"}</div>
       </div>
 
       <div style={{ fontSize: 12, opacity: 0.75, marginTop: 8 }}>
-        If it still says “missing token”, the app isn’t storing your JWT in localStorage under the common keys.
+        Tip: Turn on Conversation mode and just talk. When you stop speaking, AutoProtect replies automatically.
       </div>
     </div>
   );
@@ -288,14 +423,14 @@ const card = {
   backdropFilter: "blur(8px)",
 };
 
-const topRow = {
+const rowTop = {
   display: "flex",
-  alignItems: "center",
   justifyContent: "space-between",
+  alignItems: "center",
   gap: 10,
 };
 
-const titleStyle = { fontWeight: 700, letterSpacing: 0.3 };
+const titleStyle = { fontWeight: 800, letterSpacing: 0.2 };
 
 const controls = {
   display: "flex",
@@ -312,6 +447,16 @@ const btnPrimary = {
   background: "rgba(255,255,255,0.08)",
   color: "white",
   cursor: "pointer",
+  fontWeight: 800,
+};
+
+const btnSmall = {
+  padding: "8px 10px",
+  borderRadius: 10,
+  border: "1px solid rgba(255,255,255,0.18)",
+  background: "rgba(255,255,255,0.06)",
+  color: "white",
+  cursor: "pointer",
   fontWeight: 700,
 };
 
@@ -321,6 +466,15 @@ const toggle = {
   gap: 6,
   fontSize: 13,
   opacity: 0.9,
+};
+
+const selectStyle = {
+  borderRadius: 10,
+  padding: "8px 10px",
+  border: "1px solid rgba(255,255,255,0.18)",
+  background: "rgba(0,0,0,0.25)",
+  color: "white",
+  outline: "none",
 };
 
 const box = {
