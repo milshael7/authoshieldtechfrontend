@@ -11,6 +11,7 @@ function getApiBase() {
 export default function VoiceAI({
   endpoint = "/api/ai/chat",
   title = "Voice AI",
+  getContext,
 }) {
   const API_BASE = useMemo(() => getApiBase(), []);
   const [supported, setSupported] = useState(true);
@@ -22,7 +23,7 @@ export default function VoiceAI({
   const [reply, setReply] = useState("");
 
   const recRef = useRef(null);
-  const finalTextRef = useRef("");
+  const bufferRef = useRef("");
 
   const SpeechRecognition =
     window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -46,9 +47,10 @@ export default function VoiceAI({
 
     rec.onend = () => {
       setListening(false);
+      const msg = (bufferRef.current || "").trim();
+      bufferRef.current = "";
+      if (msg) void sendToAI(msg);
       setStatus(conversation ? "Paused (tap mic to resume)" : "Idle");
-      // In conversation mode, we can auto-restart after speaking ends
-      // but iOS/Safari may block auto-restart; we keep it manual-safe.
     };
 
     rec.onerror = (e) => {
@@ -58,33 +60,22 @@ export default function VoiceAI({
 
     rec.onresult = (event) => {
       let interim = "";
-      let finalText = finalTextRef.current || "";
+      let finalText = bufferRef.current || "";
 
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const r = event.results[i];
         const text = r[0]?.transcript || "";
-        if (r.isFinal) finalText += text;
+        if (r.isFinal) finalText += text + " ";
         else interim += text;
       }
 
-      finalTextRef.current = finalText;
-      setTranscript((finalText + " " + interim).trim());
-
-      // If we got a final chunk, send it
-      const last = event.results[event.results.length - 1];
-      if (last && last.isFinal) {
-        const msg = finalTextRef.current.trim();
-        // reset capture buffer (so next sentence is separate)
-        finalTextRef.current = "";
-        if (msg) void sendToAI(msg);
-      }
+      bufferRef.current = finalText;
+      setTranscript((finalText + interim).trim());
     };
 
     recRef.current = rec;
     return () => {
-      try {
-        rec.stop();
-      } catch {}
+      try { rec.stop(); } catch {}
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -93,77 +84,104 @@ export default function VoiceAI({
     if (!speechOn) return;
     if (!("speechSynthesis" in window)) return;
 
-    // stop any previous speech
-    window.speechSynthesis.cancel();
+    try {
+      window.speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text);
 
-    const u = new SpeechSynthesisUtterance(text);
-    u.rate = 1;
-    u.pitch = 1;
-    u.volume = 1;
+      const voices = window.speechSynthesis.getVoices?.() || [];
+      const preferred =
+        voices.find(v => /en-US/i.test(v.lang) && /Samantha|Aria|Zira|Google/i.test(v.name)) ||
+        voices.find(v => /en/i.test(v.lang)) ||
+        voices[0];
+      if (preferred) u.voice = preferred;
 
-    // pick a decent English voice if available
-    const voices = window.speechSynthesis.getVoices?.() || [];
-    const preferred =
-      voices.find((v) => /en-US/i.test(v.lang) && /female|aria|samantha|zira/i.test(v.name)) ||
-      voices.find((v) => /en/i.test(v.lang)) ||
-      voices[0];
+      u.onstart = () => setStatus("Speaking…");
+      u.onend = () => setStatus("Reply ready");
 
-    if (preferred) u.voice = preferred;
-
-    window.speechSynthesis.speak(u);
+      window.speechSynthesis.speak(u);
+    } catch {
+      // If speech fails, we still show text.
+    }
   }
 
   async function sendToAI(message) {
     setStatus("Thinking…");
     setReply("");
 
+    const ctx = (() => {
+      try {
+        return typeof getContext === "function" ? (getContext() || {}) : {};
+      } catch {
+        return {};
+      }
+    })();
+
+    // send multiple keys so backend accepts whichever it expects
+    const payload = {
+      message,
+      prompt: message,
+      input: message,
+      text: message,
+      context: ctx,
+    };
+
     try {
       const res = await fetch(API_BASE + endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ message }),
+        body: JSON.stringify(payload),
       });
 
       const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        const msg = data?.error || data?.message || `HTTP ${res.status}`;
+        const msg =
+          data?.error ||
+          data?.message ||
+          data?.detail ||
+          `HTTP ${res.status}`;
         setStatus("AI error: " + msg);
+        setReply(String(msg));
         return;
       }
 
       const text =
-        data?.reply ||
-        data?.text ||
-        data?.message ||
-        data?.output ||
-        "(No reply)";
+        data?.reply ??
+        data?.text ??
+        data?.message ??
+        data?.output ??
+        data?.result ??
+        data?.answer ??
+        "";
+
+      if (!text) {
+        setStatus("AI returned empty reply (backend mismatch)");
+        setReply("(No reply returned. Backend may use a different field.)");
+        return;
+      }
 
       setReply(text);
       setStatus("Reply ready");
       speak(text);
-    } catch (e) {
-      setStatus("Network error");
+    } catch {
+      setStatus("Network error calling AI");
+      setReply("Network error calling AI");
     }
   }
 
   function startMic() {
     if (!recRef.current) return;
     try {
-      finalTextRef.current = "";
+      bufferRef.current = "";
       setTranscript("");
       recRef.current.start();
-    } catch (e) {
-      // start() can throw if already started
-    }
+    } catch {}
   }
 
   function stopMic() {
     if (!recRef.current) return;
-    try {
-      recRef.current.stop();
-    } catch {}
+    try { recRef.current.stop(); } catch {}
   }
 
   function toggleMic() {
@@ -172,20 +190,12 @@ export default function VoiceAI({
     else startMic();
   }
 
-  function toggleConversation() {
-    const next = !conversation;
-    setConversation(next);
-    setStatus(next ? "Conversation mode ON" : "Conversation mode OFF");
-    // In conversation mode, user still taps mic to comply with browser policies.
-  }
-
   if (!supported) {
     return (
       <div style={card}>
         <div style={titleStyle}>{title}</div>
         <div style={{ opacity: 0.85 }}>
-          Voice input isn’t supported in this browser. Try Chrome on desktop or
-          Android. (iPhone Safari can be limited.)
+          Voice input isn’t supported in this browser.
         </div>
       </div>
     );
@@ -207,7 +217,7 @@ export default function VoiceAI({
           <input
             type="checkbox"
             checked={conversation}
-            onChange={toggleConversation}
+            onChange={() => setConversation(v => !v)}
           />
           Conversation mode
         </label>
@@ -216,7 +226,7 @@ export default function VoiceAI({
           <input
             type="checkbox"
             checked={speechOn}
-            onChange={() => setSpeechOn((v) => !v)}
+            onChange={() => setSpeechOn(v => !v)}
           />
           Voice reply
         </label>
@@ -233,8 +243,7 @@ export default function VoiceAI({
       </div>
 
       <div style={{ fontSize: 12, opacity: 0.75, marginTop: 8 }}>
-        Tip: On iPhone, you may need to tap “Push to Talk” each time due to
-        browser mic rules.
+        If “AI says” stays empty, the status line will show the backend error.
       </div>
     </div>
   );
@@ -272,7 +281,7 @@ const btnPrimary = {
   background: "rgba(255,255,255,0.08)",
   color: "white",
   cursor: "pointer",
-  fontWeight: 600,
+  fontWeight: 700,
 };
 
 const toggle = {
