@@ -11,6 +11,29 @@ function apiBase() {
   );
 }
 
+function fmtNum(n, digits = 2) {
+  const x = Number(n);
+  if (!Number.isFinite(x)) return "—";
+  return x.toLocaleString(undefined, { maximumFractionDigits: digits });
+}
+
+function fmtCompact(n, digits = 2) {
+  const x = Number(n);
+  if (!Number.isFinite(x)) return "—";
+  const ax = Math.abs(x);
+  if (ax >= 1e12) return (x / 1e12).toFixed(digits) + "t";
+  if (ax >= 1e9) return (x / 1e9).toFixed(digits) + "b";
+  if (ax >= 1e6) return (x / 1e6).toFixed(digits) + "m";
+  if (ax >= 1e3) return (x / 1e3).toFixed(digits) + "k";
+  return fmtNum(x, digits);
+}
+
+function pct(n, digits = 0) {
+  const x = Number(n);
+  if (!Number.isFinite(x)) return "—";
+  return (x * 100).toFixed(digits) + "%";
+}
+
 export default function Trading({ user }) {
   const UI_SYMBOLS = ["BTCUSD", "ETHUSD"];
   const UI_TO_BACKEND = { BTCUSD: "BTCUSDT", ETHUSD: "ETHUSDT" };
@@ -25,21 +48,22 @@ export default function Trading({ user }) {
   const [showAI, setShowAI] = useState(true);
   const [wideChart, setWideChart] = useState(false);
 
-  // ✅ Updated: allow learnStats + equity if backend provides it
   const [paper, setPaper] = useState({
     running: false,
     balance: 0,
-    equity: 0,
     pnl: 0,
-    position: null,
+    openPosition: null,
     trades: [],
     learnStats: null,
-    notes: []
+    decision: null,
+    decisionReason: null,
+    confidence: null,
+    ticksSeen: null
   });
   const [paperStatus, setPaperStatus] = useState("Loading…");
 
   const [messages, setMessages] = useState(() => ([
-    { from: "ai", text: "AutoProtect ready. Ask me about the chart, learning signals, paper balance, P&L, or risk rules." }
+    { from: "ai", text: "AutoProtect ready. Ask me about the chart, learning stats, paper balance, P&L, or risk rules." }
   ]));
   const [input, setInput] = useState("");
   const logRef = useRef(null);
@@ -163,19 +187,7 @@ export default function Trading({ user }) {
         const res = await fetch(`${base}/api/paper/status`, { credentials: "include" });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
-
-        // ✅ normalize shape (backend may send position/equity/learnStats/notes)
-        setPaper({
-          running: !!data?.running,
-          balance: Number(data?.balance || 0),
-          equity: Number(data?.equity || data?.balance || 0),
-          pnl: Number(data?.pnl || 0),
-          position: data?.position || data?.openPosition || null,
-          trades: Array.isArray(data?.trades) ? data.trades : [],
-          learnStats: data?.learnStats || null,
-          notes: Array.isArray(data?.notes) ? data.notes : []
-        });
-
+        setPaper(data);
         setPaperStatus("OK");
       } catch {
         setPaperStatus("Error loading paper status");
@@ -290,10 +302,12 @@ export default function Trading({ user }) {
         paper: {
           running: paper.running,
           balance: paper.balance,
-          equity: paper.equity,
           pnl: paper.pnl,
           tradesCount: paper.trades?.length || 0,
-          learnStats: paper.learnStats || null
+          ticksSeen: paper.ticksSeen ?? paper.learnStats?.ticksSeen,
+          confidence: paper.confidence ?? paper.learnStats?.confidence,
+          decision: paper.decision ?? paper.learnStats?.decision,
+          decisionReason: paper.decisionReason ?? paper.learnStats?.decisionReason,
         }
       };
 
@@ -301,7 +315,7 @@ export default function Trading({ user }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ message: clean, prompt: clean, input: clean, text: clean, context })
+        body: JSON.stringify({ message: clean, context })
       });
 
       const data = await res.json().catch(() => ({}));
@@ -326,7 +340,11 @@ export default function Trading({ user }) {
   }
 
   const showRightPanel = showAI && !wideChart;
-  const ls = paper.learnStats || null;
+
+  const ticksSeen = paper.ticksSeen ?? paper.learnStats?.ticksSeen ?? 0;
+  const conf = paper.confidence ?? paper.learnStats?.confidence ?? 0;
+  const decision = paper.decision ?? paper.learnStats?.decision ?? "WAIT";
+  const reason = paper.decisionReason ?? paper.learnStats?.decisionReason ?? "—";
 
   return (
     <div className="tradeWrap">
@@ -334,7 +352,7 @@ export default function Trading({ user }) {
         <div className="tradeTop">
           <div>
             <h2 style={{ margin: 0 }}>Trading Terminal</h2>
-            <small className="muted">Hide panels • widen chart • use Voice AI for hands-free guidance.</small>
+            <small className="muted">Learning stats + paper trading • keep numbers tight + readable.</small>
           </div>
 
           <div className="actions">
@@ -355,8 +373,10 @@ export default function Trading({ user }) {
 
             <div className="pill">
               <small>Feed</small>
-              <div style={{ marginTop: 6, fontWeight: 800 }}>{feedStatus}</div>
-              <small className="muted">Last: {last.toLocaleString()}</small>
+              <div style={{ marginTop: 6, fontWeight: 800, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
+                {feedStatus}
+              </div>
+              <small className="muted">Last: {fmtCompact(last, 2)}</small>
             </div>
 
             <div className="pill">
@@ -382,87 +402,59 @@ export default function Trading({ user }) {
 
       <div className="tradeGrid" style={{ gridTemplateColumns: showRightPanel ? "1.8fr 1fr" : "1fr" }}>
         <div className="card tradeChart">
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
             <b>{symbol}</b>
             <span className={`badge ${paper.running ? "ok" : ""}`}>Paper Trader: {paper.running ? "ON" : "OFF"}</span>
           </div>
 
+          {/* ✅ Learning strip (tight text, no overflow) */}
+          <div style={{
+            marginTop: 10,
+            display: "grid",
+            gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+            gap: 10
+          }}>
+            <div className="kpiBox">
+              <div className="kpiVal">{fmtCompact(ticksSeen, 0)}</div>
+              <div className="kpiLbl">Ticks Seen</div>
+            </div>
+            <div className="kpiBox">
+              <div className="kpiVal">{pct(conf, 0)}</div>
+              <div className="kpiLbl">Confidence</div>
+            </div>
+            <div className="kpiBox">
+              <div className="kpiVal">{decision}</div>
+              <div className="kpiLbl">Decision</div>
+            </div>
+            <div className="kpiBox">
+              <div className="kpiVal" title={reason} style={{ fontSize: 14 }}>
+                <span style={{ display:"block", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
+                  {reason}
+                </span>
+              </div>
+              <div className="kpiLbl">Reason</div>
+            </div>
+          </div>
+
           {showMoney && (
-            <>
-              <div className="kpi">
-                <div>
-                  <b>${Number(paper.balance || 0).toLocaleString()}</b>
-                  <span>Paper Balance</span>
-                </div>
-                <div>
-                  <b>${Number(paper.pnl || 0).toLocaleString()}</b>
-                  <span>P / L</span>
-                </div>
-                <div>
-                  <b>{paper.trades?.length || 0}</b>
-                  <span>Recent Trades</span>
-                </div>
-                <div>
-                  <b>{paperStatus}</b>
-                  <span>Status</span>
-                </div>
+            <div className="kpi">
+              <div>
+                <b>${fmtCompact(paper.balance || 0, 2)}</b>
+                <span>Paper Balance</span>
               </div>
-
-              {/* ✅ NEW: Learning panel */}
-              <div className="kpi" style={{ marginTop: 10 }}>
-                <div>
-                  <b>{ls ? (ls.ticksSeen ?? 0) : "-"}</b>
-                  <span>Ticks Seen</span>
-                </div>
-                <div>
-                  <b>{ls ? (ls.confidence ?? 0) : "-"}%</b>
-                  <span>Confidence</span>
-                </div>
-                <div>
-                  <b>{ls ? (ls.volatilityState || "idle") : "-"}</b>
-                  <span>Volatility</span>
-                </div>
-                <div>
-                  <b style={{ fontSize: 12 }}>{ls ? (ls.lastReason || "—") : "—"}</b>
-                  <span>Decision Reason</span>
-                </div>
+              <div>
+                <b>${fmtCompact(paper.pnl || 0, 2)}</b>
+                <span>P / L</span>
               </div>
-
-              {ls && (
-                <div style={{ marginTop: 10 }} className="muted">
-                  <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
-                    <span><b>Decision:</b> {ls.lastDecision}</span>
-                    <span><b>Warmup Left:</b> {ls.warmupLeft}</span>
-                    <span><b>Edge:</b> {typeof ls.lastEdge === "number" ? ls.lastEdge : "-"}</span>
-                    <span><b>Vol:</b> {typeof ls.lastVol === "number" ? ls.lastVol : "-"}</span>
-                  </div>
-                </div>
-              )}
-
-              {paper.notes && paper.notes.length > 0 && (
-                <div style={{ marginTop: 10 }}>
-                  <b>AutoProtect Notes</b>
-                  <div className="tableWrap">
-                    <table className="table">
-                      <thead>
-                        <tr>
-                          <th>Time</th>
-                          <th>Note</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {paper.notes.slice().reverse().slice(0, 6).map((n, i) => (
-                          <tr key={i}>
-                            <td>{new Date(n.time).toLocaleTimeString()}</td>
-                            <td>{n.text}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-            </>
+              <div>
+                <b>{fmtCompact(paper.trades?.length || 0, 0)}</b>
+                <span>Recent Trades</span>
+              </div>
+              <div>
+                <b style={{ whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{paperStatus}</b>
+                <span>Status</span>
+              </div>
+            </div>
           )}
 
           <div style={{ marginTop: 12, height: 520 }}>
@@ -486,7 +478,7 @@ export default function Trading({ user }) {
                   <thead>
                     <tr>
                       <th>Time</th>
-                      <th>Side</th>
+                      <th>Type</th>
                       <th>Price</th>
                       <th>Profit</th>
                     </tr>
@@ -495,13 +487,13 @@ export default function Trading({ user }) {
                     {(paper.trades || []).slice().reverse().slice(0, 10).map((t, i) => (
                       <tr key={i}>
                         <td>{new Date(t.time).toLocaleTimeString()}</td>
-                        <td>{t.side || t.type || "-"}</td>
-                        <td>{Number(t.exit ?? t.price ?? 0).toFixed(2)}</td>
-                        <td>{t.profit !== undefined ? Number(t.profit).toFixed(2) : "-"}</td>
+                        <td>{t.type}</td>
+                        <td>{fmtNum(t.price, 2)}</td>
+                        <td>{t.profit !== undefined ? fmtNum(t.profit, 2) : "-"}</td>
                       </tr>
                     ))}
                     {(!paper.trades || paper.trades.length === 0) && (
-                      <tr><td colSpan="4" className="muted">No trades yet (watch Learning panel above)</td></tr>
+                      <tr><td colSpan="4" className="muted">No trades yet (wait a bit while it learns)</td></tr>
                     )}
                   </tbody>
                 </table>
@@ -534,7 +526,7 @@ export default function Trading({ user }) {
               <input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="Ask about learning, confidence, volatility, trades…"
+                placeholder="Ask about trades, learning, risk rules…"
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
                     sendToAI(input);
@@ -558,10 +550,12 @@ export default function Trading({ user }) {
                   paper: {
                     running: paper.running,
                     balance: paper.balance,
-                    equity: paper.equity,
                     pnl: paper.pnl,
                     tradesCount: paper.trades?.length || 0,
-                    learnStats: paper.learnStats || null
+                    ticksSeen,
+                    confidence: conf,
+                    decision,
+                    decisionReason: reason,
                   }
                 })}
               />
