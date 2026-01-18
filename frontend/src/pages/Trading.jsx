@@ -1,24 +1,14 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-
-function canSTT() {
-  return !!(window.SpeechRecognition || window.webkitSpeechRecognition);
-}
-
-function speakText(text) {
-  try {
-    if (!window.speechSynthesis) return;
-    const u = new SpeechSynthesisUtterance(text);
-    window.speechSynthesis.cancel();
-    window.speechSynthesis.speak(u);
-  } catch {}
-}
+import VoiceAI from "../components/VoiceAI";
 
 function clamp(n, a, b) {
   return Math.max(a, Math.min(b, n));
 }
 
 function apiBase() {
-  return (import.meta.env.VITE_API_BASE || "").trim();
+  return (
+    (import.meta.env.VITE_API_BASE || import.meta.env.VITE_BACKEND_URL || "").trim()
+  );
 }
 
 export default function Trading({ user }) {
@@ -30,7 +20,7 @@ export default function Trading({ user }) {
   const [feedStatus, setFeedStatus] = useState("Connecting…");
   const [last, setLast] = useState(65300);
 
-  // ✅ NEW: hide/show panels (your request)
+  // ✅ hide/show panels
   const [showMoney, setShowMoney] = useState(true);
   const [showTradeLog, setShowTradeLog] = useState(true);
   const [showAI, setShowAI] = useState(true);
@@ -46,15 +36,12 @@ export default function Trading({ user }) {
   });
   const [paperStatus, setPaperStatus] = useState("Loading…");
 
-  // Voice + chat
-  const [voiceOn, setVoiceOn] = useState(false);
-  const [listening, setListening] = useState(false);
+  // Chat log (REAL backend replies)
   const [messages, setMessages] = useState(() => ([
-    { from: "ai", text: "AI Panel ready. You can hide panels using the buttons above the chart." }
+    { from: "ai", text: "AutoProtect AI ready. Ask me about the chart, paper balance, P&L, or risk rules." }
   ]));
   const [input, setInput] = useState("");
   const logRef = useRef(null);
-  const sttSupported = useMemo(() => canSTT(), []);
 
   // Candle chart
   const canvasRef = useRef(null);
@@ -274,45 +261,61 @@ export default function Trading({ user }) {
     ctx.setLineDash([]);
   }, [candles, last]);
 
-  const sendToAI = (text) => {
+  async function sendToAI(text) {
     const clean = (text || "").trim();
     if (!clean) return;
 
     setMessages(prev => [...prev, { from: "you", text: clean }]);
 
-    const reply =
-      `AutoProtect AI: Paper trader is ${paper.running ? "RUNNING" : "STOPPED"}. ` +
-      `Balance $${Number(paper.balance || 0).toLocaleString()} / P&L $${Number(paper.pnl || 0).toLocaleString()}. ` +
-      `Symbol ${symbol}, mode ${mode}.`;
+    const base = apiBase();
+    if (!base) {
+      setMessages(prev => [...prev, { from: "ai", text: "Backend URL missing. Set VITE_API_BASE on Vercel." }]);
+      return;
+    }
 
-    setTimeout(() => {
+    try {
+      // Provide context so replies feel “real”
+      const context = {
+        symbol,
+        mode,
+        last,
+        paper: {
+          running: paper.running,
+          balance: paper.balance,
+          pnl: paper.pnl,
+          tradesCount: paper.trades?.length || 0
+        }
+      };
+
+      const res = await fetch(`${base}/api/ai/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          message: clean,
+          context
+        })
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const msg = data?.error || data?.message || `HTTP ${res.status}`;
+        setMessages(prev => [...prev, { from: "ai", text: "AI error: " + msg }]);
+        return;
+      }
+
+      const reply =
+        data?.reply ||
+        data?.text ||
+        data?.message ||
+        "(No reply from AI)";
+
       setMessages(prev => [...prev, { from: "ai", text: reply }]);
-      if (voiceOn) speakText(reply);
-    }, 250);
-  };
+    } catch {
+      setMessages(prev => [...prev, { from: "ai", text: "Network error talking to AI backend." }]);
+    }
+  }
 
-  const startVoice = () => {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) return;
-
-    const rec = new SpeechRecognition();
-    rec.lang = "en-US";
-    rec.interimResults = false;
-    rec.maxAlternatives = 1;
-
-    rec.onstart = () => setListening(true);
-    rec.onerror = () => setListening(false);
-    rec.onend = () => setListening(false);
-
-    rec.onresult = (e) => {
-      const text = e?.results?.[0]?.[0]?.transcript || "";
-      sendToAI(text);
-    };
-
-    rec.start();
-  };
-
-  // Layout: chart area can become wide (hide AI)
   const showRightPanel = showAI && !wideChart;
 
   return (
@@ -321,7 +324,7 @@ export default function Trading({ user }) {
         <div className="tradeTop">
           <div>
             <h2 style={{ margin: 0 }}>Trading Terminal</h2>
-            <small className="muted">Use toggles to hide panels and keep the chart clean.</small>
+            <small className="muted">Hide panels • widen chart • use Voice AI when you want hands-free guidance.</small>
           </div>
 
           <div className="actions">
@@ -331,6 +334,9 @@ export default function Trading({ user }) {
                 <button className={mode === "Live" ? "active" : ""} onClick={() => setMode("Live")}>Live</button>
                 <button className={mode === "Paper" ? "active" : ""} onClick={() => setMode("Paper")}>Paper</button>
               </div>
+              <small className="muted" style={{ display: "block", marginTop: 6 }}>
+                (Live will be locked down later for safety.)
+              </small>
             </div>
 
             <div className="pill">
@@ -346,7 +352,6 @@ export default function Trading({ user }) {
               <small className="muted">Last: {last.toLocaleString()}</small>
             </div>
 
-            {/* ✅ NEW: panel toggles */}
             <div className="pill">
               <small>Panels</small>
               <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
@@ -449,15 +454,8 @@ export default function Trading({ user }) {
               <div>
                 <b>AI Panel</b>
                 <div className="muted" style={{ fontSize: 12 }}>
-                  Hide this panel anytime • {sttSupported ? "Voice supported" : "Voice may be limited"}
+                  Real AI replies • Voice panel below • Hide anytime
                 </div>
-              </div>
-
-              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                <span className={`badge ${voiceOn ? "ok" : ""}`}>Voice: {voiceOn ? "ON" : "OFF"}</span>
-                <button onClick={() => setVoiceOn(v => !v)} style={{ width: "auto" }}>
-                  Toggle Voice
-                </button>
               </div>
             </div>
 
@@ -487,15 +485,9 @@ export default function Trading({ user }) {
               </button>
             </div>
 
-            <div style={{ display: "flex", gap: 10, marginTop: 10, alignItems: "center" }}>
-              <button
-                style={{ width: "auto" }}
-                disabled={!sttSupported || listening}
-                onClick={() => { if (sttSupported) startVoice(); }}
-              >
-                {listening ? "Listening…" : "🎙 Tap to speak"}
-              </button>
-              <small className="muted">Turn Voice ON for spoken replies.</small>
+            {/* ✅ NEW: Voice AI module (push-to-talk + conversation mode) */}
+            <div style={{ marginTop: 12 }}>
+              <VoiceAI title="AutoProtect Voice" endpoint="/api/ai/chat" />
             </div>
           </div>
         )}
