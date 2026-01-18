@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import VoiceAI from "../components/VoiceAI";
 
 function clamp(n, a, b) {
@@ -20,13 +20,11 @@ export default function Trading({ user }) {
   const [feedStatus, setFeedStatus] = useState("Connecting…");
   const [last, setLast] = useState(65300);
 
-  // ✅ hide/show panels
   const [showMoney, setShowMoney] = useState(true);
   const [showTradeLog, setShowTradeLog] = useState(true);
   const [showAI, setShowAI] = useState(true);
   const [wideChart, setWideChart] = useState(false);
 
-  // Paper money panel
   const [paper, setPaper] = useState({
     running: false,
     balance: 0,
@@ -36,14 +34,12 @@ export default function Trading({ user }) {
   });
   const [paperStatus, setPaperStatus] = useState("Loading…");
 
-  // Chat log (REAL backend replies)
   const [messages, setMessages] = useState(() => ([
     { from: "ai", text: "AutoProtect AI ready. Ask me about the chart, paper balance, P&L, or risk rules." }
   ]));
   const [input, setInput] = useState("");
   const logRef = useRef(null);
 
-  // Candle chart
   const canvasRef = useRef(null);
   const [candles, setCandles] = useState(() => {
     const base = 65300;
@@ -98,7 +94,6 @@ export default function Trading({ user }) {
     });
   };
 
-  // WebSocket feed
   useEffect(() => {
     let ws;
     let fallbackTimer;
@@ -151,7 +146,6 @@ export default function Trading({ user }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [symbol]);
 
-  // Pull paper status
   useEffect(() => {
     let t;
     const base = apiBase();
@@ -177,7 +171,6 @@ export default function Trading({ user }) {
     return () => clearInterval(t);
   }, []);
 
-  // Draw candles
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -274,7 +267,6 @@ export default function Trading({ user }) {
     }
 
     try {
-      // Provide context so replies feel “real”
       const context = {
         symbol,
         mode,
@@ -291,10 +283,7 @@ export default function Trading({ user }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({
-          message: clean,
-          context
-        })
+        body: JSON.stringify({ message: clean, prompt: clean, input: clean, text: clean, context })
       });
 
       const data = await res.json().catch(() => ({}));
@@ -305,9 +294,11 @@ export default function Trading({ user }) {
       }
 
       const reply =
-        data?.reply ||
-        data?.text ||
-        data?.message ||
+        data?.reply ??
+        data?.text ??
+        data?.message ??
+        data?.output ??
+        data?.result ??
         "(No reply from AI)";
 
       setMessages(prev => [...prev, { from: "ai", text: reply }]);
@@ -324,7 +315,7 @@ export default function Trading({ user }) {
         <div className="tradeTop">
           <div>
             <h2 style={{ margin: 0 }}>Trading Terminal</h2>
-            <small className="muted">Hide panels • widen chart • use Voice AI when you want hands-free guidance.</small>
+            <small className="muted">Hide panels • widen chart • use Voice AI for hands-free guidance.</small>
           </div>
 
           <div className="actions">
@@ -334,9 +325,6 @@ export default function Trading({ user }) {
                 <button className={mode === "Live" ? "active" : ""} onClick={() => setMode("Live")}>Live</button>
                 <button className={mode === "Paper" ? "active" : ""} onClick={() => setMode("Paper")}>Paper</button>
               </div>
-              <small className="muted" style={{ display: "block", marginTop: 6 }}>
-                (Live will be locked down later for safety.)
-              </small>
             </div>
 
             <div className="pill">
@@ -374,7 +362,6 @@ export default function Trading({ user }) {
       </div>
 
       <div className="tradeGrid" style={{ gridTemplateColumns: showRightPanel ? "1.8fr 1fr" : "1fr" }}>
-        {/* LEFT */}
         <div className="card tradeChart">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <b>{symbol}</b>
@@ -447,7 +434,6 @@ export default function Trading({ user }) {
           )}
         </div>
 
-        {/* RIGHT: AI */}
         {showRightPanel && (
           <div className="card tradeAI">
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
@@ -485,9 +471,22 @@ export default function Trading({ user }) {
               </button>
             </div>
 
-            {/* ✅ NEW: Voice AI module (push-to-talk + conversation mode) */}
             <div style={{ marginTop: 12 }}>
-              <VoiceAI title="AutoProtect Voice" endpoint="/api/ai/chat" />
+              <VoiceAI
+                title="AutoProtect Voice"
+                endpoint="/api/ai/chat"
+                getContext={() => ({
+                  symbol,
+                  mode,
+                  last,
+                  paper: {
+                    running: paper.running,
+                    balance: paper.balance,
+                    pnl: paper.pnl,
+                    tradesCount: paper.trades?.length || 0
+                  }
+                })}
+              />
             </div>
           </div>
         )}
