@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import VoiceAI from "../components/VoiceAI";
 
 function clamp(n, a, b) {
@@ -6,28 +6,9 @@ function clamp(n, a, b) {
 }
 
 function apiBase() {
-  return (import.meta.env.VITE_API_BASE || import.meta.env.VITE_BACKEND_URL || "").trim();
-}
-
-// Optional auth header (won’t break if you don’t use tokens)
-function getToken() {
-  try {
-    return (
-      localStorage.getItem("token") ||
-      localStorage.getItem("jwt") ||
-      localStorage.getItem("access_token") ||
-      ""
-    );
-  } catch {
-    return "";
-  }
-}
-function authHeaders(extra = {}) {
-  const t = getToken();
-  return {
-    ...(t ? { Authorization: `Bearer ${t}` } : {}),
-    ...extra,
-  };
+  return (
+    (import.meta.env.VITE_API_BASE || import.meta.env.VITE_BACKEND_URL || "").trim()
+  );
 }
 
 function fmtNum(n, digits = 2) {
@@ -35,6 +16,7 @@ function fmtNum(n, digits = 2) {
   if (!Number.isFinite(x)) return "—";
   return x.toLocaleString(undefined, { maximumFractionDigits: digits });
 }
+
 function fmtCompact(n, digits = 2) {
   const x = Number(n);
   if (!Number.isFinite(x)) return "—";
@@ -45,58 +27,52 @@ function fmtCompact(n, digits = 2) {
   if (ax >= 1e3) return (x / 1e3).toFixed(digits) + "k";
   return fmtNum(x, digits);
 }
+
 function pct(n, digits = 0) {
   const x = Number(n);
   if (!Number.isFinite(x)) return "—";
   return (x * 100).toFixed(digits) + "%";
 }
 
-export default function Trading() {
-  // 10 well-known coins (frontend display)
-  const UI_SYMBOLS = ["BTCUSD","ETHUSD","SOLUSD","LTCUSD","BCHUSD","XRPUSD","ADAUSD","DOGEUSD","DOTUSD","LINKUSD"];
+export default function Trading({ user }) {
+  // ✅ show 10 coins in UI
+  const UI_SYMBOLS = [
+    "BTCUSD",
+    "ETHUSD",
+    "SOLUSD",
+    "XRPUSD",
+    "ADAUSD",
+    "DOTUSD",
+    "LINKUSD",
+    "LTCUSD",
+    "BCHUSD",
+    "XLMUSD",
+  ];
 
-  // Map UI symbol -> backend tick symbol (what your Render WS broadcasts)
+  // ✅ UI -> backend mapping
   const UI_TO_BACKEND = {
     BTCUSD: "BTCUSDT",
     ETHUSD: "ETHUSDT",
     SOLUSD: "SOLUSDT",
-    LTCUSD: "LTCUSDT",
-    BCHUSD: "BCHUSDT",
     XRPUSD: "XRPUSDT",
     ADAUSD: "ADAUSDT",
-    DOGEUSD: "DOGEUSDT",
     DOTUSD: "DOTUSDT",
     LINKUSD: "LINKUSDT",
+    LTCUSD: "LTCUSDT",
+    BCHUSD: "BCHUSDT",
+    XLMUSD: "XLMUSDT",
   };
 
   const [symbol, setSymbol] = useState("BTCUSD");
   const [mode, setMode] = useState("Paper");
   const [feedStatus, setFeedStatus] = useState("Connecting…");
-
-  // Market watch last prices
-  const [lastBySym, setLastBySym] = useState(() => ({
-    BTCUSDT: null,
-    ETHUSDT: null,
-    SOLUSDT: null,
-    LTCUSDT: null,
-    BCHUSDT: null,
-    XRPUSDT: null,
-    ADAUSDT: null,
-    DOGEUSDT: null,
-    DOTUSDT: null,
-    LINKUSDT: null,
-  }));
-
-  // Current chart price
   const [last, setLast] = useState(65300);
 
-  // Panels
   const [showMoney, setShowMoney] = useState(true);
   const [showTradeLog, setShowTradeLog] = useState(true);
   const [showAI, setShowAI] = useState(true);
   const [wideChart, setWideChart] = useState(false);
 
-  // Paper
   const [paper, setPaper] = useState({
     running: false,
     balance: 0,
@@ -104,23 +80,16 @@ export default function Trading() {
     trades: [],
     position: null,
     learnStats: null,
-    limits: null,
-    config: null,
+    lastPriceBySymbol: {},
   });
   const [paperStatus, setPaperStatus] = useState("Loading…");
 
-  // Live readiness (optional)
-  const [live, setLive] = useState(null);
-  const [liveStatus, setLiveStatus] = useState("Loading…");
-
-  // AI Chat
-  const [messages, setMessages] = useState(() => [
-    { from: "ai", text: "AutoProtect ready. Ask about market moves, learning stats, paper trades, or risk rules." }
-  ]);
+  const [messages, setMessages] = useState(() => ([
+    { from: "ai", text: "AutoProtect ready. Ask me about the chart, learning stats, paper balance, P&L, or risk rules." }
+  ]));
   const [input, setInput] = useState("");
   const logRef = useRef(null);
 
-  // Chart
   const canvasRef = useRef(null);
   const [candles, setCandles] = useState(() => {
     const base = 65300;
@@ -144,48 +113,38 @@ export default function Trading() {
     if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
   }, [messages]);
 
-  const wantedBackendSymbol = useMemo(() => UI_TO_BACKEND[symbol] || symbol, [symbol]);
-
-  const applyTick = (backendSymbol, price, nowMs) => {
-    setLastBySym((prev) => ({ ...prev, [backendSymbol]: Number(price) }));
-
-    // Only update chart for current selected symbol
-    if (backendSymbol !== wantedBackendSymbol) return;
-
-    const p = Number(price);
-    if (!Number.isFinite(p)) return;
-
-    setLast(Number(p.toFixed(2)));
+  const applyTick = (price, nowMs) => {
+    setLast(Number(price.toFixed(2)));
     setCandles((prev) => {
       const bucketSec = 5;
-      const nowSec = Math.floor((nowMs || Date.now()) / 1000);
+      const nowSec = Math.floor(nowMs / 1000);
       const bucketTime = Math.floor(nowSec / bucketSec) * bucketSec;
 
       const next = [...prev];
       const lastC = next[next.length - 1];
 
       if (!lastC || lastC.time !== bucketTime) {
-        const o = lastC ? lastC.close : p;
+        const o = lastC ? lastC.close : price;
         next.push({
           time: bucketTime,
           open: o,
-          high: Math.max(o, p),
-          low: Math.min(o, p),
-          close: p
+          high: Math.max(o, price),
+          low: Math.min(o, price),
+          close: price
         });
-        while (next.length > 140) next.shift();
+        while (next.length > 120) next.shift();
         return next;
       }
 
-      lastC.high = Math.max(lastC.high, p);
-      lastC.low = Math.min(lastC.low, p);
-      lastC.close = p;
+      lastC.high = Math.max(lastC.high, price);
+      lastC.low = Math.min(lastC.low, price);
+      lastC.close = price;
       next[next.length - 1] = { ...lastC };
       return next;
     });
   };
 
-  // WS feed
+  // ✅ WebSocket feed (filters for selected symbol)
   useEffect(() => {
     let ws;
     let fallbackTimer;
@@ -195,36 +154,15 @@ export default function Trading() {
       ? base.replace(/^https:\/\//i, "wss://").replace(/^http:\/\//i, "ws://")
       : "";
 
+    const wantedBackendSymbol = UI_TO_BACKEND[symbol] || symbol;
+
     const startFallback = () => {
       setFeedStatus("Disconnected (demo fallback)");
-      // fallback for all 10 so the UI doesn't look dead if WS fails
-      const startMap = { ...lastBySym };
-      const defaults = {
-        BTCUSDT: 65300,
-        ETHUSDT: 3500,
-        SOLUSDT: 150,
-        LTCUSDT: 90,
-        BCHUSDT: 400,
-        XRPUSDT: 0.7,
-        ADAUSDT: 0.4,
-        DOGEUSDT: 0.08,
-        DOTUSDT: 7,
-        LINKUSDT: 15,
-      };
-      Object.keys(defaults).forEach(k => {
-        if (!Number.isFinite(Number(startMap[k]))) startMap[k] = defaults[k];
-      });
-
+      let price = last || 100;
       fallbackTimer = setInterval(() => {
-        const jitter = (x) => Math.max(0.000001, x + (Math.random() - 0.5) * x * 0.002);
-        const next = { ...startMap };
-        Object.keys(next).forEach(k => (next[k] = jitter(next[k])));
-        startMap.BTCUSDT = next.BTCUSDT; startMap.ETHUSDT = next.ETHUSDT; startMap.SOLUSDT = next.SOLUSDT;
-        startMap.LTCUSDT = next.LTCUSDT; startMap.BCHUSDT = next.BCHUSDT; startMap.XRPUSDT = next.XRPUSDT;
-        startMap.ADAUSDT = next.ADAUSDT; startMap.DOGEUSDT = next.DOGEUSDT; startMap.DOTUSDT = next.DOTUSDT;
-        startMap.LINKUSDT = next.LINKUSDT;
-
-        Object.entries(next).forEach(([sym, price]) => applyTick(sym, price, Date.now()));
+        const delta = (Math.random() - 0.5) * Math.max(1, price * 0.002);
+        price = Math.max(0.0001, price + delta);
+        applyTick(price, Date.now());
       }, 900);
     };
 
@@ -236,7 +174,6 @@ export default function Trading() {
 
       setFeedStatus("Connecting…");
       ws = new WebSocket(`${wsBase}/ws/market`);
-
       ws.onopen = () => setFeedStatus("Connected");
       ws.onclose = () => startFallback();
       ws.onerror = () => startFallback();
@@ -245,15 +182,14 @@ export default function Trading() {
         try {
           const msg = JSON.parse(e.data);
 
-          if (msg?.type === "hello" && msg?.last) {
-            const l = msg.last || {};
-            Object.entries(l).forEach(([sym, price]) => {
-              if (price != null) applyTick(String(sym), Number(price), Date.now());
-            });
+          // hello snapshot -> set starting last for chosen symbol
+          if (msg?.type === "hello" && msg?.last && msg?.last[wantedBackendSymbol]) {
+            applyTick(Number(msg.last[wantedBackendSymbol]), Date.now());
+            return;
           }
 
-          if (msg?.type === "tick" && msg.symbol && msg.price) {
-            applyTick(String(msg.symbol), Number(msg.price), Number(msg.ts || Date.now()));
+          if (msg?.type === "tick" && msg.symbol === wantedBackendSymbol) {
+            applyTick(Number(msg.price), Number(msg.ts || Date.now()));
           }
         } catch {}
       };
@@ -266,9 +202,9 @@ export default function Trading() {
       clearInterval(fallbackTimer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [wantedBackendSymbol]);
+  }, [symbol]);
 
-  // Paper polling
+  // ✅ paper status polling
   useEffect(() => {
     let t;
     const base = apiBase();
@@ -279,10 +215,7 @@ export default function Trading() {
 
     const fetchStatus = async () => {
       try {
-        const res = await fetch(`${base}/api/paper/status`, {
-          headers: { ...authHeaders() },
-          credentials: "include",
-        });
+        const res = await fetch(`${base}/api/paper/status`, { credentials: "include" });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         setPaper(data);
@@ -297,37 +230,7 @@ export default function Trading() {
     return () => clearInterval(t);
   }, []);
 
-  // Live status polling (optional)
-  useEffect(() => {
-    let t;
-    const base = apiBase();
-    if (!base) {
-      setLiveStatus("Missing VITE_API_BASE");
-      return;
-    }
-
-    const fetchLive = async () => {
-      try {
-        const res = await fetch(`${base}/api/live/status`, {
-          headers: { ...authHeaders() },
-          credentials: "include",
-        });
-        if (res.status === 404) { setLiveStatus("Not installed"); return; }
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        setLive(data || null);
-        setLiveStatus("OK");
-      } catch {
-        setLiveStatus("Error");
-      }
-    };
-
-    fetchLive();
-    t = setInterval(fetchLive, 5000);
-    return () => clearInterval(t);
-  }, []);
-
-  // Draw candles
+  // ✅ draw candles
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -355,11 +258,11 @@ export default function Trading() {
       ctx.stroke();
     }
 
-    const view = candles.slice(-90);
+    const view = candles.slice(-80);
     if (!view.length) return;
 
-    const highs = view.map((c) => c.high);
-    const lows = view.map((c) => c.low);
+    const highs = view.map(c => c.high);
+    const lows = view.map(c => c.low);
     const maxP = Math.max(...highs);
     const minP = Math.min(...lows);
 
@@ -415,118 +318,108 @@ export default function Trading() {
     const clean = (text || "").trim();
     if (!clean) return;
 
-    setMessages((prev) => [...prev, { from: "you", text: clean }]);
+    setMessages(prev => [...prev, { from: "you", text: clean }]);
 
     const base = apiBase();
     if (!base) {
-      setMessages((prev) => [...prev, { from: "ai", text: "Backend URL missing. Set VITE_API_BASE on Vercel." }]);
+      setMessages(prev => [...prev, { from: "ai", text: "Backend URL missing. Set VITE_API_BASE on Vercel." }]);
       return;
     }
 
     try {
+      const backendSymbol = UI_TO_BACKEND[symbol] || symbol;
+
       const context = {
-        symbol,
+        symbol: backendSymbol,
+        uiSymbol: symbol,
         mode,
         last,
-        market: lastBySym,
         paper: {
           running: paper.running,
           balance: paper.balance,
           pnl: paper.pnl,
           tradesCount: paper.trades?.length || 0,
-          ticksSeen: paper.learnStats?.ticksSeen ?? 0,
-          confidence: paper.learnStats?.confidence ?? 0,
-          decision: paper.learnStats?.decision ?? "WAIT",
-          decisionReason: paper.learnStats?.lastReason ?? "—",
-        },
-        live,
+          ticksSeen: paper.learnStats?.ticksSeen,
+          confidence: paper.learnStats?.confidence,
+          decision: paper.learnStats?.decision,
+          decisionReason: paper.learnStats?.lastReason,
+        }
       };
 
       const res = await fetch(`${base}/api/ai/chat`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeaders() },
+        headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ message: clean, context }),
+        body: JSON.stringify({ message: clean, context })
       });
 
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         const msg = data?.error || data?.message || `HTTP ${res.status}`;
-        setMessages((prev) => [...prev, { from: "ai", text: "AI error: " + msg }]);
+        setMessages(prev => [...prev, { from: "ai", text: "AI error: " + msg }]);
         return;
       }
 
-      setMessages((prev) => [...prev, { from: "ai", text: data?.reply ?? "(No reply from AutoProtect)" }]);
+      const reply = data?.reply ?? "(No reply from AI)";
+      setMessages(prev => [...prev, { from: "ai", text: reply }]);
     } catch {
-      setMessages((prev) => [...prev, { from: "ai", text: "Network error talking to AI backend." }]);
+      setMessages(prev => [...prev, { from: "ai", text: "Network error talking to AI backend." }]);
     }
   }
+
+  const showRightPanel = showAI && !wideChart;
 
   const ticksSeen = paper.learnStats?.ticksSeen ?? 0;
   const conf = paper.learnStats?.confidence ?? 0;
   const decision = paper.learnStats?.decision ?? "WAIT";
   const reason = paper.learnStats?.lastReason ?? "—";
-  const showRightPanel = showAI && !wideChart;
-
-  const marketRows = [
-    ["BTC", "BTCUSDT"],
-    ["ETH", "ETHUSDT"],
-    ["SOL", "SOLUSDT"],
-    ["LTC", "LTCUSDT"],
-    ["BCH", "BCHUSDT"],
-    ["XRP", "XRPUSDT"],
-    ["ADA", "ADAUSDT"],
-    ["DOGE", "DOGEUSDT"],
-    ["DOT", "DOTUSDT"],
-    ["LINK", "LINKUSDT"],
-  ];
 
   return (
     <div className="tradeWrap">
       <div className="card">
-        <div className="tradeTop" style={{ alignItems: "flex-start" }}>
-          <div style={{ minWidth: 240 }}>
-            <h2 style={{ margin: 0 }}>Trading Room</h2>
-            <small className="muted">
-              Market Watch (10) • Live chart • Paper learning • AI voice console
-            </small>
+        <div className="tradeTop">
+          <div>
+            <h2 style={{ margin: 0 }}>Trading Terminal</h2>
+            <small className="muted">10-coin live feed + paper learning. AutoProtect can reference the selected symbol.</small>
           </div>
 
-          <div className="actions" style={{ flex: 1 }}>
-            <div className="pill" style={{ minWidth: 210 }}>
+          <div className="actions">
+            <div className="pill">
               <small>Mode</small>
               <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
                 <button className={mode === "Live" ? "active" : ""} onClick={() => setMode("Live")}>Live</button>
                 <button className={mode === "Paper" ? "active" : ""} onClick={() => setMode("Paper")}>Paper</button>
               </div>
-              <small className="muted" style={{ display: "block", marginTop: 6 }}>
-                Feed: <b style={{ whiteSpace: "nowrap" }}>{feedStatus}</b>
-              </small>
             </div>
 
-            <div className="pill" style={{ minWidth: 210 }}>
-              <small>Chart Symbol</small>
+            <div className="pill">
+              <small>Symbol</small>
               <select value={symbol} onChange={(e) => setSymbol(e.target.value)} style={{ marginTop: 6 }}>
-                {UI_SYMBOLS.map((s) => <option key={s} value={s}>{s}</option>)}
+                {UI_SYMBOLS.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
-              <small className="muted" style={{ display: "block", marginTop: 6 }}>
-                Now: <b>${fmtCompact(last, 2)}</b>
-              </small>
             </div>
 
-            <div className="pill" style={{ minWidth: 260 }}>
+            <div className="pill">
+              <small>Feed</small>
+              <div style={{ marginTop: 6, fontWeight: 800, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
+                {feedStatus}
+              </div>
+              <small className="muted">Last: {fmtCompact(last, 2)}</small>
+            </div>
+
+            <div className="pill">
               <small>Panels</small>
               <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
-                <button className={showMoney ? "active" : ""} onClick={() => setShowMoney((v) => !v)} style={{ width: "auto" }}>
+                <button className={showMoney ? "active" : ""} onClick={() => setShowMoney(v => !v)} style={{ width: "auto" }}>
                   Money
                 </button>
-                <button className={showTradeLog ? "active" : ""} onClick={() => setShowTradeLog((v) => !v)} style={{ width: "auto" }}>
+                <button className={showTradeLog ? "active" : ""} onClick={() => setShowTradeLog(v => !v)} style={{ width: "auto" }}>
                   Log
                 </button>
-                <button className={showAI ? "active" : ""} onClick={() => setShowAI((v) => !v)} style={{ width: "auto" }}>
+                <button className={showAI ? "active" : ""} onClick={() => setShowAI(v => !v)} style={{ width: "auto" }}>
                   AI
                 </button>
-                <button className={wideChart ? "active" : ""} onClick={() => setWideChart((v) => !v)} style={{ width: "auto" }}>
+                <button className={wideChart ? "active" : ""} onClick={() => setWideChart(v => !v)} style={{ width: "auto" }}>
                   Wide
                 </button>
               </div>
@@ -535,45 +428,15 @@ export default function Trading() {
         </div>
       </div>
 
-      <div
-        className="tradeGrid"
-        style={{
-          gridTemplateColumns: showRightPanel ? "1.7fr 1fr" : "1fr",
-          alignItems: "start"
-        }}
-      >
-        {/* LEFT */}
+      <div className="tradeGrid" style={{ gridTemplateColumns: showRightPanel ? "1.8fr 1fr" : "1fr" }}>
         <div className="card tradeChart">
-          {/* Market Watch */}
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
-            <b>Market Watch</b>
+            <b>{symbol}</b>
             <span className={`badge ${paper.running ? "ok" : ""}`}>Paper Trader: {paper.running ? "ON" : "OFF"}</span>
           </div>
 
-          <div className="tableWrap" style={{ marginTop: 10 }}>
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Coin</th>
-                  <th>Price (USD)</th>
-                  <th>Backend Symbol</th>
-                </tr>
-              </thead>
-              <tbody>
-                {marketRows.map(([label, sym]) => (
-                  <tr key={sym}>
-                    <td style={{ whiteSpace: "nowrap" }}><b>{label}</b></td>
-                    <td style={{ whiteSpace: "nowrap" }}>${fmtCompact(lastBySym[sym] ?? 0, 4)}</td>
-                    <td style={{ whiteSpace: "nowrap", opacity: 0.8 }}>{sym}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Learning strip */}
           <div style={{
-            marginTop: 12,
+            marginTop: 10,
             display: "grid",
             gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
             gap: 10
@@ -592,7 +455,7 @@ export default function Trading() {
             </div>
             <div className="kpiBox">
               <div className="kpiVal" title={reason} style={{ fontSize: 14 }}>
-                <span style={{ display: "block", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                <span style={{ display:"block", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
                   {reason}
                 </span>
               </div>
@@ -600,40 +463,29 @@ export default function Trading() {
             </div>
           </div>
 
-          {/* Money KPIs */}
           {showMoney && (
-            <div className="kpi" style={{ marginTop: 12 }}>
+            <div className="kpi">
               <div>
-                <b style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                  ${fmtCompact(paper.balance || 0, 2)}
-                </b>
+                <b>${fmtCompact(paper.balance || 0, 2)}</b>
                 <span>Paper Balance</span>
               </div>
               <div>
-                <b style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                  ${fmtCompact(paper.pnl || 0, 2)}
-                </b>
+                <b>${fmtCompact(paper.pnl || 0, 2)}</b>
                 <span>P / L</span>
               </div>
               <div>
-                <b style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                  {fmtCompact(paper.trades?.length || 0, 0)}
-                </b>
+                <b>{fmtCompact(paper.trades?.length || 0, 0)}</b>
                 <span>Recent Trades</span>
               </div>
               <div>
-                <b style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                  {paperStatus}
-                </b>
+                <b style={{ whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{paperStatus}</b>
                 <span>Status</span>
               </div>
             </div>
           )}
 
-          {/* Chart */}
-          <div style={{ marginTop: 12, height: 560 }}>
+          <div style={{ marginTop: 12, height: 520 }}>
             <canvas
-              ref={canvasRef}
               style={{
                 width: "100%",
                 height: "100%",
@@ -641,12 +493,12 @@ export default function Trading() {
                 border: "1px solid rgba(255,255,255,0.10)",
                 background: "rgba(0,0,0,0.20)"
               }}
+              ref={canvasRef}
             />
           </div>
 
-          {/* Trade Log */}
           {showTradeLog && (
-            <div style={{ marginTop: 14 }}>
+            <div style={{ marginTop: 12 }}>
               <b>Trade Log</b>
               <div className="tableWrap">
                 <table className="table">
@@ -660,21 +512,17 @@ export default function Trading() {
                     </tr>
                   </thead>
                   <tbody>
-                    {(paper.trades || []).slice().reverse().slice(0, 12).map((t, i) => (
+                    {(paper.trades || []).slice().reverse().slice(0, 10).map((t, i) => (
                       <tr key={i}>
-                        <td style={{ whiteSpace: "nowrap" }}>{new Date(t.time).toLocaleTimeString()}</td>
-                        <td style={{ whiteSpace: "nowrap" }}>{t.symbol || "—"}</td>
-                        <td style={{ whiteSpace: "nowrap" }}>{t.type}</td>
-                        <td style={{ whiteSpace: "nowrap" }}>{fmtNum(t.price, 2)}</td>
-                        <td style={{ whiteSpace: "nowrap" }}>
-                          {t.profit !== undefined ? fmtNum(t.profit, 2) : "-"}
-                        </td>
+                        <td>{new Date(t.time).toLocaleTimeString()}</td>
+                        <td>{t.symbol}</td>
+                        <td>{t.type}</td>
+                        <td>{fmtNum(t.price, 4)}</td>
+                        <td>{t.profit !== undefined ? fmtNum(t.profit, 2) : "-"}</td>
                       </tr>
                     ))}
                     {(!paper.trades || paper.trades.length === 0) && (
-                      <tr>
-                        <td colSpan="5" className="muted">No trades yet (it’s learning)</td>
-                      </tr>
+                      <tr><td colSpan="5" className="muted">No trades yet (it’s learning)</td></tr>
                     )}
                   </tbody>
                 </table>
@@ -683,32 +531,21 @@ export default function Trading() {
           )}
         </div>
 
-        {/* RIGHT */}
         {showRightPanel && (
           <div className="card tradeAI">
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
               <div>
-                <b>AutoProtect Console</b>
+                <b>AI Panel</b>
                 <div className="muted" style={{ fontSize: 12 }}>
-                  Chat + Voice while it learns
+                  Ask about the selected symbol • Paper trades • Risk rules
                 </div>
               </div>
-            </div>
-
-            <div className="pill" style={{ marginTop: 12 }}>
-              <small className="muted">
-                Live readiness: <b>{liveStatus}</b>{" "}
-                {live?.keys ? `• Keys: ${live.keys}` : ""}
-              </small>
-              {live?.note ? <div className="muted" style={{ marginTop: 8 }}>{live.note}</div> : null}
             </div>
 
             <div className="chatLog" ref={logRef} style={{ marginTop: 12 }}>
               {messages.map((m, idx) => (
                 <div key={idx} className={`chatMsg ${m.from === "you" ? "you" : "ai"}`}>
-                  <b style={{ display: "block", marginBottom: 4 }}>
-                    {m.from === "you" ? "You" : "AutoProtect"}
-                  </b>
+                  <b style={{ display: "block", marginBottom: 4 }}>{m.from === "you" ? "You" : "AutoProtect"}</b>
                   <div>{m.text}</div>
                 </div>
               ))}
@@ -718,7 +555,7 @@ export default function Trading() {
               <input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="Ask about market moves, confidence, risk rules…"
+                placeholder="Ask about SOL, BTC, ETH… risk rules…"
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
                     sendToAI(input);
@@ -730,64 +567,3 @@ export default function Trading() {
                 Send
               </button>
             </div>
-
-            <div style={{ marginTop: 12 }}>
-              <VoiceAI
-                title="AutoProtect Voice"
-                endpoint="/api/ai/chat"
-                getContext={() => ({
-                  symbol,
-                  mode,
-                  last,
-                  market: lastBySym,
-                  paper: {
-                    running: paper.running,
-                    balance: paper.balance,
-                    pnl: paper.pnl,
-                    tradesCount: paper.trades?.length || 0,
-                    ticksSeen,
-                    confidence: conf,
-                    decision,
-                    decisionReason: reason,
-                  },
-                  live,
-                })}
-              />
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Local styles for tight numbers + phone fit */}
-      <style>{`
-        .kpiBox{
-          background: rgba(255,255,255,0.04);
-          border: 1px solid rgba(255,255,255,0.08);
-          border-radius: 12px;
-          padding: 12px;
-          min-width: 0;
-        }
-        .kpiVal{
-          font-size: 20px;
-          font-weight: 800;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-        }
-        .kpiLbl{
-          font-size: 12px;
-          opacity: .8;
-          margin-top: 4px;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-        }
-        @media (max-width: 520px){
-          .kpi{
-            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-          }
-        }
-      `}</style>
-    </div>
-  );
-}
