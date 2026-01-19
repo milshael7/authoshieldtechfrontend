@@ -1,19 +1,4 @@
-Bet — resend your current trading.jsx and I’ll finish it clean.
-
-But so you don’t have to wait on me to “guess” what you already changed, here’s what I’m gonna do the right way:
-	1.	You paste your current trading.jsx (exactly what’s in GitHub right now).
-	2.	I’ll send you back ONE full finished trading.jsx you can replace بالكامل (no small edits).
-
-In the meantime (so you can see what “finished” looks like), here’s the completed Trading.jsx version that includes:
-	•	✅ Paper stats + learning stats (ticks/confidence/decision/reason)
-	•	✅ Market WS feed
-	•	✅ AI chat + VoiceAI
-	•	✅ Stage C Live Trading panel (status + toggle mode + dry-run + arm/disarm + test order)
-	•	✅ Fixes the “invalid token” pain by attaching a token if you have one saved
-
-✅ FULL src/pages/trading.jsx (replace whole file)
-
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import VoiceAI from "../components/VoiceAI";
 
 function clamp(n, a, b) {
@@ -21,12 +6,10 @@ function clamp(n, a, b) {
 }
 
 function apiBase() {
-  return (
-    (import.meta.env.VITE_API_BASE || import.meta.env.VITE_BACKEND_URL || "").trim()
-  );
+  return (import.meta.env.VITE_API_BASE || import.meta.env.VITE_BACKEND_URL || "").trim();
 }
 
-// ---- auth helpers (prevents "invalid token" if your backend expects auth) ----
+// ---- auth helpers (optional; prevents "invalid token" issues if some endpoints are protected) ----
 function getToken() {
   try {
     return (
@@ -39,23 +22,20 @@ function getToken() {
     return "";
   }
 }
-
 function authHeaders(extra = {}) {
   const t = getToken();
   return {
-    "Content-Type": "application/json",
     ...(t ? { Authorization: `Bearer ${t}` } : {}),
-    ...extra
+    ...extra,
   };
 }
 
-// ---- number formatting ----
+// ---- formatting ----
 function fmtNum(n, digits = 2) {
   const x = Number(n);
   if (!Number.isFinite(x)) return "—";
   return x.toLocaleString(undefined, { maximumFractionDigits: digits });
 }
-
 function fmtCompact(n, digits = 2) {
   const x = Number(n);
   if (!Number.isFinite(x)) return "—";
@@ -66,7 +46,6 @@ function fmtCompact(n, digits = 2) {
   if (ax >= 1e3) return (x / 1e3).toFixed(digits) + "k";
   return fmtNum(x, digits);
 }
-
 function pct(n, digits = 0) {
   const x = Number(n);
   if (!Number.isFinite(x)) return "—";
@@ -79,15 +58,21 @@ export default function Trading({ user }) {
 
   const [symbol, setSymbol] = useState("BTCUSD");
   const [mode, setMode] = useState("Paper");
+
+  // Market watch (last prices)
+  const [lastBySym, setLastBySym] = useState({ BTCUSDT: null, ETHUSDT: null });
   const [feedStatus, setFeedStatus] = useState("Connecting…");
+
+  // Chart price
   const [last, setLast] = useState(65300);
 
+  // Panels
   const [showMoney, setShowMoney] = useState(true);
   const [showTradeLog, setShowTradeLog] = useState(true);
   const [showAI, setShowAI] = useState(true);
   const [wideChart, setWideChart] = useState(false);
 
-  // ---- paper status ----
+  // Paper
   const [paper, setPaper] = useState({
     running: false,
     balance: 0,
@@ -100,27 +85,25 @@ export default function Trading({ user }) {
   });
   const [paperStatus, setPaperStatus] = useState("Loading…");
 
-  // ---- live status (Stage C) ----
+  // Live (optional: if backend has /api/live/status)
   const [live, setLive] = useState({
     ok: false,
-    enabled: false,
-    dryRun: true,
-    armed: false,
-    keysPresent: false,
     exchange: "kraken",
+    keys: "unknown",
+    liveTradingEnabled: false,
+    dryRun: true,
     note: "",
   });
   const [liveStatus, setLiveStatus] = useState("Loading…");
-  const [liveMsg, setLiveMsg] = useState("");
 
-  // ---- AI chat ----
-  const [messages, setMessages] = useState(() => ([
-    { from: "ai", text: "AutoProtect ready. Ask me about learning stats, paper trades, and risk rules." }
-  ]));
+  // AI Chat
+  const [messages, setMessages] = useState(() => [
+    { from: "ai", text: "AutoProtect ready. Ask about the market, learning stats, paper trades, or risk rules." }
+  ]);
   const [input, setInput] = useState("");
   const logRef = useRef(null);
 
-  // ---- chart ----
+  // Chart
   const canvasRef = useRef(null);
   const [candles, setCandles] = useState(() => {
     const base = 65300;
@@ -144,38 +127,48 @@ export default function Trading({ user }) {
     if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
   }, [messages]);
 
-  const applyTick = (price, nowMs) => {
-    setLast(Number(price.toFixed(2)));
+  const wantedBackendSymbol = useMemo(() => UI_TO_BACKEND[symbol] || symbol, [symbol]);
+
+  const applyTick = (backendSymbol, price, nowMs) => {
+    setLastBySym((prev) => ({ ...prev, [backendSymbol]: Number(price) }));
+
+    // Only drive chart candles for current symbol
+    if (backendSymbol !== wantedBackendSymbol) return;
+
+    const p = Number(price);
+    if (!Number.isFinite(p)) return;
+
+    setLast(Number(p.toFixed(2)));
     setCandles((prev) => {
       const bucketSec = 5;
-      const nowSec = Math.floor(nowMs / 1000);
+      const nowSec = Math.floor((nowMs || Date.now()) / 1000);
       const bucketTime = Math.floor(nowSec / bucketSec) * bucketSec;
 
       const next = [...prev];
       const lastC = next[next.length - 1];
 
       if (!lastC || lastC.time !== bucketTime) {
-        const o = lastC ? lastC.close : price;
+        const o = lastC ? lastC.close : p;
         next.push({
           time: bucketTime,
           open: o,
-          high: Math.max(o, price),
-          low: Math.min(o, price),
-          close: price
+          high: Math.max(o, p),
+          low: Math.min(o, p),
+          close: p
         });
-        while (next.length > 120) next.shift();
+        while (next.length > 140) next.shift();
         return next;
       }
 
-      lastC.high = Math.max(lastC.high, price);
-      lastC.low = Math.min(lastC.low, price);
-      lastC.close = price;
+      lastC.high = Math.max(lastC.high, p);
+      lastC.low = Math.min(lastC.low, p);
+      lastC.close = p;
       next[next.length - 1] = { ...lastC };
       return next;
     });
   };
 
-  // ---- WS market feed ----
+  // ---- WebSocket feed ----
   useEffect(() => {
     let ws;
     let fallbackTimer;
@@ -185,15 +178,16 @@ export default function Trading({ user }) {
       ? base.replace(/^https:\/\//i, "wss://").replace(/^http:\/\//i, "ws://")
       : "";
 
-    const wantedBackendSymbol = UI_TO_BACKEND[symbol] || symbol;
-
     const startFallback = () => {
       setFeedStatus("Disconnected (demo fallback)");
-      let price = last || (symbol === "ETHUSD" ? 3500 : 65300);
+      let btc = lastBySym.BTCUSDT ?? 65300;
+      let eth = lastBySym.ETHUSDT ?? 3500;
+
       fallbackTimer = setInterval(() => {
-        const delta = (Math.random() - 0.5) * (symbol === "ETHUSD" ? 6 : 40);
-        price = Math.max(1, price + delta);
-        applyTick(price, Date.now());
+        btc = Math.max(1, btc + (Math.random() - 0.5) * 40);
+        eth = Math.max(1, eth + (Math.random() - 0.5) * 6);
+        applyTick("BTCUSDT", btc, Date.now());
+        applyTick("ETHUSDT", eth, Date.now());
       }, 900);
     };
 
@@ -205,6 +199,7 @@ export default function Trading({ user }) {
 
       setFeedStatus("Connecting…");
       ws = new WebSocket(`${wsBase}/ws/market`);
+
       ws.onopen = () => setFeedStatus("Connected");
       ws.onclose = () => startFallback();
       ws.onerror = () => startFallback();
@@ -212,8 +207,13 @@ export default function Trading({ user }) {
       ws.onmessage = (e) => {
         try {
           const msg = JSON.parse(e.data);
-          if (msg?.type === "tick" && msg.symbol === wantedBackendSymbol) {
-            applyTick(Number(msg.price), Number(msg.ts || Date.now()));
+          if (msg?.type === "hello" && msg?.last) {
+            const l = msg.last || {};
+            if (l.BTCUSDT) applyTick("BTCUSDT", Number(l.BTCUSDT), Date.now());
+            if (l.ETHUSDT) applyTick("ETHUSDT", Number(l.ETHUSDT), Date.now());
+          }
+          if (msg?.type === "tick" && msg.symbol && msg.price) {
+            applyTick(String(msg.symbol), Number(msg.price), Number(msg.ts || Date.now()));
           }
         } catch {}
       };
@@ -226,9 +226,9 @@ export default function Trading({ user }) {
       clearInterval(fallbackTimer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [symbol]);
+  }, [wantedBackendSymbol]);
 
-  // ---- paper status polling ----
+  // ---- Paper status polling ----
   useEffect(() => {
     let t;
     const base = apiBase();
@@ -240,8 +240,7 @@ export default function Trading({ user }) {
     const fetchStatus = async () => {
       try {
         const res = await fetch(`${base}/api/paper/status`, {
-          headers: authHeaders(),
-          // keep cookies if you use them; harmless otherwise
+          headers: { ...authHeaders() },
           credentials: "include",
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -258,7 +257,7 @@ export default function Trading({ user }) {
     return () => clearInterval(t);
   }, []);
 
-  // ---- live status polling (Stage C) ----
+  // ---- Live status polling (optional) ----
   useEffect(() => {
     let t;
     const base = apiBase();
@@ -270,25 +269,31 @@ export default function Trading({ user }) {
     const fetchLive = async () => {
       try {
         const res = await fetch(`${base}/api/live/status`, {
-          headers: authHeaders(),
+          headers: { ...authHeaders() },
           credentials: "include",
         });
+
+        // If route doesn't exist yet, don't break the whole page
+        if (res.status === 404) {
+          setLiveStatus("Not installed");
+          return;
+        }
+
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
-        setLive({ ...live, ...data });
+        setLive(data || {});
         setLiveStatus("OK");
-      } catch (e) {
-        setLiveStatus("Error loading live status");
+      } catch {
+        setLiveStatus("Error");
       }
     };
 
     fetchLive();
-    t = setInterval(fetchLive, 4000);
+    t = setInterval(fetchLive, 5000);
     return () => clearInterval(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ---- draw candles ----
+  // ---- Draw candles ----
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -316,11 +321,11 @@ export default function Trading({ user }) {
       ctx.stroke();
     }
 
-    const view = candles.slice(-80);
+    const view = candles.slice(-90);
     if (!view.length) return;
 
-    const highs = view.map(c => c.high);
-    const lows = view.map(c => c.low);
+    const highs = view.map((c) => c.high);
+    const lows = view.map((c) => c.low);
     const maxP = Math.max(...highs);
     const minP = Math.min(...lows);
 
@@ -372,16 +377,16 @@ export default function Trading({ user }) {
     ctx.setLineDash([]);
   }, [candles, last]);
 
-  // ---- AI chat (backend) ----
+  // ---- AI chat ----
   async function sendToAI(text) {
     const clean = (text || "").trim();
     if (!clean) return;
 
-    setMessages(prev => [...prev, { from: "you", text: clean }]);
+    setMessages((prev) => [...prev, { from: "you", text: clean }]);
 
     const base = apiBase();
     if (!base) {
-      setMessages(prev => [...prev, { from: "ai", text: "Backend URL missing. Set VITE_API_BASE on Vercel." }]);
+      setMessages((prev) => [...prev, { from: "ai", text: "Backend URL missing. Set VITE_API_BASE on Vercel." }]);
       return;
     }
 
@@ -395,116 +400,98 @@ export default function Trading({ user }) {
           balance: paper.balance,
           pnl: paper.pnl,
           tradesCount: paper.trades?.length || 0,
-          ticksSeen: paper.learnStats?.ticksSeen ?? paper.ticksSeen ?? 0,
-          confidence: paper.learnStats?.confidence ?? paper.confidence ?? 0,
-          decision: paper.learnStats?.decision ?? paper.decision ?? "WAIT",
-          decisionReason: paper.learnStats?.lastReason ?? paper.decisionReason ?? "—",
+          ticksSeen: paper.learnStats?.ticksSeen ?? 0,
+          confidence: paper.learnStats?.confidence ?? 0,
+          decision: paper.learnStats?.decision ?? "WAIT",
+          decisionReason: paper.learnStats?.lastReason ?? "—",
         },
-        live: {
-          enabled: !!live.enabled,
-          dryRun: !!live.dryRun,
-          armed: !!live.armed,
-          keysPresent: !!live.keysPresent,
-        }
+        live: live || null,
       };
 
       const res = await fetch(`${base}/api/ai/chat`, {
         method: "POST",
-        headers: authHeaders(),
+        headers: {
+          "Content-Type": "application/json",
+          ...authHeaders(),
+        },
         credentials: "include",
-        body: JSON.stringify({ message: clean, context })
+        body: JSON.stringify({ message: clean, context }),
       });
 
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         const msg = data?.error || data?.message || `HTTP ${res.status}`;
-        setMessages(prev => [...prev, { from: "ai", text: "AI error: " + msg }]);
+        setMessages((prev) => [...prev, { from: "ai", text: "AI error: " + msg }]);
         return;
       }
 
-      const reply = data?.reply ?? "(No reply from AI)";
-      setMessages(prev => [...prev, { from: "ai", text: reply }]);
+      const reply = data?.reply ?? "(No reply from AutoProtect)";
+      setMessages((prev) => [...prev, { from: "ai", text: reply }]);
     } catch {
-      setMessages(prev => [...prev, { from: "ai", text: "Network error talking to AI backend." }]);
+      setMessages((prev) => [...prev, { from: "ai", text: "Network error talking to AI backend." }]);
     }
   }
 
-  // ---- Live actions (Stage C) ----
-  async function liveAction(path, body = {}) {
-    const base = apiBase();
-    if (!base) return setLiveMsg("Missing VITE_API_BASE");
-    setLiveMsg("Working…");
-    try {
-      const res = await fetch(`${base}${path}`, {
-        method: "POST",
-        headers: authHeaders(),
-        credentials: "include",
-        body: JSON.stringify(body)
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setLiveMsg(data?.error || data?.message || `HTTP ${res.status}`);
-        return;
-      }
-      setLiveMsg(data?.message || "OK");
-    } catch {
-      setLiveMsg("Network error");
-    }
-  }
-
-  const showRightPanel = showAI && !wideChart;
-
+  // ---- derived stats ----
   const ticksSeen = paper.learnStats?.ticksSeen ?? 0;
   const conf = paper.learnStats?.confidence ?? 0;
   const decision = paper.learnStats?.decision ?? "WAIT";
   const reason = paper.learnStats?.lastReason ?? "—";
 
+  const showRightPanel = showAI && !wideChart;
+
+  // ---- UI helpers ----
+  const currentBackend = wantedBackendSymbol;
+  const btc = lastBySym.BTCUSDT;
+  const eth = lastBySym.ETHUSDT;
+
   return (
     <div className="tradeWrap">
+      {/* Top control bar */}
       <div className="card">
-        <div className="tradeTop">
-          <div>
-            <h2 style={{ margin: 0 }}>Trading Terminal</h2>
-            <small className="muted">Paper learning + Live readiness • everything visible, no guessing.</small>
+        <div className="tradeTop" style={{ alignItems: "flex-start" }}>
+          <div style={{ minWidth: 240 }}>
+            <h2 style={{ margin: 0 }}>Trading Room</h2>
+            <small className="muted">
+              Live market + learning stats + paper trading. Built to feel like a real terminal.
+            </small>
           </div>
 
-          <div className="actions">
-            <div className="pill">
+          <div className="actions" style={{ flex: 1 }}>
+            <div className="pill" style={{ minWidth: 210 }}>
               <small>Mode</small>
               <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
                 <button className={mode === "Live" ? "active" : ""} onClick={() => setMode("Live")}>Live</button>
                 <button className={mode === "Paper" ? "active" : ""} onClick={() => setMode("Paper")}>Paper</button>
               </div>
+              <small className="muted" style={{ display: "block", marginTop: 6 }}>
+                Feed: <b style={{ whiteSpace: "nowrap" }}>{feedStatus}</b>
+              </small>
             </div>
 
-            <div className="pill">
+            <div className="pill" style={{ minWidth: 210 }}>
               <small>Symbol</small>
               <select value={symbol} onChange={(e) => setSymbol(e.target.value)} style={{ marginTop: 6 }}>
-                {UI_SYMBOLS.map(s => <option key={s} value={s}>{s}</option>)}
+                {UI_SYMBOLS.map((s) => <option key={s} value={s}>{s}</option>)}
               </select>
+              <small className="muted" style={{ display: "block", marginTop: 6 }}>
+                Now: <b>${fmtCompact(last, 2)}</b>
+              </small>
             </div>
 
-            <div className="pill">
-              <small>Feed</small>
-              <div style={{ marginTop: 6, fontWeight: 800, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
-                {feedStatus}
-              </div>
-              <small className="muted">Last: {fmtCompact(last, 2)}</small>
-            </div>
-
-            <div className="pill">
+            <div className="pill" style={{ minWidth: 260 }}>
               <small>Panels</small>
               <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
-                <button className={showMoney ? "active" : ""} onClick={() => setShowMoney(v => !v)} style={{ width: "auto" }}>
+                <button className={showMoney ? "active" : ""} onClick={() => setShowMoney((v) => !v)} style={{ width: "auto" }}>
                   Money
                 </button>
-                <button className={showTradeLog ? "active" : ""} onClick={() => setShowTradeLog(v => !v)} style={{ width: "auto" }}>
+                <button className={showTradeLog ? "active" : ""} onClick={() => setShowTradeLog((v) => !v)} style={{ width: "auto" }}>
                   Log
                 </button>
-                <button className={showAI ? "active" : ""} onClick={() => setShowAI(v => !v)} style={{ width: "auto" }}>
+                <button className={showAI ? "active" : ""} onClick={() => setShowAI((v) => !v)} style={{ width: "auto" }}>
                   AI
                 </button>
-                <button className={wideChart ? "active" : ""} onClick={() => setWideChart(v => !v)} style={{ width: "auto" }}>
+                <button className={wideChart ? "active" : ""} onClick={() => setWideChart((v) => !v)} style={{ width: "auto" }}>
                   Wide
                 </button>
               </div>
@@ -513,17 +500,61 @@ export default function Trading({ user }) {
         </div>
       </div>
 
-      <div className="tradeGrid" style={{ gridTemplateColumns: showRightPanel ? "1.8fr 1fr" : "1fr" }}>
-        {/* LEFT */}
+      {/* Main grid */}
+      <div
+        className="tradeGrid"
+        style={{
+          gridTemplateColumns: showRightPanel ? "1.7fr 1fr" : "1fr",
+          alignItems: "start"
+        }}
+      >
+        {/* LEFT: Market Watch + Chart + Stats */}
         <div className="card tradeChart">
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
-            <b>{symbol}</b>
-            <span className={`badge ${paper.running ? "ok" : ""}`}>Paper Trader: {paper.running ? "ON" : "OFF"}</span>
+          {/* Market Watch */}
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+            gap: 10,
+            marginBottom: 12
+          }}>
+            <div className="kpiBox">
+              <div className="kpiLbl">Market Watch</div>
+              <div className="kpiVal" style={{ fontSize: 14, marginTop: 6 }}>
+                <span style={{ display: "block", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  BTC: ${fmtCompact(btc ?? 0, 2)}
+                </span>
+                <span style={{ display: "block", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  ETH: ${fmtCompact(eth ?? 0, 2)}
+                </span>
+              </div>
+            </div>
+
+            <div className="kpiBox">
+              <div className="kpiLbl">Focus</div>
+              <div className="kpiVal" style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                {currentBackend}
+              </div>
+              <div className="kpiLbl" style={{ marginTop: 6 }}>
+                Paper Trader: <b>{paper.running ? "ON" : "OFF"}</b>
+              </div>
+            </div>
+
+            <div className="kpiBox">
+              <div className="kpiLbl">Live Readiness</div>
+              <div className="kpiVal" style={{ fontSize: 14 }}>
+                <span style={{ display: "block" }}>
+                  Status: <b>{liveStatus}</b>
+                </span>
+                <span style={{ display: "block", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  Keys: <b>{String(live?.keys || live?.keysPresent || "unknown")}</b>
+                </span>
+              </div>
+            </div>
           </div>
 
           {/* Learning strip */}
           <div style={{
-            marginTop: 10,
+            marginTop: 2,
             display: "grid",
             gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
             gap: 10
@@ -542,7 +573,7 @@ export default function Trading({ user }) {
             </div>
             <div className="kpiBox">
               <div className="kpiVal" title={reason} style={{ fontSize: 14 }}>
-                <span style={{ display:"block", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
+                <span style={{ display: "block", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                   {reason}
                 </span>
               </div>
@@ -550,28 +581,38 @@ export default function Trading({ user }) {
             </div>
           </div>
 
+          {/* Money KPIs */}
           {showMoney && (
-            <div className="kpi">
+            <div className="kpi" style={{ marginTop: 12 }}>
               <div>
-                <b>${fmtCompact(paper.balance || 0, 2)}</b>
+                <b style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  ${fmtCompact(paper.balance || 0, 2)}
+                </b>
                 <span>Paper Balance</span>
               </div>
               <div>
-                <b>${fmtCompact(paper.pnl || 0, 2)}</b>
+                <b style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  ${fmtCompact(paper.pnl || 0, 2)}
+                </b>
                 <span>P / L</span>
               </div>
               <div>
-                <b>{fmtCompact(paper.trades?.length || 0, 0)}</b>
+                <b style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  {fmtCompact(paper.trades?.length || 0, 0)}
+                </b>
                 <span>Recent Trades</span>
               </div>
               <div>
-                <b style={{ whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{paperStatus}</b>
+                <b style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  {paperStatus}
+                </b>
                 <span>Status</span>
               </div>
             </div>
           )}
 
-          <div style={{ marginTop: 12, height: 520 }}>
+          {/* Chart */}
+          <div style={{ marginTop: 12, height: 560 }}>
             <canvas
               ref={canvasRef}
               style={{
@@ -584,30 +625,37 @@ export default function Trading({ user }) {
             />
           </div>
 
+          {/* Trade Log */}
           {showTradeLog && (
-            <div style={{ marginTop: 12 }}>
+            <div style={{ marginTop: 14 }}>
               <b>Trade Log</b>
               <div className="tableWrap">
                 <table className="table">
                   <thead>
                     <tr>
                       <th>Time</th>
+                      <th>Symbol</th>
                       <th>Type</th>
                       <th>Price</th>
                       <th>Profit</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {(paper.trades || []).slice().reverse().slice(0, 10).map((t, i) => (
+                    {(paper.trades || []).slice().reverse().slice(0, 12).map((t, i) => (
                       <tr key={i}>
-                        <td>{new Date(t.time).toLocaleTimeString()}</td>
-                        <td>{t.type}</td>
-                        <td>{fmtNum(t.price, 2)}</td>
-                        <td>{t.profit !== undefined ? fmtNum(t.profit, 2) : "-"}</td>
+                        <td style={{ whiteSpace: "nowrap" }}>{new Date(t.time).toLocaleTimeString()}</td>
+                        <td style={{ whiteSpace: "nowrap" }}>{t.symbol || "—"}</td>
+                        <td style={{ whiteSpace: "nowrap" }}>{t.type}</td>
+                        <td style={{ whiteSpace: "nowrap" }}>{fmtNum(t.price, 2)}</td>
+                        <td style={{ whiteSpace: "nowrap" }}>
+                          {t.profit !== undefined ? fmtNum(t.profit, 2) : "-"}
+                        </td>
                       </tr>
                     ))}
                     {(!paper.trades || paper.trades.length === 0) && (
-                      <tr><td colSpan="4" className="muted">No trades yet (it’s learning)</td></tr>
+                      <tr>
+                        <td colSpan="5" className="muted">No trades yet (it’s learning)</td>
+                      </tr>
                     )}
                   </tbody>
                 </table>
@@ -616,68 +664,115 @@ export default function Trading({ user }) {
           )}
         </div>
 
-        {/* RIGHT */}
+        {/* RIGHT: AI + Voice (and later we can add order ticket UI here) */}
         {showRightPanel && (
           <div className="card tradeAI">
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
               <div>
-                <b>AI Panel</b>
+                <b>AutoProtect Console</b>
                 <div className="muted" style={{ fontSize: 12 }}>
-                  Chat + Voice + Live control panel (Stage C)
+                  Chat + Voice + guidance while it learns
                 </div>
               </div>
-            </div>
-
-            {/* LIVE panel (Stage C) */}
-            <div style={{ marginTop: 12 }} className="pill">
-              <div style={{ display:"flex", justifyContent:"space-between", gap:10, alignItems:"center" }}>
-                <b>Live Trading</b>
-                <span className={`badge ${live.keysPresent ? "ok" : "warn"}`}>
-                  Keys: {live.keysPresent ? "Present" : "Missing"}
-                </span>
-              </div>
-
-              <div style={{ marginTop: 8, fontSize: 13, opacity: .9 }}>
-                <div>Status: <b>{liveStatus}</b></div>
-                <div>Enabled: <b>{String(!!live.enabled)}</b> • Dry-run: <b>{String(!!live.dryRun)}</b> • Armed: <b>{String(!!live.armed)}</b></div>
-                {live.note ? <div className="muted">{live.note}</div> : null}
-              </div>
-
-              <div style={{ display:"flex", gap:8, flexWrap:"wrap", marginTop:10 }}>
-                <button style={{ width:"auto" }} onClick={() => liveAction("/api/live/mode", { enabled: true })}>
-                  Enable Live
-                </button>
-                <button style={{ width:"auto" }} onClick={() => liveAction("/api/live/mode", { enabled: false })}>
-                  Disable Live
-                </button>
-                <button style={{ width:"auto" }} onClick={() => liveAction("/api/live/dryrun", { dryRun: true })}>
-                  Dry-run ON
-                </button>
-                <button style={{ width:"auto" }} onClick={() => liveAction("/api/live/dryrun", { dryRun: false })}>
-                  Dry-run OFF
-                </button>
-                <button style={{ width:"auto" }} onClick={() => liveAction("/api/live/arm", { armed: true })}>
-                  ARM
-                </button>
-                <button style={{ width:"auto" }} onClick={() => liveAction("/api/live/arm", { armed: false })}>
-                  DISARM
-                </button>
-                <button
-                  style={{ width:"auto" }}
-                  onClick={() => liveAction("/api/live/order", {
-                    symbol: UI_TO_BACKEND[symbol] || symbol,
-                    side: "BUY",
-                    usd: 50
-                  })}
-                >
-                  Test Buy $50
-                </button>
-              </div>
-
-              {liveMsg ? <div className="muted" style={{ marginTop: 8 }}>{liveMsg}</div> : null}
             </div>
 
             <div className="chatLog" ref={logRef} style={{ marginTop: 12 }}>
               {messages.map((m, idx) => (
                 <div key={idx} className={`chatMsg ${m.from === "you" ? "you" : "ai"}`}>
-                  <b style={{ display: "block", marginBottom: 4 }}>{m.from === "you
+                  <b style={{ display: "block", marginBottom: 4 }}>
+                    {m.from === "you" ? "You" : "AutoProtect"}
+                  </b>
+                  <div>{m.text}</div>
+                </div>
+              ))}
+            </div>
+
+            <div className="chatBox">
+              <input
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder="Ask about market moves, confidence, risk rules…"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    sendToAI(input);
+                    setInput("");
+                  }
+                }}
+              />
+              <button style={{ width: 130 }} onClick={() => { sendToAI(input); setInput(""); }}>
+                Send
+              </button>
+            </div>
+
+            <div style={{ marginTop: 12 }}>
+              <VoiceAI
+                title="AutoProtect Voice"
+                endpoint="/api/ai/chat"
+                getContext={() => ({
+                  symbol,
+                  mode,
+                  last,
+                  paper: {
+                    running: paper.running,
+                    balance: paper.balance,
+                    pnl: paper.pnl,
+                    tradesCount: paper.trades?.length || 0,
+                    ticksSeen,
+                    confidence: conf,
+                    decision,
+                    decisionReason: reason,
+                  },
+                  live,
+                })}
+              />
+            </div>
+
+            {/* Small live note */}
+            <div className="pill" style={{ marginTop: 12 }}>
+              <small className="muted">
+                Live trading setup: keys stay on Kraken. Your platform can only read status + (later) place orders when you unlock it.
+              </small>
+              {live?.note ? <div className="muted" style={{ marginTop: 8 }}>{live.note}</div> : null}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Local styles (keeps it looking good even on phone) */}
+      <style>{`
+        .kpiBox{
+          background: rgba(255,255,255,0.04);
+          border: 1px solid rgba(255,255,255,0.08);
+          border-radius: 12px;
+          padding: 12px;
+          min-width: 0;
+        }
+        .kpiVal{
+          font-size: 20px;
+          font-weight: 800;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .kpiLbl{
+          font-size: 12px;
+          opacity: .8;
+          margin-top: 4px;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        @media (max-width: 980px){
+          .tradeTop { align-items: stretch !important; }
+          .actions { width: 100%; }
+        }
+        @media (max-width: 520px){
+          .kpi{
+            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+          }
+        }
+      `}</style>
+    </div>
+  );
+}
