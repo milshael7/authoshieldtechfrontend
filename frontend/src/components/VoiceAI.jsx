@@ -13,27 +13,10 @@ function pickProfessionalVoices(voices) {
   const by = (pred) => list.find(pred);
 
   const candidates = [
-    {
-      id: "pro_us_female",
-      label: "Professional US (Female)",
-      match: (v) =>
-        /en-US/i.test(v.lang) && /Samantha|Aria|Jenny|Zira|Google US English/i.test(v.name),
-    },
-    {
-      id: "pro_us_male",
-      label: "Professional US (Male)",
-      match: (v) =>
-        /en-US/i.test(v.lang) &&
-        /Guy|Davis|Matthew|Google US English/i.test(v.name) &&
-        /Male|Guy|Davis|Matthew/i.test(v.name),
-    },
+    { id: "pro_us_female", label: "Professional US (Female)", match: (v) => /en-US/i.test(v.lang) },
+    { id: "pro_us_male", label: "Professional US (Male)", match: (v) => /en-US/i.test(v.lang) },
     { id: "pro_uk", label: "Professional UK", match: (v) => /en-GB/i.test(v.lang) },
     { id: "neutral_en", label: "Neutral English", match: (v) => /^en/i.test(v.lang) },
-    {
-      id: "accessibility",
-      label: "Accessibility Voice",
-      match: (v) => /en/i.test(v.lang) && /compact|enhanced|premium/i.test(v.name),
-    },
   ];
 
   const resolved = candidates
@@ -55,30 +38,6 @@ function pickProfessionalVoices(voices) {
   return resolved;
 }
 
-// ✅ Token helpers (fixes "Invalid token")
-function getToken() {
-  try {
-    return (
-      window.localStorage.getItem("token") ||
-      window.localStorage.getItem("jwt") ||
-      window.localStorage.getItem("access_token") ||
-      window.localStorage.getItem("accessToken") ||
-      ""
-    );
-  } catch {
-    return "";
-  }
-}
-
-function authHeaders(extra = {}) {
-  const t = getToken();
-  return {
-    "Content-Type": "application/json",
-    ...(t ? { Authorization: `Bearer ${t}` } : {}),
-    ...extra,
-  };
-}
-
 export default function VoiceAI({
   endpoint = "/api/ai/chat",
   title = "AutoProtect Voice",
@@ -87,7 +46,8 @@ export default function VoiceAI({
   const API_BASE = useMemo(() => getApiBase(), []);
   const [supported, setSupported] = useState(true);
 
-  const [conversationMode, setConversationMode] = useState(false);
+  // ✅ default ON: hands-free by default
+  const [conversationMode, setConversationMode] = useState(true);
   const [voiceReply, setVoiceReply] = useState(true);
 
   const [voiceOptions, setVoiceOptions] = useState([]);
@@ -107,9 +67,13 @@ export default function VoiceAI({
   const lastSendRef = useRef("");
   const busyRef = useRef(false);
 
+  const userStoppedRef = useRef(false);
+  const shouldAutoRestartRef = useRef(true);
+
   const SpeechRecognition =
     window.SpeechRecognition || window.webkitSpeechRecognition;
 
+  // Load device voices
   useEffect(() => {
     if (!("speechSynthesis" in window)) return;
 
@@ -127,11 +91,14 @@ export default function VoiceAI({
     window.speechSynthesis.onvoiceschanged = load;
 
     return () => {
-      try { window.speechSynthesis.onvoiceschanged = null; } catch {}
+      try {
+        window.speechSynthesis.onvoiceschanged = null;
+      } catch {}
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Create recognition instance
   useEffect(() => {
     if (!SpeechRecognition) {
       setSupported(false);
@@ -153,6 +120,13 @@ export default function VoiceAI({
       setListening(false);
       setStatus("Mic error: " + (e?.error || "unknown"));
       clearTimeout(silenceTimerRef.current);
+
+      // ✅ mobile stability: auto restart
+      if (conversationMode && !userStoppedRef.current && shouldAutoRestartRef.current) {
+        setTimeout(() => {
+          try { rec.start(); } catch {}
+        }, 700);
+      }
     };
 
     rec.onend = () => {
@@ -160,14 +134,24 @@ export default function VoiceAI({
       clearTimeout(silenceTimerRef.current);
 
       if (!conversationMode) {
+        // push-to-talk: send on end
         const finalText = (bufferFinalRef.current + " " + interimRef.current).trim();
         bufferFinalRef.current = "";
         interimRef.current = "";
         setYouSaid(finalText || "");
         if (finalText) void sendToAI(finalText);
         setStatus("Idle");
+        return;
+      }
+
+      // ✅ conversation mode: auto restart unless user pressed Stop
+      if (conversationMode && !userStoppedRef.current && shouldAutoRestartRef.current) {
+        setStatus("Reconnecting mic…");
+        setTimeout(() => {
+          try { rec.start(); } catch {}
+        }, 450);
       } else {
-        setStatus("Conversation paused (tap Start to resume)");
+        setStatus("Conversation paused");
       }
     };
 
@@ -188,20 +172,23 @@ export default function VoiceAI({
       const combined = (finalText + interim).trim();
       setYouSaid(combined);
 
+      // ✅ hands-free: send after silence
       if (conversationMode) {
         clearTimeout(silenceTimerRef.current);
         silenceTimerRef.current = setTimeout(() => {
           const msg = (bufferFinalRef.current + " " + interimRef.current).trim();
           if (!msg) return;
           if (msg === lastSendRef.current) return;
+
           lastSendRef.current = msg;
 
+          // clear buffers for next sentence
           bufferFinalRef.current = "";
           interimRef.current = "";
-          setYouSaid(msg);
 
+          setYouSaid(msg);
           void sendToAI(msg);
-        }, 900);
+        }, 850);
       }
     };
 
@@ -211,9 +198,9 @@ export default function VoiceAI({
       try { rec.stop(); } catch {}
       clearTimeout(silenceTimerRef.current);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationMode]);
 
+  // Save voice choice
   useEffect(() => {
     try {
       window.localStorage.setItem("autoprotect_voice_choice", voiceChoice);
@@ -256,23 +243,26 @@ export default function VoiceAI({
 
     const payload = { message: clean, context: ctx };
 
+    // ✅ timeout guard
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 20000);
+
     try {
       const res = await fetch(API_BASE + endpoint, {
         method: "POST",
-        // ✅ THIS is the missing piece
-        headers: authHeaders(),
+        headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify(payload),
+        signal: controller.signal,
       });
 
       const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        const msg = data?.error || data?.message || data?.detail || `HTTP ${res.status}`;
+        const msg = data?.error || data?.message || `HTTP ${res.status}`;
         setAiSays(String(msg));
         setStatus("AI error");
         speak("AI error. " + String(msg));
-        busyRef.current = false;
         return;
       }
 
@@ -285,27 +275,29 @@ export default function VoiceAI({
         "";
 
       if (!text) {
-        setAiSays("(No reply from AI)");
+        setAiSays("(No reply from AutoProtect)");
         setStatus("Reply empty");
         speak("I did not receive a reply.");
-        busyRef.current = false;
         return;
       }
 
       setAiSays(text);
       setStatus("Reply ready");
       speak(text);
-    } catch {
-      setAiSays("Network error calling AI");
-      setStatus("Network error");
-      speak("Network error calling the AI.");
+    } catch (e) {
+      const msg = e?.name === "AbortError" ? "Request timeout" : "Network error";
+      setAiSays(msg);
+      setStatus(msg);
+      speak(msg);
     } finally {
+      clearTimeout(timeout);
       busyRef.current = false;
     }
   }
 
   function start() {
     if (!recRef.current) return;
+    userStoppedRef.current = false;
     try {
       bufferFinalRef.current = "";
       interimRef.current = "";
@@ -318,15 +310,14 @@ export default function VoiceAI({
 
   function stop() {
     if (!recRef.current) return;
+    userStoppedRef.current = true;
     try { recRef.current.stop(); } catch {}
   }
 
   if (!supported) {
     return (
       <div style={card}>
-        <div style={rowTop}>
-          <div style={titleStyle}>{title}</div>
-        </div>
+        <div style={rowTop}><div style={titleStyle}>{title}</div></div>
         <div style={{ opacity: 0.85 }}>{status}</div>
       </div>
     );
@@ -340,13 +331,7 @@ export default function VoiceAI({
       </div>
 
       <div style={controls}>
-        <button
-          onClick={() => {
-            if (listening) stop();
-            else start();
-          }}
-          style={btnPrimary}
-        >
+        <button onClick={() => (listening ? stop() : start())} style={btnPrimary}>
           {listening ? "Stop" : (conversationMode ? "Start Conversation" : "Push to Talk")}
         </button>
 
@@ -381,21 +366,11 @@ export default function VoiceAI({
             ))}
           </select>
 
-          <button
-            style={btnSmall}
-            onClick={() => speak("Voice preview. AutoProtect is ready.")}
-            type="button"
-          >
+          <button style={btnSmall} onClick={() => speak("Voice preview. AutoProtect is ready.")}>
             Preview
           </button>
         </div>
       </div>
-
-      {!getToken() ? (
-        <div style={{ marginTop: 8, fontSize: 12, opacity: 0.85 }}>
-          ⚠️ No token found in localStorage. Login first (token must be saved as <b>localStorage.token</b>).
-        </div>
-      ) : null}
 
       <div style={box}>
         <div style={boxLabel}>You said</div>
@@ -403,12 +378,12 @@ export default function VoiceAI({
       </div>
 
       <div style={box}>
-        <div style={boxLabel}>AI says</div>
+        <div style={boxLabel}>AutoProtect says</div>
         <div style={boxText}>{aiSays || "…"}</div>
       </div>
 
       <div style={{ fontSize: 12, opacity: 0.75, marginTop: 8 }}>
-        Tip: Turn on Conversation mode and just talk. When you stop speaking, AutoProtect replies automatically.
+        Tip: Leave Conversation mode ON. Talk normally. When you stop speaking, AutoProtect replies automatically.
       </div>
     </div>
   );
@@ -421,68 +396,13 @@ const card = {
   border: "1px solid rgba(255,255,255,0.10)",
   backdropFilter: "blur(8px)",
 };
-
-const rowTop = {
-  display: "flex",
-  justifyContent: "space-between",
-  alignItems: "center",
-  gap: 10,
-};
-
+const rowTop = { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 };
 const titleStyle = { fontWeight: 800, letterSpacing: 0.2 };
-
-const controls = {
-  display: "flex",
-  flexWrap: "wrap",
-  gap: 10,
-  marginTop: 10,
-  alignItems: "center",
-};
-
-const btnPrimary = {
-  padding: "10px 12px",
-  borderRadius: 10,
-  border: "1px solid rgba(255,255,255,0.18)",
-  background: "rgba(255,255,255,0.08)",
-  color: "white",
-  cursor: "pointer",
-  fontWeight: 800,
-};
-
-const btnSmall = {
-  padding: "8px 10px",
-  borderRadius: 10,
-  border: "1px solid rgba(255,255,255,0.18)",
-  background: "rgba(255,255,255,0.06)",
-  color: "white",
-  cursor: "pointer",
-  fontWeight: 700,
-};
-
-const toggle = {
-  display: "flex",
-  alignItems: "center",
-  gap: 6,
-  fontSize: 13,
-  opacity: 0.9,
-};
-
-const selectStyle = {
-  borderRadius: 10,
-  padding: "8px 10px",
-  border: "1px solid rgba(255,255,255,0.18)",
-  background: "rgba(0,0,0,0.25)",
-  color: "white",
-  outline: "none",
-};
-
-const box = {
-  marginTop: 10,
-  padding: 10,
-  borderRadius: 12,
-  border: "1px solid rgba(255,255,255,0.10)",
-  background: "rgba(0,0,0,0.25)",
-};
-
+const controls = { display: "flex", flexWrap: "wrap", gap: 10, marginTop: 10, alignItems: "center" };
+const btnPrimary = { padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.18)", background: "rgba(255,255,255,0.08)", color: "white", cursor: "pointer", fontWeight: 800 };
+const btnSmall = { padding: "8px 10px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.18)", background: "rgba(255,255,255,0.06)", color: "white", cursor: "pointer", fontWeight: 700 };
+const toggle = { display: "flex", alignItems: "center", gap: 6, fontSize: 13, opacity: 0.9 };
+const selectStyle = { borderRadius: 10, padding: "8px 10px", border: "1px solid rgba(255,255,255,0.18)", background: "rgba(0,0,0,0.25)", color: "white", outline: "none" };
+const box = { marginTop: 10, padding: 10, borderRadius: 12, border: "1px solid rgba(255,255,255,0.10)", background: "rgba(0,0,0,0.25)" };
 const boxLabel = { fontSize: 12, opacity: 0.75, marginBottom: 6 };
 const boxText = { whiteSpace: "pre-wrap", lineHeight: 1.35 };
