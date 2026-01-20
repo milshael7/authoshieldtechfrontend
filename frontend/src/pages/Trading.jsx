@@ -6,9 +6,7 @@ function clamp(n, a, b) {
 }
 
 function apiBase() {
-  return (
-    (import.meta.env.VITE_API_BASE || import.meta.env.VITE_BACKEND_URL || "").trim()
-  );
+  return (import.meta.env.VITE_API_BASE || import.meta.env.VITE_BACKEND_URL || "").trim();
 }
 
 function fmtNum(n, digits = 2) {
@@ -34,7 +32,7 @@ function pct(n, digits = 0) {
   return (x * 100).toFixed(digits) + "%";
 }
 
-export default function Trading() {
+export default function Trading({ user }) {
   const UI_SYMBOLS = ["BTCUSD", "ETHUSD"];
   const UI_TO_BACKEND = { BTCUSD: "BTCUSDT", ETHUSD: "ETHUSDT" };
 
@@ -54,16 +52,19 @@ export default function Trading() {
     pnl: 0,
     trades: [],
     position: null,
-    lastPriceBySymbol: {},
+    lastPriceBySymbol: null,
     learnStats: null,
     limits: null,
-    config: null
+    config: null,
   });
   const [paperStatus, setPaperStatus] = useState("Loading…");
 
-  const [messages, setMessages] = useState(() => ([
-    { from: "ai", text: "AutoProtect ready. Ask about learning stats, paper trades, P/L, and risk rules." }
-  ]));
+  const [messages, setMessages] = useState(() => [
+    {
+      from: "ai",
+      text: "AutoProtect ready. Ask me about the chart, learning stats, paper balance, P&L, or risk rules.",
+    },
+  ]);
   const [input, setInput] = useState("");
   const logRef = useRef(null);
 
@@ -107,7 +108,7 @@ export default function Trading() {
           open: o,
           high: Math.max(o, price),
           low: Math.min(o, price),
-          close: price
+          close: price,
         });
         while (next.length > 120) next.shift();
         return next;
@@ -121,7 +122,7 @@ export default function Trading() {
     });
   };
 
-  // Market feed (WS)
+  // Market WS
   useEffect(() => {
     let ws;
     let fallbackTimer;
@@ -168,7 +169,9 @@ export default function Trading() {
     }
 
     return () => {
-      try { if (ws) ws.close(); } catch {}
+      try {
+        if (ws) ws.close();
+      } catch {}
       clearInterval(fallbackTimer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -200,7 +203,7 @@ export default function Trading() {
     return () => clearInterval(t);
   }, []);
 
-  // Draw canvas candles
+  // Draw chart
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -231,8 +234,8 @@ export default function Trading() {
     const view = candles.slice(-80);
     if (!view.length) return;
 
-    const highs = view.map(c => c.high);
-    const lows = view.map(c => c.low);
+    const highs = view.map((c) => c.high);
+    const lows = view.map((c) => c.low);
     const maxP = Math.max(...highs);
     const minP = Math.min(...lows);
 
@@ -245,10 +248,9 @@ export default function Trading() {
       return clamp(r, 0, 1) * (cssH - 20) + 10;
     };
 
-    const w = cssW;
     const n = view.length;
     const gap = 2;
-    const candleW = Math.max(4, Math.floor((w - 20) / n) - gap);
+    const candleW = Math.max(4, Math.floor((cssW - 20) / n) - gap);
     let x = 10;
 
     for (let i = 0; i < n; i++) {
@@ -288,15 +290,16 @@ export default function Trading() {
     const clean = (text || "").trim();
     if (!clean) return;
 
-    setMessages(prev => [...prev, { from: "you", text: clean }]);
+    setMessages((prev) => [...prev, { from: "you", text: clean }]);
 
     const base = apiBase();
     if (!base) {
-      setMessages(prev => [...prev, { from: "ai", text: "Backend URL missing. Set VITE_API_BASE on Vercel." }]);
+      setMessages((prev) => [...prev, { from: "ai", text: "Backend URL missing. Set VITE_API_BASE on Vercel." }]);
       return;
     }
 
     try {
+      const learn = paper.learnStats || {};
       const context = {
         symbol,
         mode,
@@ -306,24 +309,24 @@ export default function Trading() {
           balance: paper.balance,
           pnl: paper.pnl,
           tradesCount: paper.trades?.length || 0,
-          ticksSeen: paper.learnStats?.ticksSeen,
-          confidence: paper.learnStats?.confidence,
-          decision: paper.learnStats?.decision,
-          decisionReason: paper.learnStats?.lastReason,
-        }
+          ticksSeen: learn.ticksSeen ?? 0,
+          confidence: learn.confidence ?? 0,
+          decision: learn.decision ?? "WAIT",
+          decisionReason: learn.lastReason ?? "—",
+        },
       };
 
       const res = await fetch(`${base}/api/ai/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ message: clean, context })
+        body: JSON.stringify({ message: clean, context }),
       });
 
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         const msg = data?.error || data?.message || `HTTP ${res.status}`;
-        setMessages(prev => [...prev, { from: "ai", text: "AI error: " + msg }]);
+        setMessages((prev) => [...prev, { from: "ai", text: "AI error: " + msg }]);
         return;
       }
 
@@ -335,26 +338,27 @@ export default function Trading() {
         data?.result ??
         "(No reply from AI)";
 
-      setMessages(prev => [...prev, { from: "ai", text: reply }]);
+      setMessages((prev) => [...prev, { from: "ai", text: reply }]);
     } catch {
-      setMessages(prev => [...prev, { from: "ai", text: "Network error talking to AI backend." }]);
+      setMessages((prev) => [...prev, { from: "ai", text: "Network error talking to AI backend." }]);
     }
   }
 
   const showRightPanel = showAI && !wideChart;
 
-  const ticksSeen = paper.learnStats?.ticksSeen ?? 0;
-  const conf = paper.learnStats?.confidence ?? 0;
-  const decision = paper.learnStats?.decision ?? "WAIT";
-  const reason = paper.learnStats?.lastReason ?? "—";
+  const learn = paper.learnStats || {};
+  const ticksSeen = learn.ticksSeen ?? 0;
+  const conf = learn.confidence ?? 0;
+  const decision = learn.decision ?? "WAIT";
+  const reason = learn.lastReason ?? "—";
 
   return (
     <div className="tradeWrap">
       <div className="card">
         <div className="tradeTop">
           <div>
-            <h2 style={{ margin: 0 }}>Trading Room</h2>
-            <small className="muted">Live feed + paper learning + voice.</small>
+            <h2 style={{ margin: 0 }}>Trading Terminal</h2>
+            <small className="muted">Live chart + paper engine + learning stats + AI voice.</small>
           </div>
 
           <div className="actions">
@@ -369,13 +373,15 @@ export default function Trading() {
             <div className="pill">
               <small>Symbol</small>
               <select value={symbol} onChange={(e) => setSymbol(e.target.value)} style={{ marginTop: 6 }}>
-                {UI_SYMBOLS.map(s => <option key={s} value={s}>{s}</option>)}
+                {UI_SYMBOLS.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
               </select>
             </div>
 
             <div className="pill">
               <small>Feed</small>
-              <div style={{ marginTop: 6, fontWeight: 800, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
+              <div style={{ marginTop: 6, fontWeight: 800, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                 {feedStatus}
               </div>
               <small className="muted">Last: {fmtCompact(last, 2)}</small>
@@ -384,16 +390,16 @@ export default function Trading() {
             <div className="pill">
               <small>Panels</small>
               <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
-                <button className={showMoney ? "active" : ""} onClick={() => setShowMoney(v => !v)} style={{ width: "auto" }}>
+                <button className={showMoney ? "active" : ""} onClick={() => setShowMoney((v) => !v)} style={{ width: "auto" }}>
                   Money
                 </button>
-                <button className={showTradeLog ? "active" : ""} onClick={() => setShowTradeLog(v => !v)} style={{ width: "auto" }}>
+                <button className={showTradeLog ? "active" : ""} onClick={() => setShowTradeLog((v) => !v)} style={{ width: "auto" }}>
                   Log
                 </button>
-                <button className={showAI ? "active" : ""} onClick={() => setShowAI(v => !v)} style={{ width: "auto" }}>
+                <button className={showAI ? "active" : ""} onClick={() => setShowAI((v) => !v)} style={{ width: "auto" }}>
                   AI
                 </button>
-                <button className={wideChart ? "active" : ""} onClick={() => setWideChart(v => !v)} style={{ width: "auto" }}>
+                <button className={wideChart ? "active" : ""} onClick={() => setWideChart((v) => !v)} style={{ width: "auto" }}>
                   Wide
                 </button>
               </div>
@@ -403,6 +409,7 @@ export default function Trading() {
       </div>
 
       <div className="tradeGrid" style={{ gridTemplateColumns: showRightPanel ? "1.8fr 1fr" : "1fr" }}>
+        {/* LEFT */}
         <div className="card tradeChart">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
             <b>{symbol}</b>
@@ -410,12 +417,7 @@ export default function Trading() {
           </div>
 
           {/* Learning strip */}
-          <div style={{
-            marginTop: 10,
-            display: "grid",
-            gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
-            gap: 10
-          }}>
+          <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 10 }}>
             <div className="kpiBox">
               <div className="kpiVal">{fmtCompact(ticksSeen, 0)}</div>
               <div className="kpiLbl">Ticks Seen</div>
@@ -430,7 +432,7 @@ export default function Trading() {
             </div>
             <div className="kpiBox">
               <div className="kpiVal" title={reason} style={{ fontSize: 14 }}>
-                <span style={{ display:"block", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
+                <span style={{ display: "block", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                   {reason}
                 </span>
               </div>
@@ -453,7 +455,7 @@ export default function Trading() {
                 <span>Recent Trades</span>
               </div>
               <div>
-                <b style={{ whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{paperStatus}</b>
+                <b style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{paperStatus}</b>
                 <span>Status</span>
               </div>
             </div>
@@ -467,7 +469,7 @@ export default function Trading() {
                 height: "100%",
                 borderRadius: 14,
                 border: "1px solid rgba(255,255,255,0.10)",
-                background: "rgba(0,0,0,0.20)"
+                background: "rgba(0,0,0,0.20)",
               }}
             />
           </div>
@@ -495,7 +497,9 @@ export default function Trading() {
                       </tr>
                     ))}
                     {(!paper.trades || paper.trades.length === 0) && (
-                      <tr><td colSpan="4" className="muted">No trades yet (it’s learning)</td></tr>
+                      <tr>
+                        <td colSpan="4" className="muted">No trades yet (it’s learning)</td>
+                      </tr>
                     )}
                   </tbody>
                 </table>
@@ -504,13 +508,14 @@ export default function Trading() {
           )}
         </div>
 
+        {/* RIGHT */}
         {showRightPanel && (
           <div className="card tradeAI">
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
               <div>
-                <b>AutoProtect</b>
+                <b>AI Panel</b>
                 <div className="muted" style={{ fontSize: 12 }}>
-                  Chat + Voice (hands-free available)
+                  Voice panel below • turn on Conversation Mode for hands-free
                 </div>
               </div>
             </div>
@@ -560,7 +565,7 @@ export default function Trading() {
                     confidence: conf,
                     decision,
                     decisionReason: reason,
-                  }
+                  },
                 })}
               />
             </div>
