@@ -16,15 +16,21 @@ import Company from './pages/Company.jsx';
 import Individual from './pages/Individual.jsx';
 import Trading from './pages/Trading.jsx';
 
-// ✅ Use your GitHub-hosted logo (same one used for watermark)
-const AUTOSHIELD_LOGO_URL =
-  'https://github.com/user-attachments/assets/0895f9e4-83c4-4088-8658-7a6aeb728af2';
+const LOGO_URL = "https://github.com/user-attachments/assets/0895f9e4-83c4-4088-8658-7a6aeb728af2";
 
 function Brand(){
   return (
     <div className="brand">
-      <div className="logo" aria-hidden="true"></div>
-      <div className="brandTitle"><b>AutoShield</b><span>TECH</span></div>
+      <img
+        className="logoImg"
+        src={LOGO_URL}
+        alt="AutoShield Tech"
+        onError={(e) => { e.currentTarget.style.display = "none"; }}
+      />
+      <div className="brandTitle">
+        <b>AutoShield</b>
+        <span>TECH</span>
+      </div>
     </div>
   );
 }
@@ -35,8 +41,6 @@ export default function App(){
   const [bootError, setBootError] = useState(null);
 
   useEffect(() => {
-    // If token exists but user isn't saved, we can't restore fully without a /me endpoint.
-    // Keep it simple: user is stored locally on login.
     const t = getToken();
     if (t && !user) {
       setBootError('Session token found but no user profile saved. Please sign in again.');
@@ -61,24 +65,19 @@ export default function App(){
 
   if (!user) {
     return (
-      <div className="container">
-        {/* ✅ fixed corner logo (shows on login too) */}
-        <div className="autoshield-corner-logo" aria-label="AutoShield Tech">
-          <img src={AUTOSHIELD_LOGO_URL} alt="AutoShield Tech Logo" />
-        </div>
-
-        <div className="nav">
-          <Brand />
-          <small>Security + trading, one command center</small>
-        </div>
-
-        {bootError && (
-          <div className="card" style={{borderColor:'rgba(255,180,0,.5)'}}>
-            <b>Note:</b> {bootError}
+      <div className="appShell">
+        <div className="container">
+          <div className="nav">
+            <Brand />
+            <small>Security + trading, one command center</small>
           </div>
-        )}
-
-        <Login onLogin={onLogin} />
+          {bootError && (
+            <div className="card" style={{borderColor:'rgba(255,180,0,.5)'}}>
+              <b>Note:</b> {bootError}
+            </div>
+          )}
+          <Login onLogin={onLogin} />
+        </div>
       </div>
     );
   }
@@ -108,29 +107,25 @@ export default function App(){
     : dashboardPage;
 
   return (
-    <div className="container">
-      {/* ✅ fixed corner logo (shows everywhere) */}
-      <div className="autoshield-corner-logo" aria-label="AutoShield Tech">
-        <img src={AUTOSHIELD_LOGO_URL} alt="AutoShield Tech Logo" />
-      </div>
+    <div className="appShell">
+      <div className="container">
+        <div className="nav">
+          <Brand />
+          <div className="actions" style={{maxWidth:700}}>
+            <button className={view==='dashboard'?'active':''} onClick={()=>setView('dashboard')}>Cybersecurity</button>
+            <button className={view==='trading'?'active':''} onClick={()=>setView('trading')}>Trading</button>
 
-      <div className="nav">
-        <Brand />
-        <div className="actions" style={{maxWidth:700}}>
-          <button className={view==='dashboard'?'active':''} onClick={()=>setView('dashboard')}>Cybersecurity</button>
-          <button className={view==='trading'?'active':''} onClick={()=>setView('trading')}>Trading</button>
+            <span className="badge">{user.role}</span>
+            <span className={`badge ${user.subscriptionStatus==='Active'?'ok':(user.subscriptionStatus==='PastDue'?'warn':'danger')}`}>
+              {user.subscriptionStatus}
+            </span>
+            {autoprotectEnabled && <span className="badge ok">AutoProtect</span>}
 
-          <span className="badge">{user.role}</span>
-          <span className={`badge ${user.subscriptionStatus==='Active'?'ok':(user.subscriptionStatus==='PastDue'?'warn':'danger')}`}>
-            {user.subscriptionStatus}
-          </span>
-          {autoprotectEnabled && <span className="badge ok">AutoProtect</span>}
-
-          <button onClick={signOut}>Sign out</button>
+            <button onClick={signOut}>Sign out</button>
+          </div>
         </div>
+        {page}
       </div>
-
-      {page}
     </div>
   );
 }
