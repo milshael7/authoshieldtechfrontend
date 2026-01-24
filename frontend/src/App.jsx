@@ -16,6 +16,10 @@ import Company from './pages/Company.jsx';
 import Individual from './pages/Individual.jsx';
 import Trading from './pages/Trading.jsx';
 
+// ✅ Use your GitHub-hosted logo (same one used for watermark)
+const AUTOSHIELD_LOGO_URL =
+  'https://github.com/user-attachments/assets/0895f9e4-83c4-4088-8658-7a6aeb728af2';
+
 function Brand(){
   return (
     <div className="brand">
@@ -58,11 +62,22 @@ export default function App(){
   if (!user) {
     return (
       <div className="container">
+        {/* ✅ fixed corner logo (shows on login too) */}
+        <div className="autoshield-corner-logo" aria-label="AutoShield Tech">
+          <img src={AUTOSHIELD_LOGO_URL} alt="AutoShield Tech Logo" />
+        </div>
+
         <div className="nav">
           <Brand />
           <small>Security + trading, one command center</small>
         </div>
-        {bootError && <div className="card" style={{borderColor:'rgba(255,180,0,.5)'}}><b>Note:</b> {bootError}</div>}
+
+        {bootError && (
+          <div className="card" style={{borderColor:'rgba(255,180,0,.5)'}}>
+            <b>Note:</b> {bootError}
+          </div>
+        )}
+
         <Login onLogin={onLogin} />
       </div>
     );
@@ -94,6 +109,11 @@ export default function App(){
 
   return (
     <div className="container">
+      {/* ✅ fixed corner logo (shows everywhere) */}
+      <div className="autoshield-corner-logo" aria-label="AutoShield Tech">
+        <img src={AUTOSHIELD_LOGO_URL} alt="AutoShield Tech Logo" />
+      </div>
+
       <div className="nav">
         <Brand />
         <div className="actions" style={{maxWidth:700}}>
@@ -109,6 +129,7 @@ export default function App(){
           <button onClick={signOut}>Sign out</button>
         </div>
       </div>
+
       {page}
     </div>
   );
