@@ -7,9 +7,6 @@
   --ok:#2bd576;
   --warn:#ffd166;
   --danger:#ff5a5f;
-
-  /* ✅ your watermark source (same one you posted) */
-  --wm-url: url("https://github.com/user-attachments/assets/0895f9e4-83c4-4088-8658-7a6aeb728af2");
 }
 
 *{box-sizing:border-box}
@@ -18,32 +15,46 @@ html,body{height:100%}
 body{
   margin:0;
   font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;
-  color:var(--text);
-  overflow:hidden; /* ✅ IMPORTANT: page background stays still */
-  background:
+
+  /* ✅ FIX: watermark + steady background (panels scroll over it) */
+  background-color: var(--bg);
+  background-image:
+    /* Watermark (needs transparent PNG, no text, no black square) */
+    url("/autoshield-mark.png"),
+
+    /* Your existing glow layers */
     radial-gradient(1100px 600px at 20% 0%, rgba(80,140,255,.20), transparent 55%),
-    radial-gradient(1000px 700px at 90% 40%, rgba(0,255,170,.10), transparent 55%),
-    var(--bg);
+    radial-gradient(1000px 700px at 90% 40%, rgba(0,255,170,.10), transparent 55%);
+
+  background-repeat: no-repeat, no-repeat, no-repeat;
+  background-position: center center, center center, center center;
+
+  /* ✅ watermark size (big but not annoying) */
+  background-size: 720px auto, cover, cover;
+
+  /* ✅ makes the background stay steady while content scrolls */
+  background-attachment: fixed, fixed, fixed;
+
+  color:var(--text);
+  overflow-x:hidden; /* ✅ stop side-scroll on phones */
 }
 
-/* ✅ content scrolls INSIDE this shell (background/watermark stays steady) */
-.appShell{
-  height:100vh;
-  overflow:auto;
-  -webkit-overflow-scrolling:touch;
-  position:relative;
-}
-
-/* containers/cards */
 .container{max-width:1100px;margin:0 auto;padding:24px;}
+
 .card{
   background:var(--panel);
   border:1px solid var(--line);
   border-radius:16px;
   padding:16px;
+
+  /* ✅ helps watermark feel “behind glass” */
+  backdrop-filter: blur(6px);
 }
 
+.row{display:flex;gap:16px;flex-wrap:wrap;}
+.col{flex:1;min-width:280px;}
 small{color:var(--muted)}
+
 input,select,button,textarea{
   width:100%;
   padding:10px 12px;
@@ -53,9 +64,16 @@ input,select,button,textarea{
   color:var(--text);
   outline:none;
 }
-button{cursor:pointer;background:rgba(255,255,255,.10);}
+
+button{
+  cursor:pointer;
+  background:rgba(255,255,255,.10);
+}
 button:hover{background:rgba(255,255,255,.14);}
-button.active{border-color: rgba(122,167,255,.55);background: rgba(122,167,255,.15);}
+button.active{
+  border-color: rgba(122,167,255,.55);
+  background: rgba(122,167,255,.15);
+}
 
 .badge{
   display:inline-block;
@@ -79,15 +97,21 @@ button.active{border-color: rgba(122,167,255,.55);background: rgba(122,167,255,.
 }
 
 .brand{display:flex;align-items:center;gap:10px;}
-/* ✅ your REAL logo image */
-.logoImg{
-  width:42px;
-  height:42px;
+
+/* ✅ FIX: logo box should be ONLY the mark (no text inside the logo) */
+.logo{
+  width:38px;
+  height:38px;
   border-radius:12px;
-  border:1px solid rgba(255,255,255,0.16);
-  background:rgba(0,0,0,0.20);
-  object-fit:cover;
+  border:1px solid var(--line);
+
+  /* If the file exists, use it */
+  background: url("/autoshield-mark.png") center/contain no-repeat;
+
+  /* Fallback if image fails to load */
+  background-color: rgba(255,255,255,0.04);
 }
+
 .brandTitle{line-height:1.05;}
 .brandTitle b{display:block;font-size:16px;}
 .brandTitle span{display:block;font-size:12px;color:var(--muted);letter-spacing:2px;}
@@ -97,13 +121,18 @@ button.active{border-color: rgba(122,167,255,.55);background: rgba(122,167,255,.
   border-radius:12px;
   border:1px solid var(--line);
   background:rgba(0,0,0,.20);
-  min-width:160px;
+  min-width: 160px;
 }
+
 .actions{display:flex;gap:10px;flex-wrap:wrap;}
 .actions button{flex:1;min-width:120px;width:auto;}
 
 .tableWrap{overflow:auto; -webkit-overflow-scrolling:touch;}
-.table{width:100%;border-collapse:collapse;margin-top:10px;}
+.table{
+  width:100%;
+  border-collapse:collapse;
+  margin-top:10px;
+}
 .table th,.table td{
   border-bottom:1px solid rgba(255,255,255,0.08);
   padding:8px 6px;
@@ -111,37 +140,11 @@ button.active{border-color: rgba(122,167,255,.55);background: rgba(122,167,255,.
   font-size:13px;
   white-space:nowrap;
 }
-.muted{opacity:.75}
+.error{color:#ff6b6b;}
+.muted{opacity:.75;}
 
 /* --- Trading terminal layout --- */
-.tradeWrap{
-  width:100%;
-  max-width:1100px;
-  margin:0 auto;
-  position:relative;
-  isolation:isolate;
-}
-
-/* ✅ Trading-only watermark (gray, no “black box” look) */
-.tradeWrap::before{
-  content:"";
-  position:fixed;
-  inset:0;
-  z-index:-1;
-
-  background-image: var(--wm-url);
-  background-repeat:no-repeat;
-  background-position:center;
-  background-size:640px auto;
-
-  /* KEY PART: makes black disappear + turns it into watermark style */
-  mix-blend-mode: screen;       /* black becomes “nothing”, bright parts show */
-  opacity:0.08;                 /* watermark faint */
-  filter: grayscale(100%) contrast(1.25) brightness(1.15);
-  pointer-events:none;
-}
-
-/* grid layout */
+.tradeWrap{width:100%; max-width:1100px; margin:0 auto;}
 .tradeTop{
   display:flex;
   justify-content:space-between;
@@ -149,6 +152,8 @@ button.active{border-color: rgba(122,167,255,.55);background: rgba(122,167,255,.
   gap:12px;
   flex-wrap:wrap;
 }
+
+/* ✅ grid will NOT overflow on phones */
 .tradeGrid{
   display:grid;
   grid-template-columns: 1.8fr 1fr;
@@ -160,7 +165,6 @@ button.active{border-color: rgba(122,167,255,.55);background: rgba(122,167,255,.
 .tradeChart{min-height:620px; min-width:0;}
 .tradeAI{min-height:620px; display:flex; flex-direction:column; min-width:0;}
 
-/* chat */
 .chatLog{
   flex:1;
   overflow:auto;
@@ -170,8 +174,16 @@ button.active{border-color: rgba(122,167,255,.55);background: rgba(122,167,255,.
   background: rgba(0,0,0,.25);
   min-width:0;
 }
-.chatBox{display:flex;gap:10px;margin-top:10px;min-width:0;}
-.chatBox input{flex:1;min-width:0;}
+.chatBox{
+  display:flex;
+  gap:10px;
+  margin-top:10px;
+  min-width:0;
+}
+.chatBox input{
+  flex:1;
+  min-width:0; /* ✅ stops input from pushing layout wide */
+}
 .chatMsg{
   padding:10px;
   border-radius:10px;
@@ -182,7 +194,7 @@ button.active{border-color: rgba(122,167,255,.55);background: rgba(122,167,255,.
 .chatMsg.you{ background: rgba(45, 90, 255, .12); }
 .chatMsg.ai{ background: rgba(20, 255, 160, .08); }
 
-/* KPI boxes */
+/* ✅ your new scoreboard boxes */
 .kpiBox{
   background: rgba(255,255,255,0.04);
   border: 1px solid rgba(255,255,255,0.08);
@@ -191,7 +203,7 @@ button.active{border-color: rgba(122,167,255,.55);background: rgba(122,167,255,.
   display:flex;
   flex-direction:column;
   gap:4px;
-  min-width:0;
+  min-width:0; /* ✅ allow shrink inside grid */
 }
 .kpiVal{
   font-size: 18px;
@@ -199,7 +211,7 @@ button.active{border-color: rgba(122,167,255,.55);background: rgba(122,167,255,.
   line-height: 1.1;
   white-space: nowrap;
   overflow: hidden;
-  text-overflow: ellipsis;
+  text-overflow: ellipsis; /* ✅ stops huge numbers from spilling */
 }
 .kpiLbl{
   font-size: 12px;
@@ -209,6 +221,7 @@ button.active{border-color: rgba(122,167,255,.55);background: rgba(122,167,255,.
   text-overflow: ellipsis;
 }
 
+/* Existing KPI row (Paper Balance / P&L / Trades / Status) */
 .kpi{
   display:grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -234,13 +247,12 @@ button.active{border-color: rgba(122,167,255,.55);background: rgba(122,167,255,.
 }
 .kpi span{font-size:12px;opacity:.8;}
 
-/* phone fixes */
+/* ✅ phone fixes */
 @media (max-width: 980px){
   .container{padding:14px;}
   .tradeGrid{grid-template-columns: 1fr;}
   .tradeChart, .tradeAI{min-height:auto;}
   .pill{min-width:140px;}
-  .tradeWrap::before{background-size:520px auto; opacity:0.07;}
 }
 
 @media (max-width: 560px){
@@ -250,5 +262,4 @@ button.active{border-color: rgba(122,167,255,.55);background: rgba(122,167,255,.
   .kpiVal{font-size:16px;}
   .kpi b{font-size:18px;}
   .table th,.table td{font-size:12px;}
-  .tradeWrap::before{background-size:420px auto; opacity:0.06;}
 }
