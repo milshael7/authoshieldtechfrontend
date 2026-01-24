@@ -7,6 +7,10 @@
   --ok:#2bd576;
   --warn:#ffd166;
   --danger:#ff5a5f;
+
+  /* ✅ files you will upload to: frontend/public/ */
+  --logo-url: url("/autoshield-icon-notext.png");
+  --wm-url: url("/autoshield-watermark.png");
 }
 
 *{box-sizing:border-box}
@@ -15,42 +19,21 @@ html,body{height:100%}
 body{
   margin:0;
   font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;
-
-  /* ✅ FIX: watermark + steady background (panels scroll over it) */
-  background-color: var(--bg);
-  background-image:
-    /* Watermark (needs transparent PNG, no text, no black square) */
-    url("/autoshield-mark.png"),
-
-    /* Your existing glow layers */
+  background:
     radial-gradient(1100px 600px at 20% 0%, rgba(80,140,255,.20), transparent 55%),
-    radial-gradient(1000px 700px at 90% 40%, rgba(0,255,170,.10), transparent 55%);
-
-  background-repeat: no-repeat, no-repeat, no-repeat;
-  background-position: center center, center center, center center;
-
-  /* ✅ watermark size (big but not annoying) */
-  background-size: 720px auto, cover, cover;
-
-  /* ✅ makes the background stay steady while content scrolls */
-  background-attachment: fixed, fixed, fixed;
-
+    radial-gradient(1000px 700px at 90% 40%, rgba(0,255,170,.10), transparent 55%),
+    var(--bg);
   color:var(--text);
   overflow-x:hidden; /* ✅ stop side-scroll on phones */
 }
 
 .container{max-width:1100px;margin:0 auto;padding:24px;}
-
 .card{
   background:var(--panel);
   border:1px solid var(--line);
   border-radius:16px;
   padding:16px;
-
-  /* ✅ helps watermark feel “behind glass” */
-  backdrop-filter: blur(6px);
 }
-
 .row{display:flex;gap:16px;flex-wrap:wrap;}
 .col{flex:1;min-width:280px;}
 small{color:var(--muted)}
@@ -95,21 +78,17 @@ button.active{
   gap:12px;
   margin-bottom:18px;
 }
-
 .brand{display:flex;align-items:center;gap:10px;}
 
-/* ✅ FIX: logo box should be ONLY the mark (no text inside the logo) */
+/* ✅ FIXED: navbar logo is ONLY the icon (no big picture) */
 .logo{
   width:38px;
   height:38px;
   border-radius:12px;
   border:1px solid var(--line);
-
-  /* If the file exists, use it */
-  background: url("/autoshield-mark.png") center/contain no-repeat;
-
-  /* Fallback if image fails to load */
-  background-color: rgba(255,255,255,0.04);
+  background:
+    var(--logo-url) center/cover no-repeat,
+    linear-gradient(135deg, rgba(80,140,255,.35), rgba(0,255,170,.18));
 }
 
 .brandTitle{line-height:1.05;}
@@ -144,7 +123,31 @@ button.active{
 .muted{opacity:.75;}
 
 /* --- Trading terminal layout --- */
-.tradeWrap{width:100%; max-width:1100px; margin:0 auto;}
+.tradeWrap{
+  width:100%;
+  max-width:1100px;
+  margin:0 auto;
+  position:relative;
+  z-index:0;
+}
+
+/* ✅ Trading-only watermark (background stays STILL; panels scroll above it) */
+.tradeWrap::before{
+  content:"";
+  position:fixed;
+  inset:0;
+  pointer-events:none;
+  z-index:-1;
+
+  background-image: var(--wm-url);
+  background-repeat:no-repeat;
+  background-position:center 48%;
+  background-size: min(72vw, 560px);
+
+  opacity: 0.12;            /* ✅ “US document” style */
+  filter: grayscale(1);
+}
+
 .tradeTop{
   display:flex;
   justify-content:space-between;
@@ -194,7 +197,7 @@ button.active{
 .chatMsg.you{ background: rgba(45, 90, 255, .12); }
 .chatMsg.ai{ background: rgba(20, 255, 160, .08); }
 
-/* ✅ your new scoreboard boxes */
+/* ✅ scoreboard boxes */
 .kpiBox{
   background: rgba(255,255,255,0.04);
   border: 1px solid rgba(255,255,255,0.08);
@@ -203,7 +206,7 @@ button.active{
   display:flex;
   flex-direction:column;
   gap:4px;
-  min-width:0; /* ✅ allow shrink inside grid */
+  min-width:0;
 }
 .kpiVal{
   font-size: 18px;
@@ -211,7 +214,7 @@ button.active{
   line-height: 1.1;
   white-space: nowrap;
   overflow: hidden;
-  text-overflow: ellipsis; /* ✅ stops huge numbers from spilling */
+  text-overflow: ellipsis;
 }
 .kpiLbl{
   font-size: 12px;
@@ -221,7 +224,7 @@ button.active{
   text-overflow: ellipsis;
 }
 
-/* Existing KPI row (Paper Balance / P&L / Trades / Status) */
+/* KPI row */
 .kpi{
   display:grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
