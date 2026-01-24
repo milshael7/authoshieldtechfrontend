@@ -7,6 +7,9 @@
   --ok:#2bd576;
   --warn:#ffd166;
   --danger:#ff5a5f;
+
+  /* ✅ your watermark source (same one you posted) */
+  --wm-url: url("https://github.com/user-attachments/assets/0895f9e4-83c4-4088-8658-7a6aeb728af2");
 }
 
 *{box-sizing:border-box}
@@ -15,37 +18,24 @@ html,body{height:100%}
 body{
   margin:0;
   font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;
+  color:var(--text);
+  overflow:hidden; /* ✅ IMPORTANT: page background stays still */
   background:
     radial-gradient(1100px 600px at 20% 0%, rgba(80,140,255,.20), transparent 55%),
     radial-gradient(1000px 700px at 90% 40%, rgba(0,255,170,.10), transparent 55%),
     var(--bg);
-  color:var(--text);
-  overflow-x:hidden;
 }
 
-/* ================================
-   AutoShield Tech Watermark Background
-   ================================ */
-body::before{
-  content:'';
-  position:fixed;
-  inset:0;
-  z-index:-1;
-
-  background-image:
-    url('https://github.com/user-attachments/assets/0895f9e4-83c4-4088-8658-7a6aeb728af2');
-
-  background-repeat:no-repeat;
-  background-position:center;
-  background-size:520px auto;
-
-  opacity:0.10;
-  filter:grayscale(100%) brightness(1.15) contrast(1.1);
-  pointer-events:none;
+/* ✅ content scrolls INSIDE this shell (background/watermark stays steady) */
+.appShell{
+  height:100vh;
+  overflow:auto;
+  -webkit-overflow-scrolling:touch;
+  position:relative;
 }
 
+/* containers/cards */
 .container{max-width:1100px;margin:0 auto;padding:24px;}
-
 .card{
   background:var(--panel);
   border:1px solid var(--line);
@@ -53,10 +43,7 @@ body::before{
   padding:16px;
 }
 
-.row{display:flex;gap:16px;flex-wrap:wrap;}
-.col{flex:1;min-width:280px;}
 small{color:var(--muted)}
-
 input,select,button,textarea{
   width:100%;
   padding:10px 12px;
@@ -66,16 +53,9 @@ input,select,button,textarea{
   color:var(--text);
   outline:none;
 }
-
-button{
-  cursor:pointer;
-  background:rgba(255,255,255,.10);
-}
+button{cursor:pointer;background:rgba(255,255,255,.10);}
 button:hover{background:rgba(255,255,255,.14);}
-button.active{
-  border-color: rgba(122,167,255,.55);
-  background: rgba(122,167,255,.15);
-}
+button.active{border-color: rgba(122,167,255,.55);background: rgba(122,167,255,.15);}
 
 .badge{
   display:inline-block;
@@ -99,21 +79,18 @@ button.active{
 }
 
 .brand{display:flex;align-items:center;gap:10px;}
-.logo{
-  width:38px;
-  height:38px;
+/* ✅ your REAL logo image */
+.logoImg{
+  width:42px;
+  height:42px;
   border-radius:12px;
-  background:linear-gradient(135deg, rgba(80,140,255,.85), rgba(0,255,170,.55));
-  border:1px solid var(--line);
+  border:1px solid rgba(255,255,255,0.16);
+  background:rgba(0,0,0,0.20);
+  object-fit:cover;
 }
 .brandTitle{line-height:1.05;}
 .brandTitle b{display:block;font-size:16px;}
-.brandTitle span{
-  display:block;
-  font-size:12px;
-  color:var(--muted);
-  letter-spacing:2px;
-}
+.brandTitle span{display:block;font-size:12px;color:var(--muted);letter-spacing:2px;}
 
 .pill{
   padding:8px 10px;
@@ -122,39 +99,18 @@ button.active{
   background:rgba(0,0,0,.20);
   min-width:160px;
 }
+.actions{display:flex;gap:10px;flex-wrap:wrap;}
+.actions button{flex:1;min-width:120px;width:auto;}
 
-.actions{
-  display:flex;
-  gap:10px;
-  flex-wrap:wrap;
-}
-.actions button{
-  flex:1;
-  min-width:120px;
-  width:auto;
-}
-
-.tableWrap{
-  overflow:auto;
-  -webkit-overflow-scrolling:touch;
-}
-
-.table{
-  width:100%;
-  border-collapse:collapse;
-  margin-top:10px;
-}
-
-.table th,
-.table td{
+.tableWrap{overflow:auto; -webkit-overflow-scrolling:touch;}
+.table{width:100%;border-collapse:collapse;margin-top:10px;}
+.table th,.table td{
   border-bottom:1px solid rgba(255,255,255,0.08);
   padding:8px 6px;
   text-align:left;
   font-size:13px;
   white-space:nowrap;
 }
-
-.error{color:#ff6b6b;}
 .muted{opacity:.75}
 
 /* --- Trading terminal layout --- */
@@ -162,8 +118,30 @@ button.active{
   width:100%;
   max-width:1100px;
   margin:0 auto;
+  position:relative;
+  isolation:isolate;
 }
 
+/* ✅ Trading-only watermark (gray, no “black box” look) */
+.tradeWrap::before{
+  content:"";
+  position:fixed;
+  inset:0;
+  z-index:-1;
+
+  background-image: var(--wm-url);
+  background-repeat:no-repeat;
+  background-position:center;
+  background-size:640px auto;
+
+  /* KEY PART: makes black disappear + turns it into watermark style */
+  mix-blend-mode: screen;       /* black becomes “nothing”, bright parts show */
+  opacity:0.08;                 /* watermark faint */
+  filter: grayscale(100%) contrast(1.25) brightness(1.15);
+  pointer-events:none;
+}
+
+/* grid layout */
 .tradeTop{
   display:flex;
   justify-content:space-between;
@@ -171,44 +149,29 @@ button.active{
   gap:12px;
   flex-wrap:wrap;
 }
-
 .tradeGrid{
   display:grid;
-  grid-template-columns:1.8fr 1fr;
+  grid-template-columns: 1.8fr 1fr;
   gap:14px;
   margin-top:14px;
   width:100%;
   min-width:0;
 }
+.tradeChart{min-height:620px; min-width:0;}
+.tradeAI{min-height:620px; display:flex; flex-direction:column; min-width:0;}
 
-.tradeChart{min-height:620px;min-width:0;}
-.tradeAI{
-  min-height:620px;
-  display:flex;
-  flex-direction:column;
-  min-width:0;
-}
-
+/* chat */
 .chatLog{
   flex:1;
   overflow:auto;
   border:1px solid rgba(255,255,255,.08);
   border-radius:12px;
   padding:10px;
-  background:rgba(0,0,0,.25);
-}
-
-.chatBox{
-  display:flex;
-  gap:10px;
-  margin-top:10px;
-}
-
-.chatBox input{
-  flex:1;
+  background: rgba(0,0,0,.25);
   min-width:0;
 }
-
+.chatBox{display:flex;gap:10px;margin-top:10px;min-width:0;}
+.chatBox input{flex:1;min-width:0;}
 .chatMsg{
   padding:10px;
   border-radius:10px;
@@ -216,66 +179,76 @@ button.active{
   border:1px solid rgba(255,255,255,.08);
   word-break:break-word;
 }
-.chatMsg.you{background:rgba(45,90,255,.12);}
-.chatMsg.ai{background:rgba(20,255,160,.08);}
+.chatMsg.you{ background: rgba(45, 90, 255, .12); }
+.chatMsg.ai{ background: rgba(20, 255, 160, .08); }
 
 /* KPI boxes */
 .kpiBox{
-  background:rgba(255,255,255,0.04);
-  border:1px solid rgba(255,255,255,0.08);
-  border-radius:12px;
-  padding:12px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px;
+  padding: 12px;
   display:flex;
   flex-direction:column;
   gap:4px;
+  min-width:0;
 }
-
 .kpiVal{
-  font-size:18px;
-  font-weight:900;
-  white-space:nowrap;
-  overflow:hidden;
-  text-overflow:ellipsis;
+  font-size: 18px;
+  font-weight: 900;
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-
 .kpiLbl{
-  font-size:12px;
-  opacity:.8;
+  font-size: 12px;
+  opacity: .8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .kpi{
   display:grid;
-  grid-template-columns:repeat(4,minmax(0,1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap:10px;
   margin-top:10px;
 }
-
 .kpi > div{
-  background:rgba(255,255,255,0.04);
-  border:1px solid rgba(255,255,255,0.08);
-  border-radius:12px;
-  padding:12px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px;
+  padding: 12px;
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+  min-width:0;
 }
-
 .kpi b{
-  font-size:20px;
-  white-space:nowrap;
+  font-size: 20px;
+  line-height:1.15;
+  white-space: nowrap;
   overflow:hidden;
   text-overflow:ellipsis;
 }
+.kpi span{font-size:12px;opacity:.8;}
 
-@media (max-width:980px){
+/* phone fixes */
+@media (max-width: 980px){
   .container{padding:14px;}
-  .tradeGrid{grid-template-columns:1fr;}
-  .tradeChart,.tradeAI{min-height:auto;}
+  .tradeGrid{grid-template-columns: 1fr;}
+  .tradeChart, .tradeAI{min-height:auto;}
   .pill{min-width:140px;}
+  .tradeWrap::before{background-size:520px auto; opacity:0.07;}
 }
 
-@media (max-width:560px){
+@media (max-width: 560px){
   .actions{gap:8px;}
   .actions button{min-width:110px;}
-  .kpi{grid-template-columns:repeat(2,minmax(0,1fr));}
+  .kpi{grid-template-columns: repeat(2, minmax(0, 1fr));}
   .kpiVal{font-size:16px;}
   .kpi b{font-size:18px;}
   .table th,.table td{font-size:12px;}
+  .tradeWrap::before{background-size:420px auto; opacity:0.06;}
 }
