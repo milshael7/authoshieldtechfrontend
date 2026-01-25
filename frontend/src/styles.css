@@ -12,14 +12,6 @@
 *{box-sizing:border-box}
 html,body{height:100%}
 
-/* ✅ HARD STOP: prevent any “big logo image” accidentally injected by html */
-body > img,
-body > picture,
-body > video,
-body > svg{
-  display:none !important;
-}
-
 body{
   margin:0;
   font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;
@@ -31,18 +23,17 @@ body{
   overflow-x:hidden;
 }
 
-/* ✅ Make sure nothing sets a big background image on body/html by mistake */
-html, body{
-  background-image: none;
-}
-
+/* ✅ app container */
 .container{max-width:1100px;margin:0 auto;padding:24px;}
+
+/* ✅ cards/panels */
 .card{
   background:var(--panel);
   border:1px solid var(--line);
   border-radius:16px;
   padding:16px;
 }
+
 .row{display:flex;gap:16px;flex-wrap:wrap;}
 .col{flex:1;min-width:280px;}
 small{color:var(--muted)}
@@ -88,30 +79,21 @@ button.active{
   margin-bottom:18px;
 }
 
-/* ✅ Brand row stays stable everywhere */
 .brand{display:flex;align-items:center;gap:10px;}
 
-/* ✅ THIS is the ONLY logo location */
+/* ✅ THIS is the ONLY logo spot (the little square) */
 .logo{
   width:38px;
   height:38px;
   border-radius:12px;
   border:1px solid var(--line);
 
-  background-color: rgba(0,0,0,.22);
+  /* shows your uploaded logo */
+  background-color: rgba(0,0,0,.25);
+  background-image: url("/autoshield-logo.png");
   background-repeat: no-repeat;
   background-position: center;
   background-size: cover;
-
-  /* ✅ current working image link (change later whenever) */
-  background-image: url("https://github.com/user-attachments/assets/0895f9e4-83c4-4088-8658-7a6aeb728af2");
-}
-
-/* ✅ if the image fails, you still see a clean badge */
-.logo:empty{
-  background-image:
-    radial-gradient(circle at 30% 20%, rgba(122,167,255,.75), transparent 55%),
-    radial-gradient(circle at 70% 80%, rgba(43,213,118,.45), transparent 55%);
 }
 
 .brandTitle{line-height:1.05;}
@@ -155,7 +137,6 @@ button.active{
   flex-wrap:wrap;
 }
 
-/* ✅ grid will NOT overflow on phones */
 .tradeGrid{
   display:grid;
   grid-template-columns: 1.8fr 1fr;
@@ -196,7 +177,6 @@ button.active{
 .chatMsg.you{ background: rgba(45, 90, 255, .12); }
 .chatMsg.ai{ background: rgba(20, 255, 160, .08); }
 
-/* ✅ scoreboard boxes */
 .kpiBox{
   background: rgba(255,255,255,0.04);
   border: 1px solid rgba(255,255,255,0.08);
@@ -223,7 +203,6 @@ button.active{
   text-overflow: ellipsis;
 }
 
-/* Existing KPI row */
 .kpi{
   display:grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -249,7 +228,6 @@ button.active{
 }
 .kpi span{font-size:12px;opacity:.8;}
 
-/* ✅ phone fixes */
 @media (max-width: 980px){
   .container{padding:14px;}
   .tradeGrid{grid-template-columns: 1fr;}
