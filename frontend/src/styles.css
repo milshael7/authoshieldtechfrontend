@@ -7,15 +7,6 @@
   --ok:#2bd576;
   --warn:#ffd166;
   --danger:#ff5a5f;
-
-  /* ✅ Put your images here (public folder paths) */
-  --logo-url: url("/autoshield-logo.png");
-  --wm-url: url("/autoshield-watermark.png");
-
-  /* watermark tuning */
-  --wm-opacity: .08;      /* smaller = fainter */
-  --wm-size: 820px;       /* watermark size */
-  --wm-y: 56%;            /* vertical position */
 }
 
 *{box-sizing:border-box}
@@ -24,48 +15,26 @@ html,body{height:100%}
 body{
   margin:0;
   font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;
-  color:var(--text);
-  overflow-x:hidden;
-
-  /* ✅ Clean base background (no “big logo” here) */
   background:
     radial-gradient(1100px 600px at 20% 0%, rgba(80,140,255,.20), transparent 55%),
     radial-gradient(1000px 700px at 90% 40%, rgba(0,255,170,.10), transparent 55%),
     var(--bg);
-}
-
-/* ✅ True watermark layer behind everything (no black box) */
-body::before{
-  content:"";
-  position:fixed;
-  inset:0;
-  pointer-events:none;
-  z-index:-1;
-
-  background-image: var(--wm-url);
-  background-repeat:no-repeat;
-  background-position: 50% var(--wm-y);
-  background-size: var(--wm-size);
-  opacity: var(--wm-opacity);
-
-  /* makes it look “stamped” instead of a photo */
-  filter: grayscale(1) contrast(1.05);
+  color:var(--text);
+  overflow-x:hidden;
 }
 
 .container{max-width:1100px;margin:0 auto;padding:24px;}
+
 .card{
   background:var(--panel);
   border:1px solid var(--line);
   border-radius:16px;
   padding:16px;
-  backdrop-filter: blur(6px);
 }
 
 .row{display:flex;gap:16px;flex-wrap:wrap;}
 .col{flex:1;min-width:280px;}
 small{color:var(--muted)}
-.muted{opacity:.75;}
-.error{color:#ff6b6b;}
 
 input,select,button,textarea{
   width:100%;
@@ -106,26 +75,49 @@ button.active{
   justify-content:space-between;
   gap:12px;
   margin-bottom:18px;
+  flex-wrap:wrap;
 }
 
-.brand{display:flex;align-items:center;gap:10px;}
+/* ---- Brand ---- */
+.brand{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  min-width:0;
+}
 
-/* ✅ THIS is the small square logo next to AutoShield TECH */
-.logo{
+/* ✅ This is the ONLY logo square now.
+   We LOCK its size so it can NEVER become a huge block. */
+.brandLogo{
+  flex:0 0 38px;
   width:38px;
   height:38px;
   border-radius:12px;
   border:1px solid var(--line);
-  background-color: rgba(0,0,0,.22);
-
-  /* pulls from /public/autoshield-logo.png */
-  background-image: var(--logo-url);
-  background-repeat:no-repeat;
+  background:
+    linear-gradient(135deg, rgba(80,140,255,.85), rgba(0,255,170,.55));
   background-position:center;
-  background-size: cover;
+  background-repeat:no-repeat;
+  background-size:contain;
+  overflow:hidden;
 }
 
-.brandTitle{line-height:1.05;}
+/* ✅ If you have a real logo file, use ONE of these:
+   (Pick ONE and delete the other line)
+   - public path example: /autoshield-icon-notext.png
+*/
+/*
+.brandLogo{
+  flex:0 0 38px;
+  width:38px;
+  height:38px;
+  border-radius:12px;
+  border:1px solid var(--line);
+  background: url('/autoshield-icon-notext.png') center/contain no-repeat;
+}
+*/
+
+.brandTitle{line-height:1.05; min-width:0;}
 .brandTitle b{display:block;font-size:16px;}
 .brandTitle span{display:block;font-size:12px;color:var(--muted);letter-spacing:2px;}
 
@@ -154,6 +146,9 @@ button.active{
   white-space:nowrap;
 }
 
+.error{color:#ff6b6b;}
+.muted{opacity:.75;}
+
 /* --- Trading terminal layout --- */
 .tradeWrap{width:100%; max-width:1100px; margin:0 auto;}
 .tradeTop{
@@ -172,6 +167,7 @@ button.active{
   width:100%;
   min-width:0;
 }
+
 .tradeChart{min-height:620px; min-width:0;}
 .tradeAI{min-height:620px; display:flex; flex-direction:column; min-width:0;}
 
@@ -190,7 +186,10 @@ button.active{
   margin-top:10px;
   min-width:0;
 }
-.chatBox input{flex:1;min-width:0;}
+.chatBox input{
+  flex:1;
+  min-width:0;
+}
 
 .chatMsg{
   padding:10px;
