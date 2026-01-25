@@ -16,17 +16,10 @@ import Company from './pages/Company.jsx';
 import Individual from './pages/Individual.jsx';
 import Trading from './pages/Trading.jsx';
 
-const LOGO_URL = "https://github.com/user-attachments/assets/0895f9e4-83c4-4088-8658-7a6aeb728af2";
-
 function Brand(){
   return (
     <div className="brand">
-      <img
-        className="logoImg"
-        src={LOGO_URL}
-        alt="AutoShield Tech"
-        onError={(e) => { e.currentTarget.style.display = "none"; }}
-      />
+      <div className="brandLogo" aria-hidden="true"></div>
       <div className="brandTitle">
         <b>AutoShield</b>
         <span>TECH</span>
@@ -65,19 +58,17 @@ export default function App(){
 
   if (!user) {
     return (
-      <div className="appShell">
-        <div className="container">
-          <div className="nav">
-            <Brand />
-            <small>Security + trading, one command center</small>
-          </div>
-          {bootError && (
-            <div className="card" style={{borderColor:'rgba(255,180,0,.5)'}}>
-              <b>Note:</b> {bootError}
-            </div>
-          )}
-          <Login onLogin={onLogin} />
+      <div className="container">
+        <div className="nav">
+          <Brand />
+          <small>Security + trading, one command center</small>
         </div>
+        {bootError && (
+          <div className="card" style={{borderColor:'rgba(255,180,0,.5)'}}>
+            <b>Note:</b> {bootError}
+          </div>
+        )}
+        <Login onLogin={onLogin} />
       </div>
     );
   }
@@ -107,25 +98,23 @@ export default function App(){
     : dashboardPage;
 
   return (
-    <div className="appShell">
-      <div className="container">
-        <div className="nav">
-          <Brand />
-          <div className="actions" style={{maxWidth:700}}>
-            <button className={view==='dashboard'?'active':''} onClick={()=>setView('dashboard')}>Cybersecurity</button>
-            <button className={view==='trading'?'active':''} onClick={()=>setView('trading')}>Trading</button>
+    <div className="container">
+      <div className="nav">
+        <Brand />
+        <div className="actions" style={{maxWidth:700}}>
+          <button className={view==='dashboard'?'active':''} onClick={()=>setView('dashboard')}>Cybersecurity</button>
+          <button className={view==='trading'?'active':''} onClick={()=>setView('trading')}>Trading</button>
 
-            <span className="badge">{user.role}</span>
-            <span className={`badge ${user.subscriptionStatus==='Active'?'ok':(user.subscriptionStatus==='PastDue'?'warn':'danger')}`}>
-              {user.subscriptionStatus}
-            </span>
-            {autoprotectEnabled && <span className="badge ok">AutoProtect</span>}
+          <span className="badge">{user.role}</span>
+          <span className={`badge ${user.subscriptionStatus==='Active'?'ok':(user.subscriptionStatus==='PastDue'?'warn':'danger')}`}>
+            {user.subscriptionStatus}
+          </span>
+          {autoprotectEnabled && <span className="badge ok">AutoProtect</span>}
 
-            <button onClick={signOut}>Sign out</button>
-          </div>
+          <button onClick={signOut}>Sign out</button>
         </div>
-        {page}
       </div>
+      {page}
     </div>
   );
 }
