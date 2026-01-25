@@ -11,7 +11,6 @@
 
 *{box-sizing:border-box}
 html,body{height:100%}
-
 body{
   margin:0;
   font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;
@@ -20,18 +19,16 @@ body{
     radial-gradient(1000px 700px at 90% 40%, rgba(0,255,170,.10), transparent 55%),
     var(--bg);
   color:var(--text);
-  overflow-x:hidden;
+  overflow-x:hidden; /* ✅ stop side-scroll on phones */
 }
 
 .container{max-width:1100px;margin:0 auto;padding:24px;}
-
 .card{
   background:var(--panel);
   border:1px solid var(--line);
   border-radius:16px;
   padding:16px;
 }
-
 .row{display:flex;gap:16px;flex-wrap:wrap;}
 .col{flex:1;min-width:280px;}
 small{color:var(--muted)}
@@ -75,49 +72,23 @@ button.active{
   justify-content:space-between;
   gap:12px;
   margin-bottom:18px;
-  flex-wrap:wrap;
 }
+.brand{display:flex;align-items:center;gap:10px;}
 
-/* ---- Brand ---- */
-.brand{
-  display:flex;
-  align-items:center;
-  gap:10px;
-  min-width:0;
-}
-
-/* ✅ This is the ONLY logo square now.
-   We LOCK its size so it can NEVER become a huge block. */
-.brandLogo{
-  flex:0 0 38px;
+/* ✅ THIS IS THE ONLY PLACE YOUR LOGO SHOULD SHOW */
+.logo{
   width:38px;
   height:38px;
   border-radius:12px;
   border:1px solid var(--line);
-  background:
-    linear-gradient(135deg, rgba(80,140,255,.85), rgba(0,255,170,.55));
+  background-color: rgba(0,0,0,.25);
+  background-image: url("https://github.com/user-attachments/assets/0895f9e4-83c4-4088-8658-7a6aeb728af2");
   background-position:center;
   background-repeat:no-repeat;
   background-size:contain;
-  overflow:hidden;
 }
 
-/* ✅ If you have a real logo file, use ONE of these:
-   (Pick ONE and delete the other line)
-   - public path example: /autoshield-icon-notext.png
-*/
-/*
-.brandLogo{
-  flex:0 0 38px;
-  width:38px;
-  height:38px;
-  border-radius:12px;
-  border:1px solid var(--line);
-  background: url('/autoshield-icon-notext.png') center/contain no-repeat;
-}
-*/
-
-.brandTitle{line-height:1.05; min-width:0;}
+.brandTitle{line-height:1.05;}
 .brandTitle b{display:block;font-size:16px;}
 .brandTitle span{display:block;font-size:12px;color:var(--muted);letter-spacing:2px;}
 
@@ -145,7 +116,6 @@ button.active{
   font-size:13px;
   white-space:nowrap;
 }
-
 .error{color:#ff6b6b;}
 .muted{opacity:.75;}
 
@@ -159,6 +129,7 @@ button.active{
   flex-wrap:wrap;
 }
 
+/* ✅ grid will NOT overflow on phones */
 .tradeGrid{
   display:grid;
   grid-template-columns: 1.8fr 1fr;
@@ -167,7 +138,6 @@ button.active{
   width:100%;
   min-width:0;
 }
-
 .tradeChart{min-height:620px; min-width:0;}
 .tradeAI{min-height:620px; display:flex; flex-direction:column; min-width:0;}
 
@@ -188,9 +158,8 @@ button.active{
 }
 .chatBox input{
   flex:1;
-  min-width:0;
+  min-width:0; /* ✅ stops input from pushing layout wide */
 }
-
 .chatMsg{
   padding:10px;
   border-radius:10px;
@@ -201,6 +170,7 @@ button.active{
 .chatMsg.you{ background: rgba(45, 90, 255, .12); }
 .chatMsg.ai{ background: rgba(20, 255, 160, .08); }
 
+/* ✅ your new scoreboard boxes */
 .kpiBox{
   background: rgba(255,255,255,0.04);
   border: 1px solid rgba(255,255,255,0.08);
@@ -209,7 +179,7 @@ button.active{
   display:flex;
   flex-direction:column;
   gap:4px;
-  min-width:0;
+  min-width:0; /* ✅ allow shrink inside grid */
 }
 .kpiVal{
   font-size: 18px;
@@ -217,7 +187,7 @@ button.active{
   line-height: 1.1;
   white-space: nowrap;
   overflow: hidden;
-  text-overflow: ellipsis;
+  text-overflow: ellipsis; /* ✅ stops huge numbers from spilling */
 }
 .kpiLbl{
   font-size: 12px;
@@ -227,6 +197,7 @@ button.active{
   text-overflow: ellipsis;
 }
 
+/* Existing KPI row (Paper Balance / P&L / Trades / Status) */
 .kpi{
   display:grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -252,6 +223,7 @@ button.active{
 }
 .kpi span{font-size:12px;opacity:.8;}
 
+/* ✅ phone fixes */
 @media (max-width: 980px){
   .container{padding:14px;}
   .tradeGrid{grid-template-columns: 1fr;}
