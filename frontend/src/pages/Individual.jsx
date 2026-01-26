@@ -1,15 +1,7 @@
-// frontend/src/pages/Individual.jsx
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
 import NotificationList from '../components/NotificationList.jsx';
-
-function badgeClass(level){
-  const x = String(level || '').toLowerCase();
-  if (x === 'low') return 'badge ok';
-  if (x === 'medium') return 'badge warn';
-  if (x === 'high' || x === 'critical') return 'badge danger';
-  return 'badge';
-}
+import SecurityPostureDashboard from '../components/SecurityPostureDashboard.jsx';
 
 export default function Individual({ user }) {
   const [notes, setNotes] = useState([]);
@@ -44,128 +36,23 @@ export default function Individual({ user }) {
     } catch (e) { alert(e.message); }
   };
 
-  // ✅ UI-only “Security Posture” (demo now, wired to backend later)
-  const posture = useMemo(() => {
-    // Basic logic: if they’re getting a lot of unread notifications, posture worsens.
-    const unread = (notes || []).filter(n => !n.readAt).length;
-
-    // You can tweak these thresholds later.
-    let risk = 'Low';
-    if (unread >= 3) risk = 'Medium';
-    if (unread >= 8) risk = 'High';
-
-    const coverage = {
-      mfa: true,
-      passwordPolicy: true,
-      deviceHygiene: unread < 8,     // demo: too many alerts means device hygiene needs help
-      phishingProtection: true,
-      monitoring: true,
-      incidentResponse: true,
-    };
-
-    const score =
-      (Object.values(coverage).filter(Boolean).length / Object.keys(coverage).length) * 100;
-
-    const rec = [];
-    if (unread >= 3) rec.push('Review unread alerts and mark false positives as read.');
-    if (!coverage.deviceHygiene) rec.push('Run device scan + remove suspicious extensions/apps.');
-    rec.push('Enable MFA everywhere (email + trading + admin).');
-    rec.push('Use unique passwords (password manager recommended).');
-
-    return {
-      risk,
-      unread,
-      score: Math.round(score),
-      lastScan: new Date().toLocaleString(),
-      coverage,
-      recommendations: rec
-    };
-  }, [notes]);
-
   return (
     <div className="grid">
       <div className="card">
-        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', gap:12, flexWrap:'wrap'}}>
-          <div>
-            <h2 style={{margin:0}}>Cybersecurity Dashboard</h2>
-            <p style={{margin:'6px 0 0 0'}}><small>Report an issue and track AutoProtect actions.</small></p>
-          </div>
-
-          <div style={{display:'flex', gap:10, alignItems:'center', flexWrap:'wrap'}}>
-            <span className={badgeClass(posture.risk)}>
-              Risk: {posture.risk}
-            </span>
-            <span className="badge">
-              Unread alerts: {posture.unread}
-            </span>
-            <span className="badge ok">
-              Coverage: {posture.score}%
-            </span>
-          </div>
-        </div>
+        <h2>Cybersecurity Dashboard</h2>
+        <p><small>Report an issue and track AutoProtect actions.</small></p>
       </div>
 
-      {/* ✅ NEW: Security Posture “Room” card */}
       <div className="card">
-        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', gap:12, flexWrap:'wrap'}}>
-          <h3 style={{margin:0}}>Security Posture</h3>
-          <small className="muted">Last scan: {posture.lastScan}</small>
-        </div>
-
-        <div style={{
-          marginTop: 12,
-          display: 'grid',
-          gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-          gap: 10
-        }}>
-          <div className="kpiBox">
-            <div className="kpiVal">{posture.risk}</div>
-            <div className="kpiLbl">Risk Level</div>
-          </div>
-          <div className="kpiBox">
-            <div className="kpiVal">{posture.unread}</div>
-            <div className="kpiLbl">Unread Alerts</div>
-          </div>
-          <div className="kpiBox">
-            <div className="kpiVal">{posture.score}%</div>
-            <div className="kpiLbl">Coverage Score</div>
-          </div>
-        </div>
-
-        <div style={{marginTop: 12}}>
-          <b>Coverage Checklist</b>
-          <div style={{marginTop: 8, display:'grid', gridTemplateColumns:'repeat(2, minmax(0, 1fr))', gap: 8}}>
-            <div className="badge ok">MFA Enabled</div>
-            <div className="badge ok">Password Policy</div>
-            <div className={posture.coverage.deviceHygiene ? 'badge ok' : 'badge warn'}>
-              Device Hygiene
-            </div>
-            <div className="badge ok">Phishing Protection</div>
-            <div className="badge ok">Monitoring</div>
-            <div className="badge ok">Incident Response</div>
-          </div>
-        </div>
-
-        <div style={{marginTop: 14}}>
-          <b>Recommended Actions</b>
-          <div style={{marginTop: 8, lineHeight: 1.6}} className="muted">
-            {posture.recommendations.map((x, i) => (
-              <div key={i}>• {x}</div>
-            ))}
-          </div>
-        </div>
+        <h3>Security Posture</h3>
+        <SecurityPostureDashboard />
       </div>
 
       <div className="card">
         <h3>Report a security issue</h3>
         <form onSubmit={create} className="form">
           <label>Title</label>
-          <input
-            value={project.title}
-            onChange={e=>setProject({...project,title:e.target.value})}
-            placeholder="e.g., suspicious login attempt"
-            required
-          />
+          <input value={project.title} onChange={e=>setProject({...project,title:e.target.value})} placeholder="e.g., suspicious login attempt" required />
           <label>Type</label>
           <select value={project.issueType} onChange={e=>setProject({...project,issueType:e.target.value})}>
             <option value="phishing">Phishing</option>
@@ -175,12 +62,7 @@ export default function Individual({ user }) {
             <option value="other">Other</option>
           </select>
           <label>Details</label>
-          <textarea
-            value={project.details}
-            onChange={e=>setProject({...project,details:e.target.value})}
-            placeholder="What happened? What did you notice?"
-            rows={4}
-          />
+          <textarea value={project.details} onChange={e=>setProject({...project,details:e.target.value})} placeholder="What happened? What did you notice?" rows={4} />
           <button type="submit">Create case</button>
         </form>
 
