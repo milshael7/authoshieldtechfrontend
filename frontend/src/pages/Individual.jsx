@@ -1,7 +1,11 @@
+// frontend/src/pages/Individual.jsx
 import React, { useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
 import NotificationList from '../components/NotificationList.jsx';
-import SecurityPostureDashboard from '../components/SecurityPostureDashboard.jsx';
+
+function apiBase(){
+  return (import.meta.env.VITE_API_BASE || import.meta.env.VITE_BACKEND_URL || '').trim();
+}
 
 export default function Individual({ user }) {
   const [notes, setNotes] = useState([]);
@@ -12,14 +16,40 @@ export default function Individual({ user }) {
   });
   const [created, setCreated] = useState(null);
 
-  const load = async () => setNotes(await api.meNotifications());
+  // ✅ NEW: posture state
+  const [posture, setPosture] = useState(null);
+  const [postureErr, setPostureErr] = useState('');
 
-  useEffect(() => { load().catch(e => alert(e.message)); }, []);
+  const loadNotes = async () => setNotes(await api.meNotifications());
+
+  // ✅ NEW: load posture from backend (/api/posture/me)
+  const loadPosture = async () => {
+    setPostureErr('');
+    const base = apiBase();
+    if (!base) {
+      setPostureErr('Missing VITE_API_BASE');
+      return;
+    }
+
+    try {
+      const res = await fetch(`${base}/api/posture/me`, { credentials: 'include' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || data?.message || `HTTP ${res.status}`);
+      setPosture(data);
+    } catch (e) {
+      setPostureErr(e?.message || 'Failed to load posture');
+    }
+  };
+
+  useEffect(() => {
+    loadNotes().catch(e => alert(e.message));
+    loadPosture().catch(()=>{});
+  }, []);
 
   const markRead = async (id) => {
     try {
       await api.markMyNotificationRead(id);
-      await load();
+      await loadNotes();
     } catch (e) { alert(e.message); }
   };
 
@@ -32,9 +62,13 @@ export default function Individual({ user }) {
       });
       setCreated(p);
       setProject({ title:'', issueType:'phishing', details:'' });
-      await load();
+      await loadNotes();
     } catch (e) { alert(e.message); }
   };
+
+  const score = posture?.posture?.score;
+  const risk = posture?.posture?.risk || '—';
+  const alerts = posture?.recent?.alerts || [];
 
   return (
     <div className="grid">
@@ -43,9 +77,71 @@ export default function Individual({ user }) {
         <p><small>Report an issue and track AutoProtect actions.</small></p>
       </div>
 
+      {/* ✅ NEW: Security Posture */}
       <div className="card">
-        <h3>Security Posture</h3>
-        <SecurityPostureDashboard />
+        <div style={{display:'flex', justifyContent:'space-between', gap:10, alignItems:'center'}}>
+          <h3 style={{margin:0}}>Security Posture</h3>
+          <button style={{width:150}} onClick={loadPosture}>Refresh</button>
+        </div>
+
+        {postureErr && <p className="error" style={{marginTop:10}}>{postureErr}</p>}
+
+        {!posture && !postureErr && (
+          <p style={{marginTop:10}}><small>Loading posture…</small></p>
+        )}
+
+        {posture && (
+          <>
+            <div className="kpi" style={{marginTop:10}}>
+              <div>
+                <b>{Number.isFinite(Number(score)) ? score : '—'}</b>
+                <span>Score</span>
+              </div>
+              <div>
+                <b>{String(risk).toUpperCase()}</b>
+                <span>Risk</span>
+              </div>
+              <div>
+                <b>{alerts.length}</b>
+                <span>Active alerts</span>
+              </div>
+              <div>
+                <b>{posture?.me?.autoprotectEnabled ? 'ON' : 'OFF'}</b>
+                <span>AutoProtect</span>
+              </div>
+            </div>
+
+            <div style={{marginTop:12}}>
+              <b>Recent alerts</b>
+              <div style={{height:8}} />
+              {alerts.length === 0 && <div className="muted">No alerts right now.</div>}
+              {alerts.length > 0 && (
+                <div className="tableWrap">
+                  <table className="table">
+                    <thead>
+                      <tr>
+                        <th>Time</th>
+                        <th>Type</th>
+                        <th>Severity</th>
+                        <th>Message</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {alerts.slice(0, 12).map((a, i) => (
+                        <tr key={i}>
+                          <td><small>{a.at ? new Date(a.at).toLocaleString() : '—'}</small></td>
+                          <td><small>{a.type || '—'}</small></td>
+                          <td><small>{a.severity || '—'}</small></td>
+                          <td><small>{a.msg || '—'}</small></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </>
+        )}
       </div>
 
       <div className="card">
@@ -82,8 +178,8 @@ export default function Individual({ user }) {
       <div className="card">
         <h3>How AutoProtect works (MVP)</h3>
         <p><small>
-          Right now, AutoProtect creates an audit trail and notifications. Next step is wiring the always-on AI worker
-          to monitor logins, requests, and trading activity and automatically trigger blocks/alerts.
+          AutoProtect will monitor logins, API activity, and suspicious behavior and generate alerts + an audit trail.
+          Next step is enforcing blocks and auto-remediation.
         </small></p>
       </div>
     </div>
