@@ -8,6 +8,13 @@ export default function Admin({ user }) {
   const [companies, setCompanies] = useState([]);
   const [notes, setNotes] = useState([]);
 
+  // ✅ Manager-room visibility inside Admin
+  const [mgrOverview, setMgrOverview] = useState(null);
+  const [mgrAudit, setMgrAudit] = useState([]);
+  const [mgrNotes, setMgrNotes] = useState([]);
+  const [mgrLoading, setMgrLoading] = useState(false);
+  const [mgrErr, setMgrErr] = useState('');
+
   const [newUser, setNewUser] = useState({
     email: '',
     role: 'Individual',
@@ -30,8 +37,29 @@ export default function Admin({ user }) {
     setNotes(n || []);
   };
 
+  // ✅ load manager room data (Admin allowed)
+  const loadManagerRoom = async () => {
+    setMgrLoading(true);
+    setMgrErr('');
+    try {
+      const [ov, au, no] = await Promise.all([
+        api.managerOverview(),
+        api.managerAudit(200),
+        api.managerNotifications(),
+      ]);
+      setMgrOverview(ov || null);
+      setMgrAudit(Array.isArray(au) ? au : []);
+      setMgrNotes(Array.isArray(no) ? no : []);
+    } catch (e) {
+      setMgrErr(e?.message || 'Failed to load manager room data');
+    } finally {
+      setMgrLoading(false);
+    }
+  };
+
   useEffect(() => {
     load().catch(e => alert(e.message));
+    loadManagerRoom();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -47,6 +75,7 @@ export default function Admin({ user }) {
       await api.adminCreateUser(payload);
       setNewUser({ email: '', role: 'Individual', companyId: '', password: '' });
       await load();
+      await loadManagerRoom();
       alert('User created.');
     } catch (e) {
       alert(e.message);
@@ -57,18 +86,19 @@ export default function Admin({ user }) {
     try {
       await api.adminRotateUserId(id);
       await load();
+      await loadManagerRoom();
       alert('Platform ID rotated and password reset forced.');
     } catch (e) {
       alert(e.message);
     }
   };
 
-  // ✅ FIXED: correct field name + correct toggle direction
   const toggleAutoprotect = async (u) => {
     try {
       const next = !u.autoprotectEnabled;
       await api.adminUpdateSubscription(u.id, { autoprotectEnabled: next });
       await load();
+      await loadManagerRoom();
     } catch (e) {
       alert(e.message);
     }
@@ -78,6 +108,7 @@ export default function Admin({ user }) {
     try {
       await api.adminUpdateSubscription(u.id, { subscriptionStatus: status });
       await load();
+      await loadManagerRoom();
     } catch (e) {
       alert(e.message);
     }
@@ -89,6 +120,7 @@ export default function Admin({ user }) {
       await api.adminCreateCompany({ name: newCompany.name.trim() });
       setNewCompany({ name: '' });
       await load();
+      await loadManagerRoom();
       alert('Company created.');
     } catch (e) {
       alert(e.message);
@@ -112,6 +144,91 @@ export default function Admin({ user }) {
       <div className="card">
         <h2>Admin — Cybersecurity Control</h2>
         <p><small>Manage users, companies, subscriptions, and security posture.</small></p>
+      </div>
+
+      {/* ✅ Admin sees Manager room overview right here */}
+      <div className="card">
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+          <div>
+            <h3 style={{ margin: 0 }}>Manager Room (Admin View)</h3>
+            <p style={{ marginTop: 6 }}><small>Admin can see everything Manager sees — read-only dashboard.</small></p>
+          </div>
+          <button onClick={loadManagerRoom} disabled={mgrLoading} style={{ width: 160 }}>
+            {mgrLoading ? 'Refreshing…' : 'Refresh'}
+          </button>
+        </div>
+
+        {mgrErr && <p className="error" style={{ marginTop: 10 }}>{mgrErr}</p>}
+
+        {mgrOverview && (
+          <div className="kpi" style={{ marginTop: 10 }}>
+            <div><b>{mgrOverview.users}</b><span>Users</span></div>
+            <div><b>{mgrOverview.companies}</b><span>Companies</span></div>
+            <div><b>{mgrOverview.auditEvents}</b><span>Audit events</span></div>
+            <div><b>{mgrOverview.notifications}</b><span>Notifications</span></div>
+          </div>
+        )}
+
+        {!mgrOverview && !mgrErr && (
+          <p style={{ marginTop: 10 }}><small>{mgrLoading ? 'Loading…' : 'No manager overview yet.'}</small></p>
+        )}
+      </div>
+
+      {/* ✅ Manager notifications inside Admin */}
+      <div className="card">
+        <h3>Manager Notifications (Admin View)</h3>
+        {mgrNotes.length === 0 && <p><small>{mgrLoading ? 'Loading…' : 'No notifications yet.'}</small></p>}
+        <div className="tableWrap">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Title</th>
+                <th>Message</th>
+                <th>Severity</th>
+              </tr>
+            </thead>
+            <tbody>
+              {mgrNotes.slice(0, 12).map(n => (
+                <tr key={n.id}>
+                  <td><small>{new Date(n.createdAt || Date.now()).toLocaleString()}</small></td>
+                  <td><small><b>{n.title || '—'}</b></small></td>
+                  <td><small>{n.message || '—'}</small></td>
+                  <td><small>{n.severity || 'info'}</small></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* ✅ Manager audit log inside Admin */}
+      <div className="card">
+        <h3>Manager Audit Log (Admin View)</h3>
+        {mgrAudit.length === 0 && <p><small>{mgrLoading ? 'Loading…' : 'No audit events yet.'}</small></p>}
+        <div className="tableWrap">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Action</th>
+                <th>Actor</th>
+                <th>Target</th>
+              </tr>
+            </thead>
+            <tbody>
+              {mgrAudit.slice(0, 20).map(ev => (
+                <tr key={ev.id}>
+                  <td><small>{new Date(ev.at || Date.now()).toLocaleString()}</small></td>
+                  <td><small>{ev.action || '—'}</small></td>
+                  <td><small>{ev.actorId || '—'}</small></td>
+                  <td><small>{(ev.targetType || '—') + ':' + (ev.targetId || '—')}</small></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p style={{ marginTop: 10 }}><small>Admin can see this; Managers are read-only by default.</small></p>
       </div>
 
       <div className="card">
