@@ -132,6 +132,8 @@ button.active{
 .actions button{flex:1;min-width:120px;width:auto;}
 
 .tableWrap{overflow:auto; -webkit-overflow-scrolling:touch;}
+
+/* ✅ TABLE: works for Admin/Manager/Company consistently */
 .table{
   width:100%;
   border-collapse:collapse;
@@ -139,11 +141,22 @@ button.active{
 }
 .table th,.table td{
   border-bottom:1px solid rgba(255,255,255,0.08);
-  padding:8px 6px;
+  padding:10px 8px;
   text-align:left;
   font-size:13px;
   white-space:nowrap;
+  vertical-align:top;
 }
+.table thead th{
+  font-weight:800;
+  color:rgba(255,255,255,.90);
+  background: rgba(0,0,0,.18);
+}
+.table tbody tr:hover td{
+  background: rgba(255,255,255,0.02);
+}
+.table td .muted{opacity:.75;}
+
 .error{color:#ff6b6b;}
 .muted{opacity:.75;}
 
@@ -296,7 +309,7 @@ button.active{
 }
 .kpi span{font-size:12px;opacity:.8;}
 
-/* ✅ NEW: Security Posture Dashboard (matches the picture vibe) */
+/* ✅ Security Posture Dashboard vibe (for later components) */
 .postureWrap{
   display:grid;
   grid-template-columns: 1.15fr 0.85fr;
