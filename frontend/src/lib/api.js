@@ -1,4 +1,3 @@
-// frontend/src/lib/api.js
 const API_BASE = import.meta.env.VITE_API_BASE || '';
 
 const TOKEN_KEY = 'as_token';
@@ -14,10 +13,6 @@ export const getSavedUser = () => {
 };
 export const saveUser = (u) => localStorage.setItem(USER_KEY, JSON.stringify(u));
 export const clearUser = () => localStorage.removeItem(USER_KEY);
-
-// Optional keys for paper endpoints
-const PAPER_RESET_KEY = import.meta.env.VITE_PAPER_RESET_KEY || '';
-const PAPER_OWNER_KEY = import.meta.env.VITE_PAPER_OWNER_KEY || '';
 
 async function req(path, { method = 'GET', body, auth = true, headers: extraHeaders = {} } = {}) {
   const headers = { 'Content-Type': 'application/json', ...extraHeaders };
@@ -39,75 +34,64 @@ async function req(path, { method = 'GET', body, auth = true, headers: extraHead
 }
 
 export const api = {
-  // Auth
+  // ---------------- Auth ----------------
   login: (email, password) =>
     req('/api/auth/login', { method: 'POST', body: { email, password }, auth: false }),
 
   resetPassword: (email, newPassword) =>
     req('/api/auth/reset-password', { method: 'POST', body: { email, newPassword }, auth: false }),
 
-  // Me
+  // ---------------- Me ----------------
   meNotifications: () => req('/api/me/notifications'),
   markMyNotificationRead: (id) => req(`/api/me/notifications/${id}/read`, { method: 'POST' }),
   createProject: (payload) => req('/api/me/projects', { method: 'POST', body: payload }),
 
-  // Admin
+  // ---------------- Admin ----------------
   adminUsers: () => req('/api/admin/users'),
   adminCreateUser: (payload) => req('/api/admin/users', { method: 'POST', body: payload }),
   adminRotateUserId: (id) => req(`/api/admin/users/${id}/rotate-id`, { method: 'POST' }),
-  adminUpdateSubscription: (id, payload) => req(`/api/admin/users/${id}/subscription`, { method: 'POST', body: payload }),
+  adminUpdateSubscription: (id, payload) =>
+    req(`/api/admin/users/${id}/subscription`, { method: 'POST', body: payload }),
   adminCompanies: () => req('/api/admin/companies'),
   adminCreateCompany: (payload) => req('/api/admin/companies', { method: 'POST', body: payload }),
   adminNotifications: () => req('/api/admin/notifications'),
 
-  // Manager (read-only visibility)
+  // ---------------- Manager ----------------
   managerOverview: () => req('/api/manager/overview'),
   managerUsers: () => req('/api/manager/users'),
   managerCompanies: () => req('/api/manager/companies'),
-  managerNotifications: (limit = 200) => req(`/api/manager/notifications?limit=${encodeURIComponent(limit)}`),
-  managerAudit: (limit = 200, { actorId = '', action = '' } = {}) => {
-    const qs = new URLSearchParams();
-    qs.set('limit', String(limit));
-    if (actorId) qs.set('actorId', actorId);
-    if (action) qs.set('action', action);
-    return req(`/api/manager/audit?${qs.toString()}`);
-  },
+  managerNotifications: () => req('/api/manager/notifications'),
+  managerAudit: (limit = 200) => req(`/api/manager/audit?limit=${encodeURIComponent(limit)}`),
 
-  // Company
-  companyMe: () => req('/api/company/me'),
-  companyNotifications: () => req('/api/company/notifications'),
-  companyAddMember: (userId) => req('/api/company/members', { method: 'POST', body: { userId } }),
-  companyRemoveMember: (userId) => req(`/api/company/members/${encodeURIComponent(userId)}`, { method: 'DELETE' }),
-  companyMarkRead: (id) => req(`/api/company/notifications/${id}/read`, { method: 'POST' }),
-
-  // ✅ Posture (cyber dashboards)
-  postureSummary: () => req('/api/posture/summary'),
-  postureChecks: () => req('/api/posture/checks'),
-  postureRecent: (limit = 50) => req(`/api/posture/recent?limit=${encodeURIComponent(limit)}`),
-
-  // Trading
+  // ---------------- Trading ----------------
   tradingSymbols: () => req('/api/trading/symbols'),
   tradingCandles: (symbol) => req(`/api/trading/candles?symbol=${encodeURIComponent(symbol)}`),
 
-  // AI
+  // ---------------- AI ----------------
   aiChat: (message, context) => req('/api/ai/chat', { method: 'POST', body: { message, context } }),
   aiTrainingStatus: () => req('/api/ai/training/status'),
   aiTrainingStart: () => req('/api/ai/training/start', { method: 'POST' }),
   aiTrainingStop: () => req('/api/ai/training/stop', { method: 'POST' }),
 
-  // ✅ Paper (status/reset/config)
+  // ---------------- Paper (controls) ----------------
   paperStatus: () => req('/api/paper/status'),
-  paperReset: () =>
+  paperReset: (resetKey) =>
     req('/api/paper/reset', {
       method: 'POST',
-      headers: PAPER_RESET_KEY ? { 'x-reset-key': PAPER_RESET_KEY } : {},
+      body: {},
+      headers: resetKey ? { 'x-reset-key': String(resetKey) } : {}
     }),
 
-  paperConfigGet: () => req('/api/paper/config'),
-  paperConfigSet: (payload) =>
+  paperGetConfig: () => req('/api/paper/config'),
+  paperSetConfig: ({ baselinePct, maxPct, maxTradesPerDay }, ownerKey) =>
     req('/api/paper/config', {
       method: 'POST',
-      body: payload,
-      headers: PAPER_OWNER_KEY ? { 'x-owner-key': PAPER_OWNER_KEY } : {},
+      body: { baselinePct, maxPct, maxTradesPerDay },
+      headers: ownerKey ? { 'x-owner-key': String(ownerKey) } : {}
     }),
+
+  // ---------------- Posture (cyber dashboards) ----------------
+  postureSummary: () => req('/api/posture/summary'),
+  postureChecks: () => req('/api/posture/checks'),
+  postureRecent: (limit = 50) => req(`/api/posture/recent?limit=${encodeURIComponent(limit)}`),
 };
