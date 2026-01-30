@@ -1,5 +1,4 @@
 // frontend/src/lib/api.js
-
 const API_BASE = import.meta.env.VITE_API_BASE || '';
 
 const TOKEN_KEY = 'as_token';
@@ -15,6 +14,10 @@ export const getSavedUser = () => {
 };
 export const saveUser = (u) => localStorage.setItem(USER_KEY, JSON.stringify(u));
 export const clearUser = () => localStorage.removeItem(USER_KEY);
+
+// Optional keys for paper endpoints
+const PAPER_RESET_KEY = import.meta.env.VITE_PAPER_RESET_KEY || '';
+const PAPER_OWNER_KEY = import.meta.env.VITE_PAPER_OWNER_KEY || '';
 
 async function req(path, { method = 'GET', body, auth = true, headers: extraHeaders = {} } = {}) {
   const headers = { 'Content-Type': 'application/json', ...extraHeaders };
@@ -52,8 +55,7 @@ export const api = {
   adminUsers: () => req('/api/admin/users'),
   adminCreateUser: (payload) => req('/api/admin/users', { method: 'POST', body: payload }),
   adminRotateUserId: (id) => req(`/api/admin/users/${id}/rotate-id`, { method: 'POST' }),
-  adminUpdateSubscription: (id, payload) =>
-    req(`/api/admin/users/${id}/subscription`, { method: 'POST', body: payload }),
+  adminUpdateSubscription: (id, payload) => req(`/api/admin/users/${id}/subscription`, { method: 'POST', body: payload }),
   adminCompanies: () => req('/api/admin/companies'),
   adminCreateCompany: (payload) => req('/api/admin/companies', { method: 'POST', body: payload }),
   adminNotifications: () => req('/api/admin/notifications'),
@@ -62,15 +64,26 @@ export const api = {
   managerOverview: () => req('/api/manager/overview'),
   managerUsers: () => req('/api/manager/users'),
   managerCompanies: () => req('/api/manager/companies'),
-  managerNotifications: () => req('/api/manager/notifications'),
-  managerAudit: (limit = 200) => req(`/api/manager/audit?limit=${encodeURIComponent(limit)}`),
+  managerNotifications: (limit = 200) => req(`/api/manager/notifications?limit=${encodeURIComponent(limit)}`),
+  managerAudit: (limit = 200, { actorId = '', action = '' } = {}) => {
+    const qs = new URLSearchParams();
+    qs.set('limit', String(limit));
+    if (actorId) qs.set('actorId', actorId);
+    if (action) qs.set('action', action);
+    return req(`/api/manager/audit?${qs.toString()}`);
+  },
 
   // Company
   companyMe: () => req('/api/company/me'),
   companyNotifications: () => req('/api/company/notifications'),
-  companyMarkRead: (id) => req(`/api/company/notifications/${id}/read`, { method: 'POST' }),
   companyAddMember: (userId) => req('/api/company/members', { method: 'POST', body: { userId } }),
   companyRemoveMember: (userId) => req(`/api/company/members/${encodeURIComponent(userId)}`, { method: 'DELETE' }),
+  companyMarkRead: (id) => req(`/api/company/notifications/${id}/read`, { method: 'POST' }),
+
+  // ✅ Posture (cyber dashboards)
+  postureSummary: () => req('/api/posture/summary'),
+  postureChecks: () => req('/api/posture/checks'),
+  postureRecent: (limit = 50) => req(`/api/posture/recent?limit=${encodeURIComponent(limit)}`),
 
   // Trading
   tradingSymbols: () => req('/api/trading/symbols'),
@@ -82,8 +95,19 @@ export const api = {
   aiTrainingStart: () => req('/api/ai/training/start', { method: 'POST' }),
   aiTrainingStop: () => req('/api/ai/training/stop', { method: 'POST' }),
 
-  // ✅ Cyber Posture (NEW)
-  postureSummary: () => req('/api/posture/summary'),
-  postureChecks: () => req('/api/posture/checks'),
-  postureRecent: (limit = 50) => req(`/api/posture/recent?limit=${encodeURIComponent(limit)}`),
+  // ✅ Paper (status/reset/config)
+  paperStatus: () => req('/api/paper/status'),
+  paperReset: () =>
+    req('/api/paper/reset', {
+      method: 'POST',
+      headers: PAPER_RESET_KEY ? { 'x-reset-key': PAPER_RESET_KEY } : {},
+    }),
+
+  paperConfigGet: () => req('/api/paper/config'),
+  paperConfigSet: (payload) =>
+    req('/api/paper/config', {
+      method: 'POST',
+      body: payload,
+      headers: PAPER_OWNER_KEY ? { 'x-owner-key': PAPER_OWNER_KEY } : {},
+    }),
 };
