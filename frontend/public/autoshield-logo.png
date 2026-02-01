@@ -1,1 +1,38 @@
+{/* Chart */}
+<div style={{ marginTop: 12, height: wideChart ? 620 : 520, position: "relative" }}>
+  {/* subtle watermark overlay */}
+  <div
+    style={{
+      position: "absolute",
+      inset: 0,
+      pointerEvents: "none",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      opacity: 0.08, // subtle
+      zIndex: 2,
+    }}
+  >
+    <img
+      src="/autoshield-logo.png"
+      alt=""
+      style={{
+        width: "min(420px, 60%)",
+        filter: "blur(0.2px)",
+      }}
+    />
+  </div>
 
+  <canvas
+    ref={canvasRef}
+    style={{
+      position: "relative",
+      zIndex: 1,
+      width: "100%",
+      height: "100%",
+      borderRadius: 14,
+      border: "1px solid rgba(255,255,255,0.10)",
+      background: "rgba(0,0,0,0.20)",
+    }}
+  />
+</div>
