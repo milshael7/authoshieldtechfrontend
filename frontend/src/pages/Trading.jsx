@@ -80,245 +80,27 @@ function toNum(v, fallback = 0) {
 const OWNER_KEY_LS = "as_owner_key";
 const RESET_KEY_LS = "as_reset_key";
 
-/* ---------------------------
-   NEW: Security Modules Panel
-   Matches the picture vibe:
-   glass tiles + glow dots + connector rail
---------------------------- */
-function ModuleIcon({ kind = "shield" }) {
-  // Simple inline SVGs (no extra files)
-  // neon/glow is done via CSS filter
-  if (kind === "google") {
-    return (
-      <svg viewBox="0 0 64 64" width="34" height="34" aria-hidden="true">
-        <path
-          fill="#EA4335"
-          d="M32 28.2v11.6h16.2C46.5 47.7 40.2 52 32 52 20.9 52 12 43.1 12 32s8.9-20 20-20c5.6 0 10.3 2.1 13.9 5.5l7.8-7.8C49 4.8 41 1 32 1 14.9 1 1 14.9 1 32s13.9 31 31 31c17.9 0 29.7-12.6 29.7-30.3 0-2-.2-3.5-.5-5H32z"
-        />
-        <path fill="#34A853" d="M12.6 38.2 3.9 44.9C9 55 19.7 62 32 62c8.1 0 15-2.7 20-7.3l-9.6-7.4c-2.6 1.8-6 2.9-10.4 2.9-7.9 0-14.5-5.3-16.9-12z" />
-        <path fill="#FBBC05" d="M3.9 19.1 12.8 25.8C15.4 19 23 14.1 32 14.1c4.4 0 8.4 1.5 11.5 4.4l8.6-8.6C47 5.2 40 2 32 2 19.7 2 9 9 3.9 19.1z" />
-        <path fill="#4285F4" d="M63.2 32.7c0-1.8-.2-3.1-.5-4.5H32v9.9h17.7c-.8 4-3.5 7.5-7.3 9.2l9.6 7.4c5.6-5.2 11.2-12.7 11.2-22z" />
-      </svg>
-    );
+/* -------------------------------------------------------
+   ✅ TradingView-like chrome around your existing canvas
+   (no new dependencies, no breaking the trading logic)
+------------------------------------------------------- */
+
+const TF = [
+  { k: "1m", sec: 60 },
+  { k: "5m", sec: 300 },
+  { k: "15m", sec: 900 },
+  { k: "1H", sec: 3600 },
+  { k: "4H", sec: 14400 },
+  { k: "1D", sec: 86400 },
+];
+
+function tvTimeStr(tsMs) {
+  try {
+    const d = new Date(tsMs);
+    return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  } catch {
+    return "—";
   }
-
-  if (kind === "microsoft") {
-    return (
-      <svg viewBox="0 0 64 64" width="34" height="34" aria-hidden="true">
-        <rect x="6" y="6" width="24" height="24" fill="#F25022" />
-        <rect x="34" y="6" width="24" height="24" fill="#7FBA00" />
-        <rect x="6" y="34" width="24" height="24" fill="#00A4EF" />
-        <rect x="34" y="34" width="24" height="24" fill="#FFB900" />
-      </svg>
-    );
-  }
-
-  if (kind === "chart") {
-    return (
-      <svg viewBox="0 0 64 64" width="34" height="34" aria-hidden="true">
-        <circle cx="32" cy="32" r="26" fill="#ff2d7a" opacity="0.18" />
-        <circle cx="32" cy="32" r="22" fill="#ff2d7a" opacity="0.10" />
-        <path
-          d="M18 40c6-10 12-8 16-14 4-6 8-4 12 6"
-          fill="none"
-          stroke="#ff2d7a"
-          strokeWidth="4"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        <circle cx="18" cy="40" r="3" fill="#fff" />
-        <circle cx="34" cy="26" r="3" fill="#fff" />
-        <circle cx="46" cy="32" r="3" fill="#fff" />
-      </svg>
-    );
-  }
-
-  // default shield
-  return (
-    <svg viewBox="0 0 64 64" width="34" height="34" aria-hidden="true">
-      <path
-        d="M32 6l20 8v18c0 14-9 22-20 26C21 54 12 46 12 32V14l20-8z"
-        fill="rgba(0,255,170,0.22)"
-        stroke="rgba(0,255,170,0.95)"
-        strokeWidth="3"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function SecurityModulesPanel() {
-  const top = [
-    { label: "EDR", icon: "shield" },
-    { label: "ITDR", icon: "google" }, // can be any; we’re matching “logos vibe”
-    { label: "EMAIL", icon: "chart" },
-  ];
-  const bottom = [
-    { label: "DATA", icon: "shield" },
-    { label: "SAT", icon: "shield" },
-    { label: "DARK WEB", icon: "shield" },
-  ];
-
-  return (
-    <div className="as-modWrap">
-      <div className="as-modPanel">
-        <div className="as-modBg" aria-hidden="true" />
-
-        {/* rails */}
-        <div className="as-rail as-railTop" aria-hidden="true" />
-        <div className="as-rail as-railBot" aria-hidden="true" />
-
-        <div className="as-modGrid">
-          {top.map((m) => (
-            <div key={m.label} className="as-modCell">
-              <div className="as-tile">
-                <div className="as-tileIcon">
-                  <ModuleIcon kind={m.icon} />
-                </div>
-              </div>
-              <div className="as-node" aria-hidden="true" />
-              <div className="as-modLabel">{m.label}</div>
-            </div>
-          ))}
-        </div>
-
-        <div className="as-modGrid as-modGridBottom">
-          {bottom.map((m) => (
-            <div key={m.label} className="as-modCell">
-              <div className="as-tile">
-                <div className="as-tileIcon">
-                  <ModuleIcon kind={m.icon} />
-                </div>
-              </div>
-              <div className="as-node" aria-hidden="true" />
-              <div className="as-modLabel">{m.label}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Self-contained CSS so you see results immediately without touching styles.css */}
-      <style>{`
-        .as-modWrap{ margin: 0 0 12px 0; }
-        .as-modPanel{
-          position: relative;
-          border-radius: 22px;
-          overflow: hidden;
-          border: 1px solid rgba(255,255,255,0.10);
-          background: rgba(0,0,0,0.22);
-          box-shadow: 0 12px 30px rgba(0,0,0,0.35);
-          padding: 18px 16px 16px;
-          min-height: 340px;
-          isolation: isolate;
-        }
-        .as-modBg{
-          position:absolute; inset:0;
-          background:
-            radial-gradient(800px 420px at 20% 0%, rgba(122,167,255,.16), transparent 60%),
-            radial-gradient(900px 520px at 80% 30%, rgba(0,255,170,.10), transparent 62%),
-            repeating-linear-gradient(90deg, rgba(255,255,255,.06) 0 2px, transparent 2px 14px),
-            radial-gradient(900px 600px at 50% 80%, rgba(120,80,255,.14), transparent 65%),
-            rgba(10,14,26,0.65);
-          opacity: 0.85;
-          filter: blur(0px);
-          z-index: 0;
-        }
-        .as-rail{
-          position:absolute;
-          left: 7%;
-          right: 7%;
-          height: 4px;
-          border-radius: 999px;
-          background: linear-gradient(90deg, rgba(0,255,170,0.0), rgba(0,255,170,0.55), rgba(0,255,170,0.0));
-          box-shadow: 0 0 18px rgba(0,255,170,0.35);
-          z-index: 1;
-        }
-        .as-railTop{ top: 52%; }
-        .as-railBot{ top: 78%; opacity: 0.85; }
-
-        .as-modGrid{
-          position: relative;
-          z-index: 2;
-          display: grid;
-          grid-template-columns: repeat(3, minmax(0, 1fr));
-          gap: 20px;
-          align-items: start;
-          justify-items: center;
-          padding: 10px 6px 0;
-        }
-        .as-modGridBottom{ margin-top: 22px; }
-
-        .as-modCell{
-          width: 100%;
-          max-width: 220px;
-          display:flex;
-          flex-direction: column;
-          align-items:center;
-          min-width: 0;
-        }
-
-        .as-tile{
-          width: 100%;
-          aspect-ratio: 1 / 1;
-          border-radius: 18px;
-          border: 1px solid rgba(255,255,255,0.14);
-          background: linear-gradient(180deg, rgba(255,255,255,0.09), rgba(0,0,0,0.18));
-          box-shadow: 0 10px 22px rgba(0,0,0,0.30);
-          display:flex;
-          align-items:center;
-          justify-content:center;
-          backdrop-filter: blur(10px);
-        }
-        .as-tileIcon{
-          filter: drop-shadow(0 0 10px rgba(0,255,170,0.18));
-          transform: translateZ(0);
-        }
-
-        .as-node{
-          width: 14px;
-          height: 14px;
-          border-radius: 999px;
-          margin-top: 10px;
-          background: rgba(0,255,170,0.95);
-          box-shadow: 0 0 20px rgba(0,255,170,0.65);
-          position: relative;
-        }
-        .as-node::before{
-          content:"";
-          position:absolute;
-          left:50%;
-          transform: translateX(-50%);
-          top: -28px;
-          width: 4px;
-          height: 26px;
-          border-radius: 999px;
-          background: linear-gradient(180deg, rgba(0,255,170,0.0), rgba(0,255,170,0.65));
-          box-shadow: 0 0 14px rgba(0,255,170,0.35);
-        }
-        .as-modLabel{
-          margin-top: 10px;
-          font-weight: 900;
-          letter-spacing: 2px;
-          font-size: 18px;
-          color: rgba(255,255,255,0.92);
-          text-align:center;
-          text-transform: uppercase;
-          white-space: nowrap;
-        }
-
-        @media (max-width: 980px){
-          .as-modPanel{ min-height: 320px; }
-          .as-modLabel{ font-size: 16px; letter-spacing: 1.5px; }
-          .as-railTop{ top: 54%; }
-          .as-railBot{ top: 80%; }
-        }
-        @media (max-width: 560px){
-          .as-modGrid{ gap: 14px; }
-          .as-modLabel{ font-size: 14px; }
-        }
-      `}</style>
-    </div>
-  );
 }
 
 export default function Trading({ user }) {
@@ -329,6 +111,11 @@ export default function Trading({ user }) {
   const [mode, setMode] = useState("Paper");
   const [feedStatus, setFeedStatus] = useState("Connecting…");
   const [last, setLast] = useState(65300);
+
+  // ✅ NEW: timeframe affects candle bucket + label
+  const [tfKey, setTfKey] = useState("1H");
+  const tfSec = useMemo(() => TF.find((t) => t.k === tfKey)?.sec ?? 3600, [tfKey]);
+  const bucketSec = useMemo(() => clamp(Math.floor(tfSec / 12), 5, 60 * 5), [tfSec]); // visually nice aggregation
 
   const [showMoney, setShowMoney] = useState(true);
   const [showTradeLog, setShowTradeLog] = useState(true);
@@ -343,11 +130,10 @@ export default function Trading({ user }) {
   const [cfgStatus, setCfgStatus] = useState("—");
   const [cfgBusy, setCfgBusy] = useState(false);
 
-  // Local editable config (separate so polling doesn't clobber typing)
   const [cfgForm, setCfgForm] = useState({
-    baselinePct: 0.02, // 2%
-    maxPct: 0.05, // 5%
-    maxTradesPerDay: 12, // 12 trades/day
+    baselinePct: 0.02,
+    maxPct: 0.05,
+    maxTradesPerDay: 12,
   });
 
   const [paper, setPaper] = useState({
@@ -373,12 +159,13 @@ export default function Trading({ user }) {
   const logRef = useRef(null);
 
   const canvasRef = useRef(null);
+
   const [candles, setCandles] = useState(() => {
     const base = 65300;
     const out = [];
     let p = base;
     let t = Math.floor(Date.now() / 1000);
-    for (let i = 80; i > 0; i--) {
+    for (let i = 120; i > 0; i--) {
       const time = t - i * 5;
       const o = p;
       const move = (Math.random() - 0.5) * 60;
@@ -398,7 +185,6 @@ export default function Trading({ user }) {
   const applyTick = (price, nowMs) => {
     setLast(Number(price.toFixed(2)));
     setCandles((prev) => {
-      const bucketSec = 5;
       const nowSec = Math.floor(nowMs / 1000);
       const bucketTime = Math.floor(nowSec / bucketSec) * bucketSec;
 
@@ -414,7 +200,7 @@ export default function Trading({ user }) {
           low: Math.min(o, price),
           close: price,
         });
-        while (next.length > 120) next.shift();
+        while (next.length > 160) next.shift();
         return next;
       }
 
@@ -542,7 +328,7 @@ export default function Trading({ user }) {
     };
   }, []);
 
-  // ---- draw candles ----
+  // ---- draw candles (now includes TradingView-like overlays + volume) ----
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -557,74 +343,163 @@ export default function Trading({ user }) {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
     ctx.clearRect(0, 0, cssW, cssH);
-    ctx.fillStyle = "rgba(0,0,0,0.28)";
+
+    // Layout areas (TV-like)
+    const padL = 54; // left toolbar space inside chart
+    const padR = 66; // right price scale
+    const padT = 36; // top bar inside chart
+    const volH = Math.floor(cssH * 0.23); // bottom volume area
+    const padB = 28; // bottom status bar inside chart
+
+    const chartX0 = padL + 8;
+    const chartX1 = cssW - padR - 10;
+    const chartY0 = padT + 10;
+    const chartY1 = cssH - volH - padB - 10;
+
+    const volY0 = cssH - volH - padB - 6;
+    const volY1 = cssH - padB - 10;
+
+    // Background
+    ctx.fillStyle = "rgba(6,10,18,0.70)";
     ctx.fillRect(0, 0, cssW, cssH);
 
-    ctx.strokeStyle = "rgba(255,255,255,0.08)";
+    // subtle gradient
+    const g = ctx.createLinearGradient(0, 0, 0, cssH);
+    g.addColorStop(0, "rgba(255,255,255,0.05)");
+    g.addColorStop(1, "rgba(0,0,0,0.10)");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, cssW, cssH);
+
+    // panel border
+    ctx.strokeStyle = "rgba(255,255,255,0.10)";
     ctx.lineWidth = 1;
-    for (let i = 1; i < 6; i++) {
-      const y = (cssH * i) / 6;
+    ctx.strokeRect(0.5, 0.5, cssW - 1, cssH - 1);
+
+    // Grid lines
+    ctx.strokeStyle = "rgba(255,255,255,0.07)";
+    ctx.lineWidth = 1;
+
+    const gridRows = 6;
+    for (let i = 0; i <= gridRows; i++) {
+      const y = chartY0 + ((chartY1 - chartY0) * i) / gridRows;
       ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(cssW, y);
+      ctx.moveTo(chartX0, y);
+      ctx.lineTo(chartX1, y);
       ctx.stroke();
     }
 
-    const view = candles.slice(-80);
+    const view = candles.slice(-90);
     if (!view.length) return;
 
     const highs = view.map((c) => c.high);
     const lows = view.map((c) => c.low);
     const maxP = Math.max(...highs);
     const minP = Math.min(...lows);
-
-    const pad = (maxP - minP) * 0.06 || 10;
+    const pad = (maxP - minP) * 0.08 || 10;
     const top = maxP + pad;
     const bot = minP - pad;
 
-    const px = (p) => {
+    const py = (p) => {
       const r = (top - p) / (top - bot);
-      return clamp(r, 0, 1) * (cssH - 20) + 10;
+      return clamp(r, 0, 1) * (chartY1 - chartY0) + chartY0;
     };
 
-    const w = cssW;
+    // Candles
     const n = view.length;
     const gap = 2;
-    const candleW = Math.max(4, Math.floor((w - 20) / n) - gap);
-    let x = 10;
+    const usableW = chartX1 - chartX0;
+    const candleW = Math.max(4, Math.floor((usableW - 20) / n) - gap);
+    let x = chartX0 + 10;
+
+    // Volume basis from candle "activity"
+    const vols = view.map((c) => Math.abs(c.close - c.open) + (c.high - c.low) * 0.35);
+    const maxV = Math.max(...vols, 1);
 
     for (let i = 0; i < n; i++) {
       const c = view[i];
-      const openY = px(c.open);
-      const closeY = px(c.close);
-      const highY = px(c.high);
-      const lowY = px(c.low);
-
+      const openY = py(c.open);
+      const closeY = py(c.close);
+      const highY = py(c.high);
+      const lowY = py(c.low);
       const up = c.close >= c.open;
 
+      // wick
       ctx.strokeStyle = "rgba(255,255,255,0.55)";
       ctx.beginPath();
       ctx.moveTo(x + candleW / 2, highY);
       ctx.lineTo(x + candleW / 2, lowY);
       ctx.stroke();
 
+      // body
       ctx.fillStyle = up ? "rgba(43,213,118,0.85)" : "rgba(255,90,95,0.85)";
       const y = Math.min(openY, closeY);
       const h = Math.max(2, Math.abs(closeY - openY));
       ctx.fillRect(x, y, candleW, h);
 
+      // volume bar
+      const v = vols[i];
+      const vh = (v / maxV) * (volY1 - volY0);
+      ctx.fillStyle = up ? "rgba(43,213,118,0.55)" : "rgba(255,90,95,0.55)";
+      ctx.fillRect(x, volY1 - vh, candleW, vh);
+
       x += candleW + gap;
     }
 
-    const lastY = px(last);
-    ctx.strokeStyle = "rgba(122,167,255,0.7)";
+    // Last price line
+    const lastY = py(last);
+    ctx.strokeStyle = "rgba(0,255,170,0.60)";
     ctx.setLineDash([6, 6]);
     ctx.beginPath();
-    ctx.moveTo(0, lastY);
-    ctx.lineTo(cssW, lastY);
+    ctx.moveTo(chartX0, lastY);
+    ctx.lineTo(chartX1, lastY);
     ctx.stroke();
     ctx.setLineDash([]);
-  }, [candles, last]);
+
+    // Right price scale labels
+    ctx.fillStyle = "rgba(255,255,255,0.75)";
+    ctx.font = "12px system-ui, -apple-system, Segoe UI, Roboto, Arial";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+
+    for (let i = 0; i <= gridRows; i++) {
+      const y = chartY0 + ((chartY1 - chartY0) * i) / gridRows;
+      const price = top - ((top - bot) * i) / gridRows;
+      const label = fmtMoney(price, 2);
+      ctx.fillText(label, chartX1 + 10, y);
+    }
+
+    // Last price box (right)
+    const lp = fmtMoney(last, 2);
+    const boxW = 86;
+    const boxH = 22;
+    const bx = cssW - boxW - 8;
+    const by = clamp(lastY - boxH / 2, chartY0, chartY1 - boxH);
+    ctx.fillStyle = "rgba(0,255,170,0.18)";
+    ctx.strokeStyle = "rgba(0,255,170,0.55)";
+    ctx.lineWidth = 1;
+    ctx.fillRect(bx, by, boxW, boxH);
+    ctx.strokeRect(bx + 0.5, by + 0.5, boxW - 1, boxH - 1);
+    ctx.fillStyle = "rgba(255,255,255,0.92)";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(lp, bx + boxW / 2, by + boxH / 2);
+
+    // Top-left info line (TV-like)
+    ctx.textAlign = "left";
+    ctx.fillStyle = "rgba(255,255,255,0.75)";
+    ctx.font = "12px system-ui, -apple-system, Segoe UI, Roboto, Arial";
+    ctx.fillText(`${symbol} · ${tfKey} · ${mode}`, chartX0, 18);
+
+    // Bottom status bar
+    ctx.fillStyle = "rgba(255,255,255,0.55)";
+    ctx.textAlign = "right";
+    ctx.fillText(`${tvTimeStr(Date.now())} (Local)`, cssW - 10, cssH - 12);
+
+    // Volume label
+    ctx.textAlign = "left";
+    ctx.fillStyle = "rgba(255,255,255,0.55)";
+    ctx.fillText(`Volume`, chartX0, volY0 - 8);
+  }, [candles, last, symbol, tfKey, mode]);
 
   async function sendToAI(text) {
     const clean = (text || "").trim();
@@ -641,6 +516,7 @@ export default function Trading({ user }) {
     try {
       const context = {
         symbol,
+        tf: tfKey,
         mode,
         last,
         paper: {
@@ -738,18 +614,9 @@ export default function Trading({ user }) {
     return `${ts} • ${type} ${sym}`;
   }
 
-  // ✅ Derived “amount” display based on equity
-  const baselineUsd = useMemo(() => {
-    const bp = toNum(cfgForm.baselinePct, 0);
-    return Math.max(0, equity * bp);
-  }, [cfgForm.baselinePct, equity]);
+  const baselineUsd = useMemo(() => Math.max(0, equity * toNum(cfgForm.baselinePct, 0)), [cfgForm.baselinePct, equity]);
+  const maxUsd = useMemo(() => Math.max(0, equity * toNum(cfgForm.maxPct, 0)), [cfgForm.maxPct, equity]);
 
-  const maxUsd = useMemo(() => {
-    const mp = toNum(cfgForm.maxPct, 0);
-    return Math.max(0, equity * mp);
-  }, [cfgForm.maxPct, equity]);
-
-  // ✅ Save config (one-shot)
   const savePaperConfig = async () => {
     const base = apiBase();
     if (!base) return alert("Missing VITE_API_BASE");
@@ -757,20 +624,15 @@ export default function Trading({ user }) {
     const baselinePct = clamp(toNum(cfgForm.baselinePct, 0.02), 0, 1);
     const maxPct = clamp(toNum(cfgForm.maxPct, 0.05), 0, 1);
     const maxTradesPerDay = clamp(toInt(cfgForm.maxTradesPerDay, 12), 1, 1000);
-
     if (maxPct < baselinePct) return alert("Max % must be >= Baseline %");
 
     setCfgBusy(true);
     setCfgStatus("Saving…");
     try {
       localStorage.setItem(OWNER_KEY_LS, ownerKey || "");
-
       const res = await fetch(`${base}/api/paper/config`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(ownerKey ? { "x-owner-key": String(ownerKey) } : {}),
-        },
+        headers: { "Content-Type": "application/json", ...(ownerKey ? { "x-owner-key": String(ownerKey) } : {}) },
         credentials: "include",
         body: JSON.stringify({ baselinePct, maxPct, maxTradesPerDay }),
       });
@@ -779,10 +641,7 @@ export default function Trading({ user }) {
       if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
 
       setCfgStatus("Saved ✅");
-      setPaper((prev) => ({
-        ...prev,
-        config: { ...(prev.config || {}), baselinePct, maxPct, maxTradesPerDay },
-      }));
+      setPaper((prev) => ({ ...prev, config: { ...(prev.config || {}), baselinePct, maxPct, maxTradesPerDay } }));
     } catch (e) {
       setCfgStatus("Save failed");
       alert(e?.message || "Failed to save config");
@@ -792,24 +651,18 @@ export default function Trading({ user }) {
     }
   };
 
-  // ✅ Reset paper session (one-shot)
   const resetPaper = async () => {
     const base = apiBase();
     if (!base) return alert("Missing VITE_API_BASE");
     if (!resetKey) return alert("Enter reset key first.");
-
     if (!confirm("Reset paper trading stats + trades?")) return;
 
     setCfgBusy(true);
     try {
       localStorage.setItem(RESET_KEY_LS, resetKey || "");
-
       const res = await fetch(`${base}/api/paper/reset`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-reset-key": String(resetKey),
-        },
+        headers: { "Content-Type": "application/json", "x-reset-key": String(resetKey) },
         credentials: "include",
         body: JSON.stringify({}),
       });
@@ -829,14 +682,11 @@ export default function Trading({ user }) {
     const w = Number(wins) || 0;
     const l = Number(losses) || 0;
     const total = w + l;
-    if (!total) return 0;
-    return w / total;
+    return total ? w / total : 0;
   }, [wins, losses]);
 
-  // ✅ Right sidebar only if AI visible and not wide-chart
   const showRightPanel = showAI && !wideChart;
 
-  // ✅ Layout
   const layoutCols = useMemo(() => {
     if (wideChart) return "1fr";
     if (showRightPanel) return "320px 1fr 360px";
@@ -850,11 +700,7 @@ export default function Trading({ user }) {
     backdropFilter: "blur(8px)",
   };
 
-  const headerBar = {
-    ...baseCard,
-    padding: 14,
-    marginBottom: 12,
-  };
+  const headerBar = { ...baseCard, padding: 14, marginBottom: 12 };
 
   const pill = {
     border: "1px solid rgba(255,255,255,0.10)",
@@ -899,24 +745,12 @@ export default function Trading({ user }) {
     padding: 10,
   };
 
-  const kpiVal = {
-    fontWeight: 900,
-    fontSize: 18,
-    lineHeight: 1.1,
-  };
-
-  const kpiLbl = {
-    marginTop: 6,
-    fontSize: 12,
-    opacity: 0.75,
-  };
+  const kpiVal = { fontWeight: 900, fontSize: 18, lineHeight: 1.1 };
+  const kpiLbl = { marginTop: 6, fontSize: 12, opacity: 0.75 };
 
   return (
     <div style={{ padding: 12 }}>
-      {/* ✅ NEW: This is the panel that matches your image vibe */}
-      <SecurityModulesPanel />
-
-      {/* ======= TOP HEADER (Binance-ish) ======= */}
+      {/* ======= TOP HEADER ======= */}
       <div style={headerBar}>
         <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
           <div>
@@ -931,8 +765,13 @@ export default function Trading({ user }) {
               <span style={chip}>
                 Paper: <b style={{ marginLeft: 6 }}>{paper.running ? "ON" : "OFF"}</b>
               </span>
+              <span style={chip}>
+                TF: <b style={{ marginLeft: 6 }}>{tfKey}</b>
+              </span>
             </div>
-            <div style={{ marginTop: 6, opacity: 0.75, fontSize: 12 }}>Live feed + candles + paper trader + AI explanations.</div>
+            <div style={{ marginTop: 6, opacity: 0.75, fontSize: 12 }}>
+              TradingView-like chart chrome + price scale + volume.
+            </div>
           </div>
 
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
@@ -1006,7 +845,8 @@ export default function Trading({ user }) {
             <div>
               <b style={{ fontSize: 14 }}>AI Trading Controls (Paper)</b>
               <div style={{ marginTop: 6, opacity: 0.75, fontSize: 12, lineHeight: 1.5 }}>
-                Equity: <b>{fmtMoneyCompact(equity, 2)}</b> • Win rate: <b>{(winRate * 100).toFixed(0)}%</b> • Config: <b>{cfgStatus}</b>
+                Equity: <b>{fmtMoneyCompact(equity, 2)}</b> • Win rate: <b>{(winRate * 100).toFixed(0)}%</b> • Config:{" "}
+                <b>{cfgStatus}</b>
               </div>
             </div>
 
@@ -1076,7 +916,9 @@ export default function Trading({ user }) {
                     style={inputStyle}
                     placeholder="12"
                   />
-                  <div style={{ marginTop: 6, opacity: 0.75, fontSize: 12 }}>This prevents overtrading and helps reduce one-sided losing.</div>
+                  <div style={{ marginTop: 6, opacity: 0.75, fontSize: 12 }}>
+                    This prevents overtrading and helps reduce one-sided losing.
+                  </div>
                 </div>
               </div>
             </div>
@@ -1166,6 +1008,7 @@ export default function Trading({ user }) {
             </span>
           </div>
 
+          {/* KPIs */}
           <div style={kpiGrid}>
             <div style={kpiBox}>
               <div style={kpiVal}>{fmtCompact(wins, 0)}</div>
@@ -1201,24 +1044,63 @@ export default function Trading({ user }) {
             </div>
           </div>
 
-          {paper.position && (
-            <div style={{ ...baseCard, borderColor: "rgba(122,167,255,0.35)", padding: 12, marginTop: 12 }}>
-              <b>Open Position</b>
-              <div style={{ marginTop: 8, opacity: 0.85, fontSize: 12, lineHeight: 1.6 }}>
-                <div>
-                  <b>{paper.position.symbol}</b> • {paper.position.strategy || "—"} • Entry {fmtMoney(paper.position.entry, 2)}
-                </div>
-                <div>
-                  Notional {fmtMoneyCompact(paper.position.usd ?? paper.position.entryNotionalUsd, 2)} • Qty {fmtNum(paper.position.qty, 6)}
-                </div>
-                <div>
-                  Age {fmtDur(paper.position.ageMs)} • Remaining {paper.position.remainingMs !== null ? fmtDur(paper.position.remainingMs) : "—"}
-                </div>
-              </div>
-            </div>
-          )}
+          {/* ✅ TradingView-like timeframe bar (real UI) */}
+          <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {TF.map((t) => (
+              <button key={t.k} type="button" style={btn(tfKey === t.k)} onClick={() => setTfKey(t.k)}>
+                {t.k}
+              </button>
+            ))}
+            <span style={{ ...chip, marginLeft: "auto" }}>
+              Bucket: <b style={{ marginLeft: 6 }}>{bucketSec}s</b>
+            </span>
+          </div>
 
-          <div style={{ marginTop: 12, height: wideChart ? 620 : 520 }}>
+          {/* ✅ Chart panel with TV chrome feel */}
+          <div style={{ marginTop: 10, height: wideChart ? 620 : 520, position: "relative" }}>
+            {/* Left tool rail overlay */}
+            <div
+              style={{
+                position: "absolute",
+                left: 10,
+                top: 10,
+                bottom: 10,
+                width: 40,
+                borderRadius: 12,
+                border: "1px solid rgba(255,255,255,0.10)",
+                background: "rgba(0,0,0,0.30)",
+                backdropFilter: "blur(6px)",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                paddingTop: 10,
+                gap: 10,
+                zIndex: 3,
+              }}
+            >
+              {["↕", "⌖", "／", "T", "⟂", "⌁", "⤧", "⚙"].map((ic, idx) => (
+                <div
+                  key={idx}
+                  style={{
+                    width: 26,
+                    height: 26,
+                    borderRadius: 8,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    border: "1px solid rgba(255,255,255,0.10)",
+                    background: "rgba(255,255,255,0.04)",
+                    fontSize: 12,
+                    opacity: 0.85,
+                    userSelect: "none",
+                  }}
+                  title="Tool"
+                >
+                  {ic}
+                </div>
+              ))}
+            </div>
+
             <canvas
               ref={canvasRef}
               style={{
@@ -1231,6 +1113,7 @@ export default function Trading({ user }) {
             />
           </div>
 
+          {/* Trade Log */}
           {showTradeLog && (
             <div style={{ marginTop: 12 }}>
               <b>Trade Log</b>
@@ -1277,6 +1160,7 @@ export default function Trading({ user }) {
             </div>
           )}
 
+          {/* History */}
           {showHistory && (
             <div style={{ marginTop: 12 }}>
               <b>History</b>
@@ -1362,7 +1246,7 @@ export default function Trading({ user }) {
             </div>
 
             <div style={{ marginTop: 12 }}>
-              <VoiceAI title="AutoProtect Voice" endpoint="/api/ai/chat" getContext={() => ({ symbol, mode, last, paper })} />
+              <VoiceAI title="AutoProtect Voice" endpoint="/api/ai/chat" getContext={() => ({ symbol, tf: tfKey, mode, last, paper })} />
             </div>
           </div>
         )}
