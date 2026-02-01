@@ -238,7 +238,6 @@ export default function Trading({ user }) {
       } catch {}
       clearInterval(fallbackTimer);
     };
-    // ✅ FIX: only depend on symbol (NOT last) to avoid reconnect loop/flicker
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [symbol]);
 
@@ -281,7 +280,6 @@ export default function Trading({ user }) {
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
 
-        // Your /api/paper/config returns { ok:true, owner, sizing, limits }
         const cfg = data?.owner || data?.config || data || {};
         if (cancelled) return;
 
@@ -397,10 +395,7 @@ export default function Trading({ user }) {
 
     const base = apiBase();
     if (!base) {
-      setMessages((prev) => [
-        ...prev,
-        { from: "ai", text: "Backend URL missing. Set VITE_API_BASE on Vercel." },
-      ]);
+      setMessages((prev) => [...prev, { from: "ai", text: "Backend URL missing. Set VITE_API_BASE on Vercel." }]);
       return;
     }
 
@@ -488,10 +483,10 @@ export default function Trading({ user }) {
 
     if (type === "BUY") {
       const hold = t?.holdMs ? fmtDur(t.holdMs) : "—";
-      return `${ts} • BUY ${sym} • ${strat} • Notional ${fmtMoneyCompact(
-        usd,
+      return `${ts} • BUY ${sym} • ${strat} • Notional ${fmtMoneyCompact(usd, 2)} • Entry ${fmtMoney(
+        pxv,
         2
-      )} • Entry ${fmtMoney(pxv, 2)} • Entry cost ${fmtMoneyCompact(cost, 2)} • Planned hold ${hold}`;
+      )} • Entry cost ${fmtMoneyCompact(cost, 2)} • Planned hold ${hold}`;
     }
 
     if (type === "SELL") {
@@ -565,6 +560,7 @@ export default function Trading({ user }) {
     if (!base) return alert("Missing VITE_API_BASE");
     if (!resetKey) return alert("Enter reset key first.");
 
+    // eslint-disable-next-line no-restricted-globals
     if (!confirm("Reset paper trading stats + trades?")) return;
 
     setCfgBusy(true);
@@ -603,208 +599,123 @@ export default function Trading({ user }) {
   // ✅ Right sidebar only if AI visible and not wide-chart
   const showRightPanel = showAI && !wideChart;
 
-  // ✅ Layout: 3 columns on desktop, stacked on mobile (CSS can stack)
+  // ✅ Layout columns (now we actually apply styles.css grid feel)
   const layoutCols = useMemo(() => {
     if (wideChart) return "1fr";
-    if (showRightPanel) return "320px 1fr 360px";
-    return "320px 1fr";
+    if (showRightPanel) return "1.35fr 0.9fr"; // chart + AI terminal
+    return "1fr"; // chart only
   }, [wideChart, showRightPanel]);
 
-  const baseCard = {
-    borderRadius: 14,
-    border: "1px solid rgba(255,255,255,0.10)",
-    background: "rgba(0,0,0,0.25)",
-    backdropFilter: "blur(8px)",
-  };
-
-  const headerBar = {
-    ...baseCard,
-    padding: 14,
-    marginBottom: 12,
-  };
-
-  const pill = {
-    border: "1px solid rgba(255,255,255,0.10)",
-    background: "rgba(0,0,0,0.18)",
-    borderRadius: 12,
-    padding: 10,
-    minWidth: 140,
-  };
-
-  const btn = (active = false) => ({
-    padding: "8px 10px",
-    borderRadius: 10,
-    border: "1px solid rgba(255,255,255,0.18)",
-    background: active ? "rgba(122,167,255,0.22)" : "rgba(255,255,255,0.06)",
-    color: "white",
-    cursor: "pointer",
-    fontWeight: 800,
-    width: "auto",
-  });
-
-  const chip = {
-    padding: "6px 10px",
-    borderRadius: 999,
-    border: "1px solid rgba(255,255,255,0.14)",
-    background: "rgba(0,0,0,0.18)",
-    fontSize: 12,
-    opacity: 0.95,
-    whiteSpace: "nowrap",
-  };
-
-  const kpiGrid = {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
-    gap: 10,
-    marginTop: 10,
-  };
-
-  const kpiBox = {
-    borderRadius: 12,
-    border: "1px solid rgba(255,255,255,0.10)",
-    background: "rgba(0,0,0,0.18)",
-    padding: 10,
-  };
-
-  const kpiVal = {
-    fontWeight: 900,
-    fontSize: 18,
-    lineHeight: 1.1,
-  };
-
-  const kpiLbl = {
-    marginTop: 6,
-    fontSize: 12,
-    opacity: 0.75,
-  };
-
   return (
-    <div style={{ padding: 12 }}>
-      {/* ======= TOP HEADER (Binance-ish) ======= */}
-      <div style={headerBar}>
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-          <div>
-            <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
-              <h2 style={{ margin: 0, letterSpacing: 0.2 }}>Trading Room</h2>
-              <span style={chip}>
-                Feed: <b style={{ marginLeft: 6 }}>{feedStatus}</b>
-              </span>
-              <span style={chip}>
-                Last: <b style={{ marginLeft: 6 }}>{fmtMoney(last, 2)}</b>
-              </span>
-              <span style={chip}>
-                Paper: <b style={{ marginLeft: 6 }}>{paper.running ? "ON" : "OFF"}</b>
-              </span>
-            </div>
-            <div style={{ marginTop: 6, opacity: 0.75, fontSize: 12 }}>
-              Live feed + candles + paper trader + AI explanations.
+    <div className="tradeWrap">
+      {/* ======= TOP HEADER ======= */}
+      <div className="card tradeTop">
+        <div style={{ flex: 1, minWidth: 260 }}>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
+            <h2 style={{ margin: 0, letterSpacing: 0.2 }}>Trading Room</h2>
+
+            <span className="badge">
+              Feed: <b>{feedStatus}</b>
+            </span>
+
+            <span className="badge">
+              Last: <b>{fmtMoney(last, 2)}</b>
+            </span>
+
+            <span className={`badge ${paper.running ? "ok" : "warn"}`}>
+              Paper: <b>{paper.running ? "ON" : "OFF"}</b>
+            </span>
+          </div>
+
+          <div style={{ marginTop: 6 }}>
+            <small>Live feed + candles + paper trader + AI explanations.</small>
+          </div>
+        </div>
+
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+          <div className="pill">
+            <div style={{ fontSize: 12, opacity: 0.75, fontWeight: 900 }}>Mode</div>
+            <div className="actions" style={{ marginTop: 8 }}>
+              <button className={mode === "Live" ? "active" : ""} onClick={() => setMode("Live")} type="button">
+                Live
+              </button>
+              <button className={mode === "Paper" ? "active" : ""} onClick={() => setMode("Paper")} type="button">
+                Paper
+              </button>
             </div>
           </div>
 
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-            <div style={pill}>
-              <div style={{ fontSize: 12, opacity: 0.75, fontWeight: 800 }}>Mode</div>
-              <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
-                <button style={btn(mode === "Live")} onClick={() => setMode("Live")} type="button">
-                  Live
-                </button>
-                <button style={btn(mode === "Paper")} onClick={() => setMode("Paper")} type="button">
-                  Paper
-                </button>
-              </div>
-            </div>
+          <div className="pill">
+            <div style={{ fontSize: 12, opacity: 0.75, fontWeight: 900 }}>Symbol</div>
+            <select value={symbol} onChange={(e) => setSymbol(e.target.value)} style={{ marginTop: 8 }}>
+              {UI_SYMBOLS.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+          </div>
 
-            <div style={pill}>
-              <div style={{ fontSize: 12, opacity: 0.75, fontWeight: 800 }}>Symbol</div>
-              <select
-                value={symbol}
-                onChange={(e) => setSymbol(e.target.value)}
-                style={{
-                  marginTop: 8,
-                  width: "100%",
-                  padding: "8px 10px",
-                  borderRadius: 10,
-                  border: "1px solid rgba(255,255,255,0.18)",
-                  background: "rgba(0,0,0,0.25)",
-                  color: "white",
-                  outline: "none",
-                }}
-              >
-                {UI_SYMBOLS.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div style={pill}>
-              <div style={{ fontSize: 12, opacity: 0.75, fontWeight: 800 }}>Panels</div>
-              <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
-                <button style={btn(showMoney)} onClick={() => setShowMoney((v) => !v)} type="button">
-                  Money
-                </button>
-                <button style={btn(showTradeLog)} onClick={() => setShowTradeLog((v) => !v)} type="button">
-                  Log
-                </button>
-                <button style={btn(showHistory)} onClick={() => setShowHistory((v) => !v)} type="button">
-                  History
-                </button>
-                <button style={btn(showControls)} onClick={() => setShowControls((v) => !v)} type="button">
-                  Controls
-                </button>
-                <button style={btn(showAI)} onClick={() => setShowAI((v) => !v)} type="button">
-                  AI
-                </button>
-                <button style={btn(wideChart)} onClick={() => setWideChart((v) => !v)} type="button">
-                  Wide
-                </button>
-              </div>
+          <div className="pill">
+            <div style={{ fontSize: 12, opacity: 0.75, fontWeight: 900 }}>Panels</div>
+            <div className="actions" style={{ marginTop: 8 }}>
+              <button className={showMoney ? "active" : ""} onClick={() => setShowMoney((v) => !v)} type="button">
+                Money
+              </button>
+              <button className={showTradeLog ? "active" : ""} onClick={() => setShowTradeLog((v) => !v)} type="button">
+                Log
+              </button>
+              <button className={showHistory ? "active" : ""} onClick={() => setShowHistory((v) => !v)} type="button">
+                History
+              </button>
+              <button className={showControls ? "active" : ""} onClick={() => setShowControls((v) => !v)} type="button">
+                Controls
+              </button>
+              <button className={showAI ? "active" : ""} onClick={() => setShowAI((v) => !v)} type="button">
+                AI
+              </button>
+              <button className={wideChart ? "active" : ""} onClick={() => setWideChart((v) => !v)} type="button">
+                Wide
+              </button>
             </div>
           </div>
         </div>
       </div>
 
-      {/* ======= CONTROLS (kept, but visually cleaner) ======= */}
+      {/* ======= CONTROLS ======= */}
       {showControls && (
-        <div style={{ ...baseCard, padding: 14, marginBottom: 12 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+        <div className="card" style={{ marginTop: 14 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
             <div>
               <b style={{ fontSize: 14 }}>AI Trading Controls (Paper)</b>
-              <div style={{ marginTop: 6, opacity: 0.75, fontSize: 12, lineHeight: 1.5 }}>
-                Equity: <b>{fmtMoneyCompact(equity, 2)}</b> • Win rate: <b>{(winRate * 100).toFixed(0)}%</b> • Config:{" "}
-                <b>{cfgStatus}</b>
+              <div style={{ marginTop: 6 }}>
+                <small>
+                  Equity: <b>{fmtMoneyCompact(equity, 2)}</b> • Win rate: <b>{(winRate * 100).toFixed(0)}%</b> • Config:{" "}
+                  <b>{cfgStatus}</b>
+                </small>
               </div>
             </div>
 
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-              <button style={btn(false)} onClick={savePaperConfig} disabled={cfgBusy} type="button">
+            <div className="actions" style={{ minWidth: 320 }}>
+              <button onClick={savePaperConfig} disabled={cfgBusy} type="button">
                 {cfgBusy ? "Working…" : "Save Controls"}
               </button>
-              <button style={btn(false)} onClick={resetPaper} disabled={cfgBusy} type="button">
+              <button onClick={resetPaper} disabled={cfgBusy} type="button">
                 Reset Paper (key)
               </button>
             </div>
           </div>
 
-          <div style={{ height: 12 }} />
-
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
-              gap: 12,
-            }}
-          >
-            <div style={{ ...baseCard, background: "rgba(0,0,0,.18)", padding: 12 }}>
+          <div className="grid" style={{ marginTop: 14 }}>
+            <div className="card" style={{ padding: 12 }}>
               <b style={{ fontSize: 13 }}>Trade Size</b>
-              <div style={{ marginTop: 6, opacity: 0.75, fontSize: 12, lineHeight: 1.5 }}>
-                Baseline % = normal size. Max % = ceiling size. Estimated USD uses current equity.
+              <div style={{ marginTop: 6 }}>
+                <small>Baseline % = normal size. Max % = ceiling. Estimated USD uses current equity.</small>
               </div>
 
-              <div style={{ marginTop: 10, display: "grid", gap: 10 }}>
+              <div style={{ marginTop: 12, display: "grid", gap: 10 }}>
                 <div>
-                  <div style={{ fontSize: 12, opacity: 0.75, fontWeight: 800 }}>Baseline %</div>
+                  <label style={labelStyle}>Baseline %</label>
                   <input
                     type="number"
                     step="0.001"
@@ -812,16 +723,15 @@ export default function Trading({ user }) {
                     max="1"
                     value={cfgForm.baselinePct}
                     onChange={(e) => setCfgForm((p) => ({ ...p, baselinePct: toNum(e.target.value, 0) }))}
-                    style={inputStyle}
                     placeholder="0.02 = 2%"
                   />
-                  <div style={{ marginTop: 6, opacity: 0.75, fontSize: 12 }}>
+                  <small>
                     Est. baseline amount: <b>{fmtMoneyCompact(baselineUsd, 2)}</b>
-                  </div>
+                  </small>
                 </div>
 
                 <div>
-                  <div style={{ fontSize: 12, opacity: 0.75, fontWeight: 800 }}>Max %</div>
+                  <label style={labelStyle}>Max %</label>
                   <input
                     type="number"
                     step="0.001"
@@ -829,16 +739,15 @@ export default function Trading({ user }) {
                     max="1"
                     value={cfgForm.maxPct}
                     onChange={(e) => setCfgForm((p) => ({ ...p, maxPct: toNum(e.target.value, 0) }))}
-                    style={inputStyle}
                     placeholder="0.05 = 5%"
                   />
-                  <div style={{ marginTop: 6, opacity: 0.75, fontSize: 12 }}>
+                  <small>
                     Est. max amount: <b>{fmtMoneyCompact(maxUsd, 2)}</b>
-                  </div>
+                  </small>
                 </div>
 
                 <div>
-                  <div style={{ fontSize: 12, opacity: 0.75, fontWeight: 800 }}>Max trades/day</div>
+                  <label style={labelStyle}>Max trades/day</label>
                   <input
                     type="number"
                     step="1"
@@ -846,175 +755,141 @@ export default function Trading({ user }) {
                     max="1000"
                     value={cfgForm.maxTradesPerDay}
                     onChange={(e) => setCfgForm((p) => ({ ...p, maxTradesPerDay: toInt(e.target.value, 1) }))}
-                    style={inputStyle}
                     placeholder="12"
                   />
-                  <div style={{ marginTop: 6, opacity: 0.75, fontSize: 12 }}>
-                    This prevents overtrading and helps reduce one-sided losing.
-                  </div>
+                  <small>This prevents overtrading and helps reduce one-sided losing.</small>
                 </div>
               </div>
             </div>
 
-            <div style={{ ...baseCard, background: "rgba(0,0,0,.18)", padding: 12 }}>
+            <div className="card" style={{ padding: 12 }}>
               <b style={{ fontSize: 13 }}>Keys</b>
-              <div style={{ marginTop: 10, display: "grid", gap: 10 }}>
+              <div style={{ marginTop: 12, display: "grid", gap: 10 }}>
                 <div>
-                  <div style={{ fontSize: 12, opacity: 0.75, fontWeight: 800 }}>Owner key</div>
-                  <input
-                    value={ownerKey}
-                    onChange={(e) => setOwnerKey(e.target.value)}
-                    style={inputStyle}
-                    placeholder="x-owner-key"
-                  />
+                  <label style={labelStyle}>Owner key</label>
+                  <input value={ownerKey} onChange={(e) => setOwnerKey(e.target.value)} placeholder="x-owner-key" />
                 </div>
                 <div>
-                  <div style={{ fontSize: 12, opacity: 0.75, fontWeight: 800 }}>Reset key</div>
-                  <input
-                    value={resetKey}
-                    onChange={(e) => setResetKey(e.target.value)}
-                    style={inputStyle}
-                    placeholder="x-reset-key"
-                  />
+                  <label style={labelStyle}>Reset key</label>
+                  <input value={resetKey} onChange={(e) => setResetKey(e.target.value)} placeholder="x-reset-key" />
                 </div>
-                <div style={{ marginTop: 4, opacity: 0.75, fontSize: 12, lineHeight: 1.5 }}>
+                <small>
                   Tip: If saving fails, backend rejected <b>x-owner-key</b>.
-                </div>
+                </small>
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* ======= MAIN LAYOUT (Binance-ish) ======= */}
+      {/* ======= MAIN TERMINAL GRID ======= */}
       <div
+        className="tradeGrid"
         style={{
-          display: "grid",
           gridTemplateColumns: layoutCols,
-          gap: 12,
-          alignItems: "start",
+          marginTop: 14,
         }}
       >
-        {/* LEFT SIDEBAR: Market / Quick Stats */}
-        {!wideChart && (
-          <div style={{ ...baseCard, padding: 12 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
-              <b style={{ fontSize: 13 }}>Market</b>
-              <span style={chip}>{symbol}</span>
-            </div>
-
-            <div style={{ marginTop: 10, display: "grid", gap: 10 }}>
-              <div style={kpiBox}>
-                <div style={{ fontSize: 12, opacity: 0.75, fontWeight: 800 }}>Last</div>
-                <div style={{ ...kpiVal, marginTop: 6 }}>{fmtMoney(last, 2)}</div>
-              </div>
-
-              <div style={kpiBox}>
-                <div style={{ fontSize: 12, opacity: 0.75, fontWeight: 800 }}>Feed</div>
-                <div style={{ marginTop: 6, fontWeight: 900 }}>{feedStatus}</div>
-                <div style={{ marginTop: 6, opacity: 0.75, fontSize: 12 }}>Paper: {paper.running ? "ON" : "OFF"}</div>
-              </div>
-
-              {showMoney && (
-                <div style={kpiBox}>
-                  <div style={{ fontSize: 12, opacity: 0.75, fontWeight: 800 }}>Balances</div>
-                  <div style={{ marginTop: 8, display: "grid", gap: 6, fontSize: 12, opacity: 0.9 }}>
-                    <div>
-                      Cash: <b>{fmtMoneyCompact(cashBal, 2)}</b>
-                    </div>
-                    <div>
-                      Equity: <b>{fmtMoneyCompact(equity, 2)}</b>
-                    </div>
-                    <div>
-                      Unrealized: <b>{fmtMoneyCompact(unreal, 2)}</b>
-                    </div>
-                    <div>
-                      Status: <b>{paperStatus}</b>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* CENTER: Chart + KPIs + Position + Tables */}
-        <div style={{ ...baseCard, padding: 12 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+        {/* ======= CHART / STATS PANEL ======= */}
+        <div className="card tradeChart">
+          {/* Top row: decision */}
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-              <b style={{ fontSize: 14 }}>{symbol}</b>
-              <span style={chip}>
-                Decision: <b style={{ marginLeft: 6 }}>{decision}</b>
+              <span className="badge">{symbol}</span>
+              <span className="badge">
+                Decision: <b>{decision}</b>
               </span>
-              <span style={chip}>
-                Conf: <b style={{ marginLeft: 6 }}>{pct(conf, 0)}</b>
+              <span className="badge">
+                Conf: <b>{pct(conf, 0)}</b>
               </span>
-              <span style={chip}>
-                Ticks: <b style={{ marginLeft: 6 }}>{fmtCompact(ticksSeen, 0)}</b>
+              <span className="badge">
+                Ticks: <b>{fmtCompact(ticksSeen, 0)}</b>
               </span>
             </div>
-            <span style={{ ...chip, maxWidth: 420, overflow: "hidden", textOverflow: "ellipsis" }} title={reason}>
-              Reason: <b style={{ marginLeft: 6 }}>{reason}</b>
+
+            <span className="badge" title={reason} style={{ maxWidth: 520, overflow: "hidden", textOverflow: "ellipsis" }}>
+              Reason: <b>{reason}</b>
             </span>
           </div>
 
-          {/* KPIs (auto-wrap, not squished) */}
-          <div style={kpiGrid}>
-            <div style={kpiBox}>
-              <div style={kpiVal}>{fmtCompact(wins, 0)}</div>
-              <div style={kpiLbl}>Wins</div>
+          {/* KPI grid (NOW USING CSS .kpi/.kpiBox styles you already wrote) */}
+          <div className="kpi" style={{ marginTop: 12 }}>
+            <div className="kpiBox">
+              <div className="kpiVal">{fmtCompact(wins, 0)}</div>
+              <div className="kpiLbl">Wins</div>
             </div>
-            <div style={kpiBox}>
-              <div style={kpiVal}>{fmtCompact(losses, 0)}</div>
-              <div style={kpiLbl}>Losses</div>
+            <div className="kpiBox">
+              <div className="kpiVal">{fmtCompact(losses, 0)}</div>
+              <div className="kpiLbl">Losses</div>
             </div>
-            <div style={kpiBox}>
-              <div style={kpiVal}>{fmtMoneyCompact(grossProfit, 2)}</div>
-              <div style={kpiLbl}>Total Gain</div>
+            <div className="kpiBox">
+              <div className="kpiVal">{fmtMoneyCompact(grossProfit, 2)}</div>
+              <div className="kpiLbl">Total Gain</div>
             </div>
-            <div style={kpiBox}>
-              <div style={kpiVal}>{fmtMoneyCompact(grossLoss, 2)}</div>
-              <div style={kpiLbl}>Total Loss</div>
+            <div className="kpiBox">
+              <div className="kpiVal">{fmtMoneyCompact(grossLoss, 2)}</div>
+              <div className="kpiLbl">Total Loss</div>
             </div>
-            <div style={kpiBox}>
-              <div style={kpiVal}>{fmtMoneyCompact(net, 2)}</div>
-              <div style={kpiLbl}>Net P&L</div>
+            <div className="kpiBox">
+              <div className="kpiVal">{fmtMoneyCompact(net, 2)}</div>
+              <div className="kpiLbl">Net P&L</div>
             </div>
-            <div style={kpiBox}>
-              <div style={kpiVal}>{fmtMoneyCompact(feePaid, 2)}</div>
-              <div style={kpiLbl}>Fees</div>
+            <div className="kpiBox">
+              <div className="kpiVal">{fmtMoneyCompact(feePaid, 2)}</div>
+              <div className="kpiLbl">Fees</div>
             </div>
-            <div style={kpiBox}>
-              <div style={kpiVal}>{fmtMoneyCompact(slip, 2)}</div>
-              <div style={kpiLbl}>Slippage</div>
+            <div className="kpiBox">
+              <div className="kpiVal">{fmtMoneyCompact(slip, 2)}</div>
+              <div className="kpiLbl">Slippage</div>
             </div>
-            <div style={kpiBox}>
-              <div style={kpiVal}>{fmtMoneyCompact(spr, 2)}</div>
-              <div style={kpiLbl}>Spread</div>
+            <div className="kpiBox">
+              <div className="kpiVal">{fmtMoneyCompact(spr, 2)}</div>
+              <div className="kpiLbl">Spread</div>
             </div>
           </div>
 
+          {showMoney && (
+            <div className="card" style={{ marginTop: 14, padding: 12 }}>
+              <b style={{ fontSize: 13 }}>Balances</b>
+              <div style={{ marginTop: 10, display: "grid", gap: 6 }}>
+                <small>
+                  Cash: <b>{fmtMoneyCompact(cashBal, 2)}</b>
+                </small>
+                <small>
+                  Equity: <b>{fmtMoneyCompact(equity, 2)}</b>
+                </small>
+                <small>
+                  Unrealized: <b>{fmtMoneyCompact(unreal, 2)}</b>
+                </small>
+                <small>
+                  Status: <b>{paperStatus}</b>
+                </small>
+              </div>
+            </div>
+          )}
+
           {paper.position && (
-            <div style={{ ...baseCard, borderColor: "rgba(122,167,255,0.35)", padding: 12, marginTop: 12 }}>
+            <div className="card" style={{ marginTop: 14, padding: 12, borderColor: "rgba(122,167,255,0.35)" }}>
               <b>Open Position</b>
-              <div style={{ marginTop: 8, opacity: 0.85, fontSize: 12, lineHeight: 1.6 }}>
-                <div>
-                  <b>{paper.position.symbol}</b> • {paper.position.strategy || "—"} • Entry {fmtMoney(paper.position.entry, 2)}
-                </div>
-                <div>
-                  Notional {fmtMoneyCompact(paper.position.usd ?? paper.position.entryNotionalUsd, 2)} • Qty{" "}
-                  {fmtNum(paper.position.qty, 6)}
-                </div>
-                <div>
-                  Age {fmtDur(paper.position.ageMs)} • Remaining{" "}
-                  {paper.position.remainingMs !== null ? fmtDur(paper.position.remainingMs) : "—"}
-                </div>
+              <div style={{ marginTop: 10, display: "grid", gap: 6 }}>
+                <small>
+                  <b>{paper.position.symbol}</b> • {paper.position.strategy || "—"} • Entry{" "}
+                  <b>{fmtMoney(paper.position.entry, 2)}</b>
+                </small>
+                <small>
+                  Notional <b>{fmtMoneyCompact(paper.position.usd ?? paper.position.entryNotionalUsd, 2)}</b> • Qty{" "}
+                  <b>{fmtNum(paper.position.qty, 6)}</b>
+                </small>
+                <small>
+                  Age <b>{fmtDur(paper.position.ageMs)}</b> • Remaining{" "}
+                  <b>{paper.position.remainingMs !== null ? fmtDur(paper.position.remainingMs) : "—"}</b>
+                </small>
               </div>
             </div>
           )}
 
           {/* Chart */}
-          <div style={{ marginTop: 12, height: wideChart ? 620 : 520 }}>
+          <div style={{ marginTop: 14, height: wideChart ? 620 : 520 }}>
             <canvas
               ref={canvasRef}
               style={{
@@ -1023,45 +898,21 @@ export default function Trading({ user }) {
                 borderRadius: 14,
                 border: "1px solid rgba(255,255,255,0.10)",
                 background: "rgba(0,0,0,0.20)",
+                display: "block",
               }}
             />
           </div>
 
           {/* Trade Log */}
           {showTradeLog && (
-            <div style={{ marginTop: 12 }}>
+            <div style={{ marginTop: 14 }}>
               <b>Trade Log</b>
-              <div
-                style={{
-                  marginTop: 10,
-                  maxHeight: 320,
-                  overflow: "auto",
-                  borderRadius: 12,
-                  border: "1px solid rgba(255,255,255,0.10)",
-                }}
-              >
-                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+              <div className="tableWrap" style={{ marginTop: 10 }}>
+                <table className="table tableSticky">
                   <thead>
-                    <tr
-                      style={{
-                        position: "sticky",
-                        top: 0,
-                        background: "rgba(0,0,0,0.55)",
-                        backdropFilter: "blur(6px)",
-                      }}
-                    >
+                    <tr>
                       {["Time", "Type", "Strategy", "Price", "USD", "Entry Cost", "Held", "Exit", "Net P/L"].map((h) => (
-                        <th
-                          key={h}
-                          style={{
-                            textAlign: "left",
-                            padding: 10,
-                            borderBottom: "1px solid rgba(255,255,255,0.10)",
-                            opacity: 0.85,
-                          }}
-                        >
-                          {h}
-                        </th>
+                        <th key={h}>{h}</th>
                       ))}
                     </tr>
                   </thead>
@@ -1071,24 +922,22 @@ export default function Trading({ user }) {
                       .reverse()
                       .slice(0, 24)
                       .map((t, i) => (
-                        <tr key={i} style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-                          <td style={td}>{t.time ? new Date(t.time).toLocaleTimeString() : "—"}</td>
-                          <td style={td}>{t.type || "—"}</td>
-                          <td style={td}>{t.strategy || "—"}</td>
-                          <td style={td}>{fmtMoney(t.price, 2)}</td>
-                          <td style={td}>{t.usd !== undefined ? fmtMoneyCompact(t.usd, 2) : "—"}</td>
-                          <td style={td}>{t.cost !== undefined ? fmtMoneyCompact(t.cost, 2) : "—"}</td>
-                          <td style={td}>{t.holdMs !== undefined ? fmtDur(t.holdMs) : "—"}</td>
-                          <td style={td}>{t.exitReason ? niceReason(t.exitReason) : t.note ? niceReason(t.note) : "—"}</td>
-                          <td style={td}>{t.profit !== undefined ? fmtMoneyCompact(t.profit, 2) : "—"}</td>
+                        <tr key={i}>
+                          <td>{t.time ? new Date(t.time).toLocaleTimeString() : "—"}</td>
+                          <td>{t.type || "—"}</td>
+                          <td>{t.strategy || "—"}</td>
+                          <td>{fmtMoney(t.price, 2)}</td>
+                          <td>{t.usd !== undefined ? fmtMoneyCompact(t.usd, 2) : "—"}</td>
+                          <td>{t.cost !== undefined ? fmtMoneyCompact(t.cost, 2) : "—"}</td>
+                          <td>{t.holdMs !== undefined ? fmtDur(t.holdMs) : "—"}</td>
+                          <td>{t.exitReason ? niceReason(t.exitReason) : t.note ? niceReason(t.note) : "—"}</td>
+                          <td>{t.profit !== undefined ? fmtMoneyCompact(t.profit, 2) : "—"}</td>
                         </tr>
                       ))}
 
                     {(!paper.trades || paper.trades.length === 0) && (
                       <tr>
-                        <td style={td} colSpan={9}>
-                          No trades yet (it’s learning)
-                        </td>
+                        <td colSpan={9}>No trades yet (it’s learning)</td>
                       </tr>
                     )}
                   </tbody>
@@ -1099,24 +948,14 @@ export default function Trading({ user }) {
 
           {/* History */}
           {showHistory && (
-            <div style={{ marginTop: 12 }}>
+            <div style={{ marginTop: 14 }}>
               <b>History</b>
-              <div style={{ marginTop: 6, opacity: 0.75, fontSize: 12 }}>
-                Scroll to review how every trade happened (entry, size, strategy, hold time, exit reason, result).
+              <div style={{ marginTop: 6 }}>
+                <small>Scroll to review how every trade happened (entry, size, strategy, hold time, exit reason, result).</small>
               </div>
 
-              <div
-                style={{
-                  marginTop: 10,
-                  maxHeight: 340,
-                  overflow: "auto",
-                  border: "1px solid rgba(255,255,255,0.10)",
-                  borderRadius: 12,
-                  padding: 10,
-                  background: "rgba(0,0,0,0.18)",
-                }}
-              >
-                {historyItems.length === 0 && <div style={{ opacity: 0.75 }}>No history yet.</div>}
+              <div className="card" style={{ marginTop: 10, padding: 10, maxHeight: 340, overflow: "auto" }}>
+                {historyItems.length === 0 && <div className="muted">No history yet.</div>}
 
                 {historyItems.map((t, idx) => (
                   <div
@@ -1137,39 +976,23 @@ export default function Trading({ user }) {
           )}
         </div>
 
-        {/* RIGHT SIDEBAR: AI + Voice */}
+        {/* ======= AI TERMINAL PANEL ======= */}
         {showRightPanel && (
-          <div style={{ ...baseCard, padding: 12 }}>
+          <div className="card tradeAI">
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
               <div>
                 <b style={{ fontSize: 13 }}>AI Assistant</b>
-                <div style={{ fontSize: 12, opacity: 0.75, marginTop: 4 }}>Ask why it bought/sold • voice below</div>
+                <div style={{ marginTop: 4 }}>
+                  <small>Ask why it bought/sold • voice below</small>
+                </div>
               </div>
+
+              <span className="badge ok">AutoProtect</span>
             </div>
 
-            <div
-              ref={logRef}
-              style={{
-                marginTop: 12,
-                height: 360,
-                overflow: "auto",
-                borderRadius: 12,
-                border: "1px solid rgba(255,255,255,0.10)",
-                background: "rgba(0,0,0,0.18)",
-                padding: 10,
-              }}
-            >
+            <div ref={logRef} className="chatLog" style={{ marginTop: 12 }}>
               {messages.map((m, idx) => (
-                <div
-                  key={idx}
-                  style={{
-                    padding: "10px 10px",
-                    borderBottom: "1px solid rgba(255,255,255,0.06)",
-                    background: m.from === "you" ? "rgba(122,167,255,0.10)" : "transparent",
-                    borderRadius: 10,
-                    marginBottom: 8,
-                  }}
-                >
+                <div key={idx} className={`chatMsg ${m.from === "you" ? "you" : "ai"}`}>
                   <b style={{ display: "block", marginBottom: 4, fontSize: 12 }}>
                     {m.from === "you" ? "You" : "AutoProtect"}
                   </b>
@@ -1178,7 +1001,7 @@ export default function Trading({ user }) {
               ))}
             </div>
 
-            <div style={{ marginTop: 10, display: "flex", gap: 10 }}>
+            <div className="chatBox">
               <input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
@@ -1189,10 +1012,9 @@ export default function Trading({ user }) {
                     setInput("");
                   }
                 }}
-                style={{ ...inputStyle, flex: 1 }}
               />
               <button
-                style={{ ...btn(false), minWidth: 110 }}
+                style={{ width: 120 }}
                 onClick={() => {
                   sendToAI(input);
                   setInput("");
@@ -1213,18 +1035,4 @@ export default function Trading({ user }) {
   );
 }
 
-const inputStyle = {
-  width: "100%",
-  borderRadius: 10,
-  padding: "10px 10px",
-  border: "1px solid rgba(255,255,255,0.18)",
-  background: "rgba(0,0,0,0.25)",
-  color: "white",
-  outline: "none",
-};
-
-const td = {
-  padding: 10,
-  verticalAlign: "top",
-  opacity: 0.92,
-};
+const labelStyle = { fontSize: 12, opacity: 0.75, fontWeight: 900, display: "block", marginBottom: 6 };
