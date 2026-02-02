@@ -78,56 +78,56 @@ function toNum(v, fallback = 0) {
   return Number.isFinite(n) ? n : fallback;
 }
 
+function useIsMobile(breakpoint = 980) {
+  const [isMobile, setIsMobile] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.matchMedia?.(`(max-width:${breakpoint}px)`)?.matches ?? window.innerWidth <= breakpoint;
+  });
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia?.(`(max-width:${breakpoint}px)`);
+    const onChange = () => setIsMobile(mq?.matches ?? window.innerWidth <= breakpoint);
+
+    onChange();
+    if (mq?.addEventListener) mq.addEventListener("change", onChange);
+    else mq?.addListener?.(onChange);
+
+    window.addEventListener("resize", onChange);
+    return () => {
+      window.removeEventListener("resize", onChange);
+      if (mq?.removeEventListener) mq.removeEventListener("change", onChange);
+      else mq?.removeListener?.(onChange);
+    };
+  }, [breakpoint]);
+
+  return isMobile;
+}
+
 const OWNER_KEY_LS = "as_owner_key";
 const RESET_KEY_LS = "as_reset_key";
 
-// Breakpoint: keep consistent + safe
-const MOBILE_BP = 980;
-
 export default function Trading({ user }) {
+  // ---- Trading “internal pages” (this is the Kraken-style split) ----
+  // Terminal = chart-focused, comfortable, no squish
+  // Reports  = logs/history/performance, full width
+  const [tab, setTab] = useState("terminal"); // "terminal" | "reports"
+
+  const isMobile = useIsMobile(980);
+
   const UI_SYMBOLS = ["BTCUSD", "ETHUSD"];
   const UI_TO_BACKEND = { BTCUSD: "BTCUSDT", ETHUSD: "ETHUSDT" };
 
-  // --- Responsive / “Facebook style” tabs inside Trading ---
-  const [isMobile, setIsMobile] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return window.innerWidth <= MOBILE_BP;
-  });
-
-  const TABS = useMemo(
-    () => [
-      { id: "terminal", label: "Terminal" }, // chart + market + ai (desktop style), mobile keeps it clean
-      { id: "chart", label: "Chart" },
-      { id: "log", label: "Log" },
-      { id: "history", label: "History" },
-      { id: "ai", label: "AI" },
-      { id: "controls", label: "Controls" },
-    ],
-    []
-  );
-
-  const [tab, setTab] = useState("terminal");
-
-  useEffect(() => {
-    const onResize = () => setIsMobile(window.innerWidth <= MOBILE_BP);
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, []);
-
-  // --- Trading state ---
   const [symbol, setSymbol] = useState("BTCUSD");
   const [mode, setMode] = useState("Paper");
   const [feedStatus, setFeedStatus] = useState("Connecting…");
   const [last, setLast] = useState(65300);
 
-  // panels toggles (desktop uses them; mobile uses tab)
-  const [showMoney, setShowMoney] = useState(true);
-  const [showTradeLog, setShowTradeLog] = useState(true);
-  const [showHistory, setShowHistory] = useState(true);
+  // Terminal toggles (keep it clean)
+  const [showLeftSidebar, setShowLeftSidebar] = useState(true);
   const [showAI, setShowAI] = useState(true);
-  const [wideChart, setWideChart] = useState(false);
 
-  // Trading Controls panel
+  // ✅ Trading Controls panel
   const [showControls, setShowControls] = useState(true);
   const [ownerKey, setOwnerKey] = useState(() => localStorage.getItem(OWNER_KEY_LS) || "");
   const [resetKey, setResetKey] = useState(() => localStorage.getItem(RESET_KEY_LS) || "");
@@ -169,7 +169,7 @@ export default function Trading({ user }) {
     const out = [];
     let p = base;
     let t = Math.floor(Date.now() / 1000);
-    for (let i = 80; i > 0; i--) {
+    for (let i = 120; i > 0; i--) {
       const time = t - i * 5;
       const o = p;
       const move = (Math.random() - 0.5) * 60;
@@ -205,7 +205,7 @@ export default function Trading({ user }) {
           low: Math.min(o, price),
           close: price,
         });
-        while (next.length > 180) next.shift();
+        while (next.length > 220) next.shift();
         return next;
       }
 
@@ -299,7 +299,7 @@ export default function Trading({ user }) {
     return () => clearInterval(t);
   }, []);
 
-  // Load paper config once
+  // ✅ Load paper config once
   useEffect(() => {
     const base = apiBase();
     if (!base) return;
@@ -343,7 +343,10 @@ export default function Trading({ user }) {
 
     const base = apiBase();
     if (!base) {
-      setMessages((prev) => [...prev, { from: "ai", text: "Backend URL missing. Set VITE_API_BASE on Vercel." }]);
+      setMessages((prev) => [
+        ...prev,
+        { from: "ai", text: "Backend URL missing. Set VITE_API_BASE on Vercel." },
+      ]);
       return;
     }
 
@@ -396,7 +399,6 @@ export default function Trading({ user }) {
     }
   }
 
-  // Derived stats
   const ticksSeen = paper.learnStats?.ticksSeen ?? 0;
   const conf = paper.learnStats?.confidence ?? 0;
   const decision = paper.learnStats?.decision ?? "WAIT";
@@ -448,9 +450,18 @@ export default function Trading({ user }) {
     return `${ts} • ${type} ${sym}`;
   }
 
-  const baselineUsd = useMemo(() => Math.max(0, equity * toNum(cfgForm.baselinePct, 0)), [cfgForm.baselinePct, equity]);
-  const maxUsd = useMemo(() => Math.max(0, equity * toNum(cfgForm.maxPct, 0)), [cfgForm.maxPct, equity]);
+  // ✅ Derived “amount” display based on equity
+  const baselineUsd = useMemo(() => {
+    const bp = toNum(cfgForm.baselinePct, 0);
+    return Math.max(0, equity * bp);
+  }, [cfgForm.baselinePct, equity]);
 
+  const maxUsd = useMemo(() => {
+    const mp = toNum(cfgForm.maxPct, 0);
+    return Math.max(0, equity * mp);
+  }, [cfgForm.maxPct, equity]);
+
+  // ✅ Save config (one-shot)
   const savePaperConfig = async () => {
     const base = apiBase();
     if (!base) return alert("Missing VITE_API_BASE");
@@ -494,11 +505,11 @@ export default function Trading({ user }) {
     }
   };
 
+  // ✅ Reset paper session (one-shot)
   const resetPaper = async () => {
     const base = apiBase();
     if (!base) return alert("Missing VITE_API_BASE");
     if (!resetKey) return alert("Enter reset key first.");
-
     // eslint-disable-next-line no-restricted-globals
     if (!confirm("Reset paper trading stats + trades?")) return;
 
@@ -508,7 +519,10 @@ export default function Trading({ user }) {
 
       const res = await fetch(`${base}/api/paper/reset`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-reset-key": String(resetKey) },
+        headers: {
+          "Content-Type": "application/json",
+          "x-reset-key": String(resetKey),
+        },
         credentials: "include",
         body: JSON.stringify({}),
       });
@@ -532,10 +546,19 @@ export default function Trading({ user }) {
     return w / total;
   }, [wins, losses]);
 
-  // Desktop right panel logic
-  const showRightPanelDesktop = showAI && !wideChart;
+  // ------- layout rules -------
+  const showRightPanel = showAI && !isMobile;
+  const showLeftPanel = showLeftSidebar && !isMobile;
 
-  // --- Styles ---
+  const terminalCols = useMemo(() => {
+    // Kraken vibe: left info, center chart, right assistant
+    if (isMobile) return "1fr";
+    if (showLeftPanel && showRightPanel) return "320px 1fr 360px";
+    if (showLeftPanel && !showRightPanel) return "320px 1fr";
+    if (!showLeftPanel && showRightPanel) return "1fr 360px";
+    return "1fr";
+  }, [isMobile, showLeftPanel, showRightPanel]);
+
   const baseCard = {
     borderRadius: 14,
     border: "1px solid rgba(255,255,255,0.10)",
@@ -543,14 +566,14 @@ export default function Trading({ user }) {
     backdropFilter: "blur(8px)",
   };
 
-  const headerBar = { ...baseCard, padding: 14, marginBottom: 12 };
-
-  const pill = {
-    border: "1px solid rgba(255,255,255,0.10)",
+  const chip = {
+    padding: "6px 10px",
+    borderRadius: 999,
+    border: "1px solid rgba(255,255,255,0.14)",
     background: "rgba(0,0,0,0.18)",
-    borderRadius: 12,
-    padding: 10,
-    minWidth: 140,
+    fontSize: 12,
+    opacity: 0.95,
+    whiteSpace: "nowrap",
   };
 
   const btn = (active = false) => ({
@@ -564,19 +587,17 @@ export default function Trading({ user }) {
     width: "auto",
   });
 
-  const chip = {
-    padding: "6px 10px",
-    borderRadius: 999,
-    border: "1px solid rgba(255,255,255,0.14)",
+  const pill = {
+    border: "1px solid rgba(255,255,255,0.10)",
     background: "rgba(0,0,0,0.18)",
-    fontSize: 12,
-    opacity: 0.95,
-    whiteSpace: "nowrap",
+    borderRadius: 12,
+    padding: 10,
+    minWidth: 140,
   };
 
   const kpiGrid = {
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+    gridTemplateColumns: isMobile ? "repeat(2, minmax(0, 1fr))" : "repeat(4, minmax(0, 1fr))",
     gap: 10,
     marginTop: 10,
   };
@@ -598,398 +619,73 @@ export default function Trading({ user }) {
     textOverflow: "ellipsis",
   };
 
-  const kpiLbl = { marginTop: 6, fontSize: 12, opacity: 0.75 };
-
-  // Chart height: mobile uses shorter; desktop can be tall
-  const chartHeight = wideChart ? 640 : isMobile ? 420 : 560;
-
-  // ------------------------------------------------------------
-  // “Facebook-style” inside Trading:
-  // Mobile shows ONE section at a time (tabs).
-  // Desktop can show multi-column “Terminal”.
-  // ------------------------------------------------------------
-  const renderControlsPanel = () => {
-    if (!(isMobile ? tab === "controls" : showControls)) return null;
-
-    return (
-      <div style={{ ...baseCard, padding: 14, marginBottom: 12 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-          <div>
-            <b style={{ fontSize: 14 }}>AI Trading Controls (Paper)</b>
-            <div style={{ marginTop: 6, opacity: 0.75, fontSize: 12, lineHeight: 1.5 }}>
-              Equity: <b>{fmtMoneyCompact(equity, 2)}</b> • Win rate: <b>{(winRate * 100).toFixed(0)}%</b> • Config:{" "}
-              <b>{cfgStatus}</b>
-            </div>
-          </div>
-
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-            <button style={btn(false)} onClick={savePaperConfig} disabled={cfgBusy} type="button">
-              {cfgBusy ? "Working…" : "Save Controls"}
-            </button>
-            <button style={btn(false)} onClick={resetPaper} disabled={cfgBusy} type="button">
-              Reset Paper (key)
-            </button>
-          </div>
-        </div>
-
-        <div style={{ height: 12 }} />
-
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 12 }}>
-          <div style={{ ...baseCard, background: "rgba(0,0,0,.18)", padding: 12 }}>
-            <b style={{ fontSize: 13 }}>Trade Size</b>
-            <div style={{ marginTop: 6, opacity: 0.75, fontSize: 12, lineHeight: 1.5 }}>
-              Baseline % = normal size. Max % = ceiling size. Estimated USD uses current equity.
-            </div>
-
-            <div style={{ marginTop: 10, display: "grid", gap: 10 }}>
-              <div>
-                <div style={{ fontSize: 12, opacity: 0.75, fontWeight: 800 }}>Baseline %</div>
-                <input
-                  type="number"
-                  step="0.001"
-                  min="0"
-                  max="1"
-                  value={cfgForm.baselinePct}
-                  onChange={(e) => setCfgForm((p) => ({ ...p, baselinePct: toNum(e.target.value, 0) }))}
-                  style={inputStyle}
-                  placeholder="0.02 = 2%"
-                />
-                <div style={{ marginTop: 6, opacity: 0.75, fontSize: 12 }}>
-                  Est. baseline amount: <b>{fmtMoneyCompact(baselineUsd, 2)}</b>
-                </div>
-              </div>
-
-              <div>
-                <div style={{ fontSize: 12, opacity: 0.75, fontWeight: 800 }}>Max %</div>
-                <input
-                  type="number"
-                  step="0.001"
-                  min="0"
-                  max="1"
-                  value={cfgForm.maxPct}
-                  onChange={(e) => setCfgForm((p) => ({ ...p, maxPct: toNum(e.target.value, 0) }))}
-                  style={inputStyle}
-                  placeholder="0.05 = 5%"
-                />
-                <div style={{ marginTop: 6, opacity: 0.75, fontSize: 12 }}>
-                  Est. max amount: <b>{fmtMoneyCompact(maxUsd, 2)}</b>
-                </div>
-              </div>
-
-              <div>
-                <div style={{ fontSize: 12, opacity: 0.75, fontWeight: 800 }}>Max trades/day</div>
-                <input
-                  type="number"
-                  step="1"
-                  min="1"
-                  max="1000"
-                  value={cfgForm.maxTradesPerDay}
-                  onChange={(e) => setCfgForm((p) => ({ ...p, maxTradesPerDay: toInt(e.target.value, 1) }))}
-                  style={inputStyle}
-                  placeholder="12"
-                />
-                <div style={{ marginTop: 6, opacity: 0.75, fontSize: 12 }}>
-                  This prevents overtrading and helps reduce one-sided losing.
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div style={{ ...baseCard, background: "rgba(0,0,0,.18)", padding: 12 }}>
-            <b style={{ fontSize: 13 }}>Keys</b>
-            <div style={{ marginTop: 10, display: "grid", gap: 10 }}>
-              <div>
-                <div style={{ fontSize: 12, opacity: 0.75, fontWeight: 800 }}>Owner key</div>
-                <input value={ownerKey} onChange={(e) => setOwnerKey(e.target.value)} style={inputStyle} placeholder="x-owner-key" />
-              </div>
-              <div>
-                <div style={{ fontSize: 12, opacity: 0.75, fontWeight: 800 }}>Reset key</div>
-                <input value={resetKey} onChange={(e) => setResetKey(e.target.value)} style={inputStyle} placeholder="x-reset-key" />
-              </div>
-              <div style={{ marginTop: 4, opacity: 0.75, fontSize: 12, lineHeight: 1.5 }}>
-                Tip: If saving fails, backend rejected <b>x-owner-key</b>.
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
+  const kpiLbl = {
+    marginTop: 6,
+    fontSize: 12,
+    opacity: 0.75,
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
   };
 
-  const renderMarketPanel = () => {
-    // Mobile: show market in Terminal tab only (keeps phone clean)
-    if (isMobile && tab !== "terminal") return null;
+  // Bigger chart on terminal (comfortable)
+  const chartHeight = isMobile ? 520 : 620;
 
-    // Desktop: market hidden only when wideChart
-    if (!isMobile && wideChart) return null;
-
-    return (
-      <div style={{ ...baseCard, padding: 12, minWidth: 0 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
-          <b style={{ fontSize: 13 }}>Market</b>
-          <span style={chip}>{symbol}</span>
-        </div>
-
-        <div style={{ marginTop: 10, display: "grid", gap: 10 }}>
-          <div style={kpiBox}>
-            <div style={{ fontSize: 12, opacity: 0.75, fontWeight: 800 }}>Last</div>
-            <div style={{ ...kpiVal, marginTop: 6 }}>{fmtMoney(last, 2)}</div>
-          </div>
-
-          <div style={kpiBox}>
-            <div style={{ fontSize: 12, opacity: 0.75, fontWeight: 800 }}>Feed</div>
-            <div style={{ marginTop: 6, fontWeight: 900 }}>{feedStatus}</div>
-            <div style={{ marginTop: 6, opacity: 0.75, fontSize: 12 }}>Paper: {paper.running ? "ON" : "OFF"}</div>
-          </div>
-
-          {showMoney && (
-            <div style={kpiBox}>
-              <div style={{ fontSize: 12, opacity: 0.75, fontWeight: 800 }}>Balances</div>
-              <div style={{ marginTop: 8, display: "grid", gap: 6, fontSize: 12, opacity: 0.9 }}>
-                <div>Cash: <b>{fmtMoneyCompact(cashBal, 2)}</b></div>
-                <div>Equity: <b>{fmtMoneyCompact(equity, 2)}</b></div>
-                <div>Unrealized: <b>{fmtMoneyCompact(unreal, 2)}</b></div>
-                <div>Status: <b>{paperStatus}</b></div>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  };
-
-  const renderChartPanel = () => {
-    if (isMobile && !["terminal", "chart"].includes(tab)) return null;
-
-    return (
-      <div style={{ ...baseCard, padding: 12, minWidth: 0 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-            <b style={{ fontSize: 14 }}>{symbol}</b>
-            <span style={chip}>Decision: <b style={{ marginLeft: 6 }}>{decision}</b></span>
-            <span style={chip}>Conf: <b style={{ marginLeft: 6 }}>{pct(conf, 0)}</b></span>
-            <span style={chip}>Ticks: <b style={{ marginLeft: 6 }}>{fmtCompact(ticksSeen, 0)}</b></span>
-          </div>
-          <span style={{ ...chip, maxWidth: 420, overflow: "hidden", textOverflow: "ellipsis" }} title={reason}>
-            Reason: <b style={{ marginLeft: 6 }}>{reason}</b>
-          </span>
-        </div>
-
-        <div style={kpiGrid}>
-          <div style={kpiBox}><div style={kpiVal}>{fmtCompact(wins, 0)}</div><div style={kpiLbl}>Wins</div></div>
-          <div style={kpiBox}><div style={kpiVal}>{fmtCompact(losses, 0)}</div><div style={kpiLbl}>Losses</div></div>
-          <div style={kpiBox}><div style={kpiVal}>{fmtMoneyCompact(grossProfit, 2)}</div><div style={kpiLbl}>Total Gain</div></div>
-          <div style={kpiBox}><div style={kpiVal}>{fmtMoneyCompact(grossLoss, 2)}</div><div style={kpiLbl}>Total Loss</div></div>
-          <div style={kpiBox}><div style={kpiVal}>{fmtMoneyCompact(net, 2)}</div><div style={kpiLbl}>Net P&L</div></div>
-          <div style={kpiBox}><div style={kpiVal}>{fmtMoneyCompact(feePaid, 2)}</div><div style={kpiLbl}>Fees</div></div>
-          <div style={kpiBox}><div style={kpiVal}>{fmtMoneyCompact(slip, 2)}</div><div style={kpiLbl}>Slippage</div></div>
-          <div style={kpiBox}><div style={kpiVal}>{fmtMoneyCompact(spr, 2)}</div><div style={kpiLbl}>Spread</div></div>
-        </div>
-
-        {paper.position && (
-          <div style={{ ...baseCard, borderColor: "rgba(122,167,255,0.35)", padding: 12, marginTop: 12 }}>
-            <b>Open Position</b>
-            <div style={{ marginTop: 8, opacity: 0.85, fontSize: 12, lineHeight: 1.6 }}>
-              <div>
-                <b>{paper.position.symbol}</b> • {paper.position.strategy || "—"} • Entry {fmtMoney(paper.position.entry, 2)}
-              </div>
-              <div>
-                Notional {fmtMoneyCompact(paper.position.usd ?? paper.position.entryNotionalUsd, 2)} • Qty {fmtNum(paper.position.qty, 6)}
-              </div>
-              <div>
-                Age {fmtDur(paper.position.ageMs)} • Remaining{" "}
-                {paper.position.remainingMs !== null ? fmtDur(paper.position.remainingMs) : "—"}
-              </div>
-            </div>
-          </div>
-        )}
-
-        <div style={{ marginTop: 12, minWidth: 0 }}>
-          <TVChart candles={candles} height={chartHeight} symbol={symbol} last={last} />
-        </div>
-      </div>
-    );
-  };
-
-  const renderTradeLogPanel = () => {
-    if (!(isMobile ? tab === "log" : showTradeLog)) return null;
-
-    return (
-      <div style={{ ...baseCard, padding: 12, minWidth: 0 }}>
-        <b>Trade Log</b>
-        <div style={{ marginTop: 10, maxHeight: isMobile ? 520 : 320, overflow: "auto", borderRadius: 12, border: "1px solid rgba(255,255,255,0.10)" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-            <thead>
-              <tr style={{ position: "sticky", top: 0, background: "rgba(0,0,0,0.55)", backdropFilter: "blur(6px)" }}>
-                {["Time", "Type", "Strategy", "Price", "USD", "Entry Cost", "Held", "Exit", "Net P/L"].map((h) => (
-                  <th key={h} style={{ textAlign: "left", padding: 10, borderBottom: "1px solid rgba(255,255,255,0.10)", opacity: 0.85 }}>
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {(paper.trades || [])
-                .slice()
-                .reverse()
-                .slice(0, 50)
-                .map((t, i) => (
-                  <tr key={i} style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-                    <td style={td}>{t.time ? new Date(t.time).toLocaleTimeString() : "—"}</td>
-                    <td style={td}>{t.type || "—"}</td>
-                    <td style={td}>{t.strategy || "—"}</td>
-                    <td style={td}>{fmtMoney(t.price, 2)}</td>
-                    <td style={td}>{t.usd !== undefined ? fmtMoneyCompact(t.usd, 2) : "—"}</td>
-                    <td style={td}>{t.cost !== undefined ? fmtMoneyCompact(t.cost, 2) : "—"}</td>
-                    <td style={td}>{t.holdMs !== undefined ? fmtDur(t.holdMs) : "—"}</td>
-                    <td style={td}>{t.exitReason ? niceReason(t.exitReason) : t.note ? niceReason(t.note) : "—"}</td>
-                    <td style={td}>{t.profit !== undefined ? fmtMoneyCompact(t.profit, 2) : "—"}</td>
-                  </tr>
-                ))}
-
-              {(!paper.trades || paper.trades.length === 0) && (
-                <tr>
-                  <td style={td} colSpan={9}>No trades yet (it’s learning)</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    );
-  };
-
-  const renderHistoryPanel = () => {
-    if (!(isMobile ? tab === "history" : showHistory)) return null;
-
-    return (
-      <div style={{ ...baseCard, padding: 12, minWidth: 0 }}>
-        <b>History</b>
-        <div style={{ marginTop: 6, opacity: 0.75, fontSize: 12 }}>
-          Scroll to review how every trade happened (entry, size, strategy, hold time, exit reason, result).
-        </div>
-
-        <div style={{ marginTop: 10, maxHeight: isMobile ? 620 : 340, overflow: "auto", border: "1px solid rgba(255,255,255,0.10)", borderRadius: 12, padding: 10, background: "rgba(0,0,0,0.18)" }}>
-          {historyItems.length === 0 && <div style={{ opacity: 0.75 }}>No history yet.</div>}
-
-          {historyItems.map((t, idx) => (
-            <div key={idx} style={{ padding: "8px 8px", borderBottom: "1px solid rgba(255,255,255,0.06)", lineHeight: 1.5, fontSize: 12, opacity: 0.95 }}>
-              {historyLine(t)}
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  };
-
-  const renderAIPanel = () => {
-    if (!(isMobile ? tab === "ai" : showRightPanelDesktop)) return null;
-
-    return (
-      <div style={{ ...baseCard, padding: 12, minWidth: 0 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
-          <div>
-            <b style={{ fontSize: 13 }}>AI Assistant</b>
-            <div style={{ fontSize: 12, opacity: 0.75, marginTop: 4 }}>Ask why it bought/sold • voice below</div>
-          </div>
-        </div>
-
-        <div
-          ref={logRef}
-          style={{
-            marginTop: 12,
-            height: isMobile ? 420 : 360,
-            overflow: "auto",
-            borderRadius: 12,
-            border: "1px solid rgba(255,255,255,0.10)",
-            background: "rgba(0,0,0,0.18)",
-            padding: 10,
-          }}
-        >
-          {messages.map((m, idx) => (
-            <div
-              key={idx}
-              style={{
-                padding: "10px 10px",
-                borderBottom: "1px solid rgba(255,255,255,0.06)",
-                background: m.from === "you" ? "rgba(122,167,255,0.10)" : "transparent",
-                borderRadius: 10,
-                marginBottom: 8,
-              }}
-            >
-              <b style={{ display: "block", marginBottom: 4, fontSize: 12 }}>
-                {m.from === "you" ? "You" : "AutoProtect"}
-              </b>
-              <div style={{ fontSize: 12, opacity: 0.95, whiteSpace: "pre-wrap", lineHeight: 1.45 }}>{m.text}</div>
-            </div>
-          ))}
-        </div>
-
-        <div style={{ marginTop: 10, display: "flex", gap: 10 }}>
-          <input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask: why did you enter? what strategy? what’s next?"
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                sendToAI(input);
-                setInput("");
-              }
-            }}
-            style={{ ...inputStyle, flex: 1 }}
-          />
-          <button
-            style={{ ...btn(false), minWidth: 110 }}
-            onClick={() => {
-              sendToAI(input);
-              setInput("");
-            }}
-            type="button"
-          >
-            Send
-          </button>
-        </div>
-
-        <div style={{ marginTop: 12 }}>
-          <VoiceAI title="AutoProtect Voice" endpoint="/api/ai/chat" getContext={() => ({ symbol, mode, last, paper })} />
-        </div>
-      </div>
-    );
-  };
-
-  // Desktop layout columns
-  const desktopCols = useMemo(() => {
-    if (wideChart) return "1fr";
-    return showRightPanelDesktop ? "320px 1fr 360px" : "320px 1fr";
-  }, [wideChart, showRightPanelDesktop]);
-
-  // Mobile layout = always 1 column
-  const gridCols = isMobile ? "1fr" : desktopCols;
-
+  // ------------------ UI ------------------
   return (
-    <div style={{ padding: 12, minWidth: 0 }}>
-      {/* ======= TOP HEADER ======= */}
-      <div style={headerBar}>
+    <div style={{ padding: 12 }}>
+      {/* ========= Trading Header + Internal Pages ========= */}
+      <div style={{ ...baseCard, padding: 14, marginBottom: 12 }}>
         <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-          <div style={{ minWidth: 0 }}>
+          <div>
             <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
               <h2 style={{ margin: 0, letterSpacing: 0.2 }}>Trading</h2>
-              <span style={chip}>Feed: <b style={{ marginLeft: 6 }}>{feedStatus}</b></span>
-              <span style={chip}>Last: <b style={{ marginLeft: 6 }}>{fmtMoney(last, 2)}</b></span>
-              <span style={chip}>Paper: <b style={{ marginLeft: 6 }}>{paper.running ? "ON" : "OFF"}</b></span>
+              <span style={chip}>
+                Feed: <b style={{ marginLeft: 6 }}>{feedStatus}</b>
+              </span>
+              <span style={chip}>
+                Last: <b style={{ marginLeft: 6 }}>{fmtMoney(last, 2)}</b>
+              </span>
+              <span style={chip}>
+                Paper: <b style={{ marginLeft: 6 }}>{paper.running ? "ON" : "OFF"}</b>
+              </span>
             </div>
             <div style={{ marginTop: 6, opacity: 0.75, fontSize: 12 }}>
-              Terminal + chart + paper trader + AI (mobile clean / desktop powerful).
+              Terminal (chart-first) + Reports (logs/history). No squish.
             </div>
           </div>
 
-          {/* Right-side controls (still available, but mobile stays simple) */}
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+            {/* Internal pages */}
+            <button style={btn(tab === "terminal")} onClick={() => setTab("terminal")} type="button">
+              Terminal
+            </button>
+            <button style={btn(tab === "reports")} onClick={() => setTab("reports")} type="button">
+              Reports
+            </button>
+
+            {/* Terminal view toggles */}
+            {tab === "terminal" && (
+              <>
+                <button style={btn(showLeftSidebar)} onClick={() => setShowLeftSidebar((v) => !v)} type="button">
+                  Left Panel
+                </button>
+                <button style={btn(showAI)} onClick={() => setShowAI((v) => !v)} type="button">
+                  AI Panel
+                </button>
+              </>
+            )}
+
+            {/* Mode + Symbol always accessible */}
             <div style={pill}>
               <div style={{ fontSize: 12, opacity: 0.75, fontWeight: 800 }}>Mode</div>
               <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
-                <button style={btn(mode === "Live")} onClick={() => setMode("Live")} type="button">Live</button>
-                <button style={btn(mode === "Paper")} onClick={() => setMode("Paper")} type="button">Paper</button>
+                <button style={btn(mode === "Live")} onClick={() => setMode("Live")} type="button">
+                  Live
+                </button>
+                <button style={btn(mode === "Paper")} onClick={() => setMode("Paper")} type="button">
+                  Paper
+                </button>
               </div>
             </div>
 
@@ -1010,82 +706,479 @@ export default function Trading({ user }) {
                 }}
               >
                 {UI_SYMBOLS.map((s) => (
-                  <option key={s} value={s}>{s}</option>
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
                 ))}
               </select>
             </div>
+          </div>
+        </div>
+      </div>
 
-            {!isMobile && (
-              <div style={pill}>
-                <div style={{ fontSize: 12, opacity: 0.75, fontWeight: 800 }}>Panels</div>
-                <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
-                  <button style={btn(showMoney)} onClick={() => setShowMoney((v) => !v)} type="button">Money</button>
-                  <button style={btn(showTradeLog)} onClick={() => setShowTradeLog((v) => !v)} type="button">Log</button>
-                  <button style={btn(showHistory)} onClick={() => setShowHistory((v) => !v)} type="button">History</button>
-                  <button style={btn(showControls)} onClick={() => setShowControls((v) => !v)} type="button">Controls</button>
-                  <button style={btn(showAI)} onClick={() => setShowAI((v) => !v)} type="button">AI</button>
-                  <button style={btn(wideChart)} onClick={() => setWideChart((v) => !v)} type="button">Wide</button>
+      {/* ========= TERMINAL PAGE ========= */}
+      {tab === "terminal" && (
+        <>
+          {/* Controls (optional) */}
+          {showControls && (
+            <div style={{ ...baseCard, padding: 14, marginBottom: 12 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+                <div>
+                  <b style={{ fontSize: 14 }}>AI Trading Controls (Paper)</b>
+                  <div style={{ marginTop: 6, opacity: 0.75, fontSize: 12, lineHeight: 1.5 }}>
+                    Equity: <b>{fmtMoneyCompact(equity, 2)}</b> • Win rate: <b>{(winRate * 100).toFixed(0)}%</b> • Config:{" "}
+                    <b>{cfgStatus}</b>
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                  <button style={btn(false)} onClick={() => setShowControls((v) => !v)} type="button">
+                    Hide Controls
+                  </button>
+                  <button style={btn(false)} onClick={savePaperConfig} disabled={cfgBusy} type="button">
+                    {cfgBusy ? "Working…" : "Save Controls"}
+                  </button>
+                  <button style={btn(false)} onClick={resetPaper} disabled={cfgBusy} type="button">
+                    Reset Paper (key)
+                  </button>
+                </div>
+              </div>
+
+              <div style={{ height: 12 }} />
+
+              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(2, minmax(0, 1fr))", gap: 12 }}>
+                <div style={{ ...baseCard, background: "rgba(0,0,0,.18)", padding: 12 }}>
+                  <b style={{ fontSize: 13 }}>Trade Size</b>
+                  <div style={{ marginTop: 6, opacity: 0.75, fontSize: 12, lineHeight: 1.5 }}>
+                    Baseline % = normal size. Max % = ceiling size. Estimated USD uses current equity.
+                  </div>
+
+                  <div style={{ marginTop: 10, display: "grid", gap: 10 }}>
+                    <div>
+                      <div style={{ fontSize: 12, opacity: 0.75, fontWeight: 800 }}>Baseline %</div>
+                      <input
+                        type="number"
+                        step="0.001"
+                        min="0"
+                        max="1"
+                        value={cfgForm.baselinePct}
+                        onChange={(e) => setCfgForm((p) => ({ ...p, baselinePct: toNum(e.target.value, 0) }))}
+                        style={inputStyle}
+                        placeholder="0.02 = 2%"
+                      />
+                      <div style={{ marginTop: 6, opacity: 0.75, fontSize: 12 }}>
+                        Est. baseline amount: <b>{fmtMoneyCompact(baselineUsd, 2)}</b>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div style={{ fontSize: 12, opacity: 0.75, fontWeight: 800 }}>Max %</div>
+                      <input
+                        type="number"
+                        step="0.001"
+                        min="0"
+                        max="1"
+                        value={cfgForm.maxPct}
+                        onChange={(e) => setCfgForm((p) => ({ ...p, maxPct: toNum(e.target.value, 0) }))}
+                        style={inputStyle}
+                        placeholder="0.05 = 5%"
+                      />
+                      <div style={{ marginTop: 6, opacity: 0.75, fontSize: 12 }}>
+                        Est. max amount: <b>{fmtMoneyCompact(maxUsd, 2)}</b>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div style={{ fontSize: 12, opacity: 0.75, fontWeight: 800 }}>Max trades/day</div>
+                      <input
+                        type="number"
+                        step="1"
+                        min="1"
+                        max="1000"
+                        value={cfgForm.maxTradesPerDay}
+                        onChange={(e) => setCfgForm((p) => ({ ...p, maxTradesPerDay: toInt(e.target.value, 1) }))}
+                        style={inputStyle}
+                        placeholder="12"
+                      />
+                      <div style={{ marginTop: 6, opacity: 0.75, fontSize: 12 }}>
+                        Prevents overtrading and helps reduce one-sided losing.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ ...baseCard, background: "rgba(0,0,0,.18)", padding: 12 }}>
+                  <b style={{ fontSize: 13 }}>Keys</b>
+                  <div style={{ marginTop: 10, display: "grid", gap: 10 }}>
+                    <div>
+                      <div style={{ fontSize: 12, opacity: 0.75, fontWeight: 800 }}>Owner key</div>
+                      <input value={ownerKey} onChange={(e) => setOwnerKey(e.target.value)} style={inputStyle} placeholder="x-owner-key" />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 12, opacity: 0.75, fontWeight: 800 }}>Reset key</div>
+                      <input value={resetKey} onChange={(e) => setResetKey(e.target.value)} style={inputStyle} placeholder="x-reset-key" />
+                    </div>
+                    <div style={{ marginTop: 4, opacity: 0.75, fontSize: 12, lineHeight: 1.5 }}>
+                      Tip: If saving fails, backend rejected <b>x-owner-key</b>.
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {!showControls && (
+            <div style={{ marginBottom: 12 }}>
+              <button style={btn(false)} onClick={() => setShowControls(true)} type="button">
+                Show Controls
+              </button>
+            </div>
+          )}
+
+          {/* Terminal layout (comfortable, no squish) */}
+          <div style={{ display: "grid", gridTemplateColumns: terminalCols, gap: 12, alignItems: "start" }}>
+            {/* LEFT SIDEBAR */}
+            {showLeftPanel && (
+              <div style={{ ...baseCard, padding: 12 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+                  <b style={{ fontSize: 13 }}>Market</b>
+                  <span style={chip}>{symbol}</span>
+                </div>
+
+                <div style={{ marginTop: 10, display: "grid", gap: 10 }}>
+                  <div style={kpiBox}>
+                    <div style={{ fontSize: 12, opacity: 0.75, fontWeight: 800 }}>Last</div>
+                    <div style={{ ...kpiVal, marginTop: 6 }}>{fmtMoney(last, 2)}</div>
+                  </div>
+
+                  <div style={kpiBox}>
+                    <div style={{ fontSize: 12, opacity: 0.75, fontWeight: 800 }}>Feed</div>
+                    <div style={{ marginTop: 6, fontWeight: 900 }}>{feedStatus}</div>
+                    <div style={{ marginTop: 6, opacity: 0.75, fontSize: 12 }}>Paper: {paper.running ? "ON" : "OFF"}</div>
+                  </div>
+
+                  <div style={kpiBox}>
+                    <div style={{ fontSize: 12, opacity: 0.75, fontWeight: 800 }}>Balances</div>
+                    <div style={{ marginTop: 8, display: "grid", gap: 6, fontSize: 12, opacity: 0.9 }}>
+                      <div>Cash: <b>{fmtMoneyCompact(cashBal, 2)}</b></div>
+                      <div>Equity: <b>{fmtMoneyCompact(equity, 2)}</b></div>
+                      <div>Unrealized: <b>{fmtMoneyCompact(unreal, 2)}</b></div>
+                      <div>Status: <b>{paperStatus}</b></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* CENTER (CHART FIRST) */}
+            <div style={{ ...baseCard, padding: 12, minWidth: 0 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                  <b style={{ fontSize: 14 }}>{symbol}</b>
+                  <span style={chip}>Decision: <b style={{ marginLeft: 6 }}>{decision}</b></span>
+                  <span style={chip}>Conf: <b style={{ marginLeft: 6 }}>{pct(conf, 0)}</b></span>
+                  <span style={chip}>Ticks: <b style={{ marginLeft: 6 }}>{fmtCompact(ticksSeen, 0)}</b></span>
+                </div>
+                <span style={{ ...chip, maxWidth: 520, overflow: "hidden", textOverflow: "ellipsis" }} title={reason}>
+                  Reason: <b style={{ marginLeft: 6 }}>{reason}</b>
+                </span>
+              </div>
+
+              {/* KPIs (compact, not insane) */}
+              <div style={kpiGrid}>
+                <div style={kpiBox}><div style={kpiVal}>{fmtCompact(wins, 0)}</div><div style={kpiLbl}>Wins</div></div>
+                <div style={kpiBox}><div style={kpiVal}>{fmtCompact(losses, 0)}</div><div style={kpiLbl}>Losses</div></div>
+                <div style={kpiBox}><div style={kpiVal}>{fmtMoneyCompact(net, 2)}</div><div style={kpiLbl}>Net P&L</div></div>
+                <div style={kpiBox}><div style={kpiVal}>{fmtMoneyCompact(feePaid, 2)}</div><div style={kpiLbl}>Fees</div></div>
+              </div>
+
+              {/* Position (clean) */}
+              {paper.position && (
+                <div style={{ ...baseCard, borderColor: "rgba(122,167,255,0.35)", padding: 12, marginTop: 12 }}>
+                  <b>Open Position</b>
+                  <div style={{ marginTop: 8, opacity: 0.85, fontSize: 12, lineHeight: 1.6 }}>
+                    <div>
+                      <b>{paper.position.symbol}</b> • {paper.position.strategy || "—"} • Entry {fmtMoney(paper.position.entry, 2)}
+                    </div>
+                    <div>
+                      Notional {fmtMoneyCompact(paper.position.usd ?? paper.position.entryNotionalUsd, 2)} • Qty {fmtNum(paper.position.qty, 6)}
+                    </div>
+                    <div>
+                      Age {fmtDur(paper.position.ageMs)} • Remaining{" "}
+                      {paper.position.remainingMs !== null ? fmtDur(paper.position.remainingMs) : "—"}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Chart (big, comfy) */}
+              <div style={{ marginTop: 12 }}>
+                <TVChart candles={candles} height={chartHeight} symbol={symbol} last={last} />
+              </div>
+
+              {/* Small hint: logs are in Reports */}
+              <div style={{ marginTop: 10, opacity: 0.7, fontSize: 12 }}>
+                Want logs/history? Go to <b>Reports</b>.
+              </div>
+            </div>
+
+            {/* RIGHT SIDEBAR (AI) */}
+            {showRightPanel && (
+              <div style={{ ...baseCard, padding: 12, minWidth: 0 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+                  <div>
+                    <b style={{ fontSize: 13 }}>AI Assistant</b>
+                    <div style={{ fontSize: 12, opacity: 0.75, marginTop: 4 }}>Ask why it bought/sold • voice below</div>
+                  </div>
+                </div>
+
+                <div
+                  ref={logRef}
+                  style={{
+                    marginTop: 12,
+                    height: 360,
+                    overflow: "auto",
+                    borderRadius: 12,
+                    border: "1px solid rgba(255,255,255,0.10)",
+                    background: "rgba(0,0,0,0.18)",
+                    padding: 10,
+                  }}
+                >
+                  {messages.map((m, idx) => (
+                    <div
+                      key={idx}
+                      style={{
+                        padding: "10px 10px",
+                        borderBottom: "1px solid rgba(255,255,255,0.06)",
+                        background: m.from === "you" ? "rgba(122,167,255,0.10)" : "transparent",
+                        borderRadius: 10,
+                        marginBottom: 8,
+                      }}
+                    >
+                      <b style={{ display: "block", marginBottom: 4, fontSize: 12 }}>
+                        {m.from === "you" ? "You" : "AutoProtect"}
+                      </b>
+                      <div style={{ fontSize: 12, opacity: 0.95, whiteSpace: "pre-wrap", lineHeight: 1.45 }}>
+                        {m.text}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div style={{ marginTop: 10, display: "flex", gap: 10 }}>
+                  <input
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    placeholder="Ask: why did you enter? what strategy? what’s next?"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        sendToAI(input);
+                        setInput("");
+                      }
+                    }}
+                    style={{ ...inputStyle, flex: 1, minWidth: 0 }}
+                  />
+                  <button
+                    style={{ ...btn(false), minWidth: 110 }}
+                    onClick={() => {
+                      sendToAI(input);
+                      setInput("");
+                    }}
+                    type="button"
+                  >
+                    Send
+                  </button>
+                </div>
+
+                <div style={{ marginTop: 12 }}>
+                  <VoiceAI title="AutoProtect Voice" endpoint="/api/ai/chat" getContext={() => ({ symbol, mode, last, paper })} />
                 </div>
               </div>
             )}
           </div>
-        </div>
 
-        {/* ✅ Trading “file cabinet” tabs (mobile-first) */}
-        <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
-          {TABS.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => {
-                setTab(t.id);
+          {/* On mobile: AI becomes its own card under chart (so it never squishes sideways) */}
+          {isMobile && showAI && (
+            <div style={{ ...baseCard, padding: 12, marginTop: 12 }}>
+              <b style={{ fontSize: 13 }}>AI Assistant</b>
+              <div style={{ fontSize: 12, opacity: 0.75, marginTop: 6 }}>
+                Mobile view keeps AI below chart so nothing gets squeezed.
+              </div>
 
-                // keep desktop toggles in sync when clicking tabs (helps)
-                if (t.id === "log") setShowTradeLog(true);
-                if (t.id === "history") setShowHistory(true);
-                if (t.id === "ai") setShowAI(true);
-                if (t.id === "controls") setShowControls(true);
-              }}
-              style={btn(tab === t.id)}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-      </div>
+              <div
+                ref={logRef}
+                style={{
+                  marginTop: 12,
+                  height: 260,
+                  overflow: "auto",
+                  borderRadius: 12,
+                  border: "1px solid rgba(255,255,255,0.10)",
+                  background: "rgba(0,0,0,0.18)",
+                  padding: 10,
+                }}
+              >
+                {messages.map((m, idx) => (
+                  <div
+                    key={idx}
+                    style={{
+                      padding: "10px 10px",
+                      borderBottom: "1px solid rgba(255,255,255,0.06)",
+                      background: m.from === "you" ? "rgba(122,167,255,0.10)" : "transparent",
+                      borderRadius: 10,
+                      marginBottom: 8,
+                    }}
+                  >
+                    <b style={{ display: "block", marginBottom: 4, fontSize: 12 }}>
+                      {m.from === "you" ? "You" : "AutoProtect"}
+                    </b>
+                    <div style={{ fontSize: 12, opacity: 0.95, whiteSpace: "pre-wrap", lineHeight: 1.45 }}>
+                      {m.text}
+                    </div>
+                  </div>
+                ))}
+              </div>
 
-      {/* Controls panel (mobile shows only on Controls tab; desktop uses toggle) */}
-      {renderControlsPanel()}
+              <div style={{ marginTop: 10, display: "flex", gap: 10 }}>
+                <input
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  placeholder="Ask AutoProtect…"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      sendToAI(input);
+                      setInput("");
+                    }
+                  }}
+                  style={{ ...inputStyle, flex: 1, minWidth: 0 }}
+                />
+                <button
+                  style={{ ...btn(false), minWidth: 110 }}
+                  onClick={() => {
+                    sendToAI(input);
+                    setInput("");
+                  }}
+                  type="button"
+                >
+                  Send
+                </button>
+              </div>
 
-      {/* ======= MAIN LAYOUT ======= */}
-      <div style={{ display: "grid", gridTemplateColumns: gridCols, gap: 12, alignItems: "start", minWidth: 0 }}>
-        {/* Desktop left: Market. Mobile: only inside Terminal tab */}
-        {!isMobile && renderMarketPanel()}
-        {isMobile && tab === "terminal" && renderMarketPanel()}
-
-        {/* Center: Chart (Terminal + Chart tab) */}
-        {renderChartPanel()}
-
-        {/* Desktop right: AI (toggle). Mobile: AI tab */}
-        {!isMobile && renderAIPanel()}
-        {isMobile && tab === "ai" && renderAIPanel()}
-
-        {/* Mobile: Log/History appear as their own pages. Desktop: appear below chart via toggles */}
-        {isMobile ? (
-          <>
-            {renderTradeLogPanel()}
-            {renderHistoryPanel()}
-          </>
-        ) : (
-          <>
-            {/* Desktop: show Log/History under the chart by rendering them after chart in same column */}
-            <div style={{ gridColumn: wideChart ? "1 / -1" : "2 / 3", minWidth: 0 }}>
-              {showTradeLog && renderTradeLogPanel()}
-              {showHistory && renderHistoryPanel()}
+              <div style={{ marginTop: 12 }}>
+                <VoiceAI title="AutoProtect Voice" endpoint="/api/ai/chat" getContext={() => ({ symbol, mode, last, paper })} />
+              </div>
             </div>
-          </>
-        )}
-      </div>
+          )}
+        </>
+      )}
+
+      {/* ========= REPORTS PAGE (full-width, no squish) ========= */}
+      {tab === "reports" && (
+        <div style={{ ...baseCard, padding: 14 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+            <div>
+              <h3 style={{ margin: 0 }}>Reports</h3>
+              <div style={{ marginTop: 6, opacity: 0.75, fontSize: 12 }}>
+                Trade Log + History + performance. Full width so it feels professional.
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              <span style={chip}>Wins: <b style={{ marginLeft: 6 }}>{fmtCompact(wins, 0)}</b></span>
+              <span style={chip}>Losses: <b style={{ marginLeft: 6 }}>{fmtCompact(losses, 0)}</b></span>
+              <span style={chip}>Net: <b style={{ marginLeft: 6 }}>{fmtMoneyCompact(net, 2)}</b></span>
+              <span style={chip}>Fees: <b style={{ marginLeft: 6 }}>{fmtMoneyCompact(feePaid, 2)}</b></span>
+            </div>
+          </div>
+
+          {/* Trade Log */}
+          <div style={{ marginTop: 14 }}>
+            <b>Trade Log</b>
+            <div style={{ marginTop: 10, overflow: "auto", borderRadius: 12, border: "1px solid rgba(255,255,255,0.10)" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, minWidth: 760 }}>
+                <thead>
+                  <tr style={{ position: "sticky", top: 0, background: "rgba(0,0,0,0.55)", backdropFilter: "blur(6px)" }}>
+                    {["Time", "Type", "Strategy", "Price", "USD", "Entry Cost", "Held", "Exit", "Net P/L"].map((h) => (
+                      <th
+                        key={h}
+                        style={{
+                          textAlign: "left",
+                          padding: 10,
+                          borderBottom: "1px solid rgba(255,255,255,0.10)",
+                          opacity: 0.85,
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {(paper.trades || [])
+                    .slice()
+                    .reverse()
+                    .slice(0, 50)
+                    .map((t, i) => (
+                      <tr key={i} style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+                        <td style={td}>{t.time ? new Date(t.time).toLocaleTimeString() : "—"}</td>
+                        <td style={td}>{t.type || "—"}</td>
+                        <td style={td}>{t.strategy || "—"}</td>
+                        <td style={td}>{fmtMoney(t.price, 2)}</td>
+                        <td style={td}>{t.usd !== undefined ? fmtMoneyCompact(t.usd, 2) : "—"}</td>
+                        <td style={td}>{t.cost !== undefined ? fmtMoneyCompact(t.cost, 2) : "—"}</td>
+                        <td style={td}>{t.holdMs !== undefined ? fmtDur(t.holdMs) : "—"}</td>
+                        <td style={td}>{t.exitReason ? niceReason(t.exitReason) : t.note ? niceReason(t.note) : "—"}</td>
+                        <td style={td}>{t.profit !== undefined ? fmtMoneyCompact(t.profit, 2) : "—"}</td>
+                      </tr>
+                    ))}
+
+                  {(!paper.trades || paper.trades.length === 0) && (
+                    <tr>
+                      <td style={td} colSpan={9}>No trades yet (it’s learning)</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* History */}
+          <div style={{ marginTop: 14 }}>
+            <b>History</b>
+            <div style={{ marginTop: 6, opacity: 0.75, fontSize: 12 }}>
+              Scroll to review how every trade happened (entry, size, strategy, hold time, exit reason, result).
+            </div>
+
+            <div
+              style={{
+                marginTop: 10,
+                maxHeight: 420,
+                overflow: "auto",
+                border: "1px solid rgba(255,255,255,0.10)",
+                borderRadius: 12,
+                padding: 10,
+                background: "rgba(0,0,0,0.18)",
+              }}
+            >
+              {historyItems.length === 0 && <div style={{ opacity: 0.75 }}>No history yet.</div>}
+
+              {historyItems.map((t, idx) => (
+                <div
+                  key={idx}
+                  style={{
+                    padding: "8px 8px",
+                    borderBottom: "1px solid rgba(255,255,255,0.06)",
+                    lineHeight: 1.5,
+                    fontSize: 12,
+                    opacity: 0.95,
+                  }}
+                >
+                  {historyLine(t)}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1104,4 +1197,5 @@ const td = {
   padding: 10,
   verticalAlign: "top",
   opacity: 0.92,
+  whiteSpace: "nowrap",
 };
