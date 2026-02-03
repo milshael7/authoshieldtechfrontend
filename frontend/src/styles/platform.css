@@ -1,1 +1,143 @@
+/* frontend/src/styles/platform.css
+   Platform shell ONLY (header/tabs/cards)
+   ✅ No global resets
+   ✅ No body/html styling
+   ✅ Won’t leak into TradingView iframe or other pages
+*/
 
+.platformShell{
+  width: 100%;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Top header bar */
+.platformTop{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+  background: linear-gradient(180deg, var(--panel), var(--panel2));
+  backdrop-filter: blur(10px);
+}
+
+/* Brand button (so it’s clickable and accessible) */
+.platformBrand{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding: 8px 10px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(0,0,0,.22);
+  color: var(--text);
+  cursor:pointer;
+}
+
+.platformBrand:active{ transform: translateY(1px); }
+
+.platformLogo{
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,.12);
+  background-color: rgba(0,0,0,.25);
+  background-image:url("https://github.com/user-attachments/assets/0895f9e4-83c4-4088-8658-7a6aeb728af2");
+  background-position:center;
+  background-repeat:no-repeat;
+  background-size:contain;
+}
+
+.platformBrandTxt{
+  display:flex;
+  flex-direction:column;
+  line-height: 1.05;
+  text-align:left;
+}
+
+.platformBrandTxt b{
+  font-size: 15px;
+  letter-spacing: .2px;
+}
+
+.platformBrandTxt span{
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: 2px;
+}
+
+/* Tabs row (Market/Room/Reports) */
+.platformTabs{
+  display:flex;
+  gap:10px;
+  align-items:center;
+  flex-wrap:wrap;
+}
+
+.ptab{
+  width:auto;
+  padding: 10px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(0,0,0,.22);
+  color: var(--text);
+  cursor:pointer;
+}
+
+.ptab.active{
+  border-color: rgba(122,167,255,.55);
+  background: rgba(122,167,255,.15);
+}
+
+/* Right actions (Trading/Cybersecurity/Admin) */
+.platformActions{
+  display:flex;
+  gap:10px;
+  align-items:center;
+  flex-wrap:wrap;
+  justify-content:flex-end;
+}
+
+.pbtn{
+  width:auto;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(0,0,0,.22);
+  color: var(--text);
+  cursor:pointer;
+}
+
+.pbtn:hover{ background: rgba(255,255,255,.10); }
+
+/* Main content area */
+.platformBody{
+  flex: 1;
+  width: 100%;
+  padding: 14px;
+}
+
+/* Generic card wrapper (safe for Posture/Admin/Room/Reports) */
+.platformCard{
+  border-radius: var(--radius);
+  border: 1px solid rgba(255,255,255,.10);
+  background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(0,0,0,.18));
+  box-shadow: var(--shadowSoft);
+  padding: 16px;
+  backdrop-filter: blur(10px);
+}
+
+/* Mobile */
+@media (max-width: 720px){
+  .platformTop{
+    align-items:flex-start;
+    flex-direction: column;
+  }
+  .platformActions{
+    width:100%;
+    justify-content:flex-start;
+  }
+}
