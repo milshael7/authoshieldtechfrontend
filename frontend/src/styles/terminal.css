@@ -1,0 +1,252 @@
+/* =========================================================
+   AUTOSHIELD — TRADING TERMINAL ONLY
+   SCOPE: .terminalRoot
+   ❗ NO body / html / #root / * selectors
+   ❗ NO global containers
+   ========================================================= */
+
+/* ---------- ROOT WRAPPER (CRITICAL) ---------- */
+.terminalRoot{
+  width: 100%;
+  height: calc(100vh - 120px);
+  position: relative;
+}
+
+/* ---------- MAIN TERMINAL SHELL ---------- */
+.terminalRoot .tvShell{
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-columns: 56px minmax(0,1fr) 360px;
+  grid-template-rows: 56px minmax(0,1fr);
+  border-radius: 16px;
+  overflow: hidden;
+
+  background: rgba(255,255,255,.05);
+  border: 1px solid rgba(255,255,255,.10);
+}
+
+/* ---------- LEFT TOOL BAR ---------- */
+.terminalRoot .tvLeftBar{
+  grid-row: 1 / span 2;
+  grid-column: 1;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+
+  background: rgba(0,0,0,.28);
+  border-right: 1px solid rgba(255,255,255,.10);
+}
+
+.terminalRoot .tvToolBtn{
+  height: 34px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,.14);
+  background: rgba(0,0,0,.22);
+  color: #fff;
+  cursor: pointer;
+}
+
+/* ---------- TOP BAR ---------- */
+.terminalRoot .tvTopBar{
+  grid-column: 2 / -1;
+  grid-row: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+
+  /* ✅ VERY LIGHT PURPLE (not blue, not white) */
+  background: linear-gradient(
+    180deg,
+    rgba(235,228,255,.95),
+    rgba(215,205,255,.88)
+  );
+
+  border-bottom: 1px solid rgba(160,120,255,.30);
+}
+
+/* ---------- TOP BAR CONTENT ---------- */
+.terminalRoot .tvTopLeft{
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.terminalRoot .tvBrand{
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.terminalRoot .tvBrandLogo{
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+  border: 1px solid rgba(0,0,0,.12);
+  background: rgba(255,255,255,.9) url("/autoshield-logo.png") center/contain no-repeat;
+}
+
+.terminalRoot .tvBrandTxt b{
+  display: block;
+  font-size: 13px;
+  color: #111827;
+}
+
+.terminalRoot .tvBrandTxt span{
+  display: block;
+  font-size: 11px;
+  opacity: .6;
+  letter-spacing: 2px;
+  color: #111827;
+}
+
+.terminalRoot .tvSelect{
+  min-width: 160px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(0,0,0,.15);
+  background: rgba(255,255,255,.9);
+  color: #111827;
+}
+
+/* ---------- TIMEFRAME PILLS ---------- */
+.terminalRoot .tvTfRow{
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.terminalRoot .tvPill{
+  padding: 8px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(160,120,255,.30);
+  background: rgba(160,120,255,.12);
+  color: #111827;
+  cursor: pointer;
+}
+
+.terminalRoot .tvPill.active{
+  background: rgba(160,120,255,.30);
+  border-color: rgba(160,120,255,.45);
+}
+
+/* ---------- TOP RIGHT ACTIONS ---------- */
+.terminalRoot .tvTopRight{
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.terminalRoot .tvPrimary,
+.terminalRoot .tvIconBtn{
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(0,0,0,.15);
+  background: rgba(255,255,255,.9);
+  color: #111827;
+  cursor: pointer;
+}
+
+.terminalRoot .tvPrimary{
+  background: rgba(160,120,255,.35);
+}
+
+/* ---------- CHART AREA ---------- */
+.terminalRoot .tvChartArea{
+  grid-column: 2;
+  grid-row: 2;
+  min-width: 0;
+  min-height: 0;
+  position: relative;
+}
+
+.terminalRoot .tvChartFrame{
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+.terminalRoot .tvIframe{
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
+
+  /* ✅ REPLACE HARSH WHITE */
+  background: rgba(245,240,255,.92);
+}
+
+/* ---------- RIGHT ORDER PANEL ---------- */
+.terminalRoot .tvRight{
+  grid-column: 3;
+  grid-row: 2;
+  padding: 10px;
+  overflow: auto;
+
+  background: rgba(245,240,255,.95);
+  border-left: 1px solid rgba(160,120,255,.25);
+  color: #111827;
+}
+
+/* ---------- BOTTOM PANEL ---------- */
+.terminalRoot .tvBottom{
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 10px;
+  height: 190px;
+
+  background: rgba(245,240,255,.92);
+  border: 1px solid rgba(160,120,255,.25);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.terminalRoot .tvBottomTabs{
+  display: flex;
+  gap: 8px;
+  padding: 10px;
+  border-bottom: 1px solid rgba(160,120,255,.25);
+}
+
+.terminalRoot .tvTab{
+  padding: 8px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(160,120,255,.30);
+  background: rgba(160,120,255,.12);
+  color: #111827;
+}
+
+.terminalRoot .tvTab.active{
+  background: rgba(160,120,255,.30);
+}
+
+.terminalRoot .tvBottomBody{
+  padding: 10px;
+  height: calc(190px - 56px);
+  overflow: auto;
+  color: #111827;
+}
+
+/* ---------- MOBILE ---------- */
+@media (max-width: 980px){
+  .terminalRoot{
+    height: auto;
+  }
+
+  .terminalRoot .tvShell{
+    grid-template-columns: 56px minmax(0,1fr);
+    grid-template-rows: 56px minmax(0,1fr) auto;
+  }
+
+  .terminalRoot .tvRight{
+    grid-column: 1 / -1;
+    grid-row: 3;
+    border-left: none;
+    border-top: 1px solid rgba(160,120,255,.25);
+  }
+}
