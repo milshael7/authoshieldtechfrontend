@@ -290,3 +290,33 @@ body{background:#0b1220;}
 .container{
   max-width: none !important;
 }
+/* ===== Purple skin for panels we control ===== */
+:root{
+  --tradePanelBg: rgba(160, 120, 255, .10);
+  --tradePanelBorder: rgba(160, 120, 255, .22);
+  --tradePanelSolid: rgba(18, 16, 30, .92);
+}
+
+.tvRight,
+.tvBottom,
+.tvTopBar{
+  background: var(--tradePanelBg) !important;
+  border-color: var(--tradePanelBorder) !important;
+  color: rgba(255,255,255,.92);
+}
+
+.tvTab, .tvTab2, .tvPill{
+  background: rgba(160,120,255,.10) !important;
+  border-color: rgba(160,120,255,.18) !important;
+}
+
+.tvBuyBar{
+  background: rgba(160,120,255,.30) !important;
+  border-color: rgba(160,120,255,.35) !important;
+}
+
+.tvForm input, .tvForm select{
+  background: rgba(160,120,255,.06) !important;
+  border-color: rgba(160,120,255,.20) !important;
+  color: rgba(255,255,255,.92) !important;
+}
