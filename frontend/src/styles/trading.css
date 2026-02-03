@@ -452,3 +452,82 @@
     min-height: 520px;
   }
 }
+/* ===== Settings modal (matches your “gear opens options” behavior) ===== */
+.tvSettingsBackdrop{
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,.25);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  z-index: 50;
+}
+
+.tvSettingsModal{
+  width: min(920px, 94vw);
+  max-height: min(720px, 86vh);
+  background: #fff;
+  border: 1px solid rgba(0,0,0,.12);
+  border-radius: 14px;
+  box-shadow: 0 24px 70px rgba(0,0,0,.35);
+  overflow:hidden;
+  display:flex;
+  flex-direction:column;
+}
+
+.tvSettingsHead{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap: 10px;
+  padding: 12px 14px;
+  background: #f3f4f6;
+  border-bottom: 1px solid rgba(0,0,0,.10);
+}
+
+.tvSettingsSub{ font-size: 12px; opacity:.7; margin-left: 8px; }
+
+.tvSettingsClose{
+  width:auto;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(0,0,0,.12);
+  background:#fff;
+  cursor:pointer;
+}
+
+.tvSettingsTabs{
+  display:flex;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(0,0,0,.08);
+  background: #fff;
+  flex-wrap: wrap;
+}
+
+.tvSettingsTab{
+  width:auto;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(0,0,0,.10);
+  background: #fff;
+  cursor:pointer;
+  font-weight: 700;
+  font-size: 13px;
+}
+.tvSettingsTab.active{
+  border-color: rgba(59,130,246,.35);
+  background: rgba(59,130,246,.10);
+}
+
+.tvSettingsBody{
+  padding: 12px;
+  overflow:auto;
+}
+
+.tvSettingsPanel{
+  border: 1px solid rgba(0,0,0,.10);
+  border-radius: 12px;
+  padding: 12px;
+  background: #fff;
+}
