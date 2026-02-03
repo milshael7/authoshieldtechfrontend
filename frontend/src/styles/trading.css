@@ -263,3 +263,30 @@ body{background:#0b1220;}
   .tvRight{display:none;}
   .tvFloatWrap{right:10px;}
 }
+/* =========================================================
+   OVERRIDES (keep at bottom)
+   Fix: boxed/squished terminal + max-width containers
+   ========================================================= */
+
+.platformShell{
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+}
+
+.platformBody{
+  width: 100%;
+  padding: 12px;
+}
+
+.platformBody .tvShell{
+  width: 100%;
+  height: calc(100vh - 72px); /* adjust if your header is taller */
+  border-radius: 16px;
+}
+
+/* If you still have a global container squeezing it */
+.container{
+  max-width: none !important;
+}
