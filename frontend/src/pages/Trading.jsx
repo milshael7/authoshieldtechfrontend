@@ -1,46 +1,44 @@
 // frontend/src/pages/Trading.jsx
 import React, { useState } from "react";
-import "./../styles/trading.css";
-
-import Market from "./trading/Market";
-import TradingRoom from "./trading/TradingRoom";
+import Market from "./trading/Market.jsx";
+import TradingRoom from "./trading/TradingRoom.jsx";
 
 export default function Trading() {
-  const [tab, setTab] = useState("market"); // market | room
+  const [tab, setTab] = useState("market"); // market | room | reports
 
   return (
-    <div style={{ padding: 14, maxWidth: 1400, margin: "0 auto" }}>
-      {/* Top Tabs (3 bars feel) */}
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
-        <button
-          className={tab === "market" ? "active" : ""}
-          onClick={() => setTab("market")}
-          type="button"
-          style={{ width: "auto" }}
-        >
+    <div style={{ width: "100vw", height: "100vh", margin: 0, padding: 0 }}>
+      {/* TOP NAV */}
+      <div style={{ display: "flex", gap: 10, padding: 12, flexWrap: "wrap" }}>
+        <button className={tab === "market" ? "active" : ""} onClick={() => setTab("market")}>
           Market (Chart)
         </button>
-
-        <button
-          className={tab === "room" ? "active" : ""}
-          onClick={() => setTab("room")}
-          type="button"
-          style={{ width: "auto" }}
-        >
+        <button className={tab === "room" ? "active" : ""} onClick={() => setTab("room")}>
           Trading Room
         </button>
-
-        <button
-          type="button"
-          style={{ width: "auto", opacity: 0.65 }}
-          title="Coming next"
-          disabled
-        >
+        <button className={tab === "reports" ? "active" : ""} onClick={() => setTab("reports")}>
           Reports
         </button>
       </div>
 
-      {tab === "market" ? <Market /> : <TradingRoom />}
+      {/* PAGE */}
+      <div style={{ width: "100%", height: "calc(100vh - 60px)" }}>
+        {tab === "market" && <Market />}
+        {tab === "room" && <TradingRoom />}
+        {tab === "reports" && (
+          <div style={{ padding: 14 }}>
+            <div className="card">
+              <h3>Reports</h3>
+              <ul style={{ opacity: 0.8 }}>
+                <li>Win / Loss</li>
+                <li>Daily P&amp;L</li>
+                <li>Fees &amp; slippage</li>
+                <li>Exports later</li>
+              </ul>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
