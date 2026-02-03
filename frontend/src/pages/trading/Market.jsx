@@ -1,8 +1,8 @@
 // frontend/src/pages/trading/Market.jsx
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useMemo, useState } from "react";
 import "../../styles/trading.css";
 
-const DEFAULT_SYMBOL = "OANDA:EURUSD"; // matches your reference screenshot
+const DEFAULT_SYMBOL = "OANDA:EURUSD";
 
 const SYMBOLS = [
   "OANDA:EURUSD",
@@ -15,8 +15,14 @@ const SYMBOLS = [
 export default function Market() {
   const [symbol, setSymbol] = useState(DEFAULT_SYMBOL);
   const [tf, setTf] = useState("D");
+
   const [rightTab, setRightTab] = useState("LIMIT"); // MARKET | LIMIT | STOP
   const [side, setSide] = useState("BUY"); // BUY | SELL
+
+  // ✅ MOCK PRICES (later we can LIVE-LINK)
+  const [bid, setBid] = useState("1.11077");
+  const [ask, setAsk] = useState("1.11088");
+
   const [orderPrice, setOrderPrice] = useState("1.11088");
   const [qty, setQty] = useState("1000");
   const [takeProfit, setTakeProfit] = useState(false);
@@ -24,14 +30,11 @@ export default function Market() {
   const [tp, setTp] = useState({ pips: "75", price: "1.11837", usd: "7.50", pct: "0.01" });
   const [sl, setSl] = useState({ pips: "25", price: "1.10837", usd: "2.50", pct: "0.00" });
 
-  const [bottomTab, setBottomTab] = useState("Positions"); // Positions | Orders | History | Account Summary | Trading Journal
+  const [bottomTab, setBottomTab] = useState("Positions");
   const [full, setFull] = useState(false);
 
-  // --- “real chart tools” approach:
-  // Use TradingView embed so the chart toolbar/draw tools actually work (no fake buttons).
   const tvSrc = useMemo(() => {
-    const interval =
-      tf === "D" ? "D" : tf === "W" ? "W" : tf === "M" ? "M" : tf; // 1,5,15,60 etc.
+    const interval = tf === "D" ? "D" : tf === "W" ? "W" : tf === "M" ? "M" : tf;
     const params = new URLSearchParams({
       symbol,
       interval,
@@ -52,51 +55,47 @@ export default function Market() {
     return `https://s.tradingview.com/widgetembed/?${params.toString()}`;
   }, [symbol, tf]);
 
-  // keep iframe height in sync with layout
   const shellCls = full ? "tvShell isFull" : "tvShell";
 
+  const syncOrderPrice = (s) => {
+    // Simple mock behavior: order price follows ask/bid depending on side
+    if (s === "BUY") setOrderPrice(ask);
+    else setOrderPrice(bid);
+  };
+
   const placeOrder = () => {
-    // For now this is “paper UI” — backend hook comes later.
     alert(
-      `${side} ${qty} ${symbol} @ ${orderPrice} (${rightTab})\nTP: ${
-        takeProfit ? `${tp.price}` : "OFF"
-      }\nSL: ${stopLoss ? `${sl.price}` : "OFF"}`
+      `${side} ${qty} ${symbol} @ ${orderPrice} (${rightTab})\nBid: ${bid}  Ask: ${ask}\nTP: ${
+        takeProfit ? tp.price : "OFF"
+      }\nSL: ${stopLoss ? sl.price : "OFF"}`
     );
   };
 
   return (
     <div className={shellCls}>
-      {/* LEFT TOOLBAR (like screenshot) */}
+      {/* LEFT TOOLBAR */}
       <aside className="tvLeftBar" aria-label="tools">
-        {[
-          "☰",
-          "↖",
-          "／",
-          "⟂",
-          "⌁",
-          "T",
-          "⟐",
-          "＋",
-          "⌖",
-          "⤢",
-          "⌫",
-          "👁",
-        ].map((t, i) => (
+        {["☰", "↖", "／", "⟂", "⌁", "T", "⟐", "＋", "⌖", "⤢", "⌫", "👁"].map((t, i) => (
           <button key={i} className="tvToolBtn" type="button" title="Tool">
             {t}
           </button>
         ))}
       </aside>
 
-      {/* TOP TOOLBAR */}
+      {/* TOP BAR */}
       <header className="tvTopBar">
         <div className="tvTopLeft">
+          {/* ✅ YOUR BRAND (your logo, not theirs) */}
+          <div className="tvBrand">
+            <div className="tvBrandLogo" aria-label="AutoShield Logo" />
+            <div className="tvBrandTxt">
+              <b>AutoShield</b>
+              <span>TRADING TERMINAL</span>
+            </div>
+          </div>
+
           <div className="tvSymRow">
-            <select
-              className="tvSelect"
-              value={symbol}
-              onChange={(e) => setSymbol(e.target.value)}
-            >
+            <select className="tvSelect" value={symbol} onChange={(e) => setSymbol(e.target.value)}>
               {SYMBOLS.map((s) => (
                 <option key={s} value={s}>
                   {s}
@@ -117,14 +116,6 @@ export default function Market() {
               ))}
             </div>
           </div>
-
-          <div className="tvMiniTools">
-            {["＋", "↶", "↷", "⤓", "⚙"].map((t, i) => (
-              <button key={i} className="tvIconBtn" type="button" title="Action">
-                {t}
-              </button>
-            ))}
-          </div>
         </div>
 
         <div className="tvTopRight">
@@ -142,7 +133,7 @@ export default function Market() {
         </div>
       </header>
 
-      {/* MAIN CENTER CHART */}
+      {/* CENTER CHART */}
       <main className="tvChartArea">
         <div className="tvChartFrame">
           <iframe
@@ -154,25 +145,23 @@ export default function Market() {
           />
         </div>
 
-        {/* BOTTOM PANEL (tabs like screenshot) */}
+        {/* BOTTOM PANEL */}
         <section className="tvBottom">
           <div className="tvBottomTabs">
-            {["Positions", "Orders", "History", "Account Summary", "Trading Journal"].map(
-              (t) => (
-                <button
-                  key={t}
-                  type="button"
-                  className={bottomTab === t ? "tvTab active" : "tvTab"}
-                  onClick={() => setBottomTab(t)}
-                >
-                  {t}
-                </button>
-              )
-            )}
+            {["Positions", "Orders", "History", "Account Summary", "Trading Journal"].map((t) => (
+              <button
+                key={t}
+                type="button"
+                className={bottomTab === t ? "tvTab active" : "tvTab"}
+                onClick={() => setBottomTab(t)}
+              >
+                {t}
+              </button>
+            ))}
           </div>
 
           <div className="tvBottomBody">
-            {bottomTab === "Positions" && (
+            {bottomTab === "Positions" ? (
               <table className="tvTable">
                 <thead>
                   <tr>
@@ -197,12 +186,8 @@ export default function Market() {
                   </tr>
                 </tbody>
               </table>
-            )}
-
-            {bottomTab !== "Positions" && (
-              <div className="tvEmpty">
-                {bottomTab} will be wired to backend later.
-              </div>
+            ) : (
+              <div className="tvEmpty">{bottomTab} will be wired to backend later.</div>
             )}
           </div>
         </section>
@@ -215,20 +200,30 @@ export default function Market() {
             <div className="tvRightTitle">{symbol}</div>
             <div className="tvRightSub">PAPER TRADING</div>
           </div>
+
           <div className="tvRightButtons">
             <button
               type="button"
               className={side === "SELL" ? "tvSide sell active" : "tvSide sell"}
-              onClick={() => setSide("SELL")}
+              onClick={() => {
+                setSide("SELL");
+                syncOrderPrice("SELL");
+              }}
             >
-              SELL
+              <span className="tvSideLbl">SELL</span>
+              <span className="tvSidePx">{bid}</span>
             </button>
+
             <button
               type="button"
               className={side === "BUY" ? "tvSide buy active" : "tvSide buy"}
-              onClick={() => setSide("BUY")}
+              onClick={() => {
+                setSide("BUY");
+                syncOrderPrice("BUY");
+              }}
             >
-              BUY
+              <span className="tvSideLbl">BUY</span>
+              <span className="tvSidePx">{ask}</span>
             </button>
           </div>
         </div>
@@ -250,11 +245,7 @@ export default function Market() {
           <div className="tvField">
             <label>Order Price</label>
             <div className="tvRow2">
-              <input
-                value={orderPrice}
-                onChange={(e) => setOrderPrice(e.target.value)}
-                inputMode="decimal"
-              />
+              <input value={orderPrice} onChange={(e) => setOrderPrice(e.target.value)} inputMode="decimal" />
               <select className="tvSelectSmall">
                 <option>Ask</option>
                 <option>Bid</option>
@@ -272,11 +263,7 @@ export default function Market() {
           <div className="tvSplit">
             <div className="tvBox">
               <label className="tvCheck">
-                <input
-                  type="checkbox"
-                  checked={takeProfit}
-                  onChange={(e) => setTakeProfit(e.target.checked)}
-                />
+                <input type="checkbox" checked={takeProfit} onChange={(e) => setTakeProfit(e.target.checked)} />
                 Take Profit
               </label>
 
@@ -302,11 +289,7 @@ export default function Market() {
 
             <div className="tvBox">
               <label className="tvCheck">
-                <input
-                  type="checkbox"
-                  checked={stopLoss}
-                  onChange={(e) => setStopLoss(e.target.checked)}
-                />
+                <input type="checkbox" checked={stopLoss} onChange={(e) => setStopLoss(e.target.checked)} />
                 Stop Loss
               </label>
 
@@ -341,6 +324,25 @@ export default function Market() {
               <span>Pip Value</span>
               <span>$ 0.1</span>
             </div>
+          </div>
+
+          {/* Quick mock controls so you can test without backend */}
+          <div className="tvMockRow">
+            <button
+              type="button"
+              className="tvSmallBtn"
+              onClick={() => {
+                // small random tick for demo
+                const a = (parseFloat(ask) + (Math.random() - 0.5) * 0.0002).toFixed(5);
+                const b = (parseFloat(bid) + (Math.random() - 0.5) * 0.0002).toFixed(5);
+                setAsk(a);
+                setBid(b);
+                if (side === "BUY") setOrderPrice(a);
+                else setOrderPrice(b);
+              }}
+            >
+              Tick Price
+            </button>
           </div>
         </div>
       </aside>
