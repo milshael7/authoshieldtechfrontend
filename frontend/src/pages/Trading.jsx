@@ -1,41 +1,94 @@
 // frontend/src/pages/Trading.jsx
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import Market from "./trading/Market.jsx";
 import TradingRoom from "./trading/TradingRoom.jsx";
+import "../styles/trading.css"; // ensures platformShell styles are loaded
 
 export default function Trading() {
   const [tab, setTab] = useState("market"); // market | room | reports
 
+  // Where to go when you click the logo to return to Cybersecurity/Admin
+  // Change this path later if your admin route is different.
+  const cyberUrl = useMemo(() => {
+    return (import.meta.env.VITE_CYBER_URL || "/").trim() || "/";
+  }, []);
+
+  const goCyber = () => {
+    window.location.href = cyberUrl;
+  };
+
   return (
-    <div style={{ width: "100vw", height: "100vh", margin: 0, padding: 0 }}>
-      {/* TOP NAV */}
-      <div style={{ display: "flex", gap: 10, padding: 12, flexWrap: "wrap" }}>
-        <button className={tab === "market" ? "active" : ""} onClick={() => setTab("market")}>
-          Market (Chart)
-        </button>
-        <button className={tab === "room" ? "active" : ""} onClick={() => setTab("room")}>
-          Trading Room
-        </button>
-        <button className={tab === "reports" ? "active" : ""} onClick={() => setTab("reports")}>
-          Reports
-        </button>
+    <div className="platformShell" style={{ minHeight: "100vh" }}>
+      {/* TOP PLATFORM BAR */}
+      <div className="platformTop">
+        <div className="platformBrand" onClick={goCyber} title="Back to Cybersecurity/Admin">
+          <div className="platformLogo" />
+          <div className="platformBrandTxt">
+            <b>AutoShield</b>
+            <span>ADMIN</span>
+          </div>
+        </div>
+
+        <div className="platformTabs">
+          <button
+            type="button"
+            className={tab === "market" ? "ptab active" : "ptab"}
+            onClick={() => setTab("market")}
+          >
+            Market (Chart)
+          </button>
+
+          <button
+            type="button"
+            className={tab === "room" ? "ptab active" : "ptab"}
+            onClick={() => setTab("room")}
+          >
+            Trading Room
+          </button>
+
+          <button
+            type="button"
+            className={tab === "reports" ? "ptab active" : "ptab"}
+            onClick={() => setTab("reports")}
+          >
+            Reports
+          </button>
+        </div>
+
+        <div className="platformActions">
+          <button type="button" className="pbtn" onClick={() => setTab("market")}>
+            Open Market
+          </button>
+          <button type="button" className="pbtn" onClick={goCyber}>
+            Cybersecurity
+          </button>
+        </div>
       </div>
 
-      {/* PAGE */}
-      <div style={{ width: "100%", height: "calc(100vh - 60px)" }}>
-        {tab === "market" && <Market />}
-        {tab === "room" && <TradingRoom />}
+      {/* BODY */}
+      <div className="platformBody">
+        {tab === "market" && (
+          <div className="platformCard" style={{ padding: 0 }}>
+            {/* Market already has its own terminal toolbars inside */}
+            <Market />
+          </div>
+        )}
+
+        {tab === "room" && (
+          <div className="platformCard">
+            <TradingRoom />
+          </div>
+        )}
+
         {tab === "reports" && (
-          <div style={{ padding: 14 }}>
-            <div className="card">
-              <h3>Reports</h3>
-              <ul style={{ opacity: 0.8 }}>
-                <li>Win / Loss</li>
-                <li>Daily P&amp;L</li>
-                <li>Fees &amp; slippage</li>
-                <li>Exports later</li>
-              </ul>
-            </div>
+          <div className="platformCard">
+            <h3 style={{ marginTop: 0 }}>Reports</h3>
+            <ul style={{ opacity: 0.85, lineHeight: 1.6 }}>
+              <li>Win / Loss</li>
+              <li>Daily P&amp;L</li>
+              <li>Fees &amp; slippage</li>
+              <li>Exports later</li>
+            </ul>
           </div>
         )}
       </div>
