@@ -1,17 +1,26 @@
-*{box-sizing:border-box}
-html,body,#root{height:100%; margin:0;}
-body{background:#0b1220;}
+/* =========================================================
+   TRADING TERMINAL (SCOPED)
+   IMPORTANT:
+   - NO global body/html/#root styles in this file
+   - This file must NOT change the whole app theme
+   ========================================================= */
 
 /* ===== Main layout (no squish) ===== */
 .tvShell{
-  width:100vw;
-  height:100vh;
+  width:100%;
+  height: calc(100vh - 110px); /* header space */
   display:grid;
   grid-template-columns: 56px minmax(0,1fr) 380px;
   grid-template-rows: 56px minmax(0,1fr);
-  background:#0b1220;
+  border-radius: 16px;
+  overflow:hidden;
+
+  background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(0,0,0,.22));
+  border: 1px solid rgba(255,255,255,.10);
+  box-shadow: 0 10px 30px rgba(0,0,0,.35);
 }
-.tvShell.isFull{position:fixed; inset:0; z-index:9999;}
+
+.tvShell.isFull{position:fixed; inset:0; z-index:9999; border-radius:0;}
 .tvShell.noOrder{grid-template-columns: 56px minmax(0,1fr);}
 .tvShell.noOrder .tvRight{display:none;}
 .tvShell.noBottom .tvBottom{display:none;}
@@ -22,7 +31,9 @@ body{background:#0b1220;}
   padding:10px 8px;
   background: rgba(255,255,255,.06);
   border-right: 1px solid rgba(255,255,255,.10);
-  display:flex; flex-direction:column; gap:8px;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
 }
 .tvToolBtn{
   height:34px;
@@ -94,10 +105,28 @@ body{background:#0b1220;}
 /* Chart area */
 .tvChartArea{grid-column:2; grid-row:2; min-width:0; min-height:0; position:relative;}
 .tvChartFrame{position:relative; height:100%; min-height:0;}
-.tvIframe{width:100%; height:100%; border:0; background:#fff; border-radius:14px;}
+.tvIframe{
+  width:100%;
+  height:100%;
+  border:0;
+  border-radius:14px;
+  overflow:hidden;
+  /* TradingView iframe is its own UI; don’t force global white themes here */
+  background: transparent;
+}
 
 /* Right panel */
-.tvRight{grid-column:3; grid-row:2; min-width:0; min-height:0; padding:10px; background: rgba(255,255,255,.06); border-left:1px solid rgba(255,255,255,.10);}
+.tvRight{
+  grid-column:3;
+  grid-row:2;
+  min-width:0;
+  min-height:0;
+  padding:10px;
+
+  /* light lilac glass */
+  background: rgba(160,120,255,.12);
+  border-left:1px solid rgba(160,120,255,.22);
+}
 
 /* Floating panel (when undocked) */
 .tvShell.floatMode .tvRight{display:none;}
@@ -116,24 +145,34 @@ body{background:#0b1220;}
   left: 10px;
   right: 10px;
   bottom: 10px;
-  height: 240px;
-  background: rgba(255,255,255,.06);
-  border:1px solid rgba(255,255,255,.10);
+  height: 200px; /* smaller than before (less “glass blocking”) */
+
+  background: rgba(160,120,255,.10);
+  border:1px solid rgba(160,120,255,.22);
   border-radius:14px;
   overflow:hidden;
   backdrop-filter: blur(10px);
 }
-.tvBottomTabs{display:flex; gap:8px; padding:10px; border-bottom:1px solid rgba(255,255,255,.10); flex-wrap:wrap;}
+.tvBottomTabs{
+  display:flex;
+  gap:8px;
+  padding:10px;
+  border-bottom:1px solid rgba(255,255,255,.10);
+  flex-wrap:wrap;
+}
 .tvTab{
   width:auto;
   padding:8px 10px;
   border-radius:999px;
-  border:1px solid rgba(255,255,255,.12);
-  background: rgba(0,0,0,.25);
+  border:1px solid rgba(160,120,255,.22);
+  background: rgba(160,120,255,.10);
   color:#fff;
 }
-.tvTab.active{border-color: rgba(122,167,255,.55); background: rgba(122,167,255,.20);}
-.tvBottomBody{padding:10px; color:#fff; overflow:auto; height: calc(240px - 56px);}
+.tvTab.active{
+  border-color: rgba(122,167,255,.55);
+  background: rgba(122,167,255,.20);
+}
+.tvBottomBody{padding:10px; color:#fff; overflow:auto; height: calc(200px - 56px);}
 
 /* Table */
 .tvTable{width:100%; border-collapse:collapse; color:#fff;}
@@ -142,287 +181,9 @@ body{background:#0b1220;}
 .neg{color:#ff5a5f;}
 .tvEmpty{opacity:.8;}
 
-/* ===== Order Panel (light like screenshot) ===== */
-.opCard{
-  background:#fff;
-  border-radius:14px;
-  border:1px solid rgba(0,0,0,.12);
-  box-shadow: 0 18px 50px rgba(0,0,0,.25);
-  overflow:hidden;
-}
-.opHeader{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:10px;
-  padding:10px 12px;
-  background:#f3f4f6;
-  border-bottom:1px solid rgba(0,0,0,.10);
-}
-.opTitle b{font-size:13px;}
-.opTitle span{font-size:11px; opacity:.7; margin-left:6px;}
-.opHeaderBtns{position:relative; display:flex; gap:8px;}
-.opIcon{
-  width:auto;
-  padding:8px 10px;
-  border-radius:10px;
-  border:1px solid rgba(0,0,0,.12);
-  background:#fff;
-  cursor:pointer;
-}
-.opMenu{
-  position:absolute;
-  top: 42px;
-  right: 0;
-  width: 240px;
-  background:#fff;
-  border:1px solid rgba(0,0,0,.12);
-  border-radius:12px;
-  box-shadow: 0 16px 40px rgba(0,0,0,.18);
-  padding:8px;
-  z-index:9999;
-}
-.opMenuBtn{
-  width:100%;
-  text-align:left;
-  padding:8px 10px;
-  border-radius:10px;
-  border:1px solid transparent;
-  background:#fff;
-  cursor:pointer;
-}
-.opMenuBtn:hover{background:#f3f4f6;}
-.opMenuSep{height:1px; background:rgba(0,0,0,.10); margin:6px 0;}
-.opMenuCheck{display:flex; gap:8px; align-items:flex-start; padding:6px 6px; font-size:12px; cursor:pointer;}
-.opMenuCheck input{margin-top:2px;}
-
-.opSides{display:grid; grid-template-columns: 1fr 1fr;}
-.opSide{
-  border:0;
-  padding:10px 12px;
-  cursor:pointer;
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:10px;
-  background:#eef2ff;
-}
-.opSide.sell{background:#f1f5f9;}
-.opSide.buy{background:#dbeafe;}
-.opSide.active{outline:2px solid rgba(59,130,246,.35);}
-.opSide span{font-size:11px; opacity:.8;}
-.opSide b{font-size:13px;}
-
-.opTabs{display:flex; justify-content:center; gap:18px; padding:10px 12px;}
-.opTab{
-  width:auto;
-  padding:8px 10px;
-  border-radius:999px;
-  border:1px solid rgba(0,0,0,.10);
-  background:#fff;
-  cursor:pointer;
-}
-.opTab.active{border-color:#60a5fa; background:#eff6ff;}
-
-.opBody{padding:12px;}
-.opField label{font-size:12px; opacity:.8;}
-.opRow2{display:grid; grid-template-columns: 1fr 120px; gap:8px; margin-top:6px;}
-.opRow2 input,.opRow2 select, .opBody input, .opBody select{
-  width:100%;
-  padding:10px 10px;
-  border-radius:10px;
-  border:1px solid rgba(0,0,0,.12);
-}
-.opHint{font-size:11px; opacity:.6; margin-top:6px;}
-
-.opSplit{display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:10px;}
-.opBox{border:1px solid rgba(0,0,0,.10); border-radius:12px; padding:10px;}
-.opCheck{display:flex; gap:8px; align-items:center; font-size:13px; margin-bottom:8px;}
-.opGrid2{display:grid; grid-template-columns: 1fr 1fr; gap:8px;}
-.opGrid2.disabled{opacity:.45; pointer-events:none;}
-.opGrid2 span{font-size:11px; opacity:.7;}
-
-.opBuyBar{
-  width:100%;
-  margin-top:12px;
-  padding:12px;
-  border-radius:12px;
-  border:1px solid rgba(0,0,0,.10);
-  background:#3b82f6;
-  color:#fff;
-  font-weight:700;
-  cursor:pointer;
-}
-.opInfo{margin-top:12px; border-top:1px solid rgba(0,0,0,.10); padding-top:10px;}
-.opInfo b{font-size:12px;}
-.opInfoRow{display:flex; justify-content:space-between; font-size:12px; opacity:.85; margin-top:6px;}
-
 /* Mobile */
 @media (max-width: 980px){
-  .tvShell{grid-template-columns: 56px minmax(0,1fr); }
+  .tvShell{grid-template-columns: 56px minmax(0,1fr); height: auto;}
   .tvRight{display:none;}
   .tvFloatWrap{right:10px;}
-}
-/* =========================================================
-   OVERRIDES (keep at bottom)
-   Fix: boxed/squished terminal + max-width containers
-   ========================================================= */
-
-.platformShell{
-  width: 100%;
-  max-width: none;
-  margin: 0;
-  padding: 0;
-}
-
-.platformBody{
-  width: 100%;
-  padding: 12px;
-}
-
-.platformBody .tvShell{
-  width: 100%;
-  height: calc(100vh - 72px); /* adjust if your header is taller */
-  border-radius: 16px;
-}
-
-/* If you still have a global container squeezing it */
-.container{
-  max-width: none !important;
-}
-/* ===== Purple skin for panels we control ===== */
-:root{
-  --tradePanelBg: rgba(160, 120, 255, .10);
-  --tradePanelBorder: rgba(160, 120, 255, .22);
-  --tradePanelSolid: rgba(18, 16, 30, .92);
-}
-
-.tvRight,
-.tvBottom,
-.tvTopBar{
-  background: var(--tradePanelBg) !important;
-  border-color: var(--tradePanelBorder) !important;
-  color: rgba(255,255,255,.92);
-}
-
-.tvTab, .tvTab2, .tvPill{
-  background: rgba(160,120,255,.10) !important;
-  border-color: rgba(160,120,255,.18) !important;
-}
-
-.tvBuyBar{
-  background: rgba(160,120,255,.30) !important;
-  border-color: rgba(160,120,255,.35) !important;
-}
-
-.tvForm input, .tvForm select{
-  background: rgba(160,120,255,.06) !important;
-  border-color: rgba(160,120,255,.20) !important;
-  color: rgba(255,255,255,.92) !important;
-}
-/* =========================================================
-   TRADING TERMINAL — AUTOSHIELD THEME SKIN (APPEND ONLY)
-   Uses your global :root vars from styles.css
-   ========================================================= */
-
-:root{
-  /* light purple / glass */
-  --tradeLilac: rgba(160, 120, 255, .18);
-  --tradeLilac2: rgba(160, 120, 255, .10);
-  --tradeBorder: rgba(160, 120, 255, .22);
-}
-
-/* IMPORTANT: ensure the terminal can expand full width */
-.platformShell{
-  width:100%;
-  max-width:none;
-  padding: 14px;
-}
-
-.tvShell{
-  width:100%;
-  height: calc(100vh - 110px); /* header area */
-  border-radius: var(--radius);
-  border: 1px solid var(--line);
-  background: linear-gradient(180deg, var(--panel), var(--panel2));
-  box-shadow: var(--shadow);
-  overflow:hidden;
-  position:relative;
-}
-
-/* 3-column terminal layout: tools | chart | order */
-.tvLeftBar{
-  width: 52px;
-  background: rgba(0,0,0,.22);
-  border-right: 1px solid var(--line);
-}
-
-.tvChartArea{
-  min-width:0;
-  background: transparent;
-}
-
-.tvRight{
-  width: 360px;
-  min-width: 320px;
-  background: linear-gradient(180deg, var(--tradeLilac2), rgba(0,0,0,.20));
-  border-left: 1px solid var(--line);
-}
-
-/* top bar */
-.tvTopBar{
-  background: linear-gradient(180deg, var(--tradeLilac2), rgba(0,0,0,.22));
-  border-bottom: 1px solid var(--line);
-}
-
-/* pills + tabs */
-.tvPill, .tvTab, .tvTab2{
-  background: rgba(0,0,0,.25);
-  border: 1px solid rgba(255,255,255,.12);
-  color: var(--text);
-}
-.tvPill.active, .tvTab.active, .tvTab2.active{
-  border-color: var(--accent);
-  background: rgba(122,167,255,.15);
-}
-
-/* order panel content */
-.tvForm,
-.tvOrderInfo,
-.tvBottom{
-  color: var(--text);
-}
-
-.tvForm input,
-.tvForm select{
-  background: rgba(0,0,0,.25);
-  border: 1px solid rgba(255,255,255,.12);
-  color: var(--text);
-}
-
-.tvBuyBar{
-  background: rgba(122,167,255,.20);
-  border: 1px solid rgba(122,167,255,.35);
-  color: var(--text);
-}
-
-/* Bottom panel */
-.tvBottom{
-  background: linear-gradient(180deg, rgba(0,0,0,.18), rgba(0,0,0,.28));
-  border-top: 1px solid var(--line);
-}
-
-/* Make iframe fill its space cleanly */
-.tvChartFrame{ position:relative; width:100%; height:100%; min-width:0; }
-.tvIframe{ width:100%; height:100%; border:0; display:block; }
-
-/* Responsive: stack order panel under chart on small screens */
-@media (max-width: 980px){
-  .tvShell{ height: auto; }
-  .tvRight{
-    width:100%;
-    min-width:0;
-    border-left: none;
-    border-top: 1px solid var(--line);
-  }
 }
