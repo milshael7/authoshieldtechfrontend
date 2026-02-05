@@ -1,0 +1,65 @@
+/* src/styles/layout.css */
+
+.layout-root{
+  display:flex;
+  min-height:100vh;
+}
+
+.layout-sidebar{
+  width:260px;
+  background: rgba(0,0,0,.25);
+  border-right:1px solid rgba(255,255,255,.12);
+  padding:16px;
+  display:flex;
+  flex-direction:column;
+  gap:16px;
+}
+
+.layout-main{
+  flex:1;
+  display:flex;
+  flex-direction:column;
+  min-width:0;
+}
+
+.layout-topbar{
+  padding:14px 18px;
+  border-bottom:1px solid rgba(255,255,255,.12);
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+}
+
+.layout-content{
+  padding:18px;
+  flex:1;
+  overflow:auto;
+}
+
+.layout-brand{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  font-weight:700;
+}
+
+.layout-nav{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+
+.layout-nav a{
+  text-decoration:none;
+  color:inherit;
+  opacity:.85;
+}
+
+.layout-nav a.active{
+  opacity:1;
+  font-weight:700;
+}
+
+.logout-btn{
+  margin-top:auto;
+}
