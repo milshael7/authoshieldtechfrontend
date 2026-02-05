@@ -1,11 +1,15 @@
-// frontend/src/App.jsx
-import React from "react";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+
 import Trading from "./pages/Trading.jsx";
+import NotFound from "./pages/NotFound.jsx";
 
 export default function App() {
   return (
-    <div style={{ minHeight: "100vh" }}>
-      <Trading />
-    </div>
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Trading />} />
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </BrowserRouter>
   );
 }
