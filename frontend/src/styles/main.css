@@ -1,1 +1,84 @@
+:root{
+  --bg:#0b1220;
 
+  --panel: rgba(255,255,255,.06);
+  --panel2: rgba(0,0,0,.22);
+  --panel3: rgba(255,255,255,.04);
+
+  --text: rgba(255,255,255,.92);
+  --muted: rgba(255,255,255,.70);
+  --line: rgba(255,255,255,.12);
+
+  --ok:#2bd576;
+  --warn:#ffd166;
+  --danger:#ff5a5f;
+
+  --accent: rgba(122,167,255,.85);
+  --accent2: rgba(0,255,170,.35);
+
+  --radius: 16px;
+  --radiusSm: 12px;
+
+  --shadow: 0 10px 30px rgba(0,0,0,.35);
+  --shadowSoft: 0 8px 18px rgba(0,0,0,.28);
+}
+
+*{ box-sizing:border-box }
+html,body{ height:100% }
+
+body{
+  margin:0;
+  font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial;
+  color: var(--text);
+  overflow-x:hidden;
+  background: var(--bg);
+}
+
+#root{ position:relative; z-index:1; }
+
+.container{
+  max-width:1100px;
+  margin:0 auto;
+  padding:24px;
+}
+
+.card{
+  background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(0,0,0,.18));
+  border: 1px solid rgba(255,255,255,.10);
+  border-radius: var(--radius);
+  padding: 16px;
+  box-shadow: var(--shadowSoft);
+}
+
+input,select,button,textarea{
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(0,0,0,.25);
+  color: var(--text);
+}
+
+button{
+  cursor:pointer;
+  background: rgba(255,255,255,.10);
+}
+button:hover{ background: rgba(255,255,255,.14); }
+
+.badge{
+  display:inline-flex;
+  gap:8px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(0,0,0,.25);
+  font-size: 12px;
+}
+
+.grid{
+  display:grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap:14px;
+}
+@media (max-width: 980px){
+  .grid{ grid-template-columns: 1fr; }
+}
