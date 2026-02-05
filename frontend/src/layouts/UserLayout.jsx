@@ -52,6 +52,3 @@ export default function UserLayout() {
           <Outlet />
         </section>
       </main>
-    </div>
-  );
-}
