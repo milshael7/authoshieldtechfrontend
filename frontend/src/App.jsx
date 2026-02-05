@@ -1,8 +1,8 @@
 import React from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
-// Session
-import { getSavedUser } from "./lib/api";
+// Session (✅ FIXED PATH)
+import { getSavedUser } from "./lib/api.js";
 
 // Layouts
 import AdminLayout from "./layouts/AdminLayout.jsx";
@@ -50,7 +50,7 @@ export default function App() {
           <Route path="notifications" element={<Notifications />} />
         </Route>
 
-        {/* ---------- MANAGER (WATCH ONLY) ---------- */}
+        {/* ---------- MANAGER ---------- */}
         <Route
           path="/manager/*"
           element={
@@ -60,10 +60,7 @@ export default function App() {
           }
         >
           <Route index element={<Posture scope="manager" />} />
-          <Route
-            path="trading"
-            element={<Trading mode="watch" />}
-          />
+          <Route path="trading" element={<Trading mode="watch" />} />
           <Route path="notifications" element={<Notifications />} />
         </Route>
 
@@ -95,7 +92,10 @@ export default function App() {
 
         {/* ---------- FALLBACK ---------- */}
         <Route path="/404" element={<NotFound />} />
-        <Route path="*" element={<Navigate to={user ? "/app" : "/login"} replace />} />
+        <Route
+          path="*"
+          element={<Navigate to={user ? "/app" : "/login"} replace />}
+        />
       </Routes>
     </BrowserRouter>
   );
