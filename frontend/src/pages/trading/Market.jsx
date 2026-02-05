@@ -1,39 +1,53 @@
 // frontend/src/pages/trading/Market.jsx
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useRef, useEffect } from "react";
 import "../../styles/terminal.css";
 
 const DEFAULT_SYMBOL = "OANDA:EURUSD";
-const SYMBOLS = ["OANDA:EURUSD","OANDA:GBPUSD","BITSTAMP:BTCUSD","BINANCE:BTCUSDT","BINANCE:ETHUSDT"];
+const SYMBOLS = [
+  "OANDA:EURUSD",
+  "OANDA:GBPUSD",
+  "BITSTAMP:BTCUSD",
+  "BINANCE:BTCUSDT",
+  "BINANCE:ETHUSDT",
+];
 
 export default function Market() {
+  /* ---------------- CORE STATE ---------------- */
   const [symbol, setSymbol] = useState(DEFAULT_SYMBOL);
   const [tf, setTf] = useState("D");
 
-  const [rightTab, setRightTab] = useState("LIMIT");
-  const [side, setSide] = useState("BUY");
-
-  // mock prices
   const [bid, setBid] = useState("1.11077");
   const [ask, setAsk] = useState("1.11088");
 
-  const [orderPrice, setOrderPrice] = useState("1.11088");
+  /* ---------------- ORDER PANEL STATE ---------------- */
+  // closed | docked | floating
+  const [panelMode, setPanelMode] = useState("docked");
+  const [side, setSide] = useState("BUY");
+  const [orderType, setOrderType] = useState("LIMIT");
+
+  const [orderPrice, setOrderPrice] = useState(ask);
   const [qty, setQty] = useState("1000");
 
   const [takeProfit, setTakeProfit] = useState(false);
   const [stopLoss, setStopLoss] = useState(false);
-  const [tp, setTp] = useState({ pips: "75", price: "1.11837", usd: "7.50", pct: "0.01" });
-  const [sl, setSl] = useState({ pips: "25", price: "1.10837", usd: "2.50", pct: "0.00" });
+  const [tp, setTp] = useState("1.11837");
+  const [sl, setSl] = useState("1.10837");
 
+  /* ---------------- FLOATING POSITION ---------------- */
+  const panelRef = useRef(null);
+  const [pos, setPos] = useState({ x: 200, y: 200 });
+  const drag = useRef({ active: false, x: 0, y: 0 });
+
+  /* ---------------- BOTTOM PANEL ---------------- */
   const [bottomTab, setBottomTab] = useState("Positions");
-  const [full, setFull] = useState(false);
 
+  /* ---------------- TRADINGVIEW ---------------- */
   const tvSrc = useMemo(() => {
     const interval = tf === "D" ? "D" : tf === "W" ? "W" : tf === "M" ? "M" : tf;
     const params = new URLSearchParams({
       symbol,
       interval,
       theme: "light",
-      style: "1",
       timezone: "Etc/UTC",
       withdateranges: "1",
       hide_side_toolbar: "0",
@@ -41,109 +55,124 @@ export default function Market() {
       saveimage: "1",
       details: "1",
       studies: "1",
-      calendar: "0",
-      hotlist: "0",
       locale: "en",
       toolbarbg: "#f3f4f6",
     });
     return `https://s.tradingview.com/widgetembed/?${params.toString()}`;
   }, [symbol, tf]);
 
-  const shellCls = full ? "tvShell isFull" : "tvShell";
-
-  const syncOrderPrice = (s) => {
-    if (s === "BUY") setOrderPrice(ask);
-    else setOrderPrice(bid);
-  };
-
-  const tick = () => {
+  /* ---------------- PRICE MOCK ---------------- */
+  function tick() {
     const a = (parseFloat(ask) + (Math.random() - 0.5) * 0.0002).toFixed(5);
     const b = (parseFloat(bid) + (Math.random() - 0.5) * 0.0002).toFixed(5);
     setAsk(a);
     setBid(b);
     setOrderPrice(side === "BUY" ? a : b);
-  };
+  }
 
-  const placeOrder = () => {
+  /* ---------------- BUY / SELL ---------------- */
+  function clickSide(s) {
+    setSide(s);
+    setOrderPrice(s === "BUY" ? ask : bid);
+    if (panelMode === "closed") setPanelMode("docked");
+  }
+
+  function placeOrder() {
     alert(
-      `${side} ${qty} ${symbol} @ ${orderPrice} (${rightTab})\nBid: ${bid}  Ask: ${ask}\nTP: ${
-        takeProfit ? tp.price : "OFF"
-      }\nSL: ${stopLoss ? sl.price : "OFF"}`
+      `${side} ${qty} ${symbol} @ ${orderPrice}\nTP: ${
+        takeProfit ? tp : "OFF"
+      }\nSL: ${stopLoss ? sl : "OFF"}`
     );
-  };
+  }
+
+  /* ---------------- DRAGGING ---------------- */
+  function onMouseDown(e) {
+    drag.current = {
+      active: true,
+      x: e.clientX - pos.x,
+      y: e.clientY - pos.y,
+    };
+  }
+
+  function onMouseMove(e) {
+    if (!drag.current.active) return;
+    setPos({
+      x: e.clientX - drag.current.x,
+      y: e.clientY - drag.current.y,
+    });
+  }
+
+  function onMouseUp() {
+    drag.current.active = false;
+  }
+
+  useEffect(() => {
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+    };
+  }, []);
+
+  /* ---------------- AUTO CENTER WHEN FLOATING ---------------- */
+  useEffect(() => {
+    if (panelMode === "floating") {
+      setPos({
+        x: window.innerWidth / 2 - 160,
+        y: window.innerHeight / 2 - 220,
+      });
+    }
+  }, [panelMode, bottomTab]);
 
   return (
-    <div className={shellCls}>
+    <div className={`tvShell ${panelMode === "docked" ? "withRight" : ""}`}>
       {/* LEFT TOOLBAR */}
-      <aside className="tvLeftBar" aria-label="tools">
-        {["☰", "↖", "／", "⟂", "⌁", "T", "⟐", "＋", "⌖", "⤢", "⌫", "👁"].map((t, i) => (
-          <button key={i} className="tvToolBtn" type="button" title="Tool">
-            {t}
-          </button>
+      <aside className="tvLeftBar">
+        {["☰", "↖", "／", "⟂", "⌁", "T", "⟐", "＋"].map((t, i) => (
+          <button key={i} className="tvToolBtn">{t}</button>
         ))}
       </aside>
 
       {/* TOP BAR */}
       <header className="tvTopBar">
         <div className="tvTopLeft">
-          <div className="tvBrand">
-            <div className="tvBrandLogo" aria-label="AutoShield Logo" />
-            <div className="tvBrandTxt">
-              <b>AutoShield</b>
-              <span>TRADING TERMINAL</span>
-            </div>
-          </div>
+          <select value={symbol} onChange={(e) => setSymbol(e.target.value)}>
+            {SYMBOLS.map((s) => <option key={s}>{s}</option>)}
+          </select>
 
-          <div className="tvSymRow">
-            <select className="tvSelect" value={symbol} onChange={(e) => setSymbol(e.target.value)}>
-              {SYMBOLS.map((s) => (
-                <option key={s} value={s}>{s}</option>
-              ))}
-            </select>
-
-            <div className="tvTfRow">
-              {["1", "5", "15", "60", "D", "W", "M"].map((x) => (
-                <button
-                  key={x}
-                  type="button"
-                  className={tf === x ? "tvPill active" : "tvPill"}
-                  onClick={() => setTf(x)}
-                >
-                  {x}
-                </button>
-              ))}
-            </div>
-          </div>
+          {["1","5","15","60","D","W","M"].map((x) => (
+            <button
+              key={x}
+              className={tf === x ? "tvPill active" : "tvPill"}
+              onClick={() => setTf(x)}
+            >
+              {x}
+            </button>
+          ))}
         </div>
 
         <div className="tvTopRight">
-          <button className="tvPrimary" type="button">Publish</button>
-          <button className="tvIconBtn" type="button" onClick={tick} title="Mock Tick">▶</button>
-          <button className="tvIconBtn" type="button" title="Fullscreen" onClick={() => setFull((v) => !v)}>
-            {full ? "🗗" : "🗖"}
-          </button>
+          <button onClick={tick}>▶</button>
         </div>
       </header>
 
-      {/* CENTER */}
+      {/* CHART */}
       <main className="tvChartArea">
-        <div className="tvChartFrame">
-          <iframe
-            title="TradingView Chart"
-            className="tvIframe"
-            src={tvSrc}
-            frameBorder="0"
-            allow="clipboard-write; fullscreen"
-          />
-        </div>
+        <iframe
+          title="TradingView"
+          src={tvSrc}
+          className="tvIframe"
+          frameBorder="0"
+          allow="fullscreen"
+        />
 
         {/* BOTTOM PANEL */}
         <section className="tvBottom">
           <div className="tvBottomTabs">
-            {["Positions", "Orders", "History", "Account Summary", "Trading Journal"].map((t) => (
+            {["Positions","Orders","History","Account Summary","Trading Journal"].map((t) => (
               <button
                 key={t}
-                type="button"
                 className={bottomTab === t ? "tvTab active" : "tvTab"}
                 onClick={() => setBottomTab(t)}
               >
@@ -151,124 +180,87 @@ export default function Market() {
               </button>
             ))}
           </div>
-
           <div className="tvBottomBody">
-            {bottomTab === "Positions" ? (
-              <table className="tvTable">
-                <thead>
-                  <tr>
-                    <th>Symbol</th><th>Side</th><th>Qty</th><th>Avg Fill</th><th>Take Profit</th><th>Stop Loss</th><th>Profit</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td>BITSTAMP:BTCUSD</td>
-                    <td className="buy">Buy</td>
-                    <td>1</td>
-                    <td>8,174.85</td>
-                    <td>—</td>
-                    <td>—</td>
-                    <td className="neg">-283.57</td>
-                  </tr>
-                </tbody>
-              </table>
-            ) : (
-              <div className="tvEmpty">{bottomTab} will be wired to backend later.</div>
-            )}
+            {bottomTab} panel ready for backend.
           </div>
         </section>
       </main>
 
-      {/* RIGHT DOCKED PANEL */}
-      <aside className="tvRight">
-        {renderOrderPanel({
-          symbol, rightTab, setRightTab,
-          side, setSide, bid, ask,
-          orderPrice, setOrderPrice,
-          qty, setQty,
-          takeProfit, setTakeProfit,
-          stopLoss, setStopLoss,
-          tp, setTp, sl, setSl,
-          placeOrder, syncOrderPrice
-        })}
-      </aside>
+      {/* DOCKED PANEL */}
+      {panelMode === "docked" && (
+        <aside className="tvRight">
+          {OrderPanel()}
+        </aside>
+      )}
+
+      {/* FLOATING PANEL */}
+      {panelMode === "floating" && (
+        <div
+          ref={panelRef}
+          className="tvFloating"
+          style={{ left: pos.x, top: pos.y }}
+        >
+          <div className="tvFloatHeader" onMouseDown={onMouseDown}>
+            <span>Order</span>
+            <div>
+              <button onClick={() => setPanelMode("docked")}>⇨</button>
+              <button onClick={() => setPanelMode("closed")}>✕</button>
+            </div>
+          </div>
+          {OrderPanel()}
+        </div>
+      )}
     </div>
   );
-}
 
-function renderOrderPanel(props) {
-  const {
-    symbol, rightTab, setRightTab,
-    side, setSide, bid, ask,
-    orderPrice, setOrderPrice,
-    qty, setQty,
-    takeProfit, setTakeProfit,
-    stopLoss, setStopLoss,
-    tp, setTp, sl, setSl,
-    placeOrder, syncOrderPrice
-  } = props;
-
-  return (
-    <>
-      <div style={{ marginBottom: 10 }}>
-        <div style={{ fontWeight: 900 }}>{symbol}</div>
-        <div style={{ opacity: 0.7, fontSize: 12 }}>PAPER TRADING</div>
-      </div>
-
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
-        <button type="button" className={side === "SELL" ? "tvPill active" : "tvPill"} onClick={() => { setSide("SELL"); syncOrderPrice("SELL"); }}>
-          SELL {bid}
-        </button>
-        <button type="button" className={side === "BUY" ? "tvPill active" : "tvPill"} onClick={() => { setSide("BUY"); syncOrderPrice("BUY"); }}>
-          BUY {ask}
-        </button>
-      </div>
-
-      <div style={{ display: "flex", gap: 8, justifyContent: "center", marginBottom: 10, flexWrap: "wrap" }}>
-        {["MARKET", "LIMIT", "STOP"].map((t) => (
-          <button key={t} type="button" className={rightTab === t ? "tvTab active" : "tvTab"} onClick={() => setRightTab(t)}>
-            {t}
+  /* ---------------- ORDER PANEL RENDER ---------------- */
+  function OrderPanel() {
+    return (
+      <div className="tvOrderPanel">
+        <div className="tvRow">
+          <button className={side==="SELL"?"active":""} onClick={()=>clickSide("SELL")}>
+            SELL {bid}
           </button>
-        ))}
-      </div>
-
-      <div style={{ display: "grid", gap: 10 }}>
-        <div>
-          <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 6 }}>Order Price</div>
-          <input value={orderPrice} onChange={(e) => setOrderPrice(e.target.value)} inputMode="decimal" />
+          <button className={side==="BUY"?"active":""} onClick={()=>clickSide("BUY")}>
+            BUY {ask}
+          </button>
         </div>
 
-        <div>
-          <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 6 }}>Quantity</div>
-          <input value={qty} onChange={(e) => setQty(e.target.value)} inputMode="numeric" />
+        <div className="tvRow">
+          {["MARKET","LIMIT","STOP"].map((t)=>(
+            <button
+              key={t}
+              className={orderType===t?"active":""}
+              onClick={()=>setOrderType(t)}
+            >
+              {t}
+            </button>
+          ))}
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-          <div style={{ border: "1px solid rgba(255,255,255,.12)", borderRadius: 12, padding: 10 }}>
-            <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <input type="checkbox" checked={takeProfit} onChange={(e) => setTakeProfit(e.target.checked)} />
-              <span>Take Profit</span>
-            </label>
-            <div style={{ opacity: takeProfit ? 1 : 0.45, pointerEvents: takeProfit ? "auto" : "none", marginTop: 8 }}>
-              <input value={tp.price} onChange={(e) => setTp((p) => ({ ...p, price: e.target.value }))} />
-            </div>
-          </div>
+        <input value={orderPrice} onChange={(e)=>setOrderPrice(e.target.value)} />
+        <input value={qty} onChange={(e)=>setQty(e.target.value)} />
 
-          <div style={{ border: "1px solid rgba(255,255,255,.12)", borderRadius: 12, padding: 10 }}>
-            <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <input type="checkbox" checked={stopLoss} onChange={(e) => setStopLoss(e.target.checked)} />
-              <span>Stop Loss</span>
-            </label>
-            <div style={{ opacity: stopLoss ? 1 : 0.45, pointerEvents: stopLoss ? "auto" : "none", marginTop: 8 }}>
-              <input value={sl.price} onChange={(e) => setSl((p) => ({ ...p, price: e.target.value }))} />
-            </div>
-          </div>
-        </div>
+        <label>
+          <input type="checkbox" checked={takeProfit} onChange={()=>setTakeProfit(!takeProfit)} />
+          Take Profit
+        </label>
+        {takeProfit && <input value={tp} onChange={(e)=>setTp(e.target.value)} />}
 
-        <button className="tvPrimary" type="button" onClick={placeOrder}>
-          {side} {qty} {symbol} @ {orderPrice} ({rightTab})
+        <label>
+          <input type="checkbox" checked={stopLoss} onChange={()=>setStopLoss(!stopLoss)} />
+          Stop Loss
+        </label>
+        {stopLoss && <input value={sl} onChange={(e)=>setSl(e.target.value)} />}
+
+        <button className="tvPrimary" onClick={placeOrder}>
+          {side} {qty} @ {orderPrice}
+        </button>
+
+        <button onClick={()=>setPanelMode(panelMode==="floating"?"docked":"floating")}>
+          {panelMode==="floating"?"Dock":"Float"}
         </button>
       </div>
-    </>
-  );
+    );
+  }
 }
