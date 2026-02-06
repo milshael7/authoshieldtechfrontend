@@ -1,4 +1,3 @@
-// frontend/src/pages/Trading.jsx
 import React, { useState } from "react";
 
 import Market from "./trading/Market.jsx";
@@ -8,11 +7,6 @@ import Posture from "./Posture.jsx";
 import Manager from "./Manager.jsx";
 import Admin from "./Admin.jsx";
 
-/* 🔴 IMPORTANT:
-   This path MUST be EXACT
-   - styles (plural)
-   - platform.css (lowercase)
-*/
 import "../styles/platform.css";
 
 export default function Trading() {
@@ -20,9 +14,10 @@ export default function Trading() {
   const [tab, setTab] = useState("market");
 
   return (
-    <div className="platformShell">
+    <div className="platformShell tradingShell">
       {/* ===== TOP PLATFORM BAR ===== */}
-      <div className="platformTop">
+      <div className="platformTop tradingTop">
+        {/* Brand */}
         <button
           type="button"
           className="platformBrand"
@@ -35,8 +30,9 @@ export default function Trading() {
           </div>
         </button>
 
+        {/* Tabs */}
         {section === "trading" && (
-          <div className="platformTabs">
+          <div className="platformTabs tradingTabs">
             <button
               type="button"
               className={tab === "market" ? "ptab active" : "ptab"}
@@ -49,7 +45,7 @@ export default function Trading() {
               className={tab === "room" ? "ptab active" : "ptab"}
               onClick={() => setTab("room")}
             >
-              Trading Room
+              Room
             </button>
             <button
               type="button"
@@ -61,12 +57,13 @@ export default function Trading() {
           </div>
         )}
 
-        <div className="platformActions">
+        {/* Actions */}
+        <div className="platformActions tradingActions">
           <button className="pbtn" onClick={() => setSection("trading")}>
             Trading
           </button>
           <button className="pbtn" onClick={() => setSection("security")}>
-            Cybersecurity
+            Security
           </button>
           <button className="pbtn" onClick={() => setSection("admin")}>
             Admin
@@ -75,7 +72,7 @@ export default function Trading() {
       </div>
 
       {/* ===== BODY ===== */}
-      <div className="platformBody">
+      <div className="platformBody tradingBody">
         {section === "dashboard" && (
           <div className="platformCard">
             <h3>Dashboard</h3>
@@ -98,17 +95,21 @@ export default function Trading() {
         )}
 
         {section === "trading" && (
-          <>
-            {tab === "market" && <Market />}
+          <div className="tradingContent">
+            {tab === "market" && (
+              <div className="platformCard tradingPanel">
+                <Market />
+              </div>
+            )}
 
             {tab === "room" && (
-              <div className="platformCard">
+              <div className="platformCard tradingPanel">
                 <TradingRoom />
               </div>
             )}
 
             {tab === "reports" && (
-              <div className="platformCard">
+              <div className="platformCard tradingPanel">
                 <ul>
                   <li>P&amp;L</li>
                   <li>Win / Loss</li>
@@ -117,9 +118,38 @@ export default function Trading() {
                 </ul>
               </div>
             )}
-          </>
+          </div>
         )}
       </div>
+
+      {/* ===== MOBILE FIXES ===== */}
+      <style>{`
+        @media (max-width: 768px){
+          .tradingTop{
+            flex-direction: column;
+            align-items: stretch;
+            gap: 10px;
+          }
+
+          .tradingTabs{
+            justify-content: space-between;
+          }
+
+          .tradingActions{
+            display: flex;
+            justify-content: space-between;
+            gap: 8px;
+          }
+
+          .tradingBody{
+            padding: 10px;
+          }
+
+          .tradingPanel{
+            padding: 12px;
+          }
+        }
+      `}</style>
     </div>
   );
 }
