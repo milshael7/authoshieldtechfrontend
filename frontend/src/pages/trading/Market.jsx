@@ -1,187 +1,159 @@
-import React, { useMemo, useRef, useState } from "react";
+import React, { useMemo, useState } from "react";
 import "../../styles/terminal.css";
 
-const DEFAULT_SYMBOL = "OANDA:EURUSD";
 const SYMBOLS = [
   "OANDA:EURUSD",
   "OANDA:GBPUSD",
-  "BITSTAMP:BTCUSD",
   "BINANCE:BTCUSDT",
   "BINANCE:ETHUSDT",
 ];
 
 export default function Market() {
-  const isMobile = window.innerWidth <= 768;
-
-  // ---------------- CORE STATE ----------------
-  const [symbol, setSymbol] = useState(DEFAULT_SYMBOL);
+  const [symbol, setSymbol] = useState(SYMBOLS[0]);
   const [tf, setTf] = useState("D");
   const [side, setSide] = useState("BUY");
-  const [orderType, setOrderType] = useState("LIMIT");
-
-  // ---------------- PANEL STATE ----------------
   const [panelOpen, setPanelOpen] = useState(false);
 
-  // ---------------- PRICE MOCK ----------------
-  const [bid, setBid] = useState("1.11077");
-  const [ask, setAsk] = useState("1.11088");
-  const [orderPrice, setOrderPrice] = useState("1.11088");
-  const [qty, setQty] = useState("1000");
-
-  // ---------------- TP / SL ----------------
-  const [takeProfit, setTakeProfit] = useState(false);
-  const [stopLoss, setStopLoss] = useState(false);
-  const [tp, setTp] = useState("1.11837");
-  const [sl, setSl] = useState("1.10837");
-
-  // ---------------- BOTTOM PANEL ----------------
-  const [bottomTab, setBottomTab] = useState("Positions");
-
-  // ---------------- TRADINGVIEW ----------------
   const tvSrc = useMemo(() => {
     const params = new URLSearchParams({
       symbol,
       interval: tf,
       theme: "light",
-      timezone: "Etc/UTC",
+      style: "1",
       locale: "en",
     });
     return `https://s.tradingview.com/widgetembed/?${params.toString()}`;
   }, [symbol, tf]);
 
-  function placeOrder() {
-    alert(
-      `${side} ${qty} ${symbol}\nType: ${orderType}\nPrice: ${orderPrice}`
-    );
-  }
-
   return (
     <div className="terminalRoot">
-      {/* ---------- TOP BAR ---------- */}
-      <header className="tvTopBar mobileTop">
-        <select
-          className="tvSelect"
-          value={symbol}
-          onChange={(e) => setSymbol(e.target.value)}
-        >
-          {SYMBOLS.map((s) => (
-            <option key={s}>{s}</option>
-          ))}
-        </select>
+      {/* ===== TOP BAR ===== */}
+      <header className="tvTopBar">
+        <div className="tvTopLeft">
+          <select
+            className="tvSelect"
+            value={symbol}
+            onChange={(e) => setSymbol(e.target.value)}
+          >
+            {SYMBOLS.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
 
-        <div className="tvTfRow">
-          {["1", "5", "15", "60", "D"].map((x) => (
-            <button
-              key={x}
-              className={tf === x ? "tvPill active" : "tvPill"}
-              onClick={() => setTf(x)}
-            >
-              {x}
-            </button>
-          ))}
+          <div className="tvTfRow">
+            {["1", "5", "15", "60", "D"].map((x) => (
+              <button
+                key={x}
+                className={tf === x ? "tvPill active" : "tvPill"}
+                onClick={() => setTf(x)}
+              >
+                {x}
+              </button>
+            ))}
+          </div>
         </div>
 
-        <button className="tvPrimary" onClick={() => setPanelOpen(true)}>
-          Trade
-        </button>
+        <div className="tvTopRight">
+          <button className="tvPrimary" onClick={() => setPanelOpen(true)}>
+            Trade
+          </button>
+        </div>
       </header>
 
-      {/* ---------- CHART ---------- */}
-      <main className="tvChartArea mobileChart">
+      {/* ===== CHART ===== */}
+      <main className="tvChartArea">
         <iframe
           className="tvIframe"
           title="chart"
           src={tvSrc}
           frameBorder="0"
         />
-
-        {/* ---------- BOTTOM PANEL ---------- */}
-        <section className="tvBottom mobileBottom">
-          <div className="tvBottomTabs">
-            {["Positions", "Orders", "History"].map((t) => (
-              <button
-                key={t}
-                className={bottomTab === t ? "tvTab active" : "tvTab"}
-                onClick={() => setBottomTab(t)}
-              >
-                {t}
-              </button>
-            ))}
-          </div>
-          <div className="tvBottomBody">{bottomTab} panel</div>
-        </section>
       </main>
 
-      {/* ---------- MOBILE ORDER PANEL ---------- */}
+      {/* ===== MOBILE TRADE PANEL ===== */}
       {panelOpen && (
-        <div className="mobileOrderSheet">
-          <div className="sheetHandle" />
-          <h3>{symbol}</h3>
+        <>
+          <div
+            className="tradeOverlay"
+            onClick={() => setPanelOpen(false)}
+          />
 
-          <div className="orderSide">
-            <button onClick={() => setSide("SELL")}>SELL {bid}</button>
-            <button onClick={() => setSide("BUY")}>BUY {ask}</button>
-          </div>
+          <aside className="mobileTradePanel">
+            <header>
+              <h3>{symbol}</h3>
+              <button onClick={() => setPanelOpen(false)}>✕</button>
+            </header>
 
-          <div className="orderTypes">
-            {["MARKET", "LIMIT"].map((t) => (
+            <div className="orderSide">
               <button
-                key={t}
-                className={orderType === t ? "active" : ""}
-                onClick={() => setOrderType(t)}
+                className={side === "SELL" ? "danger" : ""}
+                onClick={() => setSide("SELL")}
               >
-                {t}
+                SELL
               </button>
-            ))}
-          </div>
+              <button
+                className={side === "BUY" ? "ok" : ""}
+                onClick={() => setSide("BUY")}
+              >
+                BUY
+              </button>
+            </div>
 
-          <input value={orderPrice} onChange={(e) => setOrderPrice(e.target.value)} />
-          <input value={qty} onChange={(e) => setQty(e.target.value)} />
+            <input placeholder="Order price" />
+            <input placeholder="Quantity" />
 
-          <button className="tvPrimary" onClick={placeOrder}>
-            Place Order
-          </button>
-
-          <button onClick={() => setPanelOpen(false)}>Close</button>
-        </div>
+            <button className="tvPrimary">
+              Place {side}
+            </button>
+          </aside>
+        </>
       )}
 
-      {/* ---------- MOBILE CSS ---------- */}
+      {/* ===== MOBILE STYLES ===== */}
       <style>{`
-        @media (max-width: 768px) {
-          .mobileTop {
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
-          }
+        .tradeOverlay{
+          position:fixed;
+          inset:0;
+          background:rgba(0,0,0,.5);
+          z-index:20;
+        }
 
-          .mobileChart {
-            height: 55svh;
-          }
+        .mobileTradePanel{
+          position:fixed;
+          left:0;
+          right:0;
+          bottom:0;
+          background:#fff;
+          border-radius:18px 18px 0 0;
+          padding:16px;
+          z-index:21;
+          max-height:85vh;
+          overflow:auto;
+        }
 
-          .mobileBottom {
-            max-height: 30svh;
-            overflow: auto;
-          }
+        .mobileTradePanel header{
+          display:flex;
+          justify-content:space-between;
+          align-items:center;
+          margin-bottom:12px;
+        }
 
-          .mobileOrderSheet {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            background: #fff;
-            padding: 16px;
-            border-top-left-radius: 16px;
-            border-top-right-radius: 16px;
-            z-index: 999;
-          }
+        .orderSide{
+          display:flex;
+          gap:10px;
+          margin-bottom:12px;
+        }
 
-          .sheetHandle {
-            width: 40px;
-            height: 4px;
-            background: #ccc;
-            border-radius: 2px;
-            margin: 0 auto 10px;
+        .orderSide button{
+          flex:1;
+        }
+
+        @media (min-width: 900px){
+          .tradeOverlay,
+          .mobileTradePanel{
+            display:none;
           }
         }
       `}</style>
