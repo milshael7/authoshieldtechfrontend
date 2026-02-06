@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { getSavedUser } from "./lib/api.js";
 
@@ -15,18 +15,15 @@ import Posture from "./pages/Posture.jsx";
 import Notifications from "./pages/Notifications.jsx";
 import NotFound from "./pages/NotFound.jsx";
 
-// ---------------- Role Guard (FIXED) ----------------
+// ---------------- Role Guard ----------------
 function RequireRole({ allow, children }) {
   const user = getSavedUser();
-
   if (!user) return <Navigate to="/login" replace />;
 
-  // 🔒 Normalize role safely
   const role = String(user.role || "").toLowerCase();
   const allowed = allow.map(r => r.toLowerCase());
 
   if (!allowed.includes(role)) {
-    console.warn("Blocked role:", role);
     return <Navigate to="/404" replace />;
   }
 
@@ -34,16 +31,29 @@ function RequireRole({ allow, children }) {
 }
 
 export default function App() {
-  const user = getSavedUser();
+  const [ready, setReady] = useState(false);
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    // allow browser to fully restore storage
+    const u = getSavedUser();
+    setUser(u);
+    setReady(true);
+  }, []);
+
+  if (!ready) {
+    return <div style={{ padding: 40 }}>Loading…</div>;
+  }
+
   const role = String(user?.role || "").toLowerCase();
 
   return (
     <BrowserRouter>
       <Routes>
-        {/* ---------- PUBLIC ---------- */}
+        {/* PUBLIC */}
         <Route path="/login" element={<Login />} />
 
-        {/* ---------- ADMIN ---------- */}
+        {/* ADMIN */}
         <Route
           path="/admin/*"
           element={
@@ -57,7 +67,7 @@ export default function App() {
           <Route path="notifications" element={<Notifications />} />
         </Route>
 
-        {/* ---------- MANAGER ---------- */}
+        {/* MANAGER */}
         <Route
           path="/manager/*"
           element={
@@ -70,7 +80,7 @@ export default function App() {
           <Route path="notifications" element={<Notifications />} />
         </Route>
 
-        {/* ---------- COMPANY ---------- */}
+        {/* COMPANY */}
         <Route
           path="/company/*"
           element={
@@ -83,7 +93,7 @@ export default function App() {
           <Route path="notifications" element={<Notifications />} />
         </Route>
 
-        {/* ---------- USER ---------- */}
+        {/* USER */}
         <Route
           path="/user/*"
           element={
@@ -96,7 +106,7 @@ export default function App() {
           <Route path="notifications" element={<Notifications />} />
         </Route>
 
-        {/* ---------- FALLBACK ---------- */}
+        {/* FALLBACK */}
         <Route path="/404" element={<NotFound />} />
         <Route
           path="*"
