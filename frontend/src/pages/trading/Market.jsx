@@ -81,43 +81,49 @@ export default function Market() {
           />
 
           <aside className="mobileTradePanel">
-            <header>
+            <header className="mtpHeader">
               <h3>{symbol}</h3>
-              <button onClick={() => setPanelOpen(false)}>✕</button>
+              <button
+                className="mtpClose"
+                onClick={() => setPanelOpen(false)}
+                aria-label="Close"
+              >
+                ✕
+              </button>
             </header>
 
             <div className="orderSide">
               <button
-                className={side === "SELL" ? "danger" : ""}
+                className={`orderBtn sell ${side === "SELL" ? "active" : ""}`}
                 onClick={() => setSide("SELL")}
               >
                 SELL
               </button>
               <button
-                className={side === "BUY" ? "ok" : ""}
+                className={`orderBtn buy ${side === "BUY" ? "active" : ""}`}
                 onClick={() => setSide("BUY")}
               >
                 BUY
               </button>
             </div>
 
-            <input placeholder="Order price" />
-            <input placeholder="Quantity" />
+            <input className="tradeInput" placeholder="Order price" />
+            <input className="tradeInput" placeholder="Quantity" />
 
-            <button className="tvPrimary">
+            <button className="tvPrimary full">
               Place {side}
             </button>
           </aside>
         </>
       )}
 
-      {/* ===== MOBILE STYLES ===== */}
+      {/* ===== MOBILE-ONLY STYLES ===== */}
       <style>{`
         .tradeOverlay{
           position:fixed;
           inset:0;
-          background:rgba(0,0,0,.5);
-          z-index:20;
+          background:rgba(0,0,0,.45);
+          z-index:40;
         }
 
         .mobileTradePanel{
@@ -126,28 +132,63 @@ export default function Market() {
           right:0;
           bottom:0;
           background:#fff;
+          color:#111;
           border-radius:18px 18px 0 0;
           padding:16px;
-          z-index:21;
+          z-index:41;
           max-height:85vh;
           overflow:auto;
         }
 
-        .mobileTradePanel header{
+        .mtpHeader{
           display:flex;
           justify-content:space-between;
           align-items:center;
-          margin-bottom:12px;
+          margin-bottom:14px;
+        }
+
+        .mtpClose{
+          background:none;
+          border:none;
+          font-size:20px;
+          cursor:pointer;
         }
 
         .orderSide{
           display:flex;
           gap:10px;
-          margin-bottom:12px;
+          margin-bottom:14px;
         }
 
-        .orderSide button{
+        .orderBtn{
           flex:1;
+          padding:12px;
+          border-radius:12px;
+          border:1px solid #ddd;
+          font-weight:600;
+        }
+
+        .orderBtn.buy.active{
+          background:#2bd576;
+          color:#fff;
+        }
+
+        .orderBtn.sell.active{
+          background:#ff5a5f;
+          color:#fff;
+        }
+
+        .tradeInput{
+          width:100%;
+          padding:12px;
+          margin-bottom:10px;
+          border-radius:10px;
+          border:1px solid #ddd;
+        }
+
+        .tvPrimary.full{
+          width:100%;
+          margin-top:6px;
         }
 
         @media (min-width: 900px){
