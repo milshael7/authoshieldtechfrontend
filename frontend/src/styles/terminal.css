@@ -18,109 +18,151 @@
   height: 100%;
   position: relative;
   color: var(--text-main);
-}
-
-/* ===================== DESKTOP SHELL ===================== */
-.terminalRoot .tvShell{
-  width: 100%;
-  height: calc(100vh - 140px);
-  display: grid;
-  grid-template-columns: 56px minmax(0,1fr) 360px;
-  grid-template-rows: 56px minmax(0,1fr);
-  overflow: hidden;
   background: var(--bg-main);
-  border: 1px solid var(--border-main);
-  border-radius: 16px;
-}
-
-/* ===================== LEFT TOOLBAR ===================== */
-.tvLeftBar{
-  grid-row: 1 / span 2;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 8px;
-  background: rgba(0,0,0,.25);
-  border-right: 1px solid var(--border-main);
-}
-
-.tvToolBtn{
-  height: 34px;
-  border-radius: 12px;
-  border: 1px solid var(--border-main);
-  background: rgba(0,0,0,.22);
-  color: #fff;
 }
 
 /* ===================== TOP BAR ===================== */
 .tvTopBar{
-  grid-column: 2 / -1;
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  padding: 10px 12px;
+  display:flex;
+  gap:10px;
+  align-items:center;
+  justify-content:space-between;
+  padding:10px 12px;
   background: linear-gradient(180deg, var(--bg-soft), var(--bg-panel));
-  border-bottom: 1px solid var(--border-main);
+  border-bottom:1px solid var(--border-main);
+  z-index:20;
 }
 
-/* ===================== CHART ===================== */
+.tvTopLeft{
+  display:flex;
+  gap:10px;
+  align-items:center;
+  flex-wrap:wrap;
+}
+
+.tvSelect{
+  padding:6px 10px;
+  border-radius:10px;
+  border:1px solid var(--border-main);
+  background:#fff;
+}
+
+.tvTfRow{
+  display:flex;
+  gap:6px;
+}
+
+.tvPill{
+  padding:6px 10px;
+  border-radius:999px;
+  border:1px solid var(--border-main);
+  background:var(--accent-soft);
+  font-weight:600;
+}
+
+.tvPill.active{
+  background:var(--accent);
+}
+
+.tvPrimary{
+  padding:8px 14px;
+  border-radius:12px;
+  border:1px solid var(--border-main);
+  background:var(--accent);
+  font-weight:700;
+  cursor:pointer;
+}
+
+.tvPrimary.full{
+  width:100%;
+}
+
+/* ===================== BODY ===================== */
+.tvBody{
+  display:flex;
+  height:calc(100svh - 110px);
+  position:relative;
+}
+
 .tvChartArea{
-  grid-column: 2;
-  grid-row: 2;
-  position: relative;
+  flex:1;
+  position:relative;
 }
 
 .tvIframe{
-  width: 100%;
-  height: 100%;
-  border: none;
+  width:100%;
+  height:100%;
+  border:none;
 }
 
-/* ===================== RIGHT ORDER PANEL (DESKTOP) ===================== */
-.tvRight{
-  grid-column: 3;
-  grid-row: 2;
-  padding: 12px;
-  background: var(--bg-panel);
-  border-left: 1px solid var(--border-main);
-  overflow-y: auto;
+/* ===================== DOCKED TRADE PANEL ===================== */
+.dockPanel{
+  width:280px;
+  background:var(--bg-panel);
+  border-left:1px solid var(--border-main);
+  z-index:10;
 }
 
-/* ===================== BOTTOM PANEL ===================== */
-.tvBottom{
-  position: absolute;
-  left: 12px;
-  right: 12px;
-  bottom: 12px;
-  height: 260px;
-  background: var(--bg-panel);
-  border: 1px solid var(--border-main);
-  border-radius: 16px;
-  overflow: hidden;
+/* ===================== FLOATING TRADE PANEL ===================== */
+.floatingPanel{
+  position:fixed;
+  width:260px;
+  background:#fff;
+  border-radius:14px;
+  box-shadow:0 10px 30px rgba(0,0,0,.25);
+  z-index:60;
 }
 
-.tvBottomTabs{
-  display: flex;
-  gap: 8px;
-  padding: 10px;
-  border-bottom: 1px solid var(--border-main);
+/* ===================== TRADE PANEL ===================== */
+.tradePanel{
+  padding:14px;
+  display:flex;
+  flex-direction:column;
+  gap:12px;
 }
 
-.tvTab{
-  padding: 8px 12px;
-  border-radius: 999px;
-  background: var(--accent-soft);
-  border: 1px solid var(--border-main);
+.tpHeader{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  font-weight:700;
+  cursor:grab;
 }
 
-.tvTab.active{
-  background: var(--accent);
+.tpClose{
+  background:none;
+  border:none;
+  font-size:18px;
+  cursor:pointer;
 }
 
-.tvBottomBody{
-  padding: 12px;
-  height: calc(260px - 56px);
-  overflow-y: auto;
+.orderSide{
+  display:flex;
+  gap:8px;
+}
+
+.orderBtn{
+  flex:1;
+  padding:10px;
+  border-radius:12px;
+  border:1px solid var(--border-main);
+  font-weight:700;
+}
+
+.orderBtn.buy.active{
+  background:#2bd576;
+  color:#fff;
+}
+
+.orderBtn.sell.active{
+  background:#ff5a5f;
+  color:#fff;
+}
+
+.tradeInput{
+  padding:10px;
+  border-radius:10px;
+  border:1px solid var(--border-main);
 }
 
 /* =========================================================
@@ -128,63 +170,21 @@
    ========================================================= */
 @media (max-width: 768px){
 
-  /* Kill desktop grid entirely */
-  .terminalRoot .tvShell{
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    border-radius: 0;
+  .tvBody{
+    flex-direction:column;
+    height:auto;
   }
 
-  /* Hide desktop-only UI */
-  .tvLeftBar,
-  .tvRight{
-    display: none !important;
+  .dockPanel{
+    display:none;
   }
 
-  /* Mobile top bar */
-  .tvTopBar{
-    flex-wrap: wrap;
-    justify-content: space-between;
-  }
-
-  /* Chart gets priority */
   .tvChartArea{
-    flex: 1;
-    min-height: 55svh;
+    min-height:55svh;
   }
 
-  /* Bottom panel becomes compact */
-  .tvBottom{
-    position: relative;
-    height: auto;
-    border-radius: 0;
-    border-left: none;
-    border-right: none;
-  }
-
-  .tvBottomBody{
-    height: auto;
-    max-height: 28svh;
-  }
-
-  /* Mobile order sheet (from Market.jsx) */
-  .mobileOrderSheet{
-    position: fixed;
-    inset: auto 0 0 0;
-    background: #fff;
-    z-index: 9999;
-    padding: 16px;
-    border-top-left-radius: 16px;
-    border-top-right-radius: 16px;
-    box-shadow: 0 -10px 30px rgba(0,0,0,.25);
-  }
-
-  .sheetHandle{
-    width: 40px;
-    height: 4px;
-    background: #ccc;
-    border-radius: 999px;
-    margin: 0 auto 10px;
+  .floatingPanel{
+    width:90vw;
+    left:5vw !important;
   }
 }
