@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { clearToken, clearUser } from "../lib/api";
+import "../styles/layout.css";
 
 export default function UserLayout() {
   const navigate = useNavigate();
@@ -13,41 +14,24 @@ export default function UserLayout() {
   }
 
   return (
-    <div className="layout-root">
+    <div className={`layout-root ${open ? "sidebar-open" : ""}`}>
       {/* ---------- Mobile Overlay ---------- */}
       {open && (
         <div
+          className="sidebar-overlay"
           onClick={() => setOpen(false)}
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,.45)",
-            zIndex: 9,
-          }}
         />
       )}
 
       {/* ---------- Sidebar ---------- */}
-      <aside
-        className="layout-sidebar"
-        style={{
-          zIndex: 10,
-          transform:
-            open || window.innerWidth > 768
-              ? "translateX(0)"
-              : "translateX(-100%)",
-          transition: "transform .25s ease",
-          position: window.innerWidth <= 768 ? "fixed" : "relative",
-          height: window.innerWidth <= 768 ? "100svh" : "auto",
-        }}
-      >
+      <aside className="layout-sidebar">
         <div className="layout-brand">
           <span className="brand-logo">🛡️</span>
           <span className="brand-text">AutoShield</span>
         </div>
 
         <nav className="layout-nav">
-          <NavLink to="/user/dashboard" onClick={() => setOpen(false)}>
+          <NavLink to="/user" end onClick={() => setOpen(false)}>
             Dashboard
           </NavLink>
           <NavLink to="/user/posture" onClick={() => setOpen(false)}>
@@ -64,7 +48,7 @@ export default function UserLayout() {
           </NavLink>
         </nav>
 
-        <button className="logout-btn" onClick={logout}>
+        <button className="btn logout-btn" onClick={logout}>
           Log out
         </button>
       </aside>
@@ -72,27 +56,20 @@ export default function UserLayout() {
       {/* ---------- Main ---------- */}
       <main className="layout-main">
         <header className="layout-topbar">
-          {/* Mobile menu button */}
-          <button
-            onClick={() => setOpen(true)}
-            className="mobile-menu-btn"
-            style={{
-              display: "none",
-              background: "none",
-              border: "none",
-              fontSize: 22,
-              cursor: "pointer",
-            }}
-          >
-            ☰
-          </button>
-
           <div className="topbar-left">
-            <h1>User Security Room</h1>
+            <button
+              className="btn btn-icon mobile-menu-btn"
+              onClick={() => setOpen(true)}
+              aria-label="Open menu"
+            >
+              ☰
+            </button>
+
+            <h1 style={{ margin: 0 }}>User Security Room</h1>
           </div>
 
           <div className="topbar-right">
-            <span className="role-badge user">Individual</span>
+            <span className="badge">Individual</span>
           </div>
         </header>
 
@@ -100,15 +77,6 @@ export default function UserLayout() {
           <Outlet />
         </section>
       </main>
-
-      {/* ---------- Mobile button visibility ---------- */}
-      <style>{`
-        @media (max-width: 768px){
-          .mobile-menu-btn{
-            display:block;
-          }
-        }
-      `}</style>
     </div>
   );
 }
