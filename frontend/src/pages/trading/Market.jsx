@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useRef, useState, useEffect } from "react";
 import "../../styles/terminal.css";
 
 const SYMBOLS = [
@@ -12,7 +12,14 @@ export default function Market() {
   const [symbol, setSymbol] = useState(SYMBOLS[0]);
   const [tf, setTf] = useState("D");
   const [side, setSide] = useState("BUY");
+
   const [panelOpen, setPanelOpen] = useState(false);
+  const [docked, setDocked] = useState(true);
+  const [pos, setPos] = useState({ x: 16, y: 100 });
+
+  const dragRef = useRef(null);
+  const dragData = useRef({ x: 0, y: 0, dragging: false });
+  const snapTimer = useRef(null);
 
   const tvSrc = useMemo(() => {
     const params = new URLSearchParams({
@@ -24,6 +31,58 @@ export default function Market() {
     });
     return `https://s.tradingview.com/widgetembed/?${params.toString()}`;
   }, [symbol, tf]);
+
+  /* ---------------- DRAG LOGIC ---------------- */
+  function onDragStart(e) {
+    dragData.current.dragging = true;
+    const t = e.touches ? e.touches[0] : e;
+    dragData.current.x = t.clientX - pos.x;
+    dragData.current.y = t.clientY - pos.y;
+    setDocked(false);
+    clearTimeout(snapTimer.current);
+  }
+
+  function onDragMove(e) {
+    if (!dragData.current.dragging) return;
+    const t = e.touches ? e.touches[0] : e;
+    setPos({
+      x: t.clientX - dragData.current.x,
+      y: t.clientY - dragData.current.y,
+    });
+  }
+
+  function onDragEnd() {
+    dragData.current.dragging = false;
+    snapTimer.current = setTimeout(() => {
+      setDocked(true);
+      setPos({ x: 16, y: 100 });
+    }, 2500);
+  }
+
+  useEffect(() => {
+    window.addEventListener("mousemove", onDragMove);
+    window.addEventListener("mouseup", onDragEnd);
+    window.addEventListener("touchmove", onDragMove);
+    window.addEventListener("touchend", onDragEnd);
+    return () => {
+      window.removeEventListener("mousemove", onDragMove);
+      window.removeEventListener("mouseup", onDragEnd);
+      window.removeEventListener("touchmove", onDragMove);
+      window.removeEventListener("touchend", onDragEnd);
+    };
+  }, [pos]);
+
+  function togglePanel() {
+    if (panelOpen) {
+      setPanelOpen(false);
+      setDocked(true);
+      clearTimeout(snapTimer.current);
+    } else {
+      setPanelOpen(true);
+      setDocked(true);
+      setPos({ x: 16, y: 100 });
+    }
+  }
 
   return (
     <div className="terminalRoot">
@@ -56,148 +115,118 @@ export default function Market() {
         </div>
 
         <div className="tvTopRight">
-          <button className="tvPrimary" onClick={() => setPanelOpen(true)}>
+          <button className="tvPrimary" onClick={togglePanel}>
             Trade
           </button>
         </div>
       </header>
 
-      {/* ===== CHART ===== */}
-      <main className="tvChartArea">
-        <iframe
-          className="tvIframe"
-          title="chart"
-          src={tvSrc}
-          frameBorder="0"
-        />
-      </main>
-
-      {/* ===== MOBILE TRADE PANEL ===== */}
-      {panelOpen && (
-        <>
-          <div
-            className="tradeOverlay"
-            onClick={() => setPanelOpen(false)}
+      {/* ===== BODY ===== */}
+      <div className={`tvBody ${panelOpen && docked ? "withPanel" : ""}`}>
+        <main className="tvChartArea">
+          <iframe
+            className="tvIframe"
+            title="chart"
+            src={tvSrc}
+            frameBorder="0"
           />
+        </main>
 
-          <aside className="mobileTradePanel">
-            <header className="mtpHeader">
-              <h3>{symbol}</h3>
-              <button
-                className="mtpClose"
-                onClick={() => setPanelOpen(false)}
-                aria-label="Close"
-              >
-                ✕
-              </button>
-            </header>
-
-            <div className="orderSide">
-              <button
-                className={`orderBtn sell ${side === "SELL" ? "active" : ""}`}
-                onClick={() => setSide("SELL")}
-              >
-                SELL
-              </button>
-              <button
-                className={`orderBtn buy ${side === "BUY" ? "active" : ""}`}
-                onClick={() => setSide("BUY")}
-              >
-                BUY
-              </button>
-            </div>
-
-            <input className="tradeInput" placeholder="Order price" />
-            <input className="tradeInput" placeholder="Quantity" />
-
-            <button className="tvPrimary full">
-              Place {side}
-            </button>
+        {/* ===== DOCKED PANEL ===== */}
+        {panelOpen && docked && (
+          <aside className="dockPanel">
+            <TradePanel
+              symbol={symbol}
+              side={side}
+              setSide={setSide}
+            />
           </aside>
-        </>
+        )}
+      </div>
+
+      {/* ===== FLOATING PANEL ===== */}
+      {panelOpen && !docked && (
+        <div
+          ref={dragRef}
+          className="floatingPanel"
+          style={{ left: pos.x, top: pos.y }}
+          onMouseDown={onDragStart}
+          onTouchStart={onDragStart}
+        >
+          <TradePanel
+            symbol={symbol}
+            side={side}
+            setSide={setSide}
+          />
+        </div>
       )}
 
-      {/* ===== MOBILE-ONLY STYLES ===== */}
+      {/* ===== LOCAL STYLES ===== */}
       <style>{`
-        .tradeOverlay{
-          position:fixed;
-          inset:0;
-          background:rgba(0,0,0,.45);
-          z-index:40;
-        }
-
-        .mobileTradePanel{
-          position:fixed;
-          left:0;
-          right:0;
-          bottom:0;
-          background:#fff;
-          color:#111;
-          border-radius:18px 18px 0 0;
-          padding:16px;
-          z-index:41;
-          max-height:85vh;
-          overflow:auto;
-        }
-
-        .mtpHeader{
+        .tvBody{
           display:flex;
-          justify-content:space-between;
-          align-items:center;
-          margin-bottom:14px;
+          height:calc(100svh - 110px);
+          position:relative;
         }
 
-        .mtpClose{
-          background:none;
-          border:none;
-          font-size:20px;
-          cursor:pointer;
-        }
-
-        .orderSide{
-          display:flex;
-          gap:10px;
-          margin-bottom:14px;
-        }
-
-        .orderBtn{
+        .tvBody.withPanel .tvChartArea{
           flex:1;
-          padding:12px;
-          border-radius:12px;
-          border:1px solid #ddd;
-          font-weight:600;
         }
 
-        .orderBtn.buy.active{
-          background:#2bd576;
-          color:#fff;
+        .dockPanel{
+          width:280px;
+          border-left:1px solid rgba(0,0,0,.1);
+          background:#fff;
         }
 
-        .orderBtn.sell.active{
-          background:#ff5a5f;
-          color:#fff;
+        .floatingPanel{
+          position:fixed;
+          width:260px;
+          background:#fff;
+          border-radius:14px;
+          box-shadow:0 10px 30px rgba(0,0,0,.25);
+          z-index:50;
+          cursor:grab;
         }
 
-        .tradeInput{
-          width:100%;
-          padding:12px;
-          margin-bottom:10px;
-          border-radius:10px;
-          border:1px solid #ddd;
-        }
-
-        .tvPrimary.full{
-          width:100%;
-          margin-top:6px;
-        }
-
-        @media (min-width: 900px){
-          .tradeOverlay,
-          .mobileTradePanel{
+        @media(max-width:900px){
+          .dockPanel{
             display:none;
           }
         }
       `}</style>
+    </div>
+  );
+}
+
+/* ================= TRADE PANEL ================= */
+
+function TradePanel({ symbol, side, setSide }) {
+  return (
+    <div className="tradePanel">
+      <header className="tpHeader">{symbol}</header>
+
+      <div className="orderSide">
+        <button
+          className={`orderBtn sell ${side === "SELL" ? "active" : ""}`}
+          onClick={() => setSide("SELL")}
+        >
+          SELL
+        </button>
+        <button
+          className={`orderBtn buy ${side === "BUY" ? "active" : ""}`}
+          onClick={() => setSide("BUY")}
+        >
+          BUY
+        </button>
+      </div>
+
+      <input className="tradeInput" placeholder="Price" />
+      <input className="tradeInput" placeholder="Quantity" />
+
+      <button className="tvPrimary full">
+        Place {side}
+      </button>
     </div>
   );
 }
