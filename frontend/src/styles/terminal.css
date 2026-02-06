@@ -1,15 +1,9 @@
 /* =========================================================
-   AUTOSHIELD TECH — TRADING TERMINAL (FULL REPLACEMENT)
-   FILE: frontend/src/styles/terminal.css
-
-   ✔ Scoped ONLY to .terminalRoot
-   ✔ Docked / Floating / Hidden order panel
-   ✔ Overlay (open screen) mode
-   ✔ Bottom panel expanded
-   ✔ Day / Night theme ready
+   AUTOSHIELD TECH — TRADING TERMINAL
+   MOBILE-SAFE + DESKTOP-PERFECT
    ========================================================= */
 
-/* ===================== THEME VARIABLES ===================== */
+/* ===================== THEME ===================== */
 .terminalRoot{
   --bg-main: rgba(245,240,255,.94);
   --bg-soft: rgba(235,228,255,.95);
@@ -19,153 +13,81 @@
   --accent-soft: rgba(160,120,255,.18);
   --text-main: #111827;
   --text-soft: rgba(17,24,39,.65);
-}
 
-/* Optional night mode (future toggle) */
-.terminalRoot.theme-dark{
-  --bg-main: rgba(20,18,32,.96);
-  --bg-soft: rgba(28,25,45,.95);
-  --bg-panel: rgba(24,22,40,.97);
-  --border-main: rgba(140,110,255,.35);
-  --accent: rgba(170,140,255,.55);
-  --accent-soft: rgba(170,140,255,.20);
-  --text-main: #f4f4f8;
-  --text-soft: rgba(244,244,248,.65);
-}
-
-/* ===================== ROOT ===================== */
-.terminalRoot{
   width: 100%;
-  height: calc(100vh - 120px);
+  height: 100%;
   position: relative;
   color: var(--text-main);
 }
 
-/* ===================== SHELL ===================== */
+/* ===================== DESKTOP SHELL ===================== */
 .terminalRoot .tvShell{
   width: 100%;
-  height: 100%;
+  height: calc(100vh - 140px);
   display: grid;
   grid-template-columns: 56px minmax(0,1fr) 360px;
   grid-template-rows: 56px minmax(0,1fr);
-  border-radius: 16px;
   overflow: hidden;
   background: var(--bg-main);
   border: 1px solid var(--border-main);
-}
-
-/* ===================== OVERLAY MODE ===================== */
-.terminalRoot .tvShell.isOverlay{
-  position: fixed;
-  inset: 0;
-  z-index: 9999;
-  border-radius: 0;
+  border-radius: 16px;
 }
 
 /* ===================== LEFT TOOLBAR ===================== */
-.terminalRoot .tvLeftBar{
+.tvLeftBar{
   grid-row: 1 / span 2;
-  padding: 8px;
   display: flex;
   flex-direction: column;
   gap: 8px;
+  padding: 8px;
   background: rgba(0,0,0,.25);
   border-right: 1px solid var(--border-main);
 }
 
-.terminalRoot .tvToolBtn{
+.tvToolBtn{
   height: 34px;
   border-radius: 12px;
   border: 1px solid var(--border-main);
   background: rgba(0,0,0,.22);
   color: #fff;
-  cursor: pointer;
 }
 
 /* ===================== TOP BAR ===================== */
-.terminalRoot .tvTopBar{
+.tvTopBar{
   grid-column: 2 / -1;
   display: flex;
-  justify-content: space-between;
+  gap: 10px;
   align-items: center;
   padding: 10px 12px;
-  background: linear-gradient(
-    180deg,
-    var(--bg-soft),
-    var(--bg-panel)
-  );
+  background: linear-gradient(180deg, var(--bg-soft), var(--bg-panel));
   border-bottom: 1px solid var(--border-main);
 }
 
-.terminalRoot .tvBrand{
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.terminalRoot .tvBrandLogo{
-  width: 34px;
-  height: 34px;
-  border-radius: 12px;
-  background: url("/autoshield-logo.png") center/contain no-repeat;
-  border: 1px solid var(--border-main);
-}
-
-.terminalRoot .tvBrandTxt b{
-  font-size: 13px;
-}
-
-.terminalRoot .tvBrandTxt span{
-  font-size: 11px;
-  letter-spacing: 2px;
-  color: var(--text-soft);
-}
-
 /* ===================== CHART ===================== */
-.terminalRoot .tvChartArea{
+.tvChartArea{
   grid-column: 2;
   grid-row: 2;
   position: relative;
 }
 
-.terminalRoot .tvIframe{
+.tvIframe{
   width: 100%;
   height: 100%;
-  background: var(--bg-panel);
   border: none;
 }
 
-/* ===================== RIGHT ORDER PANEL ===================== */
-.terminalRoot .tvRight{
+/* ===================== RIGHT ORDER PANEL (DESKTOP) ===================== */
+.tvRight{
   grid-column: 3;
   grid-row: 2;
   padding: 12px;
   background: var(--bg-panel);
   border-left: 1px solid var(--border-main);
-  overflow: auto;
-  transition: transform .25s ease, opacity .25s ease;
-}
-
-/* Hidden */
-.terminalRoot .tvShell.isPanelHidden .tvRight{
-  transform: translateX(100%);
-  opacity: 0;
-}
-
-/* Floating */
-.terminalRoot .tvShell.isPanelFloating .tvRight{
-  position: absolute;
-  right: 24px;
-  top: 96px;
-  width: 360px;
-  max-height: calc(100% - 120px);
-  border-radius: 16px;
-  z-index: 50;
-  box-shadow: 0 20px 60px rgba(0,0,0,.25);
+  overflow-y: auto;
 }
 
 /* ===================== BOTTOM PANEL ===================== */
-.terminalRoot .tvBottom{
+.tvBottom{
   position: absolute;
   left: 12px;
   right: 12px;
@@ -177,44 +99,92 @@
   overflow: hidden;
 }
 
-.terminalRoot .tvBottomTabs{
+.tvBottomTabs{
   display: flex;
   gap: 8px;
   padding: 10px;
   border-bottom: 1px solid var(--border-main);
 }
 
-.terminalRoot .tvTab{
+.tvTab{
   padding: 8px 12px;
   border-radius: 999px;
   background: var(--accent-soft);
   border: 1px solid var(--border-main);
-  cursor: pointer;
 }
 
-.terminalRoot .tvTab.active{
+.tvTab.active{
   background: var(--accent);
 }
 
-.terminalRoot .tvBottomBody{
+.tvBottomBody{
   padding: 12px;
   height: calc(260px - 56px);
-  overflow: auto;
+  overflow-y: auto;
 }
 
-/* ===================== MOBILE ===================== */
-@media (max-width: 980px){
+/* =========================================================
+   MOBILE MODE — HARD OVERRIDE
+   ========================================================= */
+@media (max-width: 768px){
+
+  /* Kill desktop grid entirely */
   .terminalRoot .tvShell{
-    grid-template-columns: 56px 1fr;
-    grid-template-rows: 56px 1fr auto;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    border-radius: 0;
   }
 
-  .terminalRoot .tvRight{
-    grid-column: 1 / -1;
-    grid-row: 3;
-    border-left: none;
-    border-top: 1px solid var(--border-main);
+  /* Hide desktop-only UI */
+  .tvLeftBar,
+  .tvRight{
+    display: none !important;
+  }
+
+  /* Mobile top bar */
+  .tvTopBar{
+    flex-wrap: wrap;
+    justify-content: space-between;
+  }
+
+  /* Chart gets priority */
+  .tvChartArea{
+    flex: 1;
+    min-height: 55svh;
+  }
+
+  /* Bottom panel becomes compact */
+  .tvBottom{
     position: relative;
-    box-shadow: none;
+    height: auto;
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+  }
+
+  .tvBottomBody{
+    height: auto;
+    max-height: 28svh;
+  }
+
+  /* Mobile order sheet (from Market.jsx) */
+  .mobileOrderSheet{
+    position: fixed;
+    inset: auto 0 0 0;
+    background: #fff;
+    z-index: 9999;
+    padding: 16px;
+    border-top-left-radius: 16px;
+    border-top-right-radius: 16px;
+    box-shadow: 0 -10px 30px rgba(0,0,0,.25);
+  }
+
+  .sheetHandle{
+    width: 40px;
+    height: 4px;
+    background: #ccc;
+    border-radius: 999px;
+    margin: 0 auto 10px;
   }
 }
