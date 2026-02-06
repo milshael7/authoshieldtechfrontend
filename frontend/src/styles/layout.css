@@ -6,8 +6,10 @@
 
 .layout-root{
   display:flex;
-  min-height:100vh;
+  min-height:100svh; /* iOS-safe viewport */
 }
+
+/* ---------- Sidebar ---------- */
 
 .layout-sidebar{
   width:260px;
@@ -18,6 +20,8 @@
   flex-direction:column;
   gap:16px;
 }
+
+/* ---------- Main ---------- */
 
 .layout-main{
   flex:1;
@@ -39,6 +43,8 @@
   flex:1;
   overflow:auto;
 }
+
+/* ---------- Nav ---------- */
 
 .layout-brand{
   display:flex;
@@ -69,8 +75,52 @@
 }
 
 /* ============================= */
+/* 📱 Mobile Layout (IMPORTANT)  */
+/* ============================= */
+
+@media (max-width: 768px){
+  .layout-root{
+    flex-direction:column;
+  }
+
+  .layout-sidebar{
+    width:100%;
+    flex-direction:row;
+    align-items:center;
+    overflow-x:auto;
+    border-right:none;
+    border-bottom:1px solid rgba(255,255,255,.12);
+    padding:12px env(safe-area-inset-right) 12px env(safe-area-inset-left);
+  }
+
+  .layout-brand{
+    flex-shrink:0;
+  }
+
+  .layout-nav{
+    flex-direction:row;
+    gap:14px;
+    white-space:nowrap;
+  }
+
+  .layout-main{
+    width:100%;
+  }
+
+  .layout-topbar{
+    flex-direction:column;
+    align-items:flex-start;
+    gap:6px;
+  }
+
+  .layout-content{
+    padding:14px;
+  }
+}
+
+/* ============================= */
 /* Generic Page Layout Helpers   */
-/* (Used by Login, Forms, etc.)  */
+/* (Login, Forms, etc.)          */
 /* ============================= */
 
 .row{
@@ -89,10 +139,15 @@
   gap:16px;
 }
 
-/* Responsive */
-@media (max-width: 900px){
+/* ---------- Mobile Forms ---------- */
+
+@media (max-width: 768px){
   .row{
     flex-direction:column;
-    padding:20px;
+    padding:16px;
+  }
+
+  .col{
+    width:100%;
   }
 }
