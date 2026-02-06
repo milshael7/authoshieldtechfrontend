@@ -2,12 +2,6 @@ import React from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { clearToken, clearUser } from "../lib/api";
 
-// ❌ REMOVED (file does not exist)
-// import "../styles/layout.css";
-
-// ✅ USE EXISTING PLATFORM STYLES
-import "../styles/platform.css";
-
 export default function ManagerLayout() {
   const navigate = useNavigate();
 
