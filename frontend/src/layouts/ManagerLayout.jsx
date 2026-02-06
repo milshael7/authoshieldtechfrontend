@@ -16,10 +16,12 @@ export default function ManagerLayout() {
   return (
     <div className={`layout-root ${open ? "sidebar-open" : ""}`}>
       {/* ---------- Mobile Overlay ---------- */}
-      <div
-        className="sidebar-overlay"
-        onClick={() => setOpen(false)}
-      />
+      {open && (
+        <div
+          className="sidebar-overlay"
+          onClick={() => setOpen(false)}
+        />
+      )}
 
       {/* ---------- Sidebar ---------- */}
       <aside className="layout-sidebar manager">
@@ -49,7 +51,7 @@ export default function ManagerLayout() {
           </NavLink>
         </nav>
 
-        <button className="logout-btn" onClick={logout}>
+        <button className="btn logout-btn" onClick={logout}>
           Log out
         </button>
       </aside>
@@ -57,20 +59,20 @@ export default function ManagerLayout() {
       {/* ---------- Main ---------- */}
       <main className="layout-main">
         <header className="layout-topbar">
-          <button
-            className="mobile-menu-btn"
-            onClick={() => setOpen(true)}
-            aria-label="Open menu"
-          >
-            ☰
-          </button>
-
           <div className="topbar-left">
-            <h1>Manager Oversight Room</h1>
+            <button
+              className="btn btn-icon mobile-menu-btn"
+              onClick={() => setOpen(true)}
+              aria-label="Open menu"
+            >
+              ☰
+            </button>
+
+            <h1 style={{ margin: 0 }}>Manager Oversight Room</h1>
           </div>
 
           <div className="topbar-right">
-            <span className="role-badge manager">Read-Only</span>
+            <span className="badge">Read-only</span>
           </div>
         </header>
 
