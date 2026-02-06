@@ -8,6 +8,9 @@ const SYMBOLS = [
   "BINANCE:ETHUSDT",
 ];
 
+const SNAP_POS = { x: 16, y: 100 };
+const SNAP_DELAY = 2500;
+
 export default function Market() {
   const [symbol, setSymbol] = useState(SYMBOLS[0]);
   const [tf, setTf] = useState("D");
@@ -15,9 +18,8 @@ export default function Market() {
 
   const [panelOpen, setPanelOpen] = useState(false);
   const [docked, setDocked] = useState(true);
-  const [pos, setPos] = useState({ x: 16, y: 100 });
+  const [pos, setPos] = useState(SNAP_POS);
 
-  const dragRef = useRef(null);
   const dragData = useRef({ x: 0, y: 0, dragging: false });
   const snapTimer = useRef(null);
 
@@ -33,16 +35,18 @@ export default function Market() {
   }, [symbol, tf]);
 
   /* ---------------- DRAG LOGIC ---------------- */
-  function onDragStart(e) {
-    dragData.current.dragging = true;
+  function startDrag(e) {
     const t = e.touches ? e.touches[0] : e;
-    dragData.current.x = t.clientX - pos.x;
-    dragData.current.y = t.clientY - pos.y;
+    dragData.current = {
+      dragging: true,
+      x: t.clientX - pos.x,
+      y: t.clientY - pos.y,
+    };
     setDocked(false);
     clearTimeout(snapTimer.current);
   }
 
-  function onDragMove(e) {
+  function onMove(e) {
     if (!dragData.current.dragging) return;
     const t = e.touches ? e.touches[0] : e;
     setPos({
@@ -51,36 +55,39 @@ export default function Market() {
     });
   }
 
-  function onDragEnd() {
+  function endDrag() {
+    if (!dragData.current.dragging) return;
     dragData.current.dragging = false;
+
     snapTimer.current = setTimeout(() => {
       setDocked(true);
-      setPos({ x: 16, y: 100 });
-    }, 2500);
+      setPos(SNAP_POS);
+    }, SNAP_DELAY);
   }
 
   useEffect(() => {
-    window.addEventListener("mousemove", onDragMove);
-    window.addEventListener("mouseup", onDragEnd);
-    window.addEventListener("touchmove", onDragMove);
-    window.addEventListener("touchend", onDragEnd);
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", endDrag);
+    window.addEventListener("touchmove", onMove);
+    window.addEventListener("touchend", endDrag);
     return () => {
-      window.removeEventListener("mousemove", onDragMove);
-      window.removeEventListener("mouseup", onDragEnd);
-      window.removeEventListener("touchmove", onDragMove);
-      window.removeEventListener("touchend", onDragEnd);
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", endDrag);
+      window.removeEventListener("touchmove", onMove);
+      window.removeEventListener("touchend", endDrag);
     };
-  }, [pos]);
+  }, []);
 
   function togglePanel() {
+    clearTimeout(snapTimer.current);
     if (panelOpen) {
       setPanelOpen(false);
       setDocked(true);
-      clearTimeout(snapTimer.current);
+      setPos(SNAP_POS);
     } else {
       setPanelOpen(true);
       setDocked(true);
-      setPos({ x: 16, y: 100 });
+      setPos(SNAP_POS);
     }
   }
 
@@ -132,13 +139,14 @@ export default function Market() {
           />
         </main>
 
-        {/* ===== DOCKED PANEL ===== */}
         {panelOpen && docked && (
           <aside className="dockPanel">
             <TradePanel
               symbol={symbol}
               side={side}
               setSide={setSide}
+              onClose={togglePanel}
+              draggable={false}
             />
           </aside>
         )}
@@ -147,16 +155,16 @@ export default function Market() {
       {/* ===== FLOATING PANEL ===== */}
       {panelOpen && !docked && (
         <div
-          ref={dragRef}
           className="floatingPanel"
           style={{ left: pos.x, top: pos.y }}
-          onMouseDown={onDragStart}
-          onTouchStart={onDragStart}
         >
           <TradePanel
             symbol={symbol}
             side={side}
             setSide={setSide}
+            onClose={togglePanel}
+            draggable
+            onDragStart={startDrag}
           />
         </div>
       )}
@@ -169,14 +177,11 @@ export default function Market() {
           position:relative;
         }
 
-        .tvBody.withPanel .tvChartArea{
-          flex:1;
-        }
-
         .dockPanel{
           width:280px;
-          border-left:1px solid rgba(0,0,0,.1);
           background:#fff;
+          border-left:1px solid rgba(0,0,0,.1);
+          z-index:10;
         }
 
         .floatingPanel{
@@ -185,8 +190,7 @@ export default function Market() {
           background:#fff;
           border-radius:14px;
           box-shadow:0 10px 30px rgba(0,0,0,.25);
-          z-index:50;
-          cursor:grab;
+          z-index:60;
         }
 
         @media(max-width:900px){
@@ -201,10 +205,24 @@ export default function Market() {
 
 /* ================= TRADE PANEL ================= */
 
-function TradePanel({ symbol, side, setSide }) {
+function TradePanel({
+  symbol,
+  side,
+  setSide,
+  onClose,
+  draggable,
+  onDragStart,
+}) {
   return (
     <div className="tradePanel">
-      <header className="tpHeader">{symbol}</header>
+      <header
+        className="tpHeader"
+        onMouseDown={draggable ? onDragStart : undefined}
+        onTouchStart={draggable ? onDragStart : undefined}
+      >
+        <span>{symbol}</span>
+        <button className="tpClose" onClick={onClose}>✕</button>
+      </header>
 
       <div className="orderSide">
         <button
