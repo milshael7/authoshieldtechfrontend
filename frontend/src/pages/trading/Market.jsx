@@ -1,4 +1,3 @@
-// frontend/src/pages/trading/Market.jsx
 import React, { useMemo, useRef, useState } from "react";
 import "../../styles/terminal.css";
 
@@ -12,6 +11,8 @@ const SYMBOLS = [
 ];
 
 export default function Market() {
+  const isMobile = window.innerWidth <= 768;
+
   // ---------------- CORE STATE ----------------
   const [symbol, setSymbol] = useState(DEFAULT_SYMBOL);
   const [tf, setTf] = useState("D");
@@ -19,14 +20,7 @@ export default function Market() {
   const [orderType, setOrderType] = useState("LIMIT");
 
   // ---------------- PANEL STATE ----------------
-  // closed | docked | floating
-  const [panelState, setPanelState] = useState("closed");
-  const [overlay, setOverlay] = useState(false);
-
-  // ---------------- FLOATING POSITION ----------------
-  const panelRef = useRef(null);
-  const dragRef = useRef({ x: 0, y: 0, dragging: false });
-  const [pos, setPos] = useState({ x: 120, y: 120 });
+  const [panelOpen, setPanelOpen] = useState(false);
 
   // ---------------- PRICE MOCK ----------------
   const [bid, setBid] = useState("1.11077");
@@ -49,232 +43,148 @@ export default function Market() {
       symbol,
       interval: tf,
       theme: "light",
-      style: "1",
       timezone: "Etc/UTC",
-      details: "1",
-      studies: "1",
       locale: "en",
     });
     return `https://s.tradingview.com/widgetembed/?${params.toString()}`;
   }, [symbol, tf]);
 
-  // ---------------- HELPERS ----------------
-  function syncPrice(s) {
-    setOrderPrice(s === "BUY" ? ask : bid);
-  }
-
-  function mockTick() {
-    const a = (parseFloat(ask) + (Math.random() - 0.5) * 0.0002).toFixed(5);
-    const b = (parseFloat(bid) + (Math.random() - 0.5) * 0.0002).toFixed(5);
-    setAsk(a);
-    setBid(b);
-    setOrderPrice(side === "BUY" ? a : b);
-  }
-
-  function toggleDock() {
-    setPanelState((p) => (p === "closed" ? "docked" : "closed"));
-    setOverlay(false);
-  }
-
-  function floatPanel() {
-    setPanelState("floating");
-    setOverlay(false);
-  }
-
-  function toggleOverlay() {
-    setOverlay((v) => !v);
-  }
-
   function placeOrder() {
     alert(
-      `${side} ${qty} ${symbol}\n` +
-      `Type: ${orderType}\n` +
-      `Price: ${orderPrice}\n` +
-      `TP: ${takeProfit ? tp : "OFF"} | SL: ${stopLoss ? sl : "OFF"}`
+      `${side} ${qty} ${symbol}\nType: ${orderType}\nPrice: ${orderPrice}`
     );
   }
 
-  // ---------------- DRAG HANDLERS ----------------
-  function onDragStart(e) {
-    dragRef.current = {
-      dragging: true,
-      x: e.clientX - pos.x,
-      y: e.clientY - pos.y,
-    };
-    document.addEventListener("mousemove", onDragMove);
-    document.addEventListener("mouseup", onDragEnd);
-  }
-
-  function onDragMove(e) {
-    if (!dragRef.current.dragging) return;
-    setPos({
-      x: e.clientX - dragRef.current.x,
-      y: e.clientY - dragRef.current.y,
-    });
-  }
-
-  function onDragEnd() {
-    dragRef.current.dragging = false;
-    document.removeEventListener("mousemove", onDragMove);
-    document.removeEventListener("mouseup", onDragEnd);
-  }
-
-  // ---------------- RENDER ----------------
   return (
     <div className="terminalRoot">
-      <div
-        className={`tvShell
-          ${panelState === "closed" ? "isPanelHidden" : ""}
-          ${panelState === "floating" ? "isPanelFloating" : ""}
-          ${overlay ? "isOverlay" : ""}
-        `}
-      >
-        {/* LEFT TOOLBAR */}
-        <aside className="tvLeftBar">
-          {["☰","↖","／","⟂","⌁","T","⟐","＋","⌖","⤢","⌫","👁"].map((t,i)=>(
-            <button key={i} className="tvToolBtn">{t}</button>
+      {/* ---------- TOP BAR ---------- */}
+      <header className="tvTopBar mobileTop">
+        <select
+          className="tvSelect"
+          value={symbol}
+          onChange={(e) => setSymbol(e.target.value)}
+        >
+          {SYMBOLS.map((s) => (
+            <option key={s}>{s}</option>
           ))}
-        </aside>
+        </select>
 
-        {/* TOP BAR */}
-        <header className="tvTopBar">
-          <div className="tvTopLeft">
-            <div className="tvBrand">
-              <div className="tvBrandLogo" />
-              <div className="tvBrandTxt">
-                <b>AutoShield Tech</b>
-                <span>TRADING TERMINAL</span>
-              </div>
-            </div>
-
-            <select className="tvSelect" value={symbol} onChange={e=>setSymbol(e.target.value)}>
-              {SYMBOLS.map(s=>(
-                <option key={s} value={s}>{s}</option>
-              ))}
-            </select>
-
-            <div className="tvTfRow">
-              {["1","5","15","60","D","W","M"].map(x=>(
-                <button
-                  key={x}
-                  className={tf===x?"tvPill active":"tvPill"}
-                  onClick={()=>setTf(x)}
-                >
-                  {x}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="tvTopRight">
-            <button className="tvPrimary" onClick={toggleDock}>
-              {panelState === "closed" ? "Trade" : "Close"}
+        <div className="tvTfRow">
+          {["1", "5", "15", "60", "D"].map((x) => (
+            <button
+              key={x}
+              className={tf === x ? "tvPill active" : "tvPill"}
+              onClick={() => setTf(x)}
+            >
+              {x}
             </button>
-            <button className="tvIconBtn" onClick={mockTick}>▶</button>
-            {panelState !== "closed" && (
-              <>
-                <button className="tvIconBtn" onClick={floatPanel}>⤢</button>
-                <button className="tvIconBtn" onClick={toggleOverlay}>
-                  {overlay ? "⤡" : "⤢"}
-                </button>
-              </>
-            )}
-          </div>
-        </header>
+          ))}
+        </div>
 
-        {/* CHART */}
-        <main className="tvChartArea">
-          <iframe
-            className="tvIframe"
-            title="chart"
-            src={tvSrc}
-            frameBorder="0"
-            allow="fullscreen"
-          />
+        <button className="tvPrimary" onClick={() => setPanelOpen(true)}>
+          Trade
+        </button>
+      </header>
 
-          {/* BOTTOM PANEL */}
-          <section className="tvBottom">
-            <div className="tvBottomTabs">
-              {["Positions","Orders","History","Account Summary","Trading Journal"].map(t=>(
-                <button
-                  key={t}
-                  className={bottomTab===t?"tvTab active":"tvTab"}
-                  onClick={()=>setBottomTab(t)}
-                >
-                  {t}
-                </button>
-              ))}
-            </div>
-            <div className="tvBottomBody">
-              {bottomTab} panel (wired later)
-            </div>
-          </section>
-        </main>
+      {/* ---------- CHART ---------- */}
+      <main className="tvChartArea mobileChart">
+        <iframe
+          className="tvIframe"
+          title="chart"
+          src={tvSrc}
+          frameBorder="0"
+        />
 
-        {/* ORDER PANEL */}
-        {panelState !== "closed" && (
-          <aside
-            ref={panelRef}
-            className="tvRight"
-            style={panelState==="floating"
-              ? { left: pos.x, top: pos.y, position: "absolute" }
-              : undefined
-            }
-          >
-            {panelState === "floating" && (
-              <div
-                className="panelDragHandle"
-                onMouseDown={onDragStart}
-                style={{ cursor: "move", marginBottom: 8 }}
+        {/* ---------- BOTTOM PANEL ---------- */}
+        <section className="tvBottom mobileBottom">
+          <div className="tvBottomTabs">
+            {["Positions", "Orders", "History"].map((t) => (
+              <button
+                key={t}
+                className={bottomTab === t ? "tvTab active" : "tvTab"}
+                onClick={() => setBottomTab(t)}
               >
-                Drag
-              </div>
-            )}
-
-            <h3>{symbol}</h3>
-
-            <div className="orderSide">
-              <button onClick={()=>{setSide("SELL");syncPrice("SELL");}}>
-                SELL {bid}
+                {t}
               </button>
-              <button onClick={()=>{setSide("BUY");syncPrice("BUY");}}>
-                BUY {ask}
+            ))}
+          </div>
+          <div className="tvBottomBody">{bottomTab} panel</div>
+        </section>
+      </main>
+
+      {/* ---------- MOBILE ORDER PANEL ---------- */}
+      {panelOpen && (
+        <div className="mobileOrderSheet">
+          <div className="sheetHandle" />
+          <h3>{symbol}</h3>
+
+          <div className="orderSide">
+            <button onClick={() => setSide("SELL")}>SELL {bid}</button>
+            <button onClick={() => setSide("BUY")}>BUY {ask}</button>
+          </div>
+
+          <div className="orderTypes">
+            {["MARKET", "LIMIT"].map((t) => (
+              <button
+                key={t}
+                className={orderType === t ? "active" : ""}
+                onClick={() => setOrderType(t)}
+              >
+                {t}
               </button>
-            </div>
+            ))}
+          </div>
 
-            <div className="orderTypes">
-              {["MARKET","LIMIT","STOP"].map(t=>(
-                <button
-                  key={t}
-                  onClick={()=>setOrderType(t)}
-                  className={orderType===t?"active":""}
-                >
-                  {t}
-                </button>
-              ))}
-            </div>
+          <input value={orderPrice} onChange={(e) => setOrderPrice(e.target.value)} />
+          <input value={qty} onChange={(e) => setQty(e.target.value)} />
 
-            <input value={orderPrice} onChange={e=>setOrderPrice(e.target.value)} />
-            <input value={qty} onChange={e=>setQty(e.target.value)} />
+          <button className="tvPrimary" onClick={placeOrder}>
+            Place Order
+          </button>
 
-            <label>
-              <input type="checkbox" checked={takeProfit} onChange={e=>setTakeProfit(e.target.checked)} />
-              Take Profit
-            </label>
-            {takeProfit && <input value={tp} onChange={e=>setTp(e.target.value)} />}
+          <button onClick={() => setPanelOpen(false)}>Close</button>
+        </div>
+      )}
 
-            <label>
-              <input type="checkbox" checked={stopLoss} onChange={e=>setStopLoss(e.target.checked)} />
-              Stop Loss
-            </label>
-            {stopLoss && <input value={sl} onChange={e=>setSl(e.target.value)} />}
+      {/* ---------- MOBILE CSS ---------- */}
+      <style>{`
+        @media (max-width: 768px) {
+          .mobileTop {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+          }
 
-            <button className="tvPrimary" onClick={placeOrder}>
-              {side} {qty}
-            </button>
-          </aside>
-        )}
-      </div>
+          .mobileChart {
+            height: 55svh;
+          }
+
+          .mobileBottom {
+            max-height: 30svh;
+            overflow: auto;
+          }
+
+          .mobileOrderSheet {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: #fff;
+            padding: 16px;
+            border-top-left-radius: 16px;
+            border-top-right-radius: 16px;
+            z-index: 999;
+          }
+
+          .sheetHandle {
+            width: 40px;
+            height: 4px;
+            background: #ccc;
+            border-radius: 2px;
+            margin: 0 auto 10px;
+          }
+        }
+      `}</style>
     </div>
   );
 }
