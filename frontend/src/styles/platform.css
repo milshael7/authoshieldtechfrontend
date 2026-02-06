@@ -1,206 +1,199 @@
-/* frontend/src/styles/terminal.css */
-/* Scoped Trading Terminal ONLY — NO global selectors (no body/html/*). */
+/* =========================================================
+   AUTOSHIELD PLATFORM UI
+   File: frontend/src/styles/platform.css
+   Purpose:
+   - Global buttons
+   - Tabs
+   - Platform top bars
+   - Mobile-safe interactions
+   ========================================================= */
 
+/* =============================
+   Base Variables
+   ============================= */
 :root{
-  --tradeLilac: rgba(160, 120, 255, .18);
-  --tradeLilac2: rgba(160, 120, 255, .10);
-  --tradeBorder: rgba(160, 120, 255, .22);
+  --p-bg: rgba(255,255,255,.06);
+  --p-bg-soft: rgba(0,0,0,.22);
+  --p-border: rgba(255,255,255,.14);
+
+  --p-accent: rgba(122,167,255,.85);
+  --p-accent-soft: rgba(122,167,255,.22);
+
+  --p-text: rgba(255,255,255,.92);
+  --p-muted: rgba(255,255,255,.65);
+
+  --p-radius: 14px;
+  --p-radius-sm: 10px;
 }
 
-/* ===== Terminal grid ===== */
-.tvShell{
-  width: 100%;
-  height: calc(100vh - 110px); /* space for platform header */
-  display: grid;
-  grid-template-columns: 56px minmax(0,1fr) 380px;
-  grid-template-rows: 56px minmax(0,1fr);
-  border-radius: 16px;
-  overflow: hidden;
-  background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(0,0,0,.18));
-  border: 1px solid rgba(255,255,255,.10);
-  box-shadow: 0 10px 30px rgba(0,0,0,.35);
-}
-
-.tvShell.isFull{ position: fixed; inset: 0; z-index: 9999; height: 100vh; border-radius: 0; }
-
-/* ===== Left tools ===== */
-.tvLeftBar{
-  grid-row: 1 / span 2;
-  grid-column: 1;
-  padding: 10px 8px;
-  background: rgba(0,0,0,.22);
-  border-right: 1px solid rgba(255,255,255,.12);
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.tvToolBtn{
-  height: 34px;
-  border-radius: 12px;
-  border: 1px solid rgba(255,255,255,.12);
-  background: rgba(0,0,0,.25);
-  color: rgba(255,255,255,.92);
-  cursor: pointer;
-}
-.tvToolBtn:hover{ background: rgba(255,255,255,.10); }
-
-/* ===== Top bar ===== */
-.tvTopBar{
-  grid-column: 2 / -1;
-  grid-row: 1;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 10px 12px;
-  background: linear-gradient(180deg, var(--tradeLilac2), rgba(0,0,0,.22));
-  border-bottom: 1px solid rgba(255,255,255,.12);
-}
-
-.tvTopLeft{ display:flex; align-items:center; gap:10px; min-width:0; }
-.tvBrand{ display:flex; align-items:center; gap:10px; min-width:0; }
-.tvBrandTxt b{ display:block; font-size:14px; }
-.tvBrandTxt span{ display:block; font-size:11px; opacity:.7; letter-spacing:2px; }
-
-.tvBrandLogo{
-  width: 34px;
-  height: 34px;
-  border-radius: 12px;
-  border: 1px solid rgba(255,255,255,.12);
-  background: rgba(0,0,0,.25) url("/autoshield-logo.png") center/contain no-repeat;
-}
-
-.tvSymRow{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; min-width:0; }
-
-.tvSelect{
-  width: auto;
-  min-width: 160px;
-  padding: 10px 12px;
-  border-radius: 14px;
-  border: 1px solid rgba(255,255,255,.12);
-  background: rgba(0,0,0,.25);
-  color: rgba(255,255,255,.92);
-}
-
-.tvTfRow{ display:flex; gap:8px; flex-wrap:wrap; }
-.tvPill{
-  width:auto;
-  padding:8px 10px;
-  border-radius:999px;
-  border:1px solid rgba(255,255,255,.12);
-  background: rgba(0,0,0,.25);
-  color: rgba(255,255,255,.92);
-  cursor:pointer;
-}
-.tvPill.active{
-  border-color: rgba(122,167,255,.55);
-  background: rgba(122,167,255,.15);
-}
-
-.tvTopRight{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-.tvPrimary,.tvIconBtn{
-  width:auto;
-  padding:10px 12px;
-  border-radius:12px;
-  border:1px solid rgba(255,255,255,.12);
-  color: rgba(255,255,255,.92);
-  cursor:pointer;
-}
-.tvPrimary{ background: rgba(122,167,255,.20); }
-.tvIconBtn{ background: rgba(0,0,0,.25); }
-
-/* ===== Center chart ===== */
-.tvChartArea{ grid-column:2; grid-row:2; min-width:0; min-height:0; position:relative; }
-.tvChartFrame{ position:relative; height:100%; min-height:0; }
-.tvIframe{
+/* =============================
+   Platform Shell
+   ============================= */
+.platformShell{
   width:100%;
-  height:100%;
-  border:0;
-  display:block;
-  border-radius:14px;
-  background:#fff; /* TradingView iframe itself */
-}
-
-/* ===== Right docked panel (always docked) ===== */
-.tvRight{
-  grid-column:3;
-  grid-row:2;
-  min-width:0;
-  min-height:0;
-  padding:10px;
-  background: linear-gradient(180deg, var(--tradeLilac2), rgba(0,0,0,.20));
-  border-left: 1px solid rgba(255,255,255,.12);
-  overflow:auto;
-}
-
-/* ===== Bottom panel (smaller + not blocking) ===== */
-.tvBottom{
-  position:absolute;
-  left:10px;
-  right:10px;
-  bottom:10px;
-  height: 180px; /* smaller than before */
-  background: linear-gradient(180deg, rgba(0,0,0,.18), rgba(0,0,0,.28));
-  border: 1px solid rgba(255,255,255,.12);
-  border-radius: 14px;
-  overflow:hidden;
-  backdrop-filter: blur(10px);
-}
-
-.tvBottomTabs{
+  min-height:100%;
   display:flex;
-  gap:8px;
-  padding:10px;
-  border-bottom:1px solid rgba(255,255,255,.12);
+  flex-direction:column;
+}
+
+/* =============================
+   Top Platform Bar
+   ============================= */
+.platformTop{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:12px 16px;
+  background: linear-gradient(
+    180deg,
+    rgba(255,255,255,.08),
+    rgba(0,0,0,.25)
+  );
+  border-bottom:1px solid var(--p-border);
   flex-wrap:wrap;
 }
 
-.tvTab{
-  width:auto;
-  padding:8px 10px;
-  border-radius:999px;
-  border:1px solid rgba(255,255,255,.12);
-  background: rgba(0,0,0,.25);
-  color: rgba(255,255,255,.92);
+/* Brand */
+.platformBrand{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  background:none;
+  border:none;
+  color:var(--p-text);
   cursor:pointer;
 }
-.tvTab.active{
-  border-color: rgba(122,167,255,.55);
-  background: rgba(122,167,255,.15);
+
+.platformLogo{
+  width:34px;
+  height:34px;
+  border-radius:10px;
+  background: rgba(0,0,0,.25)
+    url("/autoshield-logo.png")
+    center/contain no-repeat;
+  border:1px solid var(--p-border);
 }
 
-.tvBottomBody{
-  padding:10px;
-  color: rgba(255,255,255,.92);
-  overflow:auto;
-  height: calc(180px - 56px);
+.platformBrandTxt b{
+  display:block;
+  font-size:14px;
 }
 
-/* Table */
-.tvTable{ width:100%; border-collapse:collapse; color: rgba(255,255,255,.92); }
-.tvTable th,.tvTable td{
-  padding:8px;
-  border-bottom:1px solid rgba(255,255,255,.12);
-  font-size:12px;
-  white-space:nowrap;
+.platformBrandTxt span{
+  display:block;
+  font-size:11px;
+  letter-spacing:2px;
+  color:var(--p-muted);
 }
-.buy{ color:#2bd576; }
-.neg{ color:#ff5a5f; }
-.tvEmpty{ opacity:.8; }
 
-/* ===== Mobile ===== */
-@media (max-width: 980px){
-  .tvShell{
-    grid-template-columns: 56px minmax(0,1fr);
-    grid-template-rows: 56px minmax(0,1fr) auto;
-    height: auto;
+/* =============================
+   Platform Tabs
+   ============================= */
+.platformTabs{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+}
+
+.ptab{
+  padding:10px 14px;
+  border-radius:999px;
+  border:1px solid var(--p-border);
+  background: var(--p-bg-soft);
+  color:var(--p-text);
+  cursor:pointer;
+  font-size:14px;
+}
+
+.ptab.active{
+  background: var(--p-accent-soft);
+  border-color: var(--p-accent);
+}
+
+/* =============================
+   Platform Actions (Buttons)
+   ============================= */
+.platformActions{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+}
+
+.pbtn{
+  padding:12px 16px;
+  border-radius:var(--p-radius);
+  border:1px solid var(--p-border);
+  background: var(--p-bg-soft);
+  color:var(--p-text);
+  cursor:pointer;
+  font-size:14px;
+  min-height:44px; /* iOS tap target */
+}
+
+.pbtn:hover{
+  background: rgba(255,255,255,.14);
+}
+
+/* Primary action */
+.pbtn.primary{
+  background: var(--p-accent-soft);
+  border-color: var(--p-accent);
+}
+
+/* =============================
+   Platform Body
+   ============================= */
+.platformBody{
+  flex:1;
+  padding:16px;
+}
+
+/* Card */
+.platformCard{
+  background: linear-gradient(
+    180deg,
+    rgba(255,255,255,.06),
+    rgba(0,0,0,.20)
+  );
+  border:1px solid var(--p-border);
+  border-radius:16px;
+  padding:16px;
+}
+
+/* =============================
+   Mobile Adjustments
+   ============================= */
+@media (max-width: 768px){
+
+  .platformTop{
+    flex-direction:column;
+    align-items:stretch;
   }
-  .tvRight{
-    grid-column: 1 / -1;
-    grid-row: 3;
-    border-left:none;
-    border-top:1px solid rgba(255,255,255,.12);
+
+  .platformBrand{
+    justify-content:flex-start;
   }
-  .tvBottom{ position:relative; left:auto; right:auto; bottom:auto; margin:10px; }
+
+  .platformTabs{
+    justify-content:space-between;
+  }
+
+  .platformActions{
+    justify-content:space-between;
+  }
+
+  .pbtn,
+  .ptab{
+    flex:1;
+    text-align:center;
+  }
+
+  .platformBody{
+    padding:12px;
+  }
+
+  .platformCard{
+    padding:14px;
+  }
 }
