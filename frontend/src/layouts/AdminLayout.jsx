@@ -8,10 +8,12 @@ export default function AdminLayout() {
   return (
     <div className={`layout-root ${open ? "sidebar-open" : ""}`}>
       {/* ---------- Mobile Overlay ---------- */}
-      <div
-        className="sidebar-overlay"
-        onClick={() => setOpen(false)}
-      />
+      {open && (
+        <div
+          className="sidebar-overlay"
+          onClick={() => setOpen(false)}
+        />
+      )}
 
       {/* ---------- Sidebar ---------- */}
       <aside className="layout-sidebar">
@@ -42,15 +44,21 @@ export default function AdminLayout() {
       {/* ---------- Main ---------- */}
       <main className="layout-main">
         <header className="layout-topbar">
-          <button
-            className="mobile-menu-btn"
-            onClick={() => setOpen(true)}
-            aria-label="Open menu"
-          >
-            ☰
-          </button>
+          <div className="topbar-left">
+            <button
+              className="btn btn-icon mobile-menu-btn"
+              onClick={() => setOpen(true)}
+              aria-label="Open menu"
+            >
+              ☰
+            </button>
 
-          <h1>Admin Dashboard</h1>
+            <h1 style={{ margin: 0 }}>Admin Dashboard</h1>
+          </div>
+
+          <div className="topbar-right">
+            <span className="badge">Admin</span>
+          </div>
         </header>
 
         <section className="layout-content">
