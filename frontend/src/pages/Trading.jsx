@@ -8,7 +8,7 @@ export default function Trading() {
 
   return (
     <div className="trading-root">
-      {/* ===== TOP BAR ===== */}
+      {/* ===== HEADER ===== */}
       <header className="trading-header">
         <div className="trading-brand">
           <strong>AutoShield</strong>
@@ -17,18 +17,23 @@ export default function Trading() {
 
         <nav className="trading-tabs">
           <button
+            type="button"
             className={tab === "market" ? "ttab active" : "ttab"}
             onClick={() => setTab("market")}
           >
             Market
           </button>
+
           <button
+            type="button"
             className={tab === "room" ? "ttab active" : "ttab"}
             onClick={() => setTab("room")}
           >
             Trading Room
           </button>
+
           <button
+            type="button"
             className={tab === "reports" ? "ttab active" : "ttab"}
             onClick={() => setTab("reports")}
           >
@@ -39,36 +44,46 @@ export default function Trading() {
 
       {/* ===== CONTENT ===== */}
       <main className="trading-content">
-        {tab === "market" && <Market />}
+        {tab === "market" && (
+          <section className="trading-section">
+            <Market />
+          </section>
+        )}
 
-        {tab === "room" && <TradingRoom />}
+        {tab === "room" && (
+          <section className="trading-section">
+            <TradingRoom />
+          </section>
+        )}
 
         {tab === "reports" && (
-          <div className="card">
-            <h3>Reports</h3>
-            <ul>
-              <li>P&amp;L</li>
-              <li>Win / Loss</li>
-              <li>Risk</li>
-              <li>AI Notes</li>
-            </ul>
-          </div>
+          <section className="trading-section">
+            <div className="card">
+              <h3>Reports</h3>
+              <ul>
+                <li>P&amp;L</li>
+                <li>Win / Loss</li>
+                <li>Risk</li>
+                <li>AI Notes</li>
+              </ul>
+            </div>
+          </section>
         )}
       </main>
 
-      {/* ===== MOBILE-FIRST STYLES ===== */}
+      {/* ===== STYLES ===== */}
       <style>{`
         .trading-root{
           display:flex;
           flex-direction:column;
-          height:100%;
           min-height:100svh;
+          height:100%;
         }
 
         .trading-header{
           position:sticky;
           top:0;
-          z-index:20;
+          z-index:30;
           background:rgba(10,15,30,.95);
           border-bottom:1px solid rgba(255,255,255,.1);
           padding:12px;
@@ -97,6 +112,7 @@ export default function Trading() {
           background:rgba(255,255,255,.08);
           color:#fff;
           font-weight:600;
+          cursor:pointer;
         }
 
         .ttab.active{
@@ -108,6 +124,10 @@ export default function Trading() {
           flex:1;
           overflow:auto;
           padding:12px;
+        }
+
+        .trading-section{
+          height:100%;
         }
 
         @media (min-width: 769px){
