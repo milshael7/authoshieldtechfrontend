@@ -1,17 +1,37 @@
 // frontend/src/components/AuthoDevPanel.jsx
 // AuthoDev 6.5 — Universal AI Text Panel
 // Professional, long-form, readable, shareable, speaker-enabled
-// Step 29: Dock / Undock + Minimize / Expand
-// Uses unified ReadAloud engine (single voice across platform)
+// Step 30: Persistent Dock + Minimize (localStorage)
+// Uses unified ReadAloud engine
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { readAloud } from "./ReadAloud";
+
+/* ================= STORAGE KEYS ================= */
+
+const STORAGE_KEY = "authodev.panel.state";
 
 /* ================= HELPERS ================= */
 
 async function copyText(text) {
   try {
     await navigator.clipboard.writeText(text);
+  } catch {}
+}
+
+function loadPanelState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return { docked: false, minimized: false };
+    return JSON.parse(raw);
+  } catch {
+    return { docked: false, minimized: false };
+  }
+}
+
+function savePanelState(state) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   } catch {}
 }
 
@@ -22,15 +42,24 @@ export default function AuthoDevPanel({
   endpoint = "/api/ai/chat",
   getContext,
 }) {
+  const saved = loadPanelState();
+
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // STEP 29 STATE
-  const [minimized, setMinimized] = useState(false);
-  const [docked, setDocked] = useState(false);
+  const [docked, setDocked] = useState(saved.docked);
+  const [minimized, setMinimized] = useState(saved.minimized);
 
   const bottomRef = useRef(null);
+
+  /* ================= PERSIST STATE ================= */
+
+  useEffect(() => {
+    savePanelState({ docked, minimized });
+  }, [docked, minimized]);
+
+  /* ================= AI ================= */
 
   async function sendMessage() {
     if (!input.trim() || loading) return;
@@ -58,14 +87,15 @@ export default function AuthoDevPanel({
 
       const data = await res.json();
 
-      const aiMsg = {
-        role: "ai",
-        text: data?.reply || "No response.",
-        speakText: data?.speakText || data?.reply || "",
-        ts: new Date().toLocaleTimeString(),
-      };
-
-      setMessages((m) => [...m, aiMsg]);
+      setMessages((m) => [
+        ...m,
+        {
+          role: "ai",
+          text: data?.reply || "No response.",
+          speakText: data?.speakText || data?.reply || "",
+          ts: new Date().toLocaleTimeString(),
+        },
+      ]);
     } catch {
       setMessages((m) => [
         ...m,
@@ -259,10 +289,6 @@ export default function AuthoDevPanel({
           border: none;
           cursor: pointer;
           opacity: .75;
-        }
-
-        .ad-actions button:hover {
-          opacity: 1;
         }
 
         .ad-time {
