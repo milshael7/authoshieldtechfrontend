@@ -1,7 +1,8 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useCallback } from "react";
 import VoiceAI from "../../components/VoiceAI";
 
 export default function TradingRoom() {
+  /* ===================== STATE ===================== */
   const [log, setLog] = useState([
     { t: new Date().toLocaleTimeString(), m: "AI online. Awaiting strategy input." },
   ]);
@@ -11,6 +12,7 @@ export default function TradingRoom() {
   const [maxTrades, setMaxTrades] = useState(3);
   const [riskPct, setRiskPct] = useState(1);
 
+  /* ===== MOCK STATS (later wire backend) ===== */
   const stats = useMemo(
     () => ({
       tradesToday: 1,
@@ -21,9 +23,43 @@ export default function TradingRoom() {
     []
   );
 
+  /* ===================== HELPERS ===================== */
   const pushLog = (m) =>
     setLog((p) => [{ t: new Date().toLocaleTimeString(), m }, ...p].slice(0, 60));
 
+  /**
+   * 🔑 THIS IS THE KEY ADDITION
+   * This context is injected into VoiceAI
+   * so the AI knows EXACTLY what’s happening.
+   */
+  const getAiContext = useCallback(() => {
+    return {
+      platform: "AutoShield",
+      room: "TradingRoom",
+
+      trading_mode: mode,
+      trade_style: shortTrades ? "short" : "session",
+
+      risk: {
+        risk_pct: Number(riskPct),
+        max_trades_per_day: Number(maxTrades),
+      },
+
+      stats: {
+        trades_today: stats.tradesToday,
+        wins: stats.wins,
+        losses: stats.losses,
+        last_action: stats.lastAction,
+      },
+
+      operator_controls: {
+        can_pause: true,
+        can_resume: true,
+      },
+    };
+  }, [mode, shortTrades, maxTrades, riskPct, stats]);
+
+  /* ===================== UI ===================== */
   return (
     <div className="trading-room">
       {/* ===== HEADER ===== */}
@@ -55,17 +91,18 @@ export default function TradingRoom() {
         <section className="tr-panel">
           <h3>AI Command</h3>
           <p className="muted">
-            Talk to the AI. Set rules, behavior, mindset.
+            Talk to AutoShield. Ask why trades happened, adjust risk, or set rules.
           </p>
 
           <VoiceAI
             title="AutoShield AI"
             endpoint="/api/ai/chat"
+            getContext={getAiContext}
             onActivity={(msg) => pushLog(msg)}
           />
         </section>
 
-        {/* ===== RIGHT: CONTROL + STATS ===== */}
+        {/* ===== RIGHT: CONTROLS + STATS ===== */}
         <section className="tr-panel">
           <h3>Trading Controls</h3>
 
@@ -109,6 +146,7 @@ export default function TradingRoom() {
           </div>
 
           <div className="stats">
+            <div><b>Mode:</b> {mode}</div>
             <div><b>Trades Today:</b> {stats.tradesToday}</div>
             <div><b>Wins:</b> {stats.wins}</div>
             <div><b>Losses:</b> {stats.losses}</div>
@@ -146,7 +184,7 @@ export default function TradingRoom() {
         </section>
       </div>
 
-      {/* ===== STYLES ===== */}
+      {/* ===== STYLES (UNCHANGED) ===== */}
       <style>{`
         .trading-room{
           display:flex;
@@ -214,19 +252,6 @@ export default function TradingRoom() {
           grid-template-columns:1fr 1fr;
           gap:10px;
           margin-bottom:10px;
-        }
-
-        .ctrl label{
-          display:flex;
-          flex-direction:column;
-          font-size:12px;
-          gap:4px;
-        }
-
-        .ctrl input{
-          padding:8px;
-          border-radius:8px;
-          border:1px solid #ccc;
         }
 
         .ctrlRow{
