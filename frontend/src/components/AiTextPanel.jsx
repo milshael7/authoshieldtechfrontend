@@ -1,4 +1,5 @@
-import React, { useState, useRef } from "react";
+import React, { useState } from "react";
+import { readAloud } from "./ReadAloud";
 
 /**
  * AuthoDev 6.5 — Professional AI Text Panel
@@ -6,7 +7,7 @@ import React, { useState, useRef } from "react";
  *
  * Features:
  * - Long professional answers (email-quality)
- * - Read aloud per message
+ * - Unified read-aloud engine (platform-wide)
  * - Copy / Share / Rate controls
  * - Clean, non-bubble layout
  */
@@ -19,8 +20,6 @@ export default function AiTextPanel({
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-
-  const synthRef = useRef(window.speechSynthesis);
 
   async function sendMessage() {
     if (!input.trim() || loading) return;
@@ -48,14 +47,15 @@ export default function AiTextPanel({
 
       const data = await res.json();
 
-      const aiMsg = {
-        role: "ai",
-        text: data.reply || "No response available.",
-        speakText: data.speakText || data.reply,
-        ts: Date.now(),
-      };
-
-      setMessages((m) => [...m, aiMsg]);
+      setMessages((m) => [
+        ...m,
+        {
+          role: "ai",
+          text: data.reply || "No response available.",
+          speakText: data.speakText || data.reply,
+          ts: Date.now(),
+        },
+      ]);
     } catch {
       setMessages((m) => [
         ...m,
@@ -71,25 +71,13 @@ export default function AiTextPanel({
     }
   }
 
-  function speak(text) {
-    if (!synthRef.current || !text) return;
-    synthRef.current.cancel();
-    const u = new SpeechSynthesisUtterance(text);
-    u.rate = 0.95;
-    u.pitch = 1;
-    synthRef.current.speak(u);
-  }
-
   function copy(text) {
     navigator.clipboard?.writeText(text);
   }
 
   function share(text) {
-    if (navigator.share) {
-      navigator.share({ text });
-    } else {
-      copy(text);
-    }
+    if (navigator.share) navigator.share({ text });
+    else copy(text);
   }
 
   return (
@@ -103,7 +91,7 @@ export default function AiTextPanel({
 
             {m.role === "ai" && (
               <div style={tools}>
-                <button style={toolBtn} onClick={() => speak(m.speakText)}>
+                <button style={toolBtn} onClick={() => readAloud(m.speakText)}>
                   🔊
                 </button>
                 <button style={toolBtn} onClick={() => copy(m.text)}>
