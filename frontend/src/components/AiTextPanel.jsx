@@ -2,9 +2,13 @@ import React, { useState, useRef } from "react";
 
 /**
  * AuthoDev 6.5 — Professional AI Text Panel
- * - Long-form answers
- * - Copy / Speak / Rate / Share
- * - Tenant-safe (backend enforced)
+ * Enterprise-grade, long-form, shareable responses
+ *
+ * Features:
+ * - Long professional answers (email-quality)
+ * - Read aloud per message
+ * - Copy / Share / Rate controls
+ * - Clean, non-bubble layout
  */
 
 export default function AiTextPanel({
@@ -46,7 +50,7 @@ export default function AiTextPanel({
 
       const aiMsg = {
         role: "ai",
-        text: data.reply || "No response.",
+        text: data.reply || "No response available.",
         speakText: data.speakText || data.reply,
         ts: Date.now(),
       };
@@ -57,7 +61,8 @@ export default function AiTextPanel({
         ...m,
         {
           role: "ai",
-          text: "Connection issue. Please try again.",
+          text:
+            "There was a connection issue while generating the response. Please try again.",
           ts: Date.now(),
         },
       ]);
@@ -79,22 +84,40 @@ export default function AiTextPanel({
     navigator.clipboard?.writeText(text);
   }
 
+  function share(text) {
+    if (navigator.share) {
+      navigator.share({ text });
+    } else {
+      copy(text);
+    }
+  }
+
   return (
     <div style={panel}>
       <div style={header}>{title}</div>
 
       <div style={chatArea}>
         {messages.map((m, i) => (
-          <div key={i} style={m.role === "ai" ? aiMsg : userMsg}>
+          <div key={i} style={m.role === "ai" ? aiBlock : userBlock}>
             <div style={text}>{m.text}</div>
 
             {m.role === "ai" && (
               <div style={tools}>
-                <button onClick={() => speak(m.speakText)}>🔊</button>
-                <button onClick={() => copy(m.text)}>📋</button>
-                <button title="Helpful">👍</button>
-                <button title="Not helpful">👎</button>
-                <button title="Share">🔗</button>
+                <button style={toolBtn} onClick={() => speak(m.speakText)}>
+                  🔊
+                </button>
+                <button style={toolBtn} onClick={() => copy(m.text)}>
+                  📋
+                </button>
+                <button style={toolBtn} title="Helpful">
+                  👍
+                </button>
+                <button style={toolBtn} title="Not helpful">
+                  👎
+                </button>
+                <button style={toolBtn} onClick={() => share(m.text)}>
+                  🔗
+                </button>
               </div>
             )}
           </div>
@@ -105,9 +128,9 @@ export default function AiTextPanel({
         <textarea
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="Ask AuthoDev about your security, activity, or issues…"
+          placeholder="Ask AuthoDev about security activity, incidents, or analysis…"
           style={inputBox}
-          rows={2}
+          rows={3}
         />
         <button onClick={sendMessage} disabled={loading} style={sendBtn}>
           {loading ? "Thinking…" : "Send"}
@@ -131,52 +154,61 @@ const panel = {
 const header = {
   padding: 14,
   fontWeight: 800,
+  fontSize: 15,
   borderBottom: "1px solid rgba(255,255,255,0.1)",
 };
 
 const chatArea = {
   flex: 1,
-  padding: 14,
+  padding: 16,
   overflowY: "auto",
   display: "flex",
   flexDirection: "column",
-  gap: 14,
+  gap: 18,
 };
 
-const userMsg = {
+const userBlock = {
   alignSelf: "flex-end",
-  maxWidth: "80%",
-  background: "rgba(122,162,255,0.2)",
+  maxWidth: "75%",
+  background: "rgba(122,162,255,0.15)",
   borderRadius: 12,
   padding: 12,
+  fontSize: 13,
 };
 
-const aiMsg = {
+const aiBlock = {
   alignSelf: "flex-start",
   maxWidth: "85%",
-  background: "rgba(255,255,255,0.08)",
+  background: "rgba(255,255,255,0.06)",
   borderRadius: 12,
-  padding: 14,
+  padding: 16,
 };
 
 const text = {
-  fontSize: 14,
-  lineHeight: 1.5,
+  fontSize: 13,
+  lineHeight: 1.6,
   whiteSpace: "pre-wrap",
 };
 
 const tools = {
   display: "flex",
-  gap: 8,
-  marginTop: 8,
+  gap: 10,
+  marginTop: 10,
   fontSize: 12,
-  opacity: 0.85,
+  opacity: 0.8,
+};
+
+const toolBtn = {
+  background: "transparent",
+  border: "none",
+  cursor: "pointer",
+  fontSize: 14,
 };
 
 const inputRow = {
   display: "flex",
   gap: 10,
-  padding: 12,
+  padding: 14,
   borderTop: "1px solid rgba(255,255,255,0.1)",
 };
 
@@ -184,14 +216,15 @@ const inputBox = {
   flex: 1,
   resize: "none",
   borderRadius: 10,
-  padding: 10,
+  padding: 12,
   background: "rgba(0,0,0,0.4)",
   color: "#fff",
   border: "1px solid rgba(255,255,255,0.15)",
+  fontSize: 13,
 };
 
 const sendBtn = {
-  padding: "0 18px",
+  padding: "0 20px",
   borderRadius: 10,
   fontWeight: 700,
   background: "#7aa2ff",
