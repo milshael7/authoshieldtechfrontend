@@ -1,11 +1,12 @@
 // frontend/src/components/AuthoDevPanel.jsx
 // AuthoDev 6.5 — Universal AI Text Panel
-// STEP 31 — VERIFIED REPLACEMENT
+// STEP 33 — MESSAGE-LEVEL AUDIO + CONTROLS (FINALIZED)
 // ✅ Per-tenant + per-room persistence
-// ✅ Visual AI panel identity
-// ✅ Mic icon placeholder (not wired)
-// ✅ Unified read-aloud
-// ❌ No logic changes, no backend changes
+// ✅ Speaker per AI message (read that message only)
+// ✅ Copy / Share / Feedback per message
+// ❌ NO mic in input
+// ❌ NO auto speech
+// ❌ NO live voice mode
 
 import React, { useEffect, useRef, useState } from "react";
 import { readAloud } from "./ReadAloud";
@@ -125,7 +126,7 @@ export default function AuthoDevPanel({
           <span className="ad-badge">AI</span>
           <h3>{title}</h3>
         </div>
-        <span className="ad-sub">Tenant-isolated assistant</span>
+        <span className="ad-sub">Text-based assistant</span>
       </header>
 
       <div className="ad-messages">
@@ -135,11 +136,19 @@ export default function AuthoDevPanel({
 
             {m.role === "ai" && (
               <div className="ad-actions">
-                <button onClick={() => readAloud(m.speakText)}>🔊</button>
-                <button onClick={() => copyText(m.text)}>📋</button>
+                <button
+                  title="Read this message"
+                  onClick={() => readAloud(m.speakText)}
+                >
+                  🔊
+                </button>
+                <button title="Copy" onClick={() => copyText(m.text)}>
+                  📋
+                </button>
                 <button title="Helpful">👍</button>
                 <button title="Not helpful">👎</button>
                 <button
+                  title="Share"
                   onClick={() =>
                     navigator.share?.({ text: m.text }) || copyText(m.text)
                   }
@@ -155,17 +164,10 @@ export default function AuthoDevPanel({
         <div ref={bottomRef} />
       </div>
 
+      {/* INPUT — TEXT ONLY */}
       <div className="ad-input">
-        <button
-          className="mic-btn"
-          title="Voice input (coming soon)"
-          disabled
-        >
-          🎤
-        </button>
-
         <textarea
-          placeholder="Ask AuthoDev about this room, security, or activity…"
+          placeholder="Ask anything…"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           rows={3}
@@ -191,7 +193,6 @@ export default function AuthoDevPanel({
           background:linear-gradient(180deg,#0f1218,#0b0e14);
           border:1px solid rgba(255,255,255,.12);
           border-radius:18px;
-          box-shadow:0 10px 30px rgba(0,0,0,.35);
         }
 
         .ad-header {
@@ -214,11 +215,6 @@ export default function AuthoDevPanel({
           border-radius:6px;
         }
 
-        .ad-header h3 {
-          margin:0;
-          font-weight:800;
-        }
-
         .ad-sub {
           font-size:12px;
           opacity:.7;
@@ -235,7 +231,7 @@ export default function AuthoDevPanel({
 
         .ad-msg {
           max-width:85%;
-          line-height:1.5;
+          line-height:1.6;
           font-size:14px;
         }
 
@@ -285,15 +281,6 @@ export default function AuthoDevPanel({
           align-items:flex-end;
         }
 
-        .mic-btn {
-          padding:10px;
-          border-radius:10px;
-          border:1px solid rgba(255,255,255,.15);
-          background:rgba(255,255,255,.06);
-          opacity:.5;
-          cursor:not-allowed;
-        }
-
         .ad-input textarea {
           flex:1;
           resize:none;
@@ -305,7 +292,7 @@ export default function AuthoDevPanel({
           font-size:14px;
         }
 
-        .ad-input button:last-child {
+        .ad-input button {
           padding:10px 16px;
           border-radius:10px;
           border:none;
