@@ -51,84 +51,97 @@ export default function Posture() {
 
   const score = useMemo(() => scoreFrom(checks), [checks]);
 
-  const coverage = useMemo(() => {
-    const base = [
-      { name: "Endpoint Protection", val: 72 },
-      { name: "Identity Security", val: 64 },
-      { name: "Email Security", val: 58 },
-      { name: "Cloud Security", val: 61 },
-    ];
-    return base.map((x) => ({
-      ...x,
-      val: pct(x.val * 0.7 + score * 0.3),
-    }));
-  }, [score]);
+  const kpis = useMemo(
+    () => [
+      { label: "Users", value: summary?.users ?? 108, trend: "▲ 7%" },
+      { label: "Devices", value: summary?.devices ?? 111, trend: "▲ 3%" },
+      { label: "Mailboxes", value: summary?.mailboxes ?? 124, trend: "▲ 2%" },
+      { label: "Browsers", value: summary?.browsers ?? 3, trend: "▲ 7%" },
+      { label: "Cloud Drives", value: summary?.drives ?? 62, trend: "▲ 1%" },
+      { label: "Internet Assets", value: summary?.assets ?? 38, trend: "▲ 2%" },
+    ],
+    [summary]
+  );
+
+  const coverage = useMemo(
+    () => [
+      { name: "Endpoint Security", val: pct(score * 0.92) },
+      { name: "Identity & Access", val: pct(score * 0.85) },
+      { name: "Email Protection", val: pct(score * 0.78) },
+      { name: "Cloud Security", val: pct(score * 0.81) },
+      { name: "Data Protection", val: pct(score * 0.74) },
+      { name: "Dark Web", val: pct(score * 0.69) },
+    ],
+    [score]
+  );
 
   /* ================= UI ================= */
 
   return (
     <div className="postureWrap">
-      {/* ================= LEFT: SOC DASHBOARD ================= */}
-      <section className="postureCard">
-        {/* ===== HEADER ===== */}
-        <div className="postureTop">
-          <div className="postureTitle">
-            <h2>Security Posture</h2>
-            <small>
-              {summary?.scope?.type
-                ? `Scope: ${summary.scope.type}`
-                : "Scope: —"}{" "}
-              • Last scan: {new Date().toLocaleTimeString()}
-            </small>
+      {/* ================= KPI STRIP ================= */}
+      <div className="kpiGrid">
+        {kpis.map((k) => (
+          <div key={k.label} className="kpiCard">
+            <small>{k.label}</small>
+            <b>{k.value}</b>
+            <span className="trend">{k.trend}</span>
           </div>
+        ))}
+      </div>
 
-          <div className="postureScore">
-            <div
-              className="scoreRing"
-              style={{ "--val": pct(score) }}
-            >
-              {pct(score)}
+      {/* ================= MAIN GRID ================= */}
+      <div className="postureGrid">
+        {/* ===== LEFT: POSTURE ===== */}
+        <section className="postureCard">
+          <div className="postureTop">
+            <div>
+              <h2>Your Security Posture</h2>
+              <small>
+                Scope: {summary?.scope?.type || "—"} • Last scan just now
+              </small>
             </div>
-            <div className="scoreMeta">
-              <b>Overall Score</b>
-              <span>
-                {loading ? "Analyzing…" : err ? "Error" : "Operational"}
-              </span>
-            </div>
-          </div>
-        </div>
 
-        {/* ===== SCORE BAR ===== */}
-        <div className="meter">
-          <div style={{ width: `${pct(score)}%` }} />
-        </div>
-
-        {err && <p className="error">{err}</p>}
-
-        {/* ===== COVERAGE ===== */}
-        <div className="coverGrid">
-          {coverage.map((x) => (
-            <div key={x.name}>
-              <div className="coverItemTop">
-                <b>{x.name}</b>
-                <small>{pct(x.val)}%</small>
+            <div className="postureScore">
+              <div className="scoreRing" style={{ "--val": pct(score) }}>
+                {pct(score)}%
               </div>
-              <div className="coverBar">
-                <div style={{ width: `${pct(x.val)}%` }} />
+              <div className="scoreMeta">
+                <b>Overall Score</b>
+                <span>{loading ? "Analyzing…" : "Active"}</span>
               </div>
             </div>
-          ))}
-        </div>
+          </div>
 
-        {/* ===== RECOMMENDED ACTIONS ===== */}
-        <div className="card" style={{ marginTop: 18 }}>
-          <h3>Recommended Actions</h3>
+          <div className="meter">
+            <div style={{ width: `${pct(score)}%` }} />
+          </div>
 
-          {checks.length === 0 && (
-            <p className="muted">
-              {loading ? "Loading…" : "No critical actions detected."}
-            </p>
-          )}
+          {err && <p className="error">{err}</p>}
+
+          <h3 style={{ marginTop: 20 }}>Coverage by Security Control</h3>
+
+          <div className="coverGrid">
+            {coverage.map((x) => (
+              <div key={x.name}>
+                <div className="coverItemTop">
+                  <b>{x.name}</b>
+                  <small>{x.val}%</small>
+                </div>
+                <div className="coverBar">
+                  <div style={{ width: `${x.val}%` }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* ===== RIGHT: INSIGHTS ===== */}
+        <aside className="postureCard">
+          <h3>Insights & Risks</h3>
+          <p className="muted">
+            Prioritized findings based on risk and exposure.
+          </p>
 
           <ul className="list">
             {checks.slice(0, 6).map((c) => (
@@ -143,54 +156,10 @@ export default function Posture() {
           </ul>
 
           <button onClick={load} disabled={loading}>
-            {loading ? "Refreshing…" : "Refresh Scan"}
+            {loading ? "Refreshing…" : "Run New Scan"}
           </button>
-        </div>
-      </section>
-
-      {/* ================= RIGHT: SOC STATUS PANEL ================= */}
-      <aside className="postureCard">
-        <h3>System Status</h3>
-        <p className="muted">
-          Live operational state of your security environment.
-        </p>
-
-        <ul className="list">
-          <li>
-            <span className="dot ok" />
-            <div>
-              <b>Monitoring Active</b>
-              <small>Telemetry and sensors online</small>
-            </div>
-          </li>
-          <li>
-            <span className="dot ok" />
-            <div>
-              <b>Threat Detection</b>
-              <small>Behavioral analysis running</small>
-            </div>
-          </li>
-          <li>
-            <span className="dot warn" />
-            <div>
-              <b>Policy Review Needed</b>
-              <small>One or more controls need attention</small>
-            </div>
-          </li>
-          <li>
-            <span className="dot ok" />
-            <div>
-              <b>Data Freshness</b>
-              <small>Last update within minutes</small>
-            </div>
-          </li>
-        </ul>
-
-        <p className="muted" style={{ marginTop: 12 }}>
-          Use the assistant at the bottom of the page to ask about risks,
-          remediation steps, or what actions matter most right now.
-        </p>
-      </aside>
+        </aside>
+      </div>
     </div>
   );
 }
