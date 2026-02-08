@@ -1,12 +1,11 @@
 // frontend/src/components/AuthoDevPanel.jsx
-// AuthoDev 6.5 — Universal AI Text Panel
-// STEP 33 — MESSAGE-LEVEL AUDIO + CONTROLS (FINALIZED)
-// ✅ Per-tenant + per-room persistence
-// ✅ Speaker per AI message (read that message only)
-// ✅ Copy / Share / Feedback per message
-// ❌ NO mic in input
-// ❌ NO auto speech
-// ❌ NO live voice mode
+// AuthoDev 6.5 — Universal AI Text Panel (SOC-TUNED)
+// STEP 34 — ROLE + PAGE AWARE BEHAVIOR LAYER
+// ✅ Assistant-only (non-intrusive)
+// ✅ SOC-grade tone enforcement
+// ✅ Role + page contextual framing
+// ❌ No UI / layout changes
+// ❌ No auto speech, no mic, no floating
 
 import React, { useEffect, useRef, useState } from "react";
 import { readAloud } from "./ReadAloud";
@@ -32,6 +31,26 @@ function getStorageKey() {
   return `authodev.panel.${tenantId}.${roomId}`;
 }
 
+function buildSystemContext(user, pageContext = {}) {
+  const role = String(user?.role || "user").toLowerCase();
+  const page = pageContext?.page || getRoomId();
+
+  return {
+    role,
+    page,
+    guidance: {
+      admin:
+        "You are a SOC advisor. Be concise, technical, and action-oriented. Assume expertise.",
+      manager:
+        "You are an oversight assistant. Focus on risk, trends, and decisions.",
+      company:
+        "You are a security guidance assistant. Explain clearly without jargon.",
+      user:
+        "You are a security assistant. Keep explanations simple and practical.",
+    }[role],
+  };
+}
+
 /* ================= COMPONENT ================= */
 
 export default function AuthoDevPanel({
@@ -40,6 +59,7 @@ export default function AuthoDevPanel({
   getContext,
 }) {
   const storageKey = getStorageKey();
+  const user = getSavedUser();
 
   const [messages, setMessages] = useState(() => {
     try {
@@ -78,13 +98,21 @@ export default function AuthoDevPanel({
     setLoading(true);
 
     try {
+      const pageContext =
+        typeof getContext === "function" ? getContext() : {};
+
+      const systemContext = buildSystemContext(user, pageContext);
+
       const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
           message: userMsg.text,
-          context: typeof getContext === "function" ? getContext() : {},
+          context: {
+            ...pageContext,
+            system: systemContext,
+          },
         }),
       });
 
@@ -92,7 +120,7 @@ export default function AuthoDevPanel({
 
       const aiMsg = {
         role: "ai",
-        text: data?.reply || "No response.",
+        text: data?.reply || "No response available.",
         speakText: data?.speakText || data?.reply || "",
         ts: new Date().toLocaleTimeString(),
       };
@@ -103,8 +131,10 @@ export default function AuthoDevPanel({
         ...m,
         {
           role: "ai",
-          text: "Network issue. Please try again.",
-          speakText: "Network issue. Please try again.",
+          text:
+            "The assistant is temporarily unavailable. Please retry shortly.",
+          speakText:
+            "The assistant is temporarily unavailable. Please retry shortly.",
           ts: new Date().toLocaleTimeString(),
         },
       ]);
@@ -126,7 +156,7 @@ export default function AuthoDevPanel({
           <span className="ad-badge">AI</span>
           <h3>{title}</h3>
         </div>
-        <span className="ad-sub">Text-based assistant</span>
+        <span className="ad-sub">Advisory assistant</span>
       </header>
 
       <div className="ad-messages">
@@ -167,7 +197,7 @@ export default function AuthoDevPanel({
       {/* INPUT — TEXT ONLY */}
       <div className="ad-input">
         <textarea
-          placeholder="Ask anything…"
+          placeholder="Ask about risks, posture, or actions…"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           rows={3}
@@ -180,127 +210,9 @@ export default function AuthoDevPanel({
         />
 
         <button onClick={sendMessage} disabled={loading}>
-          {loading ? "Thinking…" : "Send"}
+          {loading ? "Analyzing…" : "Send"}
         </button>
       </div>
-
-      {/* ================= STYLES ================= */}
-      <style>{`
-        .authodev-panel {
-          display:flex;
-          flex-direction:column;
-          height:100%;
-          background:linear-gradient(180deg,#0f1218,#0b0e14);
-          border:1px solid rgba(255,255,255,.12);
-          border-radius:18px;
-        }
-
-        .ad-header {
-          padding:14px 16px;
-          border-bottom:1px solid rgba(255,255,255,.08);
-        }
-
-        .ad-title {
-          display:flex;
-          align-items:center;
-          gap:8px;
-        }
-
-        .ad-badge {
-          background:#7aa2ff;
-          color:#000;
-          font-weight:800;
-          font-size:11px;
-          padding:4px 6px;
-          border-radius:6px;
-        }
-
-        .ad-sub {
-          font-size:12px;
-          opacity:.7;
-        }
-
-        .ad-messages {
-          flex:1;
-          overflow-y:auto;
-          padding:16px;
-          display:flex;
-          flex-direction:column;
-          gap:14px;
-        }
-
-        .ad-msg {
-          max-width:85%;
-          line-height:1.6;
-          font-size:14px;
-        }
-
-        .ad-msg.user {
-          align-self:flex-end;
-          background:rgba(122,162,255,.15);
-          padding:12px;
-          border-radius:12px;
-        }
-
-        .ad-msg.ai {
-          align-self:flex-start;
-          background:rgba(255,255,255,.07);
-          padding:14px;
-          border-radius:14px;
-        }
-
-        .ad-actions {
-          display:flex;
-          gap:10px;
-          margin-top:8px;
-          font-size:13px;
-        }
-
-        .ad-actions button {
-          background:none;
-          border:none;
-          cursor:pointer;
-          opacity:.75;
-        }
-
-        .ad-actions button:hover {
-          opacity:1;
-        }
-
-        .ad-time {
-          margin-top:6px;
-          font-size:11px;
-          opacity:.5;
-        }
-
-        .ad-input {
-          border-top:1px solid rgba(255,255,255,.08);
-          padding:12px;
-          display:flex;
-          gap:10px;
-          align-items:flex-end;
-        }
-
-        .ad-input textarea {
-          flex:1;
-          resize:none;
-          padding:10px;
-          border-radius:10px;
-          border:1px solid rgba(255,255,255,.15);
-          background:rgba(0,0,0,.3);
-          color:#fff;
-          font-size:14px;
-        }
-
-        .ad-input button {
-          padding:10px 16px;
-          border-radius:10px;
-          border:none;
-          font-weight:700;
-          background:#2bd576;
-          color:#000;
-        }
-      `}</style>
     </div>
   );
 }
