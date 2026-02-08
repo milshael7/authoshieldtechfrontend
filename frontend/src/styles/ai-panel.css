@@ -1,1 +1,129 @@
+/* ================================================= */
+/* AI / VOICE / SLIDING PANEL SYSTEM                 */
+/* ================================================= */
+/*
+  Purpose:
+  - Vertical sliding panels (up/down)
+  - Independent from sidebar and layout.css
+  - Supports stacking multiple panels later
+  - Desktop + Mobile safe
+  - No behavior logic here (CSS-only)
+*/
 
+/* ---------- Panel Stack Container ---------- */
+/* Lives INSIDE .layout-content */
+.panel-stack {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ---------- Base Panel ---------- */
+.panel {
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  overflow: hidden;
+
+  /* Animation */
+  transition:
+    max-height 0.35s ease,
+    transform 0.35s ease,
+    opacity 0.25s ease;
+}
+
+/* ---------- Panel Header ---------- */
+.panel-header {
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+
+  cursor: pointer;
+  user-select: none;
+
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.panel-title {
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.panel-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* ---------- Panel Body ---------- */
+.panel-body {
+  padding: 16px;
+  overflow: auto;
+}
+
+/* ================================================= */
+/* PANEL STATES                                      */
+/* ================================================= */
+
+/* --- Collapsed (peek only) --- */
+.panel--collapsed {
+  max-height: 56px;
+}
+
+.panel--collapsed .panel-body {
+  display: none;
+}
+
+/* --- Half (default working state) --- */
+.panel--half {
+  max-height: 45vh;
+}
+
+/* --- Expanded (focus mode) --- */
+.panel--expanded {
+  max-height: 80vh;
+}
+
+/* ================================================= */
+/* MOBILE BEHAVIOR                                   */
+/* ================================================= */
+
+@media (max-width: 768px) {
+  .panel--half {
+    max-height: 55vh;
+  }
+
+  .panel--expanded {
+    max-height: 90vh;
+  }
+
+  /* Panels feel like sheets, not popups */
+  .panel {
+    border-radius: 18px;
+  }
+}
+
+/* ================================================= */
+/* OPTIONAL VISUAL CUES                              */
+/* ================================================= */
+
+/* Subtle grip indicator (purely visual) */
+.panel-header::after {
+  content: "";
+  width: 36px;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.25);
+  margin-left: auto;
+  margin-right: auto;
+  opacity: 0.4;
+}
+
+/* Hover affordance (desktop only) */
+@media (hover: hover) {
+  .panel-header:hover {
+    background: rgba(255, 255, 255, 0.04);
+  }
+}
