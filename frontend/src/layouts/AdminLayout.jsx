@@ -5,70 +5,75 @@ import "../styles/layout.css";
 
 /**
  * AdminLayout.jsx
- * STEP 32 — Sliding AI Panel Shell (Admin)
+ * SOC Command Layout — FINAL BASELINE
  *
- * ✅ Fixed background (sidebar + topbar)
- * ✅ Page content scrolls independently
- * ✅ AI panel slides up / down
- * ✅ Mobile + desktop safe
- * ❌ No AI logic changed
- * ❌ No backend changes
+ * - Sidebar + topbar are structural (not decorative)
+ * - Main content is primary focus
+ * - AI assistant is a secondary, bottom-drawer advisor
+ * - No floating AI panels anywhere
  */
 
 export default function AdminLayout() {
-  const [open, setOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
 
   return (
-    <div className={`layout-root ${open ? "sidebar-open" : ""}`}>
-      {/* ---------- Mobile Overlay ---------- */}
-      {open && (
+    <div className={`layout-root ${menuOpen ? "sidebar-open" : ""}`}>
+      {/* ================= MOBILE OVERLAY ================= */}
+      {menuOpen && (
         <div
           className="sidebar-overlay"
-          onClick={() => setOpen(false)}
+          onClick={() => setMenuOpen(false)}
         />
       )}
 
-      {/* ---------- Sidebar ---------- */}
+      {/* ================= SIDEBAR ================= */}
       <aside className="layout-sidebar">
         <div className="layout-brand">
           <strong>AutoShield</strong>
-          <span>Admin Console</span>
+          <span>Security Operations</span>
         </div>
 
         <nav className="layout-nav">
-          <NavLink to="/admin" end onClick={() => setOpen(false)}>
-            Global Security
+          <NavLink to="/admin" end onClick={() => setMenuOpen(false)}>
+            Security Posture
           </NavLink>
-          <NavLink to="/admin/trading" onClick={() => setOpen(false)}>
-            Trading
+
+          <NavLink to="/admin/trading" onClick={() => setMenuOpen(false)}>
+            Trading Oversight
           </NavLink>
-          <NavLink to="/manager" onClick={() => setOpen(false)}>
+
+          <NavLink to="/manager" onClick={() => setMenuOpen(false)}>
             Manager View
           </NavLink>
-          <NavLink to="/company" onClick={() => setOpen(false)}>
+
+          <NavLink to="/company" onClick={() => setMenuOpen(false)}>
             Company View
           </NavLink>
-          <NavLink to="/admin/notifications" onClick={() => setOpen(false)}>
+
+          <NavLink
+            to="/admin/notifications"
+            onClick={() => setMenuOpen(false)}
+          >
             Notifications
           </NavLink>
         </nav>
       </aside>
 
-      {/* ---------- Main ---------- */}
+      {/* ================= MAIN ================= */}
       <main className="layout-main">
-        {/* ---------- Topbar ---------- */}
+        {/* ================= TOP BAR ================= */}
         <header className="layout-topbar">
           <div className="topbar-left">
             <button
               className="btn btn-icon mobile-menu-btn"
-              onClick={() => setOpen(true)}
+              onClick={() => setMenuOpen(true)}
               aria-label="Open menu"
             >
               ☰
             </button>
 
-            <h1 style={{ margin: 0 }}>Admin Dashboard</h1>
+            <h1 style={{ margin: 0 }}>SOC Dashboard</h1>
           </div>
 
           <div className="topbar-right">
@@ -77,18 +82,19 @@ export default function AdminLayout() {
               onClick={() => setAiOpen((v) => !v)}
               title="Toggle AI Assistant"
             >
-              🤖 AI
+              🤖 Assistant
             </button>
+
             <span className="badge">Admin</span>
           </div>
         </header>
 
-        {/* ---------- Page Content (scrolls) ---------- */}
+        {/* ================= PAGE CONTENT ================= */}
         <section className="layout-content">
           <Outlet />
         </section>
 
-        {/* ---------- Sliding AI Panel ---------- */}
+        {/* ================= AI ASSISTANT (BOTTOM ONLY) ================= */}
         <section
           className={`ai-drawer ${aiOpen ? "open" : ""}`}
           aria-hidden={!aiOpen}
@@ -104,61 +110,16 @@ export default function AdminLayout() {
 
           <div className="ai-drawer-body">
             <AuthoDevPanel
-              title="AuthoDev 6.5 — Admin Assistant"
+              title="AuthoDev 6.5 — SOC Advisor"
               getContext={() => ({
                 role: "admin",
-                room: "admin",
+                scope: "soc",
+                location: window.location.pathname,
               })}
             />
           </div>
         </section>
       </main>
-
-      {/* ---------- Local Styles ---------- */}
-      <style>{`
-        .ai-drawer {
-          position: sticky;
-          bottom: 0;
-          width: 100%;
-          background: rgba(10, 14, 22, 0.98);
-          border-top: 1px solid rgba(255,255,255,.12);
-          transition: transform .35s ease;
-          transform: translateY(calc(100% - 48px));
-          z-index: 20;
-        }
-
-        .ai-drawer.open {
-          transform: translateY(0);
-        }
-
-        .ai-drawer-handle {
-          height: 48px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          border-bottom: 1px solid rgba(255,255,255,.08);
-        }
-
-        .ai-toggle {
-          background: none;
-          border: none;
-          font-weight: 700;
-          color: #7aa2ff;
-          cursor: pointer;
-        }
-
-        .ai-drawer-body {
-          height: min(70vh, 520px);
-          padding: 12px;
-          overflow: hidden;
-        }
-
-        @media (min-width: 900px) {
-          .ai-drawer-body {
-            height: 420px;
-          }
-        }
-      `}</style>
     </div>
   );
 }
