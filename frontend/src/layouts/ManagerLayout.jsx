@@ -1,17 +1,11 @@
+// frontend/src/layouts/ManagerLayout.jsx
+// STEP 32 — Sliding AI Panel Shell (Manager)
+
 import React, { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { clearToken, clearUser } from "../lib/api";
 import AuthoDevPanel from "../components/AuthoDevPanel";
 import "../styles/layout.css";
-
-/**
- * ManagerLayout.jsx
- * STEP 33 — Sliding AI Panel Shell (Manager)
- *
- * ✅ Same behavior as AdminLayout
- * ✅ Role-safe context (manager only)
- * ✅ No backend or AI logic changes
- */
 
 export default function ManagerLayout() {
   const navigate = useNavigate();
