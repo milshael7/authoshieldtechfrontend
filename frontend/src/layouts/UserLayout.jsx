@@ -32,7 +32,7 @@ export default function UserLayout() {
       <aside className="layout-sidebar user">
         <div className="layout-brand">
           <span className="brand-logo">👤</span>
-          <span className="brand-text">User View</span>
+          <span className="brand-text">User</span>
         </div>
 
         <nav className="layout-nav">
@@ -98,7 +98,7 @@ export default function UserLayout() {
 
           <div className="ai-drawer-body">
             <AuthoDevPanel
-              title="AuthoDev 6.5 — Personal Assistant"
+              title="AuthoDev 6.5 — Assistant"
               getContext={() => ({
                 role: "user",
                 room: "user",
