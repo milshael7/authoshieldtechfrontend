@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { api } from "../lib/api.js";
-import AuthoDevPanel from "../components/AuthoDevPanel.jsx";
+
+/* ================= HELPERS ================= */
 
 function pct(n) {
   const x = Number(n);
@@ -17,6 +18,8 @@ function scoreFrom(checks = []) {
   }, 0);
   return Math.round((val / checks.length) * 100);
 }
+
+/* ================= PAGE ================= */
 
 export default function Posture() {
   const [summary, setSummary] = useState(null);
@@ -55,10 +58,10 @@ export default function Posture() {
 
   const cover = useMemo(() => {
     const base = [
-      { name: "Endpoint", val: 72 },
-      { name: "Identity", val: 64 },
-      { name: "Email", val: 58 },
-      { name: "Cloud", val: 61 },
+      { name: "Endpoint Security", val: 72 },
+      { name: "Identity Protection", val: 64 },
+      { name: "Email Security", val: 58 },
+      { name: "Cloud Security", val: 61 },
     ];
     return base.map((x) => ({
       ...x,
@@ -66,86 +69,82 @@ export default function Posture() {
     }));
   }, [score]);
 
+  /* ================= UI ================= */
+
   return (
-    <div
-      className="postureWrap"
-      style={{ display: "grid", gridTemplateColumns: "1fr 420px", gap: 20 }}
-    >
-      {/* ================= LEFT: SECURITY POSTURE ================= */}
-      <div className="postureCard">
-        <div className="postureTop">
-          <div className="postureTitle">
-            <b>Security Posture</b>
-            <small>
-              {summary?.scope?.type
-                ? `Scope: ${summary.scope.type}`
-                : "Scope: —"}{" "}
-              • Last update: {new Date().toLocaleTimeString()}
-            </small>
-          </div>
+    <div className="posture-page">
+      {/* ===== TOP SUMMARY ===== */}
+      <section className="posture-summary">
+        <div>
+          <h2>Security Posture</h2>
+          <small>
+            {summary?.scope?.type
+              ? `Scope: ${summary.scope.type}`
+              : "Scope: —"}{" "}
+            • Last update: {new Date().toLocaleTimeString()}
+          </small>
+        </div>
 
-          <div className="postureScore">
-            <div className="scoreRing">{pct(score)}</div>
-            <div className="scoreMeta">
-              <b>Overall Score</b>
-              <span>{loading ? "Loading…" : err ? "Error" : "MVP estimate"}</span>
+        <div className="score-card">
+          <div className="score-ring">{pct(score)}</div>
+          <div>
+            <b>Overall Score</b>
+            <div className="muted">
+              {loading ? "Loading…" : err ? "Error" : "Live estimate"}
             </div>
           </div>
         </div>
+      </section>
 
-        <div className="meter">
-          <div style={{ width: `${pct(score)}%` }} />
-        </div>
+      {/* ===== SCORE BAR ===== */}
+      <div className="meter">
+        <div style={{ width: `${pct(score)}%` }} />
+      </div>
 
-        {err && <p className="error">{err}</p>}
+      {err && <p className="error">{err}</p>}
 
-        <div className="coverGrid">
-          {cover.map((x) => (
-            <div key={x.name}>
-              <div className="coverItemTop">
-                <b>{x.name} Coverage</b>
-                <small>{pct(x.val)}%</small>
-              </div>
-              <div className="coverBar">
-                <div style={{ width: `${pct(x.val)}%` }} />
-              </div>
+      {/* ===== COVERAGE ===== */}
+      <section className="coverage-grid">
+        {cover.map((x) => (
+          <div key={x.name} className="coverage-card">
+            <div className="coverage-top">
+              <b>{x.name}</b>
+              <small>{pct(x.val)}%</small>
             </div>
-          ))}
-        </div>
+            <div className="coverBar">
+              <div style={{ width: `${pct(x.val)}%` }} />
+            </div>
+          </div>
+        ))}
+      </section>
 
-        <div className="card" style={{ marginTop: 16 }}>
-          <h3>Recommended Actions</h3>
-          <ul className="list">
-            {checks.slice(0, 6).map((c) => (
-              <li key={c.id}>
-                <span className={`dot ${c.status || "info"}`} />
+      {/* ===== RECOMMENDATIONS ===== */}
+      <section className="card">
+        <h3>Recommended Actions</h3>
+        {checks.length === 0 && (
+          <p className="muted">
+            {loading ? "Loading…" : "No actions available."}
+          </p>
+        )}
+
+        <ul className="list">
+          {checks.slice(0, 6).map((c) => (
+            <li key={c.id}>
+              <span className={`dot ${c.status || "info"}`} />
+              <div>
+                <b>{c.title}</b>
                 <div>
-                  <b>{c.title}</b>
-                  <div>
-                    <small>{c.message}</small>
-                  </div>
+                  <small>{c.message}</small>
                 </div>
-              </li>
-            ))}
-          </ul>
-          <button onClick={load} disabled={loading}>
-            {loading ? "Refreshing…" : "Refresh"}
-          </button>
-        </div>
-      </div>
+              </div>
+            </li>
+          ))}
+        </ul>
 
-      {/* ================= RIGHT: AUTHODEV ASSISTANT ================= */}
-      <div className="postureCard">
-        <AuthoDevPanel
-          title="AuthoDev 6.5 — Security Assistant"
-          getContext={() => ({
-            page: "posture",
-            score,
-            checks: checks.slice(0, 10),
-            scope: summary?.scope || null,
-          })}
-        />
-      </div>
+        <button onClick={load} disabled={loading}>
+          {loading ? "Refreshing…" : "Refresh"}
+        </button>
+      </section>
     </div>
   );
 }
