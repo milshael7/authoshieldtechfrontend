@@ -8,11 +8,9 @@ import "../styles/layout.css";
  * ManagerLayout.jsx
  * STEP 33 — Sliding AI Panel Shell (Manager)
  *
- * ✅ Same shell behavior as Admin
- * ✅ Role-aware AI context
- * ✅ Fixed background, sliding content
- * ❌ No backend changes
- * ❌ No AI logic changes
+ * ✅ Same behavior as AdminLayout
+ * ✅ Role-safe context (manager only)
+ * ✅ No backend or AI logic changes
  */
 
 export default function ManagerLayout() {
@@ -122,7 +120,6 @@ export default function ManagerLayout() {
               getContext={() => ({
                 role: "manager",
                 room: "manager",
-                permissions: "read-only",
               })}
             />
           </div>
