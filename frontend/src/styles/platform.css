@@ -1,10 +1,10 @@
 /* =========================================================
-   AUTOSHIELD PLATFORM UI
+   AUTOSHIELD PLATFORM UI — SOC BASELINE (LOCKED)
    File: frontend/src/styles/platform.css
    Purpose:
-   - Global buttons, tabs, bars
-   - SOC / Cybersecurity dashboards
-   - Posture, coverage, activity panels
+   - SOC dashboards (Posture, Status, Coverage)
+   - Shared cards, meters, lists
+   - NO layout, NO AI positioning
    ========================================================= */
 
 /* =============================
@@ -12,7 +12,7 @@
    ============================= */
 :root{
   --p-bg: rgba(255,255,255,.06);
-  --p-bg-soft: rgba(0,0,0,.22);
+  --p-bg-soft: rgba(0,0,0,.28);
   --p-border: rgba(255,255,255,.14);
 
   --p-accent: rgba(122,167,255,.9);
@@ -22,129 +22,70 @@
   --p-warn: #ffd166;
   --p-bad: #ff5a5f;
 
-  --p-text: rgba(255,255,255,.94);
+  --p-text: rgba(255,255,255,.95);
   --p-muted: rgba(255,255,255,.65);
 
-  --p-radius: 16px;
+  --p-radius: 18px;
   --p-radius-sm: 12px;
 }
 
 /* =============================
-   Platform Shell
-   ============================= */
-.platformShell{
-  width:100%;
-  min-height:100%;
-  display:flex;
-  flex-direction:column;
-}
-
-/* =============================
-   Top Platform Bar
-   ============================= */
-.platformTop{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:12px;
-  padding:14px 18px;
-  background: linear-gradient(
-    180deg,
-    rgba(255,255,255,.08),
-    rgba(0,0,0,.28)
-  );
-  border-bottom:1px solid var(--p-border);
-  flex-wrap:wrap;
-}
-
-/* =============================
-   Tabs & Buttons
-   ============================= */
-.platformTabs,
-.platformActions{
-  display:flex;
-  gap:10px;
-  flex-wrap:wrap;
-}
-
-.ptab,
-.pbtn{
-  padding:12px 18px;
-  border-radius:999px;
-  border:1px solid var(--p-border);
-  background: var(--p-bg-soft);
-  color:var(--p-text);
-  cursor:pointer;
-  font-size:14px;
-  min-height:44px;
-  transition:background .15s ease, border-color .15s ease;
-}
-
-.ptab:hover,
-.pbtn:hover{
-  background: rgba(255,255,255,.12);
-}
-
-.ptab.active,
-.pbtn.primary{
-  background: var(--p-accent-soft);
-  border-color: var(--p-accent);
-}
-
-/* =============================
-   Dashboard Layout (SOC)
+   SOC GRID LAYOUT
    ============================= */
 .postureWrap{
   display:grid;
-  grid-template-columns: 1fr 420px;
-  gap:22px;
+  grid-template-columns: minmax(0,1fr) 420px;
+  gap:24px;
+  align-items:start;
 }
 
-@media (max-width: 1100px){
+@media (max-width:1100px){
   .postureWrap{
     grid-template-columns:1fr;
   }
 }
 
 /* =============================
-   SOC Cards
+   SOC CARDS
    ============================= */
 .postureCard,
 .card{
-  background: linear-gradient(
-    180deg,
-    rgba(255,255,255,.06),
-    rgba(0,0,0,.22)
-  );
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255,255,255,.06),
+      rgba(0,0,0,.26)
+    );
   border:1px solid var(--p-border);
   border-radius:var(--p-radius);
-  padding:20px;
+  padding:22px;
 }
 
 /* =============================
-   Posture Header
+   POSTURE HEADER
    ============================= */
 .postureTop{
   display:flex;
   justify-content:space-between;
-  gap:18px;
   align-items:center;
+  gap:20px;
   flex-wrap:wrap;
 }
 
 .postureTitle h2{
   margin:0;
+  font-size:20px;
 }
 
 .postureTitle small{
   display:block;
-  margin-top:2px;
+  margin-top:4px;
   font-size:12px;
   color:var(--p-muted);
 }
 
 /* =============================
-   Score Ring
+   SCORE RING
    ============================= */
 .postureScore{
   display:flex;
@@ -153,20 +94,24 @@
 }
 
 .scoreRing{
-  width:68px;
-  height:68px;
+  width:72px;
+  height:72px;
   border-radius:50%;
   background:
-    radial-gradient(circle at center, #0b0e14 55%, transparent 56%),
+    radial-gradient(circle at center, #0b0e14 56%, transparent 57%),
     conic-gradient(
       var(--p-accent) calc(var(--val, 75) * 1%),
-      rgba(255,255,255,.15) 0
+      rgba(255,255,255,.14) 0
     );
   display:flex;
   align-items:center;
   justify-content:center;
   font-weight:800;
-  font-size:15px;
+  font-size:16px;
+}
+
+.scoreMeta b{
+  display:block;
 }
 
 .scoreMeta span{
@@ -175,7 +120,7 @@
 }
 
 /* =============================
-   Meters & Bars
+   METERS & BARS
    ============================= */
 .meter,
 .coverBar{
@@ -184,27 +129,28 @@
   border-radius:999px;
   background:rgba(255,255,255,.08);
   overflow:hidden;
-  margin:12px 0;
+  margin:14px 0;
 }
 
 .meter > div,
 .coverBar > div{
   height:100%;
-  background: linear-gradient(
-    90deg,
-    var(--p-accent),
-    #9db7ff
-  );
+  background:
+    linear-gradient(
+      90deg,
+      var(--p-accent),
+      #9db7ff
+    );
 }
 
 /* =============================
-   Coverage Grid
+   COVERAGE GRID
    ============================= */
 .coverGrid{
   display:grid;
   grid-template-columns:1fr 1fr;
   gap:18px;
-  margin-top:18px;
+  margin-top:20px;
 }
 
 .coverItemTop{
@@ -215,7 +161,7 @@
 }
 
 /* =============================
-   Lists (Actions, Alerts)
+   LISTS (ACTIONS / STATUS)
    ============================= */
 .list{
   list-style:none;
@@ -245,7 +191,7 @@
 .dot.bad{ background:var(--p-bad); }
 
 /* =============================
-   Errors
+   ERRORS
    ============================= */
 .error{
   color:var(--p-bad);
@@ -253,16 +199,21 @@
 }
 
 /* =============================
-   Mobile
+   MOBILE TUNING
    ============================= */
-@media (max-width: 768px){
+@media (max-width:768px){
   .postureWrap{
-    grid-template-columns:1fr;
     gap:16px;
   }
 
   .postureCard,
   .card{
     padding:16px;
+  }
+
+  .scoreRing{
+    width:64px;
+    height:64px;
+    font-size:14px;
   }
 }
