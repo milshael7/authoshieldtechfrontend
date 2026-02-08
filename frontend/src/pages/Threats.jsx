@@ -1,14 +1,14 @@
 // frontend/src/pages/Threats.jsx
-// SOC Threats & Detections — Phase 1
-// Enterprise-ready, analyst-first layout
-// Matches AutoShield SOC design language
+// SOC Threats & Detections — FINAL SOC BASELINE
+// Analyst-first, priority-driven, enterprise-ready
+// SAFE: builds strictly on existing layout + platform.css
 
 import React, { useEffect, useMemo, useState } from "react";
 import { api } from "../lib/api";
 
 /* ================= HELPERS ================= */
 
-function sevColor(sev) {
+function sevDot(sev) {
   if (sev === "critical") return "bad";
   if (sev === "high") return "warn";
   return "ok";
@@ -23,25 +23,24 @@ export default function Threats() {
   async function load() {
     setLoading(true);
     try {
-      // Safe placeholder: replace with real endpoint later
       const data = await api.getThreats?.();
       setThreats(
         data?.threats || [
           {
             id: 1,
-            name: "Suspicious Login Activity",
-            severity: "high",
-            source: "Identity",
-            status: "Investigating",
-            time: "5 minutes ago",
-          },
-          {
-            id: 2,
             name: "Malware Detected on Endpoint",
             severity: "critical",
             source: "Endpoint",
             status: "Unresolved",
-            time: "12 minutes ago",
+            time: "5 minutes ago",
+          },
+          {
+            id: 2,
+            name: "Suspicious Login Activity",
+            severity: "high",
+            source: "Identity",
+            status: "Investigating",
+            time: "14 minutes ago",
           },
           {
             id: 3,
@@ -49,7 +48,7 @@ export default function Threats() {
             severity: "medium",
             source: "Email",
             status: "Contained",
-            time: "32 minutes ago",
+            time: "38 minutes ago",
           },
         ]
       );
@@ -61,6 +60,8 @@ export default function Threats() {
   useEffect(() => {
     load();
   }, []);
+
+  /* ================= DERIVED ================= */
 
   const stats = useMemo(() => {
     return {
@@ -74,118 +75,133 @@ export default function Threats() {
 
   return (
     <div className="postureWrap">
-      {/* ================= LEFT: THREAT LIST ================= */}
-      <section className="postureCard">
-        <div className="postureTop">
-          <div>
-            <h2>Active Threats</h2>
-            <small>Real-time detections across your environment</small>
-          </div>
-
-          <div className="scoreMeta">
-            <b>{stats.total} Active</b>
-            <span>
-              {stats.critical} Critical • {stats.high} High
-            </span>
-          </div>
+      {/* ================= KPI STRIP ================= */}
+      <div className="kpiGrid">
+        <div className="kpiCard">
+          <small>Critical</small>
+          <b>{stats.critical}</b>
         </div>
+        <div className="kpiCard">
+          <small>High</small>
+          <b>{stats.high}</b>
+        </div>
+        <div className="kpiCard">
+          <small>Total Active</small>
+          <b>{stats.total}</b>
+        </div>
+      </div>
 
-        <div className="list" style={{ marginTop: 20 }}>
-          {loading && <p className="muted">Loading detections…</p>}
+      {/* ================= MAIN GRID ================= */}
+      <div className="postureGrid">
+        {/* ===== LEFT: ACTIVE THREATS ===== */}
+        <section className="postureCard">
+          <div className="postureTop">
+            <div>
+              <h2>Active Threats</h2>
+              <small>Real-time detections requiring attention</small>
+            </div>
 
-          {!loading &&
-            threats.map((t) => (
-              <div
-                key={t.id}
-                className="card"
-                style={{ padding: 16 }}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    gap: 16,
-                  }}
-                >
-                  <div>
-                    <b>{t.name}</b>
-                    <small
-                      style={{
-                        display: "block",
-                        marginTop: 4,
-                        color: "var(--p-muted)",
-                      }}
-                    >
-                      Source: {t.source} • Detected {t.time}
-                    </small>
-                  </div>
+            <div className="scoreMeta">
+              <b>{stats.total} Alerts</b>
+              <span>
+                {stats.critical} Critical • {stats.high} High
+              </span>
+            </div>
+          </div>
 
-                  <div style={{ textAlign: "right" }}>
-                    <span className={`dot ${sevColor(t.severity)}`} />
-                    <small
-                      style={{
-                        display: "block",
-                        marginTop: 6,
-                        fontSize: 12,
-                      }}
-                    >
-                      {t.status}
-                    </small>
+          <div className="list" style={{ marginTop: 20 }}>
+            {loading && <p className="muted">Loading threats…</p>}
+
+            {!loading &&
+              threats.map((t) => (
+                <div key={t.id} className="card" style={{ padding: 16 }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      gap: 16,
+                    }}
+                  >
+                    <div>
+                      <b>{t.name}</b>
+                      <small
+                        style={{
+                          display: "block",
+                          marginTop: 4,
+                          color: "var(--p-muted)",
+                        }}
+                      >
+                        Source: {t.source} • Detected {t.time}
+                      </small>
+                    </div>
+
+                    <div style={{ textAlign: "right" }}>
+                      <span className={`dot ${sevDot(t.severity)}`} />
+                      <small
+                        style={{
+                          display: "block",
+                          marginTop: 6,
+                          fontSize: 12,
+                        }}
+                      >
+                        {t.status}
+                      </small>
+                    </div>
                   </div>
                 </div>
+              ))}
+          </div>
+
+          <button
+            onClick={load}
+            disabled={loading}
+            style={{ marginTop: 18 }}
+          >
+            {loading ? "Refreshing…" : "Refresh Threats"}
+          </button>
+        </section>
+
+        {/* ===== RIGHT: ANALYST GUIDANCE ===== */}
+        <aside className="postureCard">
+          <h3>Analyst Guidance</h3>
+          <p className="muted">
+            Prioritize threats with the highest impact first.
+          </p>
+
+          <ul className="list">
+            <li>
+              <span className="dot bad" />
+              <div>
+                <b>Immediate Action Required</b>
+                <small>Critical threats are active</small>
               </div>
-            ))}
-        </div>
+            </li>
 
-        <button
-          onClick={load}
-          disabled={loading}
-          style={{ marginTop: 18 }}
-        >
-          {loading ? "Refreshing…" : "Refresh Threats"}
-        </button>
-      </section>
+            <li>
+              <span className="dot warn" />
+              <div>
+                <b>Investigate High Severity</b>
+                <small>Potential lateral movement</small>
+              </div>
+            </li>
 
-      {/* ================= RIGHT: STATUS PANEL ================= */}
-      <aside className="postureCard">
-        <h3>Threat Intelligence</h3>
-        <p className="muted">
-          Live risk summary and analyst guidance.
-        </p>
+            <li>
+              <span className="dot ok" />
+              <div>
+                <b>Containment Working</b>
+                <small>Some threats already mitigated</small>
+              </div>
+            </li>
+          </ul>
 
-        <ul className="list">
-          <li>
-            <span className="dot warn" />
-            <div>
-              <b>Elevated Risk Detected</b>
-              <small>Multiple high-severity alerts active</small>
-            </div>
-          </li>
-
-          <li>
-            <span className="dot ok" />
-            <div>
-              <b>Containment Active</b>
-              <small>Automated response enabled</small>
-            </div>
-          </li>
-
-          <li>
-            <span className="dot ok" />
-            <div>
-              <b>Threat Feeds Online</b>
-              <small>Intel sources up to date</small>
-            </div>
-          </li>
-        </ul>
-
-        <p className="muted" style={{ marginTop: 14 }}>
-          Use the assistant below to ask:
-          <br />• “Which threat should I prioritize?”
-          <br />• “What is the impact?”
-          <br />• “How do I remediate this?”
-        </p>
-      </aside>
+          <p className="muted" style={{ marginTop: 14 }}>
+            Ask the assistant:
+            <br />• “Which threat should I handle first?”
+            <br />• “What is the business impact?”
+            <br />• “How do I remediate this?”
+          </p>
+        </aside>
+      </div>
     </div>
   );
 }
