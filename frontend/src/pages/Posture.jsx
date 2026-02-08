@@ -1,4 +1,3 @@
-// frontend/src/pages/Posture.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import { api } from "../lib/api.js";
 
@@ -51,14 +50,15 @@ export default function Posture() {
 
   const score = useMemo(() => scoreFrom(checks), [checks]);
 
+  /* ================= DERIVED ================= */
+
   const kpis = useMemo(
     () => [
-      { label: "Users", value: summary?.users ?? 108, trend: "▲ 7%" },
-      { label: "Devices", value: summary?.devices ?? 111, trend: "▲ 3%" },
-      { label: "Mailboxes", value: summary?.mailboxes ?? 124, trend: "▲ 2%" },
-      { label: "Browsers", value: summary?.browsers ?? 3, trend: "▲ 7%" },
-      { label: "Cloud Drives", value: summary?.drives ?? 62, trend: "▲ 1%" },
-      { label: "Internet Assets", value: summary?.assets ?? 38, trend: "▲ 2%" },
+      { label: "Users", value: summary?.users ?? 108 },
+      { label: "Devices", value: summary?.devices ?? 111 },
+      { label: "Mailboxes", value: summary?.mailboxes ?? 124 },
+      { label: "Cloud Drives", value: summary?.drives ?? 62 },
+      { label: "Internet Assets", value: summary?.assets ?? 38 },
     ],
     [summary]
   );
@@ -70,9 +70,30 @@ export default function Posture() {
       { name: "Email Protection", val: pct(score * 0.78) },
       { name: "Cloud Security", val: pct(score * 0.81) },
       { name: "Data Protection", val: pct(score * 0.74) },
-      { name: "Dark Web", val: pct(score * 0.69) },
+      { name: "Dark Web Monitoring", val: pct(score * 0.69) },
     ],
     [score]
+  );
+
+  const signals = useMemo(
+    () => [
+      {
+        label: "Active Threats",
+        value: checks.filter((c) => c.status === "warn").length || 3,
+        tone: "warn",
+      },
+      {
+        label: "High-Risk Assets",
+        value: summary?.highRiskAssets ?? 7,
+        tone: "bad",
+      },
+      {
+        label: "Controls Degraded",
+        value: checks.filter((c) => c.status !== "ok").length || 2,
+        tone: "warn",
+      },
+    ],
+    [checks, summary]
   );
 
   /* ================= UI ================= */
@@ -85,18 +106,17 @@ export default function Posture() {
           <div key={k.label} className="kpiCard">
             <small>{k.label}</small>
             <b>{k.value}</b>
-            <span className="trend">{k.trend}</span>
           </div>
         ))}
       </div>
 
       {/* ================= MAIN GRID ================= */}
       <div className="postureGrid">
-        {/* ===== LEFT: POSTURE ===== */}
+        {/* ===== LEFT: SECURITY POSTURE ===== */}
         <section className="postureCard">
           <div className="postureTop">
             <div>
-              <h2>Your Security Posture</h2>
+              <h2>Security Posture</h2>
               <small>
                 Scope: {summary?.scope?.type || "—"} • Last scan just now
               </small>
@@ -108,7 +128,7 @@ export default function Posture() {
               </div>
               <div className="scoreMeta">
                 <b>Overall Score</b>
-                <span>{loading ? "Analyzing…" : "Active"}</span>
+                <span>{loading ? "Analyzing…" : "Operational"}</span>
               </div>
             </div>
           </div>
@@ -119,7 +139,25 @@ export default function Posture() {
 
           {err && <p className="error">{err}</p>}
 
-          <h3 style={{ marginTop: 20 }}>Coverage by Security Control</h3>
+          {/* ===== SECURITY SIGNALS ===== */}
+          <h3 style={{ marginTop: 22 }}>Security Signals</h3>
+
+          <div className="list">
+            {signals.map((s) => (
+              <li key={s.label}>
+                <span className={`dot ${s.tone}`} />
+                <div>
+                  <b>{s.label}</b>
+                  <small>{s.value} detected</small>
+                </div>
+              </li>
+            ))}
+          </div>
+
+          {/* ===== COVERAGE ===== */}
+          <h3 style={{ marginTop: 24 }}>
+            Coverage by Security Control
+          </h3>
 
           <div className="coverGrid">
             {coverage.map((x) => (
@@ -138,9 +176,9 @@ export default function Posture() {
 
         {/* ===== RIGHT: INSIGHTS ===== */}
         <aside className="postureCard">
-          <h3>Insights & Risks</h3>
+          <h3>Analyst Insights</h3>
           <p className="muted">
-            Prioritized findings based on risk and exposure.
+            Highest priority risks based on exposure and impact.
           </p>
 
           <ul className="list">
@@ -158,6 +196,13 @@ export default function Posture() {
           <button onClick={load} disabled={loading}>
             {loading ? "Refreshing…" : "Run New Scan"}
           </button>
+
+          <p className="muted" style={{ marginTop: 14 }}>
+            Ask the assistant:
+            <br />• “What is my biggest risk right now?”
+            <br />• “Which control needs attention?”
+            <br />• “Where should I start remediation?”
+          </p>
         </aside>
       </div>
     </div>
