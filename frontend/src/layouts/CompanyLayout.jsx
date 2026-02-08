@@ -1,19 +1,11 @@
+// frontend/src/layouts/CompanyLayout.jsx
+// STEP 32 — Sliding AI Panel Shell (Company)
+
 import React, { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { clearToken, clearUser } from "../lib/api";
 import AuthoDevPanel from "../components/AuthoDevPanel";
 import "../styles/layout.css";
-
-/**
- * CompanyLayout.jsx
- * STEP 34 — Sliding AI Panel Shell (Company)
- *
- * ✅ Same sliding behavior as Admin / Manager
- * ✅ Tenant-scoped, company-only AI context
- * ✅ Fixed background, sliding assistant panel
- * ❌ No backend changes
- * ❌ No AI logic changes
- */
 
 export default function CompanyLayout() {
   const navigate = useNavigate();
@@ -110,7 +102,6 @@ export default function CompanyLayout() {
               getContext={() => ({
                 role: "company",
                 room: "company",
-                scope: "company-only",
               })}
             />
           </div>
