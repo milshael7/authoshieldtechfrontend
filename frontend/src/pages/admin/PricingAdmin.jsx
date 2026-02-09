@@ -1,34 +1,18 @@
-// frontend/src/pages/admin/PricingAdmin.jsx
-// AutoShield Tech — Admin Pricing Control
-//
-// PURPOSE:
-// - Admin-only pricing visibility & control
-// - UI-only (no persistence yet)
-// - Reads from PRICING config
-// - Prepares backend-controlled pricing later
-//
-// RULES:
-// - NO payments
-// - NO Stripe
-// - NO auto-upgrades
-// - UI SAFE ONLY
-
 import React, { useState } from "react";
 import { PRICING } from "../../config/pricing.config";
 import "../../styles/main.css";
 
 export default function PricingAdmin() {
-  // Local editable copy (UI only)
-  const [pricing, setPricing] = useState(JSON.parse(JSON.stringify(PRICING)));
+  const [pricing, setPricing] = useState(PRICING);
 
   function update(path, value) {
-    setPricing(prev => {
-      const copy = { ...prev };
+    setPricing((prev) => {
+      const copy = structuredClone(prev);
       let ref = copy;
       for (let i = 0; i < path.length - 1; i++) {
         ref = ref[path[i]];
       }
-      ref[path[path.length - 1]] = value;
+      ref[path[path.length - 1]] = Number(value);
       return copy;
     });
   }
@@ -37,11 +21,13 @@ export default function PricingAdmin() {
     <div className="container">
       <h1>Pricing Control</h1>
       <p className="muted">
-        Adjust platform pricing. Changes are not live until backend is connected.
+        Administrators may update pricing values here.
+        Changes do not automatically upgrade users.
+        Notifications are required.
       </p>
 
-      {/* ================= INDIVIDUAL ================= */}
-      <div className="card" style={{ marginTop: 20 }}>
+      {/* ===== INDIVIDUAL ===== */}
+      <section className="card">
         <h2>Individual</h2>
 
         <label>
@@ -49,59 +35,37 @@ export default function PricingAdmin() {
           <input
             type="number"
             value={pricing.individual.monthly}
-            onChange={e =>
-              update(["individual", "monthly"], Number(e.target.value))
+            onChange={(e) =>
+              update(["individual", "monthly"], e.target.value)
             }
           />
         </label>
 
         <label>
-          Yearly Contract Fee (%)
-          <input
-            type="number"
-            value={pricing.individual.yearlyFeePercent}
-            onChange={e =>
-              update(
-                ["individual", "yearlyFeePercent"],
-                Number(e.target.value)
-              )
-            }
-          />
-        </label>
-
-        <h4 style={{ marginTop: 12 }}>AutoDev 6.5</h4>
-
-        <label>
-          First Month
+          AutoDev 6.5 – First Month
           <input
             type="number"
             value={pricing.individual.autodev.firstMonth}
-            onChange={e =>
-              update(
-                ["individual", "autodev", "firstMonth"],
-                Number(e.target.value)
-              )
+            onChange={(e) =>
+              update(["individual", "autodev", "firstMonth"], e.target.value)
             }
           />
         </label>
 
         <label>
-          Ongoing Monthly
+          AutoDev 6.5 – Ongoing
           <input
             type="number"
             value={pricing.individual.autodev.ongoing}
-            onChange={e =>
-              update(
-                ["individual", "autodev", "ongoing"],
-                Number(e.target.value)
-              )
+            onChange={(e) =>
+              update(["individual", "autodev", "ongoing"], e.target.value)
             }
           />
         </label>
-      </div>
+      </section>
 
-      {/* ================= SMALL COMPANY ================= */}
-      <div className="card" style={{ marginTop: 20 }}>
+      {/* ===== SMALL COMPANY ===== */}
+      <section className="card">
         <h2>Small Company</h2>
 
         <label>
@@ -109,40 +73,26 @@ export default function PricingAdmin() {
           <input
             type="number"
             value={pricing.smallCompany.start}
-            onChange={e =>
-              update(["smallCompany", "start"], Number(e.target.value))
+            onChange={(e) =>
+              update(["smallCompany", "start"], e.target.value)
             }
           />
         </label>
 
         <label>
-          Max Price
+          Maximum Price
           <input
             type="number"
             value={pricing.smallCompany.max}
-            onChange={e =>
-              update(["smallCompany", "max"], Number(e.target.value))
+            onChange={(e) =>
+              update(["smallCompany", "max"], e.target.value)
             }
           />
         </label>
+      </section>
 
-        <label>
-          Yearly Contract Fee (%)
-          <input
-            type="number"
-            value={pricing.smallCompany.yearlyFeePercent}
-            onChange={e =>
-              update(
-                ["smallCompany", "yearlyFeePercent"],
-                Number(e.target.value)
-              )
-            }
-          />
-        </label>
-      </div>
-
-      {/* ================= COMPANY ================= */}
-      <div className="card" style={{ marginTop: 20 }}>
+      {/* ===== COMPANY ===== */}
+      <section className="card">
         <h2>Company</h2>
 
         <label>
@@ -150,44 +100,31 @@ export default function PricingAdmin() {
           <input
             type="number"
             value={pricing.company.start}
-            onChange={e =>
-              update(["company", "start"], Number(e.target.value))
+            onChange={(e) =>
+              update(["company", "start"], e.target.value)
             }
           />
         </label>
 
         <label>
-          After 6 Months
+          Price After 6 Months
           <input
             type="number"
             value={pricing.company.afterSixMonths}
-            onChange={e =>
-              update(
-                ["company", "afterSixMonths"],
-                Number(e.target.value)
-              )
+            onChange={(e) =>
+              update(["company", "afterSixMonths"], e.target.value)
             }
           />
         </label>
+      </section>
 
-        <label>
-          Yearly Contract Fee (%)
-          <input
-            type="number"
-            value={pricing.company.yearlyFeePercent}
-            onChange={e =>
-              update(
-                ["company", "yearlyFeePercent"],
-                Number(e.target.value)
-              )
-            }
-          />
-        </label>
+      <div className="card">
+        <p className="muted">
+          ⚠️ Saving pricing requires backend confirmation.
+          <br />
+          ⚠️ Users are notified — never auto-upgraded.
+        </p>
       </div>
-
-      <p className="muted" style={{ marginTop: 20 }}>
-        ⚠️ These changes are preview-only. Backend persistence will be added later.
-      </p>
     </div>
   );
 }
