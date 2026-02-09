@@ -1,7 +1,13 @@
 // frontend/src/pages/Incidents.jsx
-// SOC Incidents & Response — FINAL SOC BASELINE
-// Timeline-driven • Priority-aware • Blueprint-aligned
-// SAFE: UI-only upgrade using existing platform.css
+// SOC Incidents & Response — SOC BASELINE (UPGRADED)
+// Timeline-driven • Priority-aware • Human-in-the-loop
+//
+// SAFE:
+// - Full file replacement
+// - UI only
+// - No automation
+// - No AI wording
+// - AutoDev 6.5 compatible (observe + report, not act)
 
 import React, { useEffect, useMemo, useState } from "react";
 
@@ -32,6 +38,7 @@ export default function Incidents() {
           asset: "Admin Account",
           time: "2 minutes ago",
           status: "Investigating",
+          scope: "company",
         },
         {
           id: "INC-10420",
@@ -40,6 +47,7 @@ export default function Incidents() {
           asset: "Workstation-014",
           time: "18 minutes ago",
           status: "Contained",
+          scope: "company",
         },
         {
           id: "INC-10418",
@@ -48,6 +56,7 @@ export default function Incidents() {
           asset: "Finance Server",
           time: "1 hour ago",
           status: "Open",
+          scope: "small-company",
         },
         {
           id: "INC-10411",
@@ -56,6 +65,7 @@ export default function Incidents() {
           asset: "User Mailbox",
           time: "3 hours ago",
           status: "Resolved",
+          scope: "individual",
         },
       ]);
       setLoading(false);
@@ -64,12 +74,25 @@ export default function Incidents() {
 
   /* ================= DERIVED ================= */
 
-  const stats = useMemo(() => ({
-    total: items.length,
-    critical: items.filter(i => i.severity === "critical").length,
-    investigating: items.filter(i => i.status === "Investigating").length,
-    open: items.filter(i => i.status === "Open").length,
-  }), [items]);
+  const stats = useMemo(
+    () => ({
+      total: items.length,
+      critical: items.filter((i) => i.severity === "critical").length,
+      investigating: items.filter(
+        (i) => i.status === "Investigating"
+      ).length,
+      open: items.filter((i) => i.status === "Open").length,
+    }),
+    [items]
+  );
+
+  const prioritized = useMemo(() => {
+    const order = { critical: 3, high: 2, medium: 1, low: 0 };
+    return [...items].sort(
+      (a, b) =>
+        (order[b.severity] || 0) - (order[a.severity] || 0)
+    );
+  }, [items]);
 
   /* ================= UI ================= */
 
@@ -101,98 +124,122 @@ export default function Incidents() {
         <section className="postureCard">
           <div className="postureTop">
             <div>
-              <h2>Incidents & Detections</h2>
-              <small>Security events requiring response or review</small>
+              <h2>Incidents & Response</h2>
+              <small>
+                Security events requiring review or human action
+              </small>
             </div>
 
             <div className="scoreMeta">
               <b>{stats.total} Active</b>
               <span>
-                {stats.critical} Critical • {stats.investigating} Investigating
+                {stats.critical} Critical •{" "}
+                {stats.investigating} Investigating
               </span>
             </div>
           </div>
 
           <div className="list" style={{ marginTop: 20 }}>
-            {loading && <p className="muted">Loading incidents…</p>}
+            {loading && (
+              <p className="muted">Loading incidents…</p>
+            )}
 
-            {!loading && items.map(i => (
-              <div key={i.id} className="card" style={{ padding: 16 }}>
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "auto 1fr auto",
-                    gap: 14,
-                    cursor: "pointer",
-                  }}
-                  onClick={() =>
-                    setExpanded(expanded === i.id ? null : i.id)
-                  }
-                >
-                  <span className={`dot ${sevDot(i.severity)}`} />
-
-                  <div>
-                    <b>{i.title}</b>
-                    <small
-                      style={{
-                        display: "block",
-                        marginTop: 4,
-                        color: "var(--p-muted)",
-                      }}
-                    >
-                      Asset: {i.asset}
-                    </small>
-                    <small
-                      style={{
-                        display: "block",
-                        marginTop: 2,
-                        fontSize: 12,
-                        color: "var(--p-muted)",
-                      }}
-                    >
-                      {i.id}
-                    </small>
-                  </div>
-
-                  <div style={{ textAlign: "right" }}>
-                    <small style={{ fontSize: 12 }}>{i.time}</small>
-                    <small
-                      style={{
-                        display: "block",
-                        marginTop: 6,
-                        fontSize: 12,
-                        fontWeight: 700,
-                      }}
-                    >
-                      {i.status}
-                    </small>
-                  </div>
-                </div>
-
-                {expanded === i.id && (
+            {!loading &&
+              prioritized.map((i) => (
+                <div key={i.id} className="card" style={{ padding: 16 }}>
                   <div
                     style={{
-                      marginTop: 14,
-                      paddingTop: 14,
-                      borderTop: "1px solid var(--p-border)",
-                      fontSize: 13,
+                      display: "grid",
+                      gridTemplateColumns: "auto 1fr auto",
+                      gap: 14,
+                      cursor: "pointer",
                     }}
+                    onClick={() =>
+                      setExpanded(
+                        expanded === i.id ? null : i.id
+                      )
+                    }
                   >
-                    <p className="muted">
-                      • Event correlated across telemetry<br />
-                      • Asset monitored for lateral movement<br />
-                      • Response actions available
-                    </p>
-                    <p className="muted">
-                      Ask the assistant:<br />
-                      – “What happened here?”<br />
-                      – “Is this contained?”<br />
-                      – “What should I do next?”
-                    </p>
+                    <span
+                      className={`dot ${sevDot(i.severity)}`}
+                    />
+
+                    <div>
+                      <b>{i.title}</b>
+                      <small
+                        style={{
+                          display: "block",
+                          marginTop: 4,
+                          color: "var(--p-muted)",
+                        }}
+                      >
+                        Asset: {i.asset}
+                      </small>
+                      <small
+                        style={{
+                          display: "block",
+                          marginTop: 2,
+                          fontSize: 12,
+                          color: "var(--p-muted)",
+                        }}
+                      >
+                        {i.id} • Scope: {i.scope}
+                      </small>
+                    </div>
+
+                    <div style={{ textAlign: "right" }}>
+                      <small style={{ fontSize: 12 }}>
+                        {i.time}
+                      </small>
+                      <small
+                        style={{
+                          display: "block",
+                          marginTop: 6,
+                          fontSize: 12,
+                          fontWeight: 700,
+                        }}
+                      >
+                        {i.status}
+                      </small>
+                    </div>
                   </div>
-                )}
-              </div>
-            ))}
+
+                  {/* ===== EXPANDED DETAILS ===== */}
+                  {expanded === i.id && (
+                    <div
+                      style={{
+                        marginTop: 14,
+                        paddingTop: 14,
+                        borderTop:
+                          "1px solid var(--p-border)",
+                        fontSize: 13,
+                      }}
+                    >
+                      <p className="muted">
+                        • Incident correlated across telemetry
+                        <br />
+                        • Asset monitored for escalation
+                        <br />
+                        • Manual response required if unresolved
+                      </p>
+
+                      <p className="muted">
+                        Recommended actions:
+                        <br />– Review impact
+                        <br />– Validate containment
+                        <br />– Assign owner
+                      </p>
+
+                      <p className="muted">
+                        Ask the assistant:
+                        <br />– “What happened?”
+                        <br />– “Is this fully contained?”
+                        <br />– “What should I do next?”
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ))}
           </div>
 
           <button style={{ marginTop: 18 }}>
@@ -202,39 +249,39 @@ export default function Incidents() {
 
         {/* ===== RIGHT: RESPONSE STATUS ===== */}
         <aside className="postureCard">
-          <h3>Incident Response State</h3>
+          <h3>Response Status</h3>
           <p className="muted">
-            Current containment and investigation posture.
+            Current investigation and containment posture.
           </p>
 
           <ul className="list">
             <li>
               <span className="dot bad" />
               <div>
-                <b>Immediate Attention Required</b>
-                <small>Critical incidents detected</small>
+                <b>Critical Incidents</b>
+                <small>Immediate attention required</small>
               </div>
             </li>
             <li>
               <span className="dot warn" />
               <div>
-                <b>Investigations Active</b>
-                <small>Analyst review ongoing</small>
+                <b>Investigations Ongoing</b>
+                <small>Human review in progress</small>
               </div>
             </li>
             <li>
               <span className="dot ok" />
               <div>
-                <b>Containment Effective</b>
-                <small>No uncontrolled spread detected</small>
+                <b>Resolved / Contained</b>
+                <small>No active spread detected</small>
               </div>
             </li>
           </ul>
 
           <p className="muted" style={{ marginTop: 14 }}>
-            Use the assistant to ask:<br />
-            • “Which incident is most urgent?”<br />
-            • “Is lateral movement detected?”
+            Use the assistant to ask:
+            <br />• “Which incident is most urgent?”
+            <br />• “Do I need to act now?”
           </p>
         </aside>
       </div>
