@@ -23,7 +23,11 @@ import Reports from "./pages/Reports.jsx";
 import Notifications from "./pages/Notifications.jsx";
 import NotFound from "./pages/NotFound.jsx";
 
-// ---------------- Role Guard ----------------
+/* =========================================================
+   ROLE GUARDS — SOC HARDENED
+   ========================================================= */
+
+// Generic role guard
 function RequireRole({ allow, children }) {
   const user = getSavedUser();
   if (!user) return <Navigate to="/login" replace />;
@@ -32,6 +36,18 @@ function RequireRole({ allow, children }) {
   const allowed = allow.map((r) => r.toLowerCase());
 
   if (!allowed.includes(role)) {
+    return <Navigate to="/404" replace />;
+  }
+
+  return children;
+}
+
+// Admin-only hard guard (governance, compliance, policies)
+function RequireAdmin({ children }) {
+  const user = getSavedUser();
+  if (!user) return <Navigate to="/login" replace />;
+
+  if (String(user.role || "").toLowerCase() !== "admin") {
     return <Navigate to="/404" replace />;
   }
 
@@ -57,10 +73,10 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* PUBLIC */}
+        {/* ================= PUBLIC ================= */}
         <Route path="/login" element={<Login />} />
 
-        {/* ADMIN — FULL SOC */}
+        {/* ================= ADMIN — FULL SOC ================= */}
         <Route
           path="/admin/*"
           element={
@@ -74,14 +90,31 @@ export default function App() {
           <Route path="threats" element={<Threats />} />
           <Route path="incidents" element={<Incidents />} />
           <Route path="vulnerabilities" element={<Vulnerabilities />} />
-          <Route path="compliance" element={<Compliance />} />
-          <Route path="policies" element={<Policies />} />
+
+          {/* GOVERNANCE — ADMIN ONLY */}
+          <Route
+            path="compliance"
+            element={
+              <RequireAdmin>
+                <Compliance />
+              </RequireAdmin>
+            }
+          />
+          <Route
+            path="policies"
+            element={
+              <RequireAdmin>
+                <Policies />
+              </RequireAdmin>
+            }
+          />
+
           <Route path="reports" element={<Reports />} />
           <Route path="trading" element={<Trading mode="admin" />} />
           <Route path="notifications" element={<Notifications />} />
         </Route>
 
-        {/* MANAGER — OPERATIONAL SOC */}
+        {/* ================= MANAGER — OPERATIONAL SOC ================= */}
         <Route
           path="/manager/*"
           element={
@@ -99,7 +132,7 @@ export default function App() {
           <Route path="notifications" element={<Notifications />} />
         </Route>
 
-        {/* COMPANY — VISIBILITY SOC */}
+        {/* ================= COMPANY — VISIBILITY SOC ================= */}
         <Route
           path="/company/*"
           element={
@@ -116,7 +149,7 @@ export default function App() {
           <Route path="notifications" element={<Notifications />} />
         </Route>
 
-        {/* USER */}
+        {/* ================= USER ================= */}
         <Route
           path="/user/*"
           element={
@@ -129,7 +162,7 @@ export default function App() {
           <Route path="notifications" element={<Notifications />} />
         </Route>
 
-        {/* FALLBACK */}
+        {/* ================= FALLBACK ================= */}
         <Route path="/404" element={<NotFound />} />
         <Route
           path="*"
