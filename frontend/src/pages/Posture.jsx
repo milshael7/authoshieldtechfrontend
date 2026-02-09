@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { api } from "../lib/api.js";
+import CoverageRadar from "../components/CoverageRadar";
 
 /* ================= HELPERS ================= */
 
@@ -73,6 +74,16 @@ export default function Posture() {
       { name: "Dark Web Monitoring", val: pct(score * 0.69) },
     ],
     [score]
+  );
+
+  // 🔹 Radar-ready normalized data (NO recomputation)
+  const radarCoverage = useMemo(
+    () =>
+      coverage.map((c) => ({
+        name: c.name,
+        coverage: c.val,
+      })),
+    [coverage]
   );
 
   const signals = useMemo(
@@ -159,7 +170,11 @@ export default function Posture() {
             Coverage by Security Control
           </h3>
 
-          <div className="coverGrid">
+          {/* 🔹 RADAR VISUAL (Blueprint element) */}
+          <CoverageRadar data={radarCoverage} />
+
+          {/* 🔹 EXISTING BARS (kept intentionally) */}
+          <div className="coverGrid" style={{ marginTop: 20 }}>
             {coverage.map((x) => (
               <div key={x.name}>
                 <div className="coverItemTop">
