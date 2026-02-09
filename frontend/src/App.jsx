@@ -3,25 +3,22 @@ import React, { useEffect, useState } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { getSavedUser } from "./lib/api.js";
 
-// =======================
-// Layouts (UNCHANGED)
-// =======================
+// Layouts
 import AdminLayout from "./layouts/AdminLayout.jsx";
 import ManagerLayout from "./layouts/ManagerLayout.jsx";
 import CompanyLayout from "./layouts/CompanyLayout.jsx";
 import SmallCompanyLayout from "./layouts/SmallCompanyLayout.jsx";
 import UserLayout from "./layouts/UserLayout.jsx";
 
-// =======================
 // Public Pages
-// =======================
 import Landing from "./pages/public/Landing.jsx";
 import Pricing from "./pages/public/Pricing.jsx";
 import Signup from "./pages/public/Signup.jsx";
 
-// =======================
+// Admin Pages (NEW – SAFE)
+import AdminPricing from "./pages/admin/AdminPricing.jsx";
+
 // Auth / App Pages
-// =======================
 import Login from "./pages/Login.jsx";
 import Trading from "./pages/Trading.jsx";
 import Posture from "./pages/Posture.jsx";
@@ -64,10 +61,6 @@ function RequireAdmin({ children }) {
   return children;
 }
 
-/* =========================================================
-   APP ROOT
-   ========================================================= */
-
 export default function App() {
   const [ready, setReady] = useState(false);
   const [user, setUser] = useState(null);
@@ -107,6 +100,7 @@ export default function App() {
           <Route path="threats" element={<Threats />} />
           <Route path="incidents" element={<Incidents />} />
           <Route path="vulnerabilities" element={<Vulnerabilities />} />
+
           <Route
             path="compliance"
             element={
@@ -123,9 +117,20 @@ export default function App() {
               </RequireAdmin>
             }
           />
+
           <Route path="reports" element={<Reports />} />
           <Route path="trading" element={<Trading mode="admin" />} />
           <Route path="notifications" element={<Notifications />} />
+
+          {/* 🔐 ADMIN PRICING CONTROL (NEW) */}
+          <Route
+            path="pricing"
+            element={
+              <RequireAdmin>
+                <AdminPricing />
+              </RequireAdmin>
+            }
+          />
         </Route>
 
         {/* ================= MANAGER ================= */}
