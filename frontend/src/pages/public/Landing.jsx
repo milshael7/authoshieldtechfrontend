@@ -26,7 +26,7 @@ export default function Landing() {
       {/* ================= HEADER ================= */}
       <header className="public-header">
         <div className="brand">
-          {/* Replace src with your real logo asset when ready */}
+          {/* Use your provided logo asset here */}
           <img
             src="/logo.png"
             alt="AutoShield Tech"
@@ -36,7 +36,9 @@ export default function Landing() {
         </div>
 
         <nav className="public-nav">
-          <button onClick={() => navigate("/login")}>Sign In</button>
+          <button onClick={() => navigate("/login")}>
+            Sign In
+          </button>
           <button
             className="primary"
             onClick={() => navigate("/pricing")}
@@ -49,12 +51,14 @@ export default function Landing() {
       {/* ================= HERO ================= */}
       <section className="hero">
         <h1>
-          Professional Cybersecurity Operations<br />
+          Professional Cybersecurity Operations
+          <br />
           Built for Real Companies
         </h1>
+
         <p className="muted">
-          Visibility, control, and protection — without shortcuts,
-          gimmicks, or automation abuse.
+          Visibility, accountability, and protection — designed for
+          professionals, not shortcuts.
         </p>
 
         <div className="hero-actions">
@@ -64,7 +68,13 @@ export default function Landing() {
           >
             Explore Plans
           </button>
-          <button onClick={() => navigate("#free-tools")}>
+          <button
+            onClick={() =>
+              document
+                .getElementById("free-tools")
+                ?.scrollIntoView({ behavior: "smooth" })
+            }
+          >
             Try Free Tools
           </button>
         </div>
@@ -74,19 +84,20 @@ export default function Landing() {
       <section id="free-tools" className="free-tools">
         <h2>Free Cybersecurity Tools</h2>
         <p className="muted center">
-          Limited access. No signup required. Upgrade anytime.
+          Limited access. No signup required. Upgrade only if it fits
+          your operation.
         </p>
 
         <div className="tool-grid">
           <div className="tool-card">
             <h3>External Exposure Scan</h3>
             <p className="muted">
-              Identify publicly visible risks affecting your company.
+              Identify publicly visible risks affecting your organization.
             </p>
             <ul>
-              <li>1 asset scan</li>
-              <li>Read-only results</li>
-              <li>No historical tracking</li>
+              <li>Single asset scan</li>
+              <li>Read-only findings</li>
+              <li>No historical storage</li>
             </ul>
             <button onClick={() => navigate("/pricing")}>
               Upgrade for Full Coverage
@@ -96,12 +107,12 @@ export default function Landing() {
           <div className="tool-card">
             <h3>Security Posture Snapshot</h3>
             <p className="muted">
-              High-level view of security controls and gaps.
+              High-level overview of control coverage and gaps.
             </p>
             <ul>
-              <li>Basic scoring</li>
-              <li>No remediation guidance</li>
-              <li>No automation</li>
+              <li>Basic scoring only</li>
+              <li>No remediation workflows</li>
+              <li>No execution</li>
             </ul>
             <button onClick={() => navigate("/pricing")}>
               Unlock Full Posture
@@ -111,12 +122,12 @@ export default function Landing() {
           <div className="tool-card">
             <h3>Phishing Risk Check</h3>
             <p className="muted">
-              Evaluate exposure to common phishing techniques.
+              Evaluate exposure to common phishing vectors.
             </p>
             <ul>
-              <li>Manual check</li>
-              <li>No monitoring</li>
+              <li>Manual assessment</li>
               <li>No alerting</li>
+              <li>No monitoring</li>
             </ul>
             <button onClick={() => navigate("/pricing")}>
               Enable Protection
@@ -126,12 +137,12 @@ export default function Landing() {
           <div className="tool-card">
             <h3>Asset Risk Preview</h3>
             <p className="muted">
-              See how attackers prioritize assets.
+              Understand how attackers prioritize assets.
             </p>
             <ul>
               <li>Limited assets</li>
               <li>No correlations</li>
-              <li>No incident linking</li>
+              <li>No incident linkage</li>
             </ul>
             <button onClick={() => navigate("/pricing")}>
               View Full Inventory
@@ -144,7 +155,7 @@ export default function Landing() {
       <section className="platform-preview">
         <h2>Inside the Platform</h2>
         <p className="muted center">
-          Designed for professionals — not hobby tools.
+          Built to support real cybersecurity work.
         </p>
 
         <div className="preview-grid">
@@ -157,7 +168,7 @@ export default function Landing() {
           <div>
             <h4>Threats & Incidents</h4>
             <p className="muted">
-              Priority-driven detection and response workflows.
+              Priority-driven detection and response.
             </p>
           </div>
           <div>
@@ -169,8 +180,8 @@ export default function Landing() {
           <div>
             <h4>AutoDev 6.5</h4>
             <p className="muted">
-              Advanced cybersecurity execution and reporting
-              — available to individuals only.
+              Advanced cybersecurity execution and reporting —
+              available to individuals only.
             </p>
           </div>
         </div>
@@ -188,9 +199,8 @@ export default function Landing() {
       {/* ================= HOW IT WORKS ================= */}
       <section className="how-it-works">
         <h2>How It Works</h2>
-
         <ol>
-          <li>Use free tools to evaluate risk</li>
+          <li>Evaluate risk using free tools</li>
           <li>Select your role: Individual, Small Company, or Company</li>
           <li>Connect your environment securely</li>
           <li>Operate with full visibility and accountability</li>
@@ -204,8 +214,8 @@ export default function Landing() {
           Business email required. No automatic upgrades.
         </p>
         <p>
-          Pricing and plans are controlled by administrators
-          and may change with notification.
+          Pricing and plans are controlled by administrators and
+          may change with notification.
         </p>
       </footer>
     </div>
