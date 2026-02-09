@@ -1,11 +1,13 @@
 // frontend/src/pages/public/Pricing.jsx
-// AutoShield Tech — Plans & Pricing
+// AutoShield Tech — Plans & Pricing (UPGRADED)
+//
 // PURPOSE:
 // - Clear, professional pricing
-// - No forced upgrades
-// - Contract-aware (monthly / yearly)
 // - Notification-driven upgrade model
-// - Role-based limits explained clearly
+// - Admin-controlled pricing (future-ready)
+// - Contract-aware (monthly / yearly)
+// - NO forced upgrades
+// - NO automation wording
 
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -15,42 +17,21 @@ export default function Pricing() {
   const navigate = useNavigate();
   const [billing, setBilling] = useState("monthly");
 
+  // NOTE:
+  // Prices shown here are DISPLAY values only.
+  // Actual billing will be controlled by administrators.
   const yearlyNote =
     billing === "yearly"
-      ? "Yearly contract includes a 5% contract fee."
-      : "Month-to-month. Cancel anytime.";
+      ? "Yearly contracts include a 5% contract fee. Pricing confirmed before billing."
+      : "Month-to-month. No automatic upgrades.";
 
   return (
     <div className="pricing-page">
-      {/* ================= PUBLIC HEADER ================= */}
-      <header className="public-header">
-        <div className="brand">
-          <img
-            src="/logo.png"
-            alt="AutoShield Tech"
-            className="brand-logo"
-          />
-          <span className="brand-name">AutoShield Tech</span>
-        </div>
-
-        <nav className="public-nav">
-          <button onClick={() => navigate("/login")}>
-            Sign In
-          </button>
-          <button
-            className="primary"
-            onClick={() => navigate("/signup")}
-          >
-            Get Started
-          </button>
-        </nav>
-      </header>
-
       {/* ================= HEADER ================= */}
       <section className="pricing-header">
         <h1>Plans & Pricing</h1>
         <p className="muted center">
-          Choose the plan that fits your role. Upgrade only when you’re ready.
+          Transparent pricing. Upgrade only when notified or when you choose.
         </p>
 
         <div className="billing-toggle">
@@ -77,17 +58,19 @@ export default function Pricing() {
         <div className="price-card">
           <h2>Individual</h2>
           <p className="price">
-            {billing === "monthly" ? "$250 / month" : "$250 × 12 + 5%"}
+            {billing === "monthly"
+              ? "$250 / month"
+              : "$250 × 12 + 5%"}
           </p>
           <p className="muted">
-            For solo cybersecurity professionals serving one role per company.
+            For professional cybersecurity practitioners.
           </p>
 
           <ul>
             <li>Single professional account</li>
             <li>One role per client company</li>
             <li>Core SOC visibility</li>
-            <li>Manual cybersecurity work</li>
+            <li>Manual cybersecurity operations</li>
             <li>AutoDev 6.5 available as upgrade</li>
           </ul>
 
@@ -105,15 +88,15 @@ export default function Pricing() {
               : "Contract-based + 5%"}
           </p>
           <p className="muted">
-            For growing companies with limited team size.
+            Designed for growing teams with capped user limits.
           </p>
 
           <ul>
             <li>Up to 10–15 users</li>
             <li>Limited SOC visibility</li>
             <li>No AutoDev 6.5 access</li>
-            <li>Upgrade notifications only</li>
-            <li>Cannot add users beyond limit</li>
+            <li>Monthly upgrade notifications</li>
+            <li>Cannot exceed user cap without upgrade</li>
           </ul>
 
           <button onClick={() => navigate("/signup")}>
@@ -130,15 +113,15 @@ export default function Pricing() {
               : "Contract-based + 5%"}
           </p>
           <p className="muted">
-            Full enterprise-grade cybersecurity operations.
+            Enterprise-grade cybersecurity operations.
           </p>
 
           <ul>
             <li>Unlimited users</li>
             <li>Full SOC visibility</li>
-            <li>Manager & admin roles</li>
-            <li>Incident, threat, asset governance</li>
-            <li>Human-operated cybersecurity only</li>
+            <li>Admin & manager roles</li>
+            <li>Incident, threat & asset governance</li>
+            <li>No automatic upgrades</li>
           </ul>
 
           <button onClick={() => navigate("/signup")}>
@@ -151,8 +134,8 @@ export default function Pricing() {
       <section className="pricing-autodev">
         <h2>AutoDev 6.5</h2>
         <p className="muted center">
-          Advanced cybersecurity execution and reporting — available to
-          individuals only.
+          Advanced cybersecurity execution and reporting.
+          Available to individuals only.
         </p>
 
         <div className="price-card wide">
@@ -162,16 +145,16 @@ export default function Pricing() {
           </p>
 
           <ul>
-            <li>Autonomous cybersecurity execution</li>
-            <li>Scheduled work hours (not 24/7 by default)</li>
-            <li>Human intervention alerts when required</li>
-            <li>Immutable reporting & audit trail</li>
-            <li>Owner-branded reporting</li>
+            <li>Continuous cybersecurity execution</li>
+            <li>Scheduled work hours</li>
+            <li>Human intervention alerts</li>
+            <li>Immutable audit & reporting history</li>
+            <li>Owner-branded reports</li>
           </ul>
 
           <p className="muted">
-            AutoDev 6.5 never replaces people. It supports professionals
-            and protects companies continuously.
+            AutoDev 6.5 operates continuously and escalates
+            when human action is required.
           </p>
         </div>
       </section>
@@ -179,8 +162,8 @@ export default function Pricing() {
       {/* ================= FOOTER ================= */}
       <footer className="public-footer">
         <p>
-          Pricing subject to change by platform administrators.
-          No automatic upgrades. Notifications only.
+          Prices shown are subject to administrative control and notification.
+          No automatic upgrades. No forced billing changes.
         </p>
       </footer>
     </div>
