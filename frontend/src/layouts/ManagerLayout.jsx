@@ -19,10 +19,6 @@
     Vulnerabilities
   </NavLink>
 
-  <NavLink to="/manager/compliance" onClick={() => setMenuOpen(false)}>
-    Compliance
-  </NavLink>
-
   <NavLink to="/manager/reports" onClick={() => setMenuOpen(false)}>
     Reports
   </NavLink>
@@ -32,15 +28,5 @@
     onClick={() => setMenuOpen(false)}
   >
     Notifications
-  </NavLink>
-
-  <hr style={{ opacity: 0.2 }} />
-
-  <NavLink to="/admin" onClick={() => setMenuOpen(false)}>
-    Admin View
-  </NavLink>
-
-  <NavLink to="/company" onClick={() => setMenuOpen(false)}>
-    Company View
   </NavLink>
 </nav>
