@@ -7,6 +7,7 @@ import { getSavedUser } from "./lib/api.js";
 import AdminLayout from "./layouts/AdminLayout.jsx";
 import ManagerLayout from "./layouts/ManagerLayout.jsx";
 import CompanyLayout from "./layouts/CompanyLayout.jsx";
+import SmallCompanyLayout from "./layouts/SmallCompanyLayout.jsx";
 import UserLayout from "./layouts/UserLayout.jsx";
 
 // Pages
@@ -27,7 +28,6 @@ import NotFound from "./pages/NotFound.jsx";
    ROLE GUARDS — SOC HARDENED
    ========================================================= */
 
-// Generic role guard
 function RequireRole({ allow, children }) {
   const user = getSavedUser();
   if (!user) return <Navigate to="/login" replace />;
@@ -42,7 +42,6 @@ function RequireRole({ allow, children }) {
   return children;
 }
 
-// Admin-only hard guard (governance, compliance, policies)
 function RequireAdmin({ children }) {
   const user = getSavedUser();
   if (!user) return <Navigate to="/login" replace />;
@@ -91,7 +90,6 @@ export default function App() {
           <Route path="incidents" element={<Incidents />} />
           <Route path="vulnerabilities" element={<Vulnerabilities />} />
 
-          {/* GOVERNANCE — ADMIN ONLY */}
           <Route
             path="compliance"
             element={
@@ -132,7 +130,7 @@ export default function App() {
           <Route path="notifications" element={<Notifications />} />
         </Route>
 
-        {/* ================= COMPANY — VISIBILITY SOC ================= */}
+        {/* ================= COMPANY — FULL COMPANY ================= */}
         <Route
           path="/company/*"
           element={
@@ -147,6 +145,37 @@ export default function App() {
           <Route path="incidents" element={<Incidents />} />
           <Route path="reports" element={<Reports />} />
           <Route path="notifications" element={<Notifications />} />
+        </Route>
+
+        {/* ================= SMALL COMPANY — LIMITED ================= */}
+        <Route
+          path="/small-company/*"
+          element={
+            <RequireRole allow={["small-company"]}>
+              <SmallCompanyLayout />
+            </RequireRole>
+          }
+        >
+          <Route index element={<Posture scope="small-company" />} />
+          <Route path="assets" element={<Assets />} />
+          <Route path="threats" element={<Threats />} />
+          <Route path="incidents" element={<Incidents />} />
+          <Route path="reports" element={<Reports />} />
+          <Route path="notifications" element={<Notifications />} />
+
+          {/* Upgrade placeholder */}
+          <Route
+            path="upgrade"
+            element={
+              <div style={{ padding: 40 }}>
+                <h2>Upgrade to Company</h2>
+                <p>
+                  Unlock full company features, team management, and expanded
+                  security controls.
+                </p>
+              </div>
+            }
+          />
         </Route>
 
         {/* ================= USER ================= */}
@@ -177,6 +206,8 @@ export default function App() {
                   ? "/manager"
                   : role === "company"
                   ? "/company"
+                  : role === "small-company"
+                  ? "/small-company"
                   : "/user"
               }
               replace
