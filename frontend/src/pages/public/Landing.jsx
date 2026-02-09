@@ -27,7 +27,7 @@ export default function Landing() {
       <header className="public-header">
         <div className="brand">
           <img
-            src="/logo.png"
+            src="/public/logo.png"
             alt="AutoShield Tech"
             className="brand-logo"
           />
@@ -35,9 +35,7 @@ export default function Landing() {
         </div>
 
         <nav className="public-nav">
-          <button onClick={() => navigate("/login")}>
-            Sign In
-          </button>
+          <button onClick={() => navigate("/login")}>Sign In</button>
           <button
             className="primary"
             onClick={() => navigate("/pricing")}
@@ -50,14 +48,12 @@ export default function Landing() {
       {/* ================= HERO ================= */}
       <section className="hero">
         <h1>
-          Professional Cybersecurity Operations
-          <br />
+          Professional Cybersecurity Operations<br />
           Built for Real Companies
         </h1>
-
         <p className="muted">
-          A serious platform for visibility, accountability, and protection.
-          No shortcuts. No gimmicks. Built for professionals.
+          Visibility, control, and protection — without shortcuts,
+          gimmicks, or automation abuse.
         </p>
 
         <div className="hero-actions">
@@ -65,15 +61,9 @@ export default function Landing() {
             className="primary"
             onClick={() => navigate("/pricing")}
           >
-            View Plans
+            Explore Plans
           </button>
-          <button
-            onClick={() =>
-              document
-                .getElementById("free-tools")
-                ?.scrollIntoView({ behavior: "smooth" })
-            }
-          >
+          <button onClick={() => document.getElementById("free-tools")?.scrollIntoView()}>
             Try Free Tools
           </button>
         </div>
@@ -90,10 +80,10 @@ export default function Landing() {
           <div className="tool-card">
             <h3>External Exposure Scan</h3>
             <p className="muted">
-              Identify publicly visible risks affecting your organization.
+              Identify publicly visible risks affecting your company.
             </p>
             <ul>
-              <li>Single asset scan</li>
+              <li>1 asset scan</li>
               <li>Read-only results</li>
               <li>No historical tracking</li>
             </ul>
@@ -105,10 +95,10 @@ export default function Landing() {
           <div className="tool-card">
             <h3>Security Posture Snapshot</h3>
             <p className="muted">
-              High-level assessment of security controls and gaps.
+              High-level view of security controls and gaps.
             </p>
             <ul>
-              <li>Basic posture score</li>
+              <li>Basic scoring</li>
               <li>No remediation guidance</li>
               <li>No automation</li>
             </ul>
@@ -123,9 +113,9 @@ export default function Landing() {
               Evaluate exposure to common phishing techniques.
             </p>
             <ul>
-              <li>Manual evaluation</li>
+              <li>Manual check</li>
               <li>No monitoring</li>
-              <li>No alerts</li>
+              <li>No alerting</li>
             </ul>
             <button onClick={() => navigate("/pricing")}>
               Enable Protection
@@ -135,12 +125,12 @@ export default function Landing() {
           <div className="tool-card">
             <h3>Asset Risk Preview</h3>
             <p className="muted">
-              Understand how attackers prioritize targets.
+              See how attackers prioritize assets.
             </p>
             <ul>
               <li>Limited assets</li>
               <li>No correlations</li>
-              <li>No incident linkage</li>
+              <li>No incident linking</li>
             </ul>
             <button onClick={() => navigate("/pricing")}>
               View Full Inventory
@@ -153,7 +143,7 @@ export default function Landing() {
       <section className="platform-preview">
         <h2>Inside the Platform</h2>
         <p className="muted center">
-          Designed for professionals who are accountable for outcomes.
+          Designed for professionals — not hobby tools.
         </p>
 
         <div className="preview-grid">
@@ -163,26 +153,23 @@ export default function Landing() {
               Continuous visibility into risk and control health.
             </p>
           </div>
-
           <div>
             <h4>Threats & Incidents</h4>
             <p className="muted">
               Priority-driven detection and response workflows.
             </p>
           </div>
-
           <div>
             <h4>Reports & Audits</h4>
             <p className="muted">
               Executive-ready reporting with immutable records.
             </p>
           </div>
-
           <div>
             <h4>AutoDev 6.5</h4>
             <p className="muted">
-              Advanced cybersecurity execution and reporting —
-              available to individuals only.
+              Advanced cybersecurity execution and reporting
+              — available to individuals only.
             </p>
           </div>
         </div>
