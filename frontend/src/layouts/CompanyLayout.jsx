@@ -15,18 +15,6 @@
     Incidents
   </NavLink>
 
-  <NavLink to="/company/vulnerabilities" onClick={() => setMenuOpen(false)}>
-    Vulnerabilities
-  </NavLink>
-
-  <NavLink to="/company/compliance" onClick={() => setMenuOpen(false)}>
-    Compliance
-  </NavLink>
-
-  <NavLink to="/company/policies" onClick={() => setMenuOpen(false)}>
-    Policies
-  </NavLink>
-
   <NavLink to="/company/reports" onClick={() => setMenuOpen(false)}>
     Reports
   </NavLink>
