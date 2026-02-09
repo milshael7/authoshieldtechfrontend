@@ -4,11 +4,12 @@
    Purpose:
    - Sidebar + Topbar structure
    - Scroll-safe content
-   - Bottom AI drawer compatibility
+   - Bottom Advisor drawer compatibility
+   - ISOLATED from public pages
    ========================================================= */
 
 /* =============================
-   Root Layout
+   Root Layout (AUTH ONLY)
    ============================= */
 .layout-root{
   display:flex;
@@ -120,7 +121,7 @@
 }
 
 /* =============================
-   AI Drawer (STRUCTURE ONLY)
+   Advisor Drawer (STRUCTURE ONLY)
    ============================= */
 .ai-drawer{
   position:sticky;
@@ -210,4 +211,17 @@
   .layout-content{
     padding:16px;
   }
+}
+
+/* =========================================================
+   PUBLIC PAGE SAFETY
+   Prevents layout styles from leaking into Landing,
+   Pricing, Signup, etc.
+   ========================================================= */
+
+.landing-page,
+.pricing-page,
+.signup-page{
+  min-height:100svh;
+  overflow-x:hidden;
 }
