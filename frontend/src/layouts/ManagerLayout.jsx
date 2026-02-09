@@ -1,25 +1,44 @@
 // frontend/src/layouts/ManagerLayout.jsx
-// AutoShield Tech — Manager Layout
-// PURPOSE:
-// - Operational SOC view
-// - Sidebar + topbar layout
-// - Mobile-safe navigation
-// - Default export (Vercel-safe)
+// Manager Layout — Operational SOC
+//
+// SAFE:
+// - Full file replacement
+// - Default export
+// - Matches existing routes
+// - No business logic
+// - Layout.css compatible
 
 import React, { useState } from "react";
-import { Outlet, NavLink } from "react-router-dom";
+import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { clearToken, clearUser } from "../lib/api";
+import AuthoDevPanel from "../components/AuthoDevPanel";
 import "../styles/layout.css";
 
 export default function ManagerLayout() {
+  const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [assistantOpen, setAssistantOpen] = useState(false);
+
+  function logout() {
+    clearToken();
+    clearUser();
+    navigate("/login");
+  }
 
   return (
     <div className={`layout-root ${menuOpen ? "sidebar-open" : ""}`}>
+      {menuOpen && (
+        <div
+          className="sidebar-overlay"
+          onClick={() => setMenuOpen(false)}
+        />
+      )}
+
       {/* ================= SIDEBAR ================= */}
-      <aside className="layout-sidebar">
+      <aside className="layout-sidebar manager">
         <div className="layout-brand">
-          <span>AutoShield Tech</span>
-          <small className="muted">Manager Console</small>
+          <strong>AutoShield</strong>
+          <span>Manager SOC</span>
         </div>
 
         <nav className="layout-nav">
@@ -39,10 +58,7 @@ export default function ManagerLayout() {
             Incidents
           </NavLink>
 
-          <NavLink
-            to="/manager/vulnerabilities"
-            onClick={() => setMenuOpen(false)}
-          >
+          <NavLink to="/manager/vulnerabilities" onClick={() => setMenuOpen(false)}>
             Vulnerabilities
           </NavLink>
 
@@ -50,41 +66,65 @@ export default function ManagerLayout() {
             Reports
           </NavLink>
 
-          <NavLink
-            to="/manager/notifications"
-            onClick={() => setMenuOpen(false)}
-          >
+          <NavLink to="/manager/notifications" onClick={() => setMenuOpen(false)}>
             Notifications
           </NavLink>
         </nav>
+
+        <button className="btn logout-btn" onClick={logout}>
+          Log out
+        </button>
       </aside>
 
-      {/* ================= OVERLAY (MOBILE) ================= */}
-      <div
-        className="sidebar-overlay"
-        onClick={() => setMenuOpen(false)}
-      />
-
       {/* ================= MAIN ================= */}
-      <div className="layout-main">
-        {/* ===== TOPBAR ===== */}
+      <main className="layout-main">
         <header className="layout-topbar">
-          <button
-            className="mobile-menu-btn"
-            onClick={() => setMenuOpen(true)}
-            aria-label="Open menu"
-          >
-            ☰
-          </button>
+          <div className="topbar-left">
+            <button
+              className="btn btn-icon mobile-menu-btn"
+              onClick={() => setMenuOpen(true)}
+            >
+              ☰
+            </button>
+            <h1 style={{ margin: 0 }}>Manager Security Dashboard</h1>
+          </div>
 
-          <div className="badge">Manager</div>
+          <div className="topbar-right">
+            <button
+              className="btn"
+              onClick={() => setAssistantOpen((v) => !v)}
+            >
+              Advisor
+            </button>
+            <span className="badge">Manager</span>
+          </div>
         </header>
 
-        {/* ===== CONTENT ===== */}
-        <main className="layout-content">
+        <section className="layout-content">
           <Outlet />
-        </main>
-      </div>
+        </section>
+
+        <section className={`ai-drawer ${assistantOpen ? "open" : ""}`}>
+          <div className="ai-drawer-handle">
+            <button
+              className="ai-toggle"
+              onClick={() => setAssistantOpen((v) => !v)}
+            >
+              {assistantOpen ? "▼ Hide Advisor" : "▲ Show Advisor"}
+            </button>
+          </div>
+
+          <div className="ai-drawer-body">
+            <AuthoDevPanel
+              title="AutoDev 6.5 — Manager Advisor"
+              getContext={() => ({
+                role: "manager",
+                location: window.location.pathname,
+              })}
+            />
+          </div>
+        </section>
+      </main>
     </div>
   );
 }
