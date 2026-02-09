@@ -26,7 +26,6 @@ export default function Landing() {
       {/* ================= HEADER ================= */}
       <header className="public-header">
         <div className="brand">
-          {/* Use your provided logo asset here */}
           <img
             src="/logo.png"
             alt="AutoShield Tech"
@@ -57,8 +56,8 @@ export default function Landing() {
         </h1>
 
         <p className="muted">
-          Visibility, accountability, and protection — designed for
-          professionals, not shortcuts.
+          A serious platform for visibility, accountability, and protection.
+          No shortcuts. No gimmicks. Built for professionals.
         </p>
 
         <div className="hero-actions">
@@ -66,7 +65,7 @@ export default function Landing() {
             className="primary"
             onClick={() => navigate("/pricing")}
           >
-            Explore Plans
+            View Plans
           </button>
           <button
             onClick={() =>
@@ -84,8 +83,7 @@ export default function Landing() {
       <section id="free-tools" className="free-tools">
         <h2>Free Cybersecurity Tools</h2>
         <p className="muted center">
-          Limited access. No signup required. Upgrade only if it fits
-          your operation.
+          Limited access. No signup required. Upgrade anytime.
         </p>
 
         <div className="tool-grid">
@@ -96,8 +94,8 @@ export default function Landing() {
             </p>
             <ul>
               <li>Single asset scan</li>
-              <li>Read-only findings</li>
-              <li>No historical storage</li>
+              <li>Read-only results</li>
+              <li>No historical tracking</li>
             </ul>
             <button onClick={() => navigate("/pricing")}>
               Upgrade for Full Coverage
@@ -107,12 +105,12 @@ export default function Landing() {
           <div className="tool-card">
             <h3>Security Posture Snapshot</h3>
             <p className="muted">
-              High-level overview of control coverage and gaps.
+              High-level assessment of security controls and gaps.
             </p>
             <ul>
-              <li>Basic scoring only</li>
-              <li>No remediation workflows</li>
-              <li>No execution</li>
+              <li>Basic posture score</li>
+              <li>No remediation guidance</li>
+              <li>No automation</li>
             </ul>
             <button onClick={() => navigate("/pricing")}>
               Unlock Full Posture
@@ -122,12 +120,12 @@ export default function Landing() {
           <div className="tool-card">
             <h3>Phishing Risk Check</h3>
             <p className="muted">
-              Evaluate exposure to common phishing vectors.
+              Evaluate exposure to common phishing techniques.
             </p>
             <ul>
-              <li>Manual assessment</li>
-              <li>No alerting</li>
+              <li>Manual evaluation</li>
               <li>No monitoring</li>
+              <li>No alerts</li>
             </ul>
             <button onClick={() => navigate("/pricing")}>
               Enable Protection
@@ -137,7 +135,7 @@ export default function Landing() {
           <div className="tool-card">
             <h3>Asset Risk Preview</h3>
             <p className="muted">
-              Understand how attackers prioritize assets.
+              Understand how attackers prioritize targets.
             </p>
             <ul>
               <li>Limited assets</li>
@@ -155,7 +153,7 @@ export default function Landing() {
       <section className="platform-preview">
         <h2>Inside the Platform</h2>
         <p className="muted center">
-          Built to support real cybersecurity work.
+          Designed for professionals who are accountable for outcomes.
         </p>
 
         <div className="preview-grid">
@@ -165,18 +163,21 @@ export default function Landing() {
               Continuous visibility into risk and control health.
             </p>
           </div>
+
           <div>
             <h4>Threats & Incidents</h4>
             <p className="muted">
-              Priority-driven detection and response.
+              Priority-driven detection and response workflows.
             </p>
           </div>
+
           <div>
             <h4>Reports & Audits</h4>
             <p className="muted">
               Executive-ready reporting with immutable records.
             </p>
           </div>
+
           <div>
             <h4>AutoDev 6.5</h4>
             <p className="muted">
@@ -200,7 +201,7 @@ export default function Landing() {
       <section className="how-it-works">
         <h2>How It Works</h2>
         <ol>
-          <li>Evaluate risk using free tools</li>
+          <li>Use free tools to evaluate risk</li>
           <li>Select your role: Individual, Small Company, or Company</li>
           <li>Connect your environment securely</li>
           <li>Operate with full visibility and accountability</li>
@@ -214,8 +215,8 @@ export default function Landing() {
           Business email required. No automatic upgrades.
         </p>
         <p>
-          Pricing and plans are controlled by administrators and
-          may change with notification.
+          Pricing and plans are controlled by administrators
+          and may change with notification.
         </p>
       </footer>
     </div>
