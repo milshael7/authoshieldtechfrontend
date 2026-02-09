@@ -27,7 +27,7 @@ export default function Landing() {
       <header className="public-header">
         <div className="brand">
           <img
-            src="/public/logo.png"
+            src="/logo.png"
             alt="AutoShield Tech"
             className="brand-logo"
           />
@@ -63,7 +63,13 @@ export default function Landing() {
           >
             Explore Plans
           </button>
-          <button onClick={() => document.getElementById("free-tools")?.scrollIntoView()}>
+          <button
+            onClick={() =>
+              document
+                .getElementById("free-tools")
+                ?.scrollIntoView({ behavior: "smooth" })
+            }
+          >
             Try Free Tools
           </button>
         </div>
