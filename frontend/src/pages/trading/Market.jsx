@@ -1,6 +1,19 @@
 import React, { useMemo, useRef, useState, useEffect } from "react";
 import "../../styles/terminal.css";
 
+/**
+ * Market.jsx
+ * SOC-aligned Market Observation & Trade Intent
+ *
+ * PURPOSE:
+ * - Market visibility
+ * - Trade intent preparation
+ * - NO execution
+ *
+ * EXECUTION HAPPENS IN:
+ * - TradingRoom.jsx
+ */
+
 const SYMBOLS = [
   "OANDA:EURUSD",
   "OANDA:GBPUSD",
@@ -11,7 +24,11 @@ const SYMBOLS = [
 const SNAP_POS = { x: 16, y: 100 };
 const SNAP_DELAY = 2500;
 
-export default function Market() {
+export default function Market({
+  mode = "paper",          // paper | live
+  dailyLimit = 5,
+  tradesUsed = 1,
+}) {
   const [symbol, setSymbol] = useState(SYMBOLS[0]);
   const [tf, setTf] = useState("D");
   const [side, setSide] = useState("BUY");
@@ -80,19 +97,24 @@ export default function Market() {
 
   function togglePanel() {
     clearTimeout(snapTimer.current);
-    if (panelOpen) {
-      setPanelOpen(false);
-      setDocked(true);
-      setPos(SNAP_POS);
-    } else {
-      setPanelOpen(true);
-      setDocked(true);
-      setPos(SNAP_POS);
-    }
+    setPanelOpen((v) => !v);
+    setDocked(true);
+    setPos(SNAP_POS);
   }
 
   return (
     <div className="terminalRoot">
+      {/* ===== GOVERNANCE BANNER ===== */}
+      <div className={`marketBanner ${mode === "live" ? "warn" : ""}`}>
+        <b>Mode:</b> {mode.toUpperCase()} &nbsp;•&nbsp;
+        <b>Trades Used:</b> {tradesUsed}/{dailyLimit}
+        {tradesUsed >= dailyLimit && (
+          <span className="warnText">
+            &nbsp;— Daily limit reached
+          </span>
+        )}
+      </div>
+
       {/* ===== TOP BAR ===== */}
       <header className="tvTopBar">
         <div className="tvTopLeft">
@@ -122,8 +144,12 @@ export default function Market() {
         </div>
 
         <div className="tvTopRight">
-          <button className="tvPrimary" onClick={togglePanel}>
-            Trade
+          <button
+            className="tvPrimary"
+            onClick={togglePanel}
+            disabled={tradesUsed >= dailyLimit}
+          >
+            Prepare Trade
           </button>
         </div>
       </header>
@@ -146,7 +172,7 @@ export default function Market() {
               side={side}
               setSide={setSide}
               onClose={togglePanel}
-              draggable={false}
+              mode={mode}
             />
           </aside>
         )}
@@ -163,42 +189,12 @@ export default function Market() {
             side={side}
             setSide={setSide}
             onClose={togglePanel}
+            mode={mode}
             draggable
             onDragStart={startDrag}
           />
         </div>
       )}
-
-      {/* ===== LOCAL STYLES ===== */}
-      <style>{`
-        .tvBody{
-          display:flex;
-          height:calc(100svh - 110px);
-          position:relative;
-        }
-
-        .dockPanel{
-          width:280px;
-          background:#fff;
-          border-left:1px solid rgba(0,0,0,.1);
-          z-index:10;
-        }
-
-        .floatingPanel{
-          position:fixed;
-          width:260px;
-          background:#fff;
-          border-radius:14px;
-          box-shadow:0 10px 30px rgba(0,0,0,.25);
-          z-index:60;
-        }
-
-        @media(max-width:900px){
-          .dockPanel{
-            display:none;
-          }
-        }
-      `}</style>
     </div>
   );
 }
@@ -210,6 +206,7 @@ function TradePanel({
   side,
   setSide,
   onClose,
+  mode,
   draggable,
   onDragStart,
 }) {
@@ -239,12 +236,16 @@ function TradePanel({
         </button>
       </div>
 
-      <input className="tradeInput" placeholder="Price" />
-      <input className="tradeInput" placeholder="Quantity" />
+      <input className="tradeInput" placeholder="Reference Price" />
+      <input className="tradeInput" placeholder="Position Size" />
 
-      <button className="tvPrimary full">
-        Place {side}
+      <button className={`tvPrimary full ${mode === "live" ? "warn" : ""}`}>
+        Queue {side} Intent
       </button>
+
+      <small className="muted" style={{ marginTop: 8 }}>
+        Trade execution occurs in the Trading Control Room.
+      </small>
     </div>
   );
 }
