@@ -1,17 +1,17 @@
 // frontend/src/layouts/ManagerLayout.jsx
-// Manager Layout — Operational SOC
+// Manager Layout — Operational SOC (UPGRADED)
 //
 // SAFE:
 // - Full file replacement
 // - Default export
-// - Matches existing routes
-// - No business logic
-// - Layout.css compatible
+// - Visual upgrade only
+// - No routing / auth / business logic changes
 
 import React, { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { clearToken, clearUser } from "../lib/api";
 import AuthoDevPanel from "../components/AuthoDevPanel";
+import Logo from "../components/Logo.jsx";
 import "../styles/layout.css";
 
 export default function ManagerLayout() {
@@ -27,6 +27,7 @@ export default function ManagerLayout() {
 
   return (
     <div className={`layout-root ${menuOpen ? "sidebar-open" : ""}`}>
+      {/* ================= MOBILE OVERLAY ================= */}
       {menuOpen && (
         <div
           className="sidebar-overlay"
@@ -36,11 +37,15 @@ export default function ManagerLayout() {
 
       {/* ================= SIDEBAR ================= */}
       <aside className="layout-sidebar manager">
+        {/* BRAND */}
         <div className="layout-brand">
-          <strong>AutoShield</strong>
-          <span>Manager SOC</span>
+          <Logo size="md" />
+          <span className="muted" style={{ fontSize: 12 }}>
+            Manager SOC
+          </span>
         </div>
 
+        {/* NAVIGATION */}
         <nav className="layout-nav">
           <NavLink to="/manager" end onClick={() => setMenuOpen(false)}>
             Security Overview
@@ -58,7 +63,10 @@ export default function ManagerLayout() {
             Incidents
           </NavLink>
 
-          <NavLink to="/manager/vulnerabilities" onClick={() => setMenuOpen(false)}>
+          <NavLink
+            to="/manager/vulnerabilities"
+            onClick={() => setMenuOpen(false)}
+          >
             Vulnerabilities
           </NavLink>
 
@@ -78,33 +86,50 @@ export default function ManagerLayout() {
 
       {/* ================= MAIN ================= */}
       <main className="layout-main">
+        {/* ================= TOP BAR ================= */}
         <header className="layout-topbar">
-          <div className="topbar-left">
+          <div
+            className="topbar-left"
+            style={{ display: "flex", alignItems: "center", gap: 14 }}
+          >
             <button
               className="btn btn-icon mobile-menu-btn"
               onClick={() => setMenuOpen(true)}
+              aria-label="Open menu"
             >
               ☰
             </button>
-            <h1 style={{ margin: 0 }}>Manager Security Dashboard</h1>
+
+            <h1 style={{ margin: 0, fontSize: 18 }}>
+              Manager Security Dashboard
+            </h1>
           </div>
 
-          <div className="topbar-right">
+          <div
+            className="topbar-right"
+            style={{ display: "flex", alignItems: "center", gap: 12 }}
+          >
             <button
               className="btn"
               onClick={() => setAssistantOpen((v) => !v)}
             >
               Advisor
             </button>
+
             <span className="badge">Manager</span>
           </div>
         </header>
 
+        {/* ================= PAGE CONTENT ================= */}
         <section className="layout-content">
           <Outlet />
         </section>
 
-        <section className={`ai-drawer ${assistantOpen ? "open" : ""}`}>
+        {/* ================= ADVISOR ================= */}
+        <section
+          className={`ai-drawer ${assistantOpen ? "open" : ""}`}
+          aria-hidden={!assistantOpen}
+        >
           <div className="ai-drawer-handle">
             <button
               className="ai-toggle"
