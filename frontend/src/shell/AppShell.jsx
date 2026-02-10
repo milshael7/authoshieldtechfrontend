@@ -1,11 +1,11 @@
 // frontend/src/shell/AppShell.jsx
-// AutoShield Tech — Application Shell (UPGRADED)
+// AutoShield Tech — Application Shell (HARDENED)
 //
 // PURPOSE:
 // - Global background mounting
+// - Brand watermark layer
 // - Single visual wrapper for entire platform
-// - Z-index safety layer
-// - Future-ready for global UI (toasts, modals)
+// - Z-index safety boundary
 //
 // HARD RULES (ENFORCED):
 // - NO routing
@@ -17,6 +17,7 @@
 
 import React from "react";
 import BackgroundLayer from "../components/BackgroundLayer.jsx";
+import BrandMark from "../components/BrandMark.jsx";
 import "../styles/background.css";
 
 export default function AppShell({ children }) {
@@ -30,10 +31,13 @@ export default function AppShell({ children }) {
         overflow: "hidden",
       }}
     >
-      {/* Global SOC Background (always behind UI) */}
+      {/* Absolute background (furthest back) */}
       <BackgroundLayer />
 
-      {/* Foreground Application Content */}
+      {/* Brand watermark (above background, below UI) */}
+      <BrandMark />
+
+      {/* Foreground application UI */}
       <div
         className="app-shell-content"
         style={{
