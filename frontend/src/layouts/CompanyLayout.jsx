@@ -1,23 +1,22 @@
 // frontend/src/layouts/CompanyLayout.jsx
-// Company Layout — SOC Visibility Baseline
+// Company Layout — SOC Visibility Baseline (UPGRADED)
 //
-// ENFORCEMENT:
+// ENFORCEMENT (UNCHANGED):
 // - Visibility only
 // - No compliance / policy control
-// - No AutoDev execution
 // - Advisory-only assistant
-// - Upgrade path exists (notifications only)
 //
 // SAFE:
 // - Full file replacement
 // - Default export (Vercel-safe)
+// - Visual upgrade only
 // - layout.css aligned
-// - No AI wording
 
 import React, { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { clearToken, clearUser } from "../lib/api.js";
 import AuthoDevPanel from "../components/AuthoDevPanel";
+import Logo from "../components/Logo.jsx";
 import "../styles/layout.css";
 
 export default function CompanyLayout() {
@@ -43,11 +42,15 @@ export default function CompanyLayout() {
 
       {/* ================= SIDEBAR ================= */}
       <aside className="layout-sidebar company">
+        {/* BRAND */}
         <div className="layout-brand">
-          <strong>AutoShield Tech</strong>
-          <small className="muted">Company Visibility</small>
+          <Logo size="md" />
+          <span className="muted" style={{ fontSize: 12 }}>
+            Company Visibility
+          </span>
         </div>
 
+        {/* NAVIGATION */}
         <nav className="layout-nav">
           <NavLink to="/company" end onClick={() => setMenuOpen(false)}>
             Security Overview
@@ -84,28 +87,41 @@ export default function CompanyLayout() {
 
       {/* ================= MAIN ================= */}
       <main className="layout-main">
-        {/* ================= TOPBAR ================= */}
+        {/* ================= TOP BAR ================= */}
         <header className="layout-topbar">
-          <button
-            className="btn btn-icon mobile-menu-btn"
-            onClick={() => setMenuOpen(true)}
-            aria-label="Open menu"
+          <div
+            className="topbar-left"
+            style={{ display: "flex", alignItems: "center", gap: 14 }}
           >
-            ☰
-          </button>
+            <button
+              className="btn btn-icon mobile-menu-btn"
+              onClick={() => setMenuOpen(true)}
+              aria-label="Open menu"
+            >
+              ☰
+            </button>
 
-          <div className="topbar-right">
+            <h1 style={{ margin: 0, fontSize: 18 }}>
+              Company Security Dashboard
+            </h1>
+          </div>
+
+          <div
+            className="topbar-right"
+            style={{ display: "flex", alignItems: "center", gap: 12 }}
+          >
             <button
               className="btn"
               onClick={() => setAdvisorOpen((v) => !v)}
             >
               Advisor
             </button>
+
             <span className="badge">Company</span>
           </div>
         </header>
 
-        {/* ================= CONTENT ================= */}
+        {/* ================= PAGE CONTENT ================= */}
         <section className="layout-content">
           <Outlet />
         </section>
