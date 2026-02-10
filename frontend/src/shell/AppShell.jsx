@@ -1,11 +1,11 @@
 // frontend/src/shell/AppShell.jsx
-// AutoShield Tech — Application Shell (HARDENED)
+// AutoShield Tech — Application Shell (FINAL HARDENED)
 //
 // PURPOSE:
 // - Global background mounting
 // - Brand watermark layer
 // - Single visual wrapper for entire platform
-// - Z-index safety boundary
+// - Z-index safety boundary (FIXED)
 //
 // HARD RULES (ENFORCED):
 // - NO routing
@@ -29,20 +29,25 @@ export default function AppShell({ children }) {
         minHeight: "100vh",
         width: "100%",
         overflow: "hidden",
+        backgroundColor: "#0B0E14", // safety fallback (prevents blue blank)
       }}
     >
-      {/* Absolute background (furthest back) */}
-      <BackgroundLayer />
+      {/* ===== BACKGROUND LAYER (z-index: 0) ===== */}
+      <div style={{ position: "fixed", inset: 0, zIndex: 0 }}>
+        <BackgroundLayer />
+      </div>
 
-      {/* Brand watermark (above background, below UI) */}
-      <BrandMark />
+      {/* ===== BRAND WATERMARK (z-index: 1) ===== */}
+      <div style={{ position: "fixed", inset: 0, zIndex: 1 }}>
+        <BrandMark />
+      </div>
 
-      {/* Foreground application UI */}
+      {/* ===== APPLICATION UI (z-index: 10) ===== */}
       <div
         className="app-shell-content"
         style={{
           position: "relative",
-          zIndex: 1,
+          zIndex: 10,
           minHeight: "100vh",
           width: "100%",
         }}
