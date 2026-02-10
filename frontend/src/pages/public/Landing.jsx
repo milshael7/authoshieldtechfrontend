@@ -1,12 +1,24 @@
 // frontend/src/pages/public/Landing.jsx
-// AutoShield Tech — Public Landing (STABLE + VISIBLE)
+// AutoShield Tech — Public Landing (STABLE + VISIBLE + SAFEGUARDED)
 
-import React from "react";
+import React, { useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import "../../styles/main.css";
 
 export default function Landing() {
   const navigate = useNavigate();
+
+  // ---- SAFETY: guarded scroll (prevents mobile/Safari crashes)
+  const scrollToFreeTools = useCallback(() => {
+    try {
+      const el = document.getElementById("free-tools");
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth" });
+      }
+    } catch {
+      /* fail silently */
+    }
+  }, []);
 
   return (
     <div className="landing-page">
@@ -50,13 +62,7 @@ export default function Landing() {
           <button className="primary" onClick={() => navigate("/pricing")}>
             Explore Plans
           </button>
-          <button
-            onClick={() =>
-              document
-                .getElementById("free-tools")
-                ?.scrollIntoView({ behavior: "smooth" })
-            }
-          >
+          <button onClick={scrollToFreeTools}>
             Try Free Tools
           </button>
         </div>
