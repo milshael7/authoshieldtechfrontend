@@ -1,17 +1,5 @@
 // frontend/src/layouts/SmallCompanyLayout.jsx
 // Small Company Layout — SOC Baseline (LIMITED)
-//
-// ENFORCEMENT:
-// - No AutoDev execution
-// - Limited SOC visibility
-// - Upgrade path to full Company
-// - Structural parity with other layouts
-// - Advisory-only assistant (NO AI wording)
-//
-// SAFE:
-// - Full file replacement
-// - Default export
-// - layout.css aligned
 
 import React, { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
@@ -82,7 +70,6 @@ export default function SmallCompanyLayout() {
 
           <hr style={{ opacity: 0.2 }} />
 
-          {/* UPGRADE CTA */}
           <NavLink
             to="/small-company/upgrade"
             className="upgrade-link"
@@ -99,7 +86,6 @@ export default function SmallCompanyLayout() {
 
       {/* ================= MAIN ================= */}
       <main className="layout-main">
-        {/* ================= TOP BAR ================= */}
         <header className="layout-topbar">
           <div className="topbar-left">
             <button
@@ -126,7 +112,6 @@ export default function SmallCompanyLayout() {
           </div>
         </header>
 
-        {/* ================= PAGE CONTENT ================= */}
         <section className="layout-content">
           <Outlet />
         </section>
@@ -163,3 +148,4 @@ export default function SmallCompanyLayout() {
       </main>
     </div>
   );
+}
