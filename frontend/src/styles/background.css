@@ -1,0 +1,39 @@
+/* =========================================================
+   AutoShield Tech — Global Background Layer
+   File: frontend/src/styles/background.css
+
+   PURPOSE:
+   - Visual foundation behind all pages
+   - SOC-grade neutral background
+   - Safe for future upgrades (images, logo, motion)
+
+   RULES:
+   - No scrolling
+   - No pointer events
+   - Must never interfere with layouts
+   ========================================================= */
+
+.background-layer {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+
+  /* Core SOC background */
+  background:
+    radial-gradient(
+      1200px 600px at 20% -10%,
+      rgba(122,167,255,0.12),
+      transparent 60%
+    ),
+    radial-gradient(
+      900px 500px at 80% 10%,
+      rgba(155,124,255,0.10),
+      transparent 65%
+    ),
+    linear-gradient(
+      180deg,
+      #0b0e14 0%,
+      #0d111a 100%
+    );
+}
