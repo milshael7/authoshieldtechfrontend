@@ -3,18 +3,59 @@
   <head>
     <meta charset="UTF-8" />
 
-    <!-- ✅ THIS is what fixes iPhone “desktop width” + squishy layouts -->
+    <!-- Viewport: mobile + notch safe -->
     <meta
       name="viewport"
       content="width=device-width, initial-scale=1, viewport-fit=cover"
     />
 
-    <link rel="icon" type="image/png" href="/autoshield-logo.png" />
+    <!-- App identity -->
     <title>AutoShield Tech</title>
+    <meta name="theme-color" content="#0b1220" />
+    <meta name="color-scheme" content="dark" />
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="/autoshield-logo.png" />
+
+    <!-- 🔒 HARD BACKGROUND GUARD (pre-React paint) -->
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        background: #0b1220; /* SOC dark base */
+        color-scheme: dark;
+        overflow: hidden;
+      }
+
+      /* Root mount guard */
+      #root {
+        min-height: 100vh;
+        background: radial-gradient(
+            1200px 600px at 20% -10%,
+            rgba(122,167,255,0.12),
+            transparent 60%
+          ),
+          radial-gradient(
+            900px 500px at 80% 10%,
+            rgba(155,124,255,0.10),
+            transparent 65%
+          ),
+          linear-gradient(
+            180deg,
+            #0b0e14 0%,
+            #0d111a 100%
+          );
+      }
+    </style>
   </head>
 
   <body>
+    <!-- React Mount -->
     <div id="root"></div>
+
+    <!-- App Entry -->
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
