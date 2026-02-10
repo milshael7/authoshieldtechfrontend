@@ -1,16 +1,12 @@
 // frontend/src/layouts/CompanyLayout.jsx
-// Company Layout — SOC Visibility Baseline (UPGRADED)
+// Company Layout — SOC Visibility Baseline (PHASE 1 CLEAN)
 //
-// ENFORCEMENT (UNCHANGED):
-// - Visibility only
-// - No compliance / policy control
+// RULES ENFORCED:
+// - NO topbar (handled globally)
+// - Sidebar + content only
+// - Scroll-safe
 // - Advisory-only assistant
-//
-// SAFE:
-// - Full file replacement
-// - Default export (Vercel-safe)
-// - Visual upgrade only
-// - layout.css aligned
+// - No AI branding text
 
 import React, { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
@@ -42,7 +38,6 @@ export default function CompanyLayout() {
 
       {/* ================= SIDEBAR ================= */}
       <aside className="layout-sidebar company">
-        {/* BRAND */}
         <div className="layout-brand">
           <Logo size="md" />
           <span className="muted" style={{ fontSize: 12 }}>
@@ -50,7 +45,6 @@ export default function CompanyLayout() {
           </span>
         </div>
 
-        {/* NAVIGATION */}
         <nav className="layout-nav">
           <NavLink to="/company" end onClick={() => setMenuOpen(false)}>
             Security Overview
@@ -87,41 +81,7 @@ export default function CompanyLayout() {
 
       {/* ================= MAIN ================= */}
       <main className="layout-main">
-        {/* ================= TOP BAR ================= */}
-        <header className="layout-topbar">
-          <div
-            className="topbar-left"
-            style={{ display: "flex", alignItems: "center", gap: 14 }}
-          >
-            <button
-              className="btn btn-icon mobile-menu-btn"
-              onClick={() => setMenuOpen(true)}
-              aria-label="Open menu"
-            >
-              ☰
-            </button>
-
-            <h1 style={{ margin: 0, fontSize: 18 }}>
-              Company Security Dashboard
-            </h1>
-          </div>
-
-          <div
-            className="topbar-right"
-            style={{ display: "flex", alignItems: "center", gap: 12 }}
-          >
-            <button
-              className="btn"
-              onClick={() => setAdvisorOpen((v) => !v)}
-            >
-              Advisor
-            </button>
-
-            <span className="badge">Company</span>
-          </div>
-        </header>
-
-        {/* ================= PAGE CONTENT ================= */}
+        {/* ================= CONTENT ================= */}
         <section className="layout-content">
           <Outlet />
         </section>
@@ -134,7 +94,7 @@ export default function CompanyLayout() {
           <div className="ai-drawer-handle">
             <button
               className="ai-toggle"
-              onClick={() => setAdvisorOpen((v) => !v)}
+              onClick={() => setAdvisorOpen(v => !v)}
             >
               {advisorOpen
                 ? "▼ Hide Advisor"
@@ -142,9 +102,12 @@ export default function CompanyLayout() {
             </button>
           </div>
 
-          <div className="ai-drawer-body">
+          <div
+            className="ai-drawer-body"
+            style={{ overflow: "auto" }} // 🔑 FIX: allow scroll + input
+          >
             <AuthoDevPanel
-              title="AutoDev 6.5 — Company Security Advisor"
+              title="Security Advisor"
               getContext={() => ({
                 role: "company",
                 mode: "advisory",
