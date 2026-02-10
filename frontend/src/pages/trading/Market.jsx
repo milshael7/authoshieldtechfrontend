@@ -2,7 +2,7 @@ import React, { useMemo, useRef, useState, useEffect } from "react";
 import "../../styles/terminal.css";
 
 /**
- * Market.jsx — UPGRADED
+ * Market.jsx — HARDENED + BRANDED
  * SOC-aligned Market Observation & Trade Intent Panel
  *
  * RESPONSIBILITY:
@@ -108,7 +108,14 @@ export default function Market({
 
   /* ================= UI ================= */
   return (
-    <div className="terminalRoot">
+    <div
+      className={`terminalRoot ${mode === "live" ? "liveMode" : ""}`}
+    >
+      {/* ===== BRAND WATERMARK (TERMINAL ONLY) ===== */}
+      <div className="terminalBrandMark" aria-hidden="true">
+        AUTOSHIELD
+      </div>
+
       {/* ===== GOVERNANCE BANNER ===== */}
       <div className={`marketBanner ${mode === "live" ? "warn" : ""}`}>
         <b>Mode:</b> {mode.toUpperCase()} &nbsp;•&nbsp;
