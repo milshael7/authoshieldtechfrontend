@@ -1,15 +1,15 @@
 import React, { useMemo, useState, useEffect, useRef } from "react";
 
 /**
- * TradingRoom.jsx
+ * TradingRoom.jsx — UPGRADED
  * SOC-aligned Trading Control Room
  *
  * ROLE:
  * - Operational governance
  * - Risk & execution visibility
- * - Operator-controlled intent only
+ * - Human-in-the-loop execution
  *
- * HARD RULES:
+ * HARD RULES (UNCHANGED):
  * - NO AI execution
  * - NO API keys
  * - NO auto trading
@@ -22,17 +22,17 @@ export default function TradingRoom({
   executionState: parentExecution = "idle",
 }) {
   /* ===================== STATE ===================== */
+  const [mode, setMode] = useState(parentMode.toUpperCase()); // PAPER | LIVE
+  const [execution, setExecution] = useState(parentExecution); // idle | armed | executing | paused
+  const [riskPct, setRiskPct] = useState(1);
+  const [tradeStyle, setTradeStyle] = useState("short"); // short | session
+  const [tradesUsed, setTradesUsed] = useState(1);
+
   const [log, setLog] = useState([
     { t: new Date().toLocaleTimeString(), m: "Trading room initialized." },
   ]);
 
-  const [mode, setMode] = useState(parentMode.toUpperCase()); // PAPER | LIVE
-  const [execution, setExecution] = useState(parentExecution); // idle | armed | executing | paused
-  const [shortTrades, setShortTrades] = useState(true);
-  const [riskPct, setRiskPct] = useState(1);
-  const [tradesUsed, setTradesUsed] = useState(1);
-
-  /* ===================== SYNC WITH PARENT ===================== */
+  /* ===================== SYNC ===================== */
   useEffect(() => {
     setMode(parentMode.toUpperCase());
   }, [parentMode]);
@@ -41,7 +41,7 @@ export default function TradingRoom({
     setExecution(parentExecution);
   }, [parentExecution]);
 
-  /* ===================== MOCK STATS ===================== */
+  /* ===================== STATS ===================== */
   const stats = useMemo(
     () => ({
       tradesToday: tradesUsed,
@@ -53,8 +53,11 @@ export default function TradingRoom({
   );
 
   /* ===================== HELPERS ===================== */
-  const pushLog = (m) =>
-    setLog((p) => [{ t: new Date().toLocaleTimeString(), m }, ...p].slice(0, 50));
+  const pushLog = (message) => {
+    setLog((prev) =>
+      [{ t: new Date().toLocaleTimeString(), m: message }, ...prev].slice(0, 60)
+    );
+  };
 
   /* ===================== AI CONTEXT (ADVISORY ONLY) ===================== */
   const learnedRef = useRef(false);
@@ -70,14 +73,14 @@ export default function TradingRoom({
       body: JSON.stringify({
         type: "site",
         text: `
-AutoShield Trading Room (SOC Context):
+AutoShield Trading Room — Governance Context
 
 - PAPER = simulated execution
 - LIVE = real capital exposure
-- Operator-controlled execution only
+- Human confirmation required for all trades
 - Daily trade limits enforced visually
-- Risk defined as percentage exposure
-- AI explains decisions, never executes
+- Risk is percentage-based
+- Assistant explains rationale, never executes
 `,
       }),
     }).catch(() => {});
@@ -103,10 +106,11 @@ AutoShield Trading Room (SOC Context):
         <div className="stats">
           <div><b>Status:</b> {execution.toUpperCase()}</div>
           <div><b>Trades Used:</b> {tradesUsed} / {dailyLimit}</div>
-          <div><b>Risk %:</b> {riskPct}%</div>
+          <div><b>Risk:</b> {riskPct}%</div>
+          <div><b>Style:</b> {tradeStyle.toUpperCase()}</div>
         </div>
 
-        {/* ===== RISK CONTROLS ===== */}
+        {/* ===== RISK CONTROL ===== */}
         <div className="ctrl">
           <label>
             Risk %
@@ -123,21 +127,23 @@ AutoShield Trading Room (SOC Context):
           </label>
         </div>
 
+        {/* ===== TRADE STYLE ===== */}
         <div className="ctrlRow">
           <button
-            className={`pill ${shortTrades ? "active" : ""}`}
+            className={`pill ${tradeStyle === "short" ? "active" : ""}`}
             onClick={() => {
-              setShortTrades(true);
-              pushLog("Trade style set to short trades");
+              setTradeStyle("short");
+              pushLog("Trade style set to SHORT trades");
             }}
           >
             Short Trades
           </button>
+
           <button
-            className={`pill ${!shortTrades ? "active" : ""}`}
+            className={`pill ${tradeStyle === "session" ? "active" : ""}`}
             onClick={() => {
-              setShortTrades(false);
-              pushLog("Trade style set to session trades");
+              setTradeStyle("session");
+              pushLog("Trade style set to SESSION trades");
             }}
           >
             Session Trades
@@ -172,15 +178,17 @@ AutoShield Trading Room (SOC Context):
 
         {tradesUsed >= dailyLimit && (
           <p className="muted" style={{ marginTop: 10 }}>
-            Daily trade limit reached. No further execution allowed today.
+            Daily trade limit reached. Execution locked.
           </p>
         )}
       </section>
 
-      {/* ================= RIGHT: LOG ================= */}
+      {/* ================= RIGHT: ACTIVITY LOG ================= */}
       <aside className="postureCard">
         <h3>Operational Activity</h3>
-        <p className="muted">System and operator actions.</p>
+        <p className="muted">
+          System state changes and operator actions.
+        </p>
 
         <div className="tr-log">
           {log.map((x, i) => (
@@ -192,7 +200,7 @@ AutoShield Trading Room (SOC Context):
         </div>
 
         <p className="muted" style={{ marginTop: 12 }}>
-          Use the assistant drawer for explanations and rationale.
+          Use the assistant drawer for explanations and trade rationale.
         </p>
       </aside>
     </div>
