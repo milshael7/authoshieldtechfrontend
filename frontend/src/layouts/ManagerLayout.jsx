@@ -1,11 +1,11 @@
 // frontend/src/layouts/ManagerLayout.jsx
-// Manager Layout — Operational SOC (UPGRADED)
+// Manager Layout — Operational SOC (PHASE 1 CLEAN)
 //
 // SAFE:
-// - Full file replacement
-// - Default export
-// - Visual upgrade only
-// - No routing / auth / business logic changes
+// - No topbar (global header only)
+// - Scroll-safe
+// - Advisory-only assistant
+// - Structural parity with Admin / Company
 
 import React, { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
@@ -37,15 +37,13 @@ export default function ManagerLayout() {
 
       {/* ================= SIDEBAR ================= */}
       <aside className="layout-sidebar manager">
-        {/* BRAND */}
         <div className="layout-brand">
           <Logo size="md" />
-          <span className="muted" style={{ fontSize: 12 }}>
+          <span style={{ fontSize: 12, opacity: 0.75 }}>
             Manager SOC
           </span>
         </div>
 
-        {/* NAVIGATION */}
         <nav className="layout-nav">
           <NavLink to="/manager" end onClick={() => setMenuOpen(false)}>
             Security Overview
@@ -86,41 +84,7 @@ export default function ManagerLayout() {
 
       {/* ================= MAIN ================= */}
       <main className="layout-main">
-        {/* ================= TOP BAR ================= */}
-        <header className="layout-topbar">
-          <div
-            className="topbar-left"
-            style={{ display: "flex", alignItems: "center", gap: 14 }}
-          >
-            <button
-              className="btn btn-icon mobile-menu-btn"
-              onClick={() => setMenuOpen(true)}
-              aria-label="Open menu"
-            >
-              ☰
-            </button>
-
-            <h1 style={{ margin: 0, fontSize: 18 }}>
-              Manager Security Dashboard
-            </h1>
-          </div>
-
-          <div
-            className="topbar-right"
-            style={{ display: "flex", alignItems: "center", gap: 12 }}
-          >
-            <button
-              className="btn"
-              onClick={() => setAssistantOpen((v) => !v)}
-            >
-              Advisor
-            </button>
-
-            <span className="badge">Manager</span>
-          </div>
-        </header>
-
-        {/* ================= PAGE CONTENT ================= */}
+        {/* ================= CONTENT ================= */}
         <section className="layout-content">
           <Outlet />
         </section>
@@ -133,15 +97,18 @@ export default function ManagerLayout() {
           <div className="ai-drawer-handle">
             <button
               className="ai-toggle"
-              onClick={() => setAssistantOpen((v) => !v)}
+              onClick={() => setAssistantOpen(v => !v)}
             >
               {assistantOpen ? "▼ Hide Advisor" : "▲ Show Advisor"}
             </button>
           </div>
 
-          <div className="ai-drawer-body">
+          <div
+            className="ai-drawer-body"
+            style={{ overflow: "auto" }} // 🔑 FIX
+          >
             <AuthoDevPanel
-              title="AutoDev 6.5 — Manager Advisor"
+              title="Manager Security Advisor"
               getContext={() => ({
                 role: "manager",
                 location: window.location.pathname,
