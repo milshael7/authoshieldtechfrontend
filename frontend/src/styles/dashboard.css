@@ -1,1 +1,157 @@
+/* =========================================================
+   DASHBOARD CORE STYLES — PHASE 2
+   ========================================================= */
 
+.postureWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+/* KPI STRIP */
+.kpiGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 14px;
+}
+
+.kpiCard {
+  padding: 14px;
+  border-radius: 12px;
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.12);
+  backdrop-filter: blur(8px);
+}
+
+.kpiCard small {
+  opacity: .7;
+  font-size: 12px;
+}
+
+.kpiCard b {
+  font-size: 22px;
+}
+
+/* MAIN DASHBOARD GRID */
+.postureGrid {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr;
+  gap: 20px;
+}
+
+.postureCard {
+  padding: 18px;
+  border-radius: 14px;
+  background: rgba(255,255,255,.05);
+  border: 1px solid rgba(255,255,255,.12);
+  backdrop-filter: blur(10px);
+}
+
+/* POSTURE HEADER */
+.postureTop {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+/* SCORE */
+.postureScore {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.scoreRing {
+  --size: 64px;
+  width: var(--size);
+  height: var(--size);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  background:
+    conic-gradient(
+      #7aa2ff calc(var(--val) * 1%),
+      rgba(255,255,255,.15) 0
+    );
+}
+
+.scoreMeta b {
+  font-size: 14px;
+}
+
+.scoreMeta span {
+  font-size: 12px;
+  opacity: .7;
+}
+
+/* METER */
+.meter {
+  height: 6px;
+  background: rgba(255,255,255,.12);
+  border-radius: 999px;
+  margin: 16px 0;
+}
+
+.meter > div {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #7aa2ff, #4ade80);
+}
+
+/* LISTS */
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.list li {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-top: 4px;
+}
+
+.dot.ok { background: #4ade80; }
+.dot.warn { background: #facc15; }
+.dot.bad { background: #ef4444; }
+
+/* COVERAGE */
+.coverGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.coverItemTop {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+}
+
+.coverBar {
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.12);
+}
+
+.coverBar > div {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #60a5fa, #22c55e);
+}
+
+/* RESPONSIVE */
+@media (max-width: 900px) {
+  .postureGrid {
+    grid-template-columns: 1fr;
+  }
+}
