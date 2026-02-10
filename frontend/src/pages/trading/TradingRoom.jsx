@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect, useRef } from "react";
 
 /**
- * TradingRoom.jsx — UPGRADED
+ * TradingRoom.jsx — HARDENED
  * SOC-aligned Trading Control Room
  *
  * ROLE:
@@ -9,7 +9,7 @@ import React, { useMemo, useState, useEffect, useRef } from "react";
  * - Risk & execution visibility
  * - Human-in-the-loop execution
  *
- * HARD RULES (UNCHANGED):
+ * HARD RULES:
  * - NO AI execution
  * - NO API keys
  * - NO auto trading
@@ -55,7 +55,7 @@ export default function TradingRoom({
   /* ===================== HELPERS ===================== */
   const pushLog = (message) => {
     setLog((prev) =>
-      [{ t: new Date().toLocaleTimeString(), m: message }, ...prev].slice(0, 60)
+      [{ t: new Date().toLocaleTimeString(), m: message }, ...prev].slice(0, 80)
     );
   };
 
@@ -77,7 +77,7 @@ AutoShield Trading Room — Governance Context
 
 - PAPER = simulated execution
 - LIVE = real capital exposure
-- Human confirmation required for all trades
+- Human confirmation required
 - Daily trade limits enforced visually
 - Risk is percentage-based
 - Assistant explains rationale, never executes
@@ -91,26 +91,53 @@ AutoShield Trading Room — Governance Context
     <div className="postureWrap">
       {/* ================= LEFT: CONTROL ================= */}
       <section className="postureCard">
+        {/* HEADER */}
         <div className="postureTop">
           <div>
             <h2>Trading Control Room</h2>
             <small>Execution intent, exposure & governance</small>
           </div>
 
-          <span className={`badge ${mode === "LIVE" ? "warn" : ""}`}>
+          <span
+            className={`badge ${
+              mode === "LIVE" ? "warn" : ""
+            }`}
+          >
             {mode}
           </span>
         </div>
 
-        {/* ===== EXECUTION STATUS ===== */}
+        {/* EXECUTION STATUS */}
         <div className="stats">
-          <div><b>Status:</b> {execution.toUpperCase()}</div>
-          <div><b>Trades Used:</b> {tradesUsed} / {dailyLimit}</div>
-          <div><b>Risk:</b> {riskPct}%</div>
-          <div><b>Style:</b> {tradeStyle.toUpperCase()}</div>
+          <div>
+            <b>Status:</b>{" "}
+            <span
+              className={`badge ${
+                execution === "paused"
+                  ? "warn"
+                  : execution === "executing"
+                  ? "ok"
+                  : ""
+              }`}
+            >
+              {execution.toUpperCase()}
+            </span>
+          </div>
+
+          <div>
+            <b>Trades Used:</b> {tradesUsed} / {dailyLimit}
+          </div>
+
+          <div>
+            <b>Risk:</b> {riskPct}%
+          </div>
+
+          <div>
+            <b>Style:</b> {tradeStyle.toUpperCase()}
+          </div>
         </div>
 
-        {/* ===== RISK CONTROL ===== */}
+        {/* RISK CONTROL */}
         <div className="ctrl">
           <label>
             Risk %
@@ -127,7 +154,7 @@ AutoShield Trading Room — Governance Context
           </label>
         </div>
 
-        {/* ===== TRADE STYLE ===== */}
+        {/* TRADE STYLE */}
         <div className="ctrlRow">
           <button
             className={`pill ${tradeStyle === "short" ? "active" : ""}`}
@@ -150,7 +177,7 @@ AutoShield Trading Room — Governance Context
           </button>
         </div>
 
-        {/* ===== OPERATOR ACTIONS ===== */}
+        {/* OPERATOR ACTIONS */}
         <div className="actions">
           <button
             className="btn warn"
@@ -177,7 +204,7 @@ AutoShield Trading Room — Governance Context
         </div>
 
         {tradesUsed >= dailyLimit && (
-          <p className="muted" style={{ marginTop: 10 }}>
+          <p className="muted" style={{ marginTop: 12 }}>
             Daily trade limit reached. Execution locked.
           </p>
         )}
@@ -190,7 +217,13 @@ AutoShield Trading Room — Governance Context
           System state changes and operator actions.
         </p>
 
-        <div className="tr-log">
+        <div
+          className="tr-log"
+          style={{
+            maxHeight: 420,
+            overflowY: "auto",
+          }}
+        >
           {log.map((x, i) => (
             <div key={i} className="tr-msg">
               <span className="time">{x.t}</span>
