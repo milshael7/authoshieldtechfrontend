@@ -4,14 +4,13 @@ import TradingRoom from "./trading/TradingRoom.jsx";
 import "../styles/platform.css";
 
 /**
- * Trading.jsx
- * SOC-aligned Trading Oversight Module (HARDENED)
+ * Trading.jsx — VISUALLY COORDINATED
+ * SOC-aligned Trading Oversight Module
  *
  * PURPOSE:
- * - Central trading supervision
- * - Paper vs Live governance (UI-only)
- * - Shared limits & execution state
- * - Market + Trading Room coordination
+ * - Single supervisory surface for trading
+ * - Shared governance state
+ * - Visual + logical consistency between Market & Trading Room
  *
  * HARD RULES:
  * - NO execution logic
@@ -24,74 +23,82 @@ export default function Trading() {
   const [tab, setTab] = useState("market");
 
   /* ================= GOVERNANCE STATE (UI ONLY) ================= */
-  const [mode, setMode] = useState("paper");            // paper | live
+  const [mode, setMode] = useState("paper"); // paper | live
   const [dailyLimit, setDailyLimit] = useState(5);
   const [executionState, setExecutionState] = useState("idle"); // idle | armed | executing
   const [tradesUsed, setTradesUsed] = useState(1);
 
   return (
-    <div className="platformCard">
+    <div className="postureWrap">
       {/* ================= HEADER ================= */}
-      <div style={{ marginBottom: 18 }}>
-        <h2 style={{ margin: 0 }}>Trading Oversight</h2>
-        <p className="muted" style={{ marginTop: 6 }}>
-          Market supervision, execution governance, and operator control.
-        </p>
-      </div>
+      <section className="postureCard" style={{ marginBottom: 20 }}>
+        <div className="postureTop">
+          <div>
+            <h2>Trading Oversight</h2>
+            <small>
+              Market supervision, execution governance, and operator control
+            </small>
+          </div>
 
-      {/* ================= GOVERNANCE PANEL ================= */}
-      <div className="platformCard" style={{ marginBottom: 22 }}>
+          <span className={`badge ${mode === "live" ? "warn" : ""}`}>
+            {mode.toUpperCase()}
+          </span>
+        </div>
+
+        {/* ================= GOVERNANCE STRIP ================= */}
         <div
-          className="grid"
+          className="stats"
           style={{
-            gap: 18,
-            gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+            marginTop: 16,
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+            gap: 14,
           }}
         >
           {/* MODE */}
           <div>
-            <small className="muted">Execution Mode</small>
-            <div style={{ marginTop: 8 }}>
+            <b>Execution Mode</b>
+            <div style={{ marginTop: 6 }}>
               <button
-                className={mode === "paper" ? "ptab active" : "ptab"}
+                className={mode === "paper" ? "pill active" : "pill"}
                 onClick={() => setMode("paper")}
               >
-                Paper
+                PAPER
               </button>
               <button
-                className={mode === "live" ? "ptab active warn" : "ptab"}
+                className={mode === "live" ? "pill warn active" : "pill warn"}
                 onClick={() => setMode("live")}
                 style={{ marginLeft: 8 }}
               >
-                Live
+                LIVE
               </button>
             </div>
           </div>
 
           {/* DAILY LIMIT */}
           <div>
-            <small className="muted">Daily Trade Limit</small>
+            <b>Daily Limit</b>
             <input
               type="number"
               min={1}
               max={50}
               value={dailyLimit}
               onChange={(e) => setDailyLimit(Number(e.target.value))}
-              style={{ marginTop: 8, width: "100%" }}
+              style={{ marginTop: 6, width: "100%" }}
             />
           </div>
 
-          {/* EXECUTION STATUS */}
+          {/* EXECUTION */}
           <div>
-            <small className="muted">Execution Status</small>
-            <div style={{ marginTop: 10 }}>
+            <b>Execution Status</b>
+            <div style={{ marginTop: 8 }}>
               <span
                 className={`badge ${
-                  executionState === "idle"
-                    ? ""
-                    : executionState === "armed"
+                  executionState === "armed"
                     ? "warn"
-                    : "ok"
+                    : executionState === "executing"
+                    ? "ok"
+                    : ""
                 }`}
               >
                 {executionState.toUpperCase()}
@@ -101,18 +108,18 @@ export default function Trading() {
 
           {/* USAGE */}
           <div>
-            <small className="muted">Trades Used</small>
-            <div style={{ marginTop: 10, fontWeight: 700 }}>
+            <b>Trades Used</b>
+            <div style={{ marginTop: 8, fontWeight: 700 }}>
               {tradesUsed} / {dailyLimit}
             </div>
           </div>
         </div>
 
         <p className="muted" style={{ marginTop: 14, fontSize: 13 }}>
-          Live trading is never automatic. All actions require operator intent
-          and are subject to audit and limits.
+          Live trading is never automatic. All actions require operator intent,
+          are visually enforced, and logged.
         </p>
-      </div>
+      </section>
 
       {/* ================= TABS ================= */}
       <div className="platformTabs" style={{ marginBottom: 18 }}>
@@ -138,7 +145,7 @@ export default function Trading() {
 
       {/* ================= CONTENT ================= */}
       {tab === "market" && (
-        <section className="platformCard">
+        <section className="postureCard">
           <Market
             mode={mode}
             dailyLimit={dailyLimit}
@@ -148,7 +155,7 @@ export default function Trading() {
       )}
 
       {tab === "room" && (
-        <section className="platformCard">
+        <section className="postureCard">
           <TradingRoom
             mode={mode}
             dailyLimit={dailyLimit}
@@ -158,7 +165,7 @@ export default function Trading() {
       )}
 
       {tab === "reports" && (
-        <section className="platformCard">
+        <section className="postureCard">
           <h3>Performance Reports</h3>
           <ul className="list">
             <li>
