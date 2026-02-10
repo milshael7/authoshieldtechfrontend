@@ -1,17 +1,33 @@
 // frontend/src/layouts/UserLayout.jsx
-// STEP 32 — Sliding AI Panel Shell (User)
-// SOC Baseline — Consistent with Admin / Manager / Company
+// User Layout — SOC Baseline (UPGRADED)
+//
+// PURPOSE:
+// - End-user visibility shell
+// - Notifications + overview only
+// - Advisory assistant (NO execution)
+//
+// HARD RULES:
+// - No admin / manager controls
+// - No trading / SOC governance
+// - Assistant is advisory only
+//
+// SAFE:
+// - Full file replacement
+// - Default export
+// - layout.css aligned
+// - Visual parity with other layouts
 
 import React, { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { clearToken, clearUser } from "../lib/api";
 import AuthoDevPanel from "../components/AuthoDevPanel";
+import Logo from "../components/Logo.jsx";
 import "../styles/layout.css";
 
 export default function UserLayout() {
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
-  const [aiOpen, setAiOpen] = useState(false);
+  const [assistantOpen, setAssistantOpen] = useState(false);
 
   function logout() {
     clearToken();
@@ -32,8 +48,10 @@ export default function UserLayout() {
       {/* ================= SIDEBAR ================= */}
       <aside className="layout-sidebar user">
         <div className="layout-brand">
-          <span className="brand-logo">👤</span>
-          <span className="brand-text">User</span>
+          <Logo size="sm" />
+          <span className="muted" style={{ fontSize: 12 }}>
+            User Portal
+          </span>
         </div>
 
         <nav className="layout-nav">
@@ -58,7 +76,10 @@ export default function UserLayout() {
       <main className="layout-main">
         {/* ================= TOP BAR ================= */}
         <header className="layout-topbar">
-          <div className="topbar-left">
+          <div
+            className="topbar-left"
+            style={{ display: "flex", alignItems: "center", gap: 14 }}
+          >
             <button
               className="btn btn-icon mobile-menu-btn"
               onClick={() => setMenuOpen(true)}
@@ -67,16 +88,20 @@ export default function UserLayout() {
               ☰
             </button>
 
-            <h1 style={{ margin: 0 }}>User Dashboard</h1>
+            <h1 style={{ margin: 0, fontSize: 18 }}>
+              User Dashboard
+            </h1>
           </div>
 
-          <div className="topbar-right">
+          <div
+            className="topbar-right"
+            style={{ display: "flex", alignItems: "center", gap: 12 }}
+          >
             <button
               className="btn"
-              onClick={() => setAiOpen((v) => !v)}
-              title="Toggle AI Assistant"
+              onClick={() => setAssistantOpen((v) => !v)}
             >
-              🤖 Assistant
+              Assistant
             </button>
 
             <span className="badge">User</span>
@@ -88,26 +113,27 @@ export default function UserLayout() {
           <Outlet />
         </section>
 
-        {/* ================= AI ASSISTANT (BOTTOM ONLY) ================= */}
+        {/* ================= ASSISTANT DRAWER ================= */}
         <section
-          className={`ai-drawer ${aiOpen ? "open" : ""}`}
-          aria-hidden={!aiOpen}
+          className={`ai-drawer ${assistantOpen ? "open" : ""}`}
+          aria-hidden={!assistantOpen}
         >
           <div className="ai-drawer-handle">
             <button
               className="ai-toggle"
-              onClick={() => setAiOpen((v) => !v)}
+              onClick={() => setAssistantOpen((v) => !v)}
             >
-              {aiOpen ? "▼ Hide Assistant" : "▲ Show Assistant"}
+              {assistantOpen ? "▼ Hide Assistant" : "▲ Show Assistant"}
             </button>
           </div>
 
           <div className="ai-drawer-body">
             <AuthoDevPanel
-              title="AuthoDev 6.5 — User Assistant"
+              title="AutoDev 6.5 — User Assistant"
               getContext={() => ({
                 role: "user",
                 scope: "individual",
+                permissions: "advisory-only",
                 location: window.location.pathname,
               })}
             />
