@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect, useRef } from "react";
 
 /**
- * TradingRoom.jsx — HARDENED
+ * TradingRoom.jsx — VISUALLY ALIGNED + HARDENED
  * SOC-aligned Trading Control Room
  *
  * ROLE:
@@ -22,10 +22,10 @@ export default function TradingRoom({
   executionState: parentExecution = "idle",
 }) {
   /* ===================== STATE ===================== */
-  const [mode, setMode] = useState(parentMode.toUpperCase()); // PAPER | LIVE
-  const [execution, setExecution] = useState(parentExecution); // idle | armed | executing | paused
+  const [mode, setMode] = useState(parentMode.toUpperCase());
+  const [execution, setExecution] = useState(parentExecution);
   const [riskPct, setRiskPct] = useState(1);
-  const [tradeStyle, setTradeStyle] = useState("short"); // short | session
+  const [tradeStyle, setTradeStyle] = useState("short");
   const [tradesUsed, setTradesUsed] = useState(1);
 
   const [log, setLog] = useState([
@@ -55,7 +55,7 @@ export default function TradingRoom({
   /* ===================== HELPERS ===================== */
   const pushLog = (message) => {
     setLog((prev) =>
-      [{ t: new Date().toLocaleTimeString(), m: message }, ...prev].slice(0, 80)
+      [{ t: new Date().toLocaleTimeString(), m: message }, ...prev].slice(0, 100)
     );
   };
 
@@ -73,14 +73,14 @@ export default function TradingRoom({
       body: JSON.stringify({
         type: "site",
         text: `
-AutoShield Trading Room — Governance Context
+AutoShield Trading Control Room — SOC Governance
 
-- PAPER = simulated execution
-- LIVE = real capital exposure
-- Human confirmation required
-- Daily trade limits enforced visually
+- Execution is human-controlled
+- PAPER = simulated
+- LIVE = real exposure
+- Trade limits enforced visually
 - Risk is percentage-based
-- Assistant explains rationale, never executes
+- Assistant provides explanation only
 `,
       }),
     }).catch(() => {});
@@ -98,16 +98,12 @@ AutoShield Trading Room — Governance Context
             <small>Execution intent, exposure & governance</small>
           </div>
 
-          <span
-            className={`badge ${
-              mode === "LIVE" ? "warn" : ""
-            }`}
-          >
+          <span className={`badge ${mode === "LIVE" ? "warn" : ""}`}>
             {mode}
           </span>
         </div>
 
-        {/* EXECUTION STATUS */}
+        {/* STATUS STRIP */}
         <div className="stats">
           <div>
             <b>Status:</b>{" "}
