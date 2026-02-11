@@ -1,7 +1,6 @@
 // ExecutionEngine.js
-// Institutional Smart Execution Engine
-// AI decides trade
-// Human sets caps only
+// Institutional Adaptive Execution Engine
+// AI full control | Human caps only | Adaptive risk logic
 
 import { evaluateConfidence } from "./ConfidenceEngine";
 
@@ -11,7 +10,7 @@ export function executeEngine({
   riskPct,
   leverage,
   recentPerformance = { wins: 0, losses: 0 },
-  humanMultiplier = 1, // 🔥 human override control
+  humanMultiplier = 1,
   humanCaps = {
     maxRiskPct: 2,
     maxLeverage: 10,
@@ -27,7 +26,7 @@ export function executeEngine({
     };
   }
 
-  /* ================= CONFIDENCE ================= */
+  /* ================= CONFIDENCE ENGINE ================= */
 
   const confidenceData = evaluateConfidence({
     engineType,
@@ -42,10 +41,39 @@ export function executeEngine({
     };
   }
 
+  /* ================= PERFORMANCE ADAPTATION ================= */
+
+  const lossStreak = recentPerformance.losses || 0;
+
+  // Risk compression after losses
+  const adaptiveRiskReduction =
+    lossStreak >= 3 ? 0.6 :
+    lossStreak === 2 ? 0.75 :
+    lossStreak === 1 ? 0.9 :
+    1;
+
+  // Leverage compression
+  const adaptiveLeverageReduction =
+    lossStreak >= 3 ? 0.5 :
+    lossStreak === 2 ? 0.7 :
+    1;
+
   /* ================= HUMAN CAPS ================= */
 
   const cappedRisk = Math.min(riskPct, humanCaps.maxRiskPct);
-  const cappedLeverage = Math.min(leverage, humanCaps.maxLeverage);
+  const cappedLeverage = Math.min(
+    leverage,
+    humanCaps.maxLeverage
+  );
+
+  const finalRisk =
+    cappedRisk *
+    adaptiveRiskReduction *
+    confidenceData.modifier *
+    humanMultiplier;
+
+  const finalLeverage =
+    cappedLeverage * adaptiveLeverageReduction;
 
   /* ================= POSITION SIZING ================= */
 
@@ -54,21 +82,26 @@ export function executeEngine({
       ? randomBetween(0.8, 1.2)
       : randomBetween(0.9, 1.1);
 
-  const effectiveRisk =
-    cappedRisk *
-    confidenceData.modifier *
-    humanMultiplier *
-    volatilityFactor;
+  const effectiveRisk = finalRisk * volatilityFactor;
 
   const positionSize =
-    (balance * effectiveRisk * cappedLeverage) / 100;
+    (balance * effectiveRisk * finalLeverage) / 100;
 
-  /* ================= AI OUTCOME MODEL ================= */
+  /* ================= ADAPTIVE WIN PROBABILITY ================= */
 
-  const outcomeBias =
+  const baseBias =
     engineType === "scalp" ? 0.52 : 0.55;
 
-  const isWin = Math.random() < outcomeBias;
+  // Confidence slightly nudges probability
+  const confidenceBoost =
+    (confidenceData.score - 50) / 1000;
+
+  const adjustedBias = Math.min(
+    0.65,
+    Math.max(0.45, baseBias + confidenceBoost)
+  );
+
+  const isWin = Math.random() < adjustedBias;
 
   const pnl = isWin
     ? positionSize * randomBetween(0.4, 0.9)
@@ -106,6 +139,12 @@ export function executeEngine({
     effectiveRisk,
     positionSize,
     isWin,
+    metadata: {
+      adaptiveRiskReduction,
+      adaptiveLeverageReduction,
+      adjustedBias,
+      lossStreak,
+    },
   };
 }
 
