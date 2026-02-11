@@ -1,90 +1,54 @@
 // CapitalAllocator.js
-// Institutional Capital Distribution + Intelligent Rebalancing (UPGRADED)
+// Institutional Capital Distribution + Smart Exchange Routing
 
-/* ============================================================
-   INITIAL CAPITAL DISTRIBUTION
-   - Reserve protected
-   - Even distribution across engines + exchanges
-   ============================================================ */
+/* ======================================================
+   INITIAL ALLOCATION
+====================================================== */
 
 export function allocateCapital({
   totalCapital,
   engines = ["scalp", "session"],
   exchanges = ["coinbase", "kraken"],
-  reservePct = 0.2, // 20% capital reserve
+  reservePct = 0.2,
 }) {
   const reserve = totalCapital * reservePct;
   const tradable = totalCapital - reserve;
 
   const perEngine = tradable / engines.length;
+  const perExchange = perEngine / exchanges.length;
 
   const allocation = {};
 
   engines.forEach((engine) => {
     allocation[engine] = {};
-    const perExchange = perEngine / exchanges.length;
-
     exchanges.forEach((exchange) => {
       allocation[engine][exchange] = perExchange;
     });
   });
 
-  return {
-    reserve,
-    allocation,
-  };
+  return { reserve, allocation };
 }
 
-/* ============================================================
-   SMART REBALANCE SYSTEM
-   - Protects reserve
-   - Prevents zero-engine death
-   - Transfers capital from strongest engine
-   - Never inflates capital artificially
-   ============================================================ */
+/* ======================================================
+   SMART REBALANCE
+====================================================== */
 
 export function rebalanceCapital({
   allocation,
-  reserve = 0,
-  floor = 100,               // minimum engine capital
-  transferPct = 0.05,        // 5% transfer from strongest engine
+  reserve,
+  floor = 100,
+  boostAmount = 200,
 }) {
-  const updated = deepClone(allocation);
-
-  // Calculate total per engine
-  const engineTotals = {};
+  const updated = JSON.parse(JSON.stringify(allocation));
 
   Object.keys(updated).forEach((engine) => {
-    engineTotals[engine] = Object.values(updated[engine]).reduce(
-      (a, b) => a + b,
-      0
-    );
+    Object.keys(updated[engine]).forEach((exchange) => {
+      if (updated[engine][exchange] < floor && reserve >= boostAmount) {
+        updated[engine][exchange] += boostAmount;
+        reserve -= boostAmount;
+      }
+    });
   });
-
-  const engines = Object.keys(engineTotals);
-
-  const weakest = engines.reduce((a, b) =>
-    engineTotals[a] < engineTotals[b] ? a : b
-  );
-
-  const strongest = engines.reduce((a, b) =>
-    engineTotals[a] > engineTotals[b] ? a : b
-  );
-
-  // If weakest below floor → transfer from strongest
-  if (engineTotals[weakest] < floor) {
-    const transferAmount = engineTotals[strongest] * transferPct;
-
-    Object.keys(updated[strongest]).forEach((exchange) => {
-      updated[strongest][exchange] -=
-        transferAmount / Object.keys(updated[strongest]).length;
-    });
-
-    Object.keys(updated[weakest]).forEach((exchange) => {
-      updated[weakest][exchange] +=
-        transferAmount / Object.keys(updated[weakest]).length;
-    });
-  }
 
   return {
     allocation: updated,
@@ -92,24 +56,48 @@ export function rebalanceCapital({
   };
 }
 
-/* ============================================================
-   GLOBAL CAPITAL SUMMARY
-   ============================================================ */
+/* ======================================================
+   TOTAL CAPITAL CALCULATION
+====================================================== */
 
-export function calculateTotalCapital(allocation, reserve = 0) {
+export function calculateTotalCapital(allocation, reserve) {
   let total = reserve;
 
-  Object.values(allocation).forEach((engine) => {
-    total += Object.values(engine).reduce((a, b) => a + b, 0);
+  Object.keys(allocation).forEach((engine) => {
+    Object.keys(allocation[engine]).forEach((exchange) => {
+      total += allocation[engine][exchange];
+    });
   });
 
   return total;
 }
 
-/* ============================================================
-   UTIL
-   ============================================================ */
+/* ======================================================
+   SMART EXCHANGE ROUTER
+====================================================== */
 
-function deepClone(obj) {
-  return JSON.parse(JSON.stringify(obj));
+export function chooseExchange({
+  allocation,
+  engineType,
+  exchangePerformance,
+  humanOverride = null,
+}) {
+  if (humanOverride) return humanOverride;
+
+  const exchanges = Object.keys(allocation[engineType]);
+
+  // Rank by performance first, capital second
+  const ranked = exchanges.sort((a, b) => {
+    const perfA = exchangePerformance[a] || 0;
+    const perfB = exchangePerformance[b] || 0;
+
+    if (perfA !== perfB) return perfB - perfA;
+
+    return (
+      allocation[engineType][b] -
+      allocation[engineType][a]
+    );
+  });
+
+  return ranked[0];
 }
