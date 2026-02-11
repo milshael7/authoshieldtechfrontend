@@ -1,23 +1,44 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { executeEngine } from "./engines/ExecutionEngine";
-import { CapitalAllocator } from "./capital/CapitalAllocator";
-import { OrderLedger } from "./ledger/OrderLedger";
-import { DrawdownGovernor } from "./risk/DrawdownGovernor";
+import { evaluateGlobalRisk } from "./engines/GlobalRiskGovernor";
 
 export default function TradingRoom({
   mode: parentMode = "paper",
   dailyLimit = 5,
 }) {
+  const [mode, setMode] = useState(parentMode.toUpperCase());
   const [engineType, setEngineType] = useState("scalp");
-  const [exchange, setExchange] = useState("coinbase");
-  const [riskPct, setRiskPct] = useState(1);
+  const [baseRisk, setBaseRisk] = useState(1);
   const [leverage, setLeverage] = useState(1);
+
+  const [allocation, setAllocation] = useState({
+    scalp: 500,
+    session: 500,
+  });
+
+  const [dailyPnL, setDailyPnL] = useState(0);
   const [tradesUsed, setTradesUsed] = useState(0);
   const [log, setLog] = useState([]);
 
-  const allocator = new CapitalAllocator({});
-  const ledger = new OrderLedger();
-  const governor = new DrawdownGovernor();
+  const peakCapital = useRef(1000);
+
+  const totalCapital = allocation.scalp + allocation.session;
+
+  useEffect(() => {
+    setMode(parentMode.toUpperCase());
+  }, [parentMode]);
+
+  /* ================= GLOBAL RISK CHECK ================= */
+
+  const globalRisk = evaluateGlobalRisk({
+    totalCapital,
+    peakCapital: peakCapital.current,
+    dailyPnL,
+  });
+
+  if (totalCapital > peakCapital.current) {
+    peakCapital.current = totalCapital;
+  }
 
   function pushLog(message) {
     setLog((prev) => [
@@ -27,86 +48,90 @@ export default function TradingRoom({
   }
 
   function executeTrade() {
-    if (tradesUsed >= dailyLimit) {
-      pushLog("Daily trade limit reached.");
+    if (!globalRisk.allowed) {
+      pushLog(`Blocked: ${globalRisk.reason}`);
       return;
     }
 
-    const balance = allocator.getBalance(exchange);
-    const total = allocator.getTotal();
+    if (tradesUsed >= dailyLimit) {
+      pushLog("Daily trade count limit reached.");
+      return;
+    }
 
-    const protection = governor.evaluate({
-      peakBalance: total,
-      currentBalance: total,
-      riskPct,
+    const engineCapital =
+      engineType === "scalp"
+        ? allocation.scalp
+        : allocation.session;
+
+    const result = executeEngine({
+      engineType,
+      balance: engineCapital,
+      riskPct: baseRisk,
       leverage,
     });
 
-    if (protection.paused) {
-      pushLog("Portfolio paused due to drawdown.");
+    if (result.blocked) {
+      pushLog(`Blocked: ${result.reason}`);
       return;
     }
 
-    const decision = executeEngine({
-      engineType,
-      balance,
-      riskPct: protection.adjustedRisk,
-      leverage: protection.adjustedLeverage,
-    });
+    const updatedCapital = result.newBalance;
 
-    if (decision.blocked) {
-      pushLog(`Blocked: ${decision.reason}`);
-      return;
-    }
+    const updatedAllocation =
+      engineType === "scalp"
+        ? {
+            ...allocation,
+            scalp: updatedCapital,
+          }
+        : {
+            ...allocation,
+            session: updatedCapital,
+          };
 
-    allocator.applyPnL(exchange, decision.pnl);
-    allocator.rebalance();
-
-    ledger.record({
-      engine: engineType,
-      exchange,
-      side: decision.isWin ? "buy" : "sell",
-      size: decision.positionSize,
-      pnl: decision.pnl,
-    });
-
+    setAllocation(updatedAllocation);
     setTradesUsed((v) => v + 1);
+    setDailyPnL((v) => v + result.pnl);
 
     pushLog(
-      `${exchange.toUpperCase()} | ${engineType.toUpperCase()} | PnL: ${decision.pnl.toFixed(
+      `${engineType.toUpperCase()} trade | PnL: ${result.pnl.toFixed(
         2
       )}`
     );
   }
 
-  const snapshot = allocator.snapshot();
-  const stats = ledger.getStats();
-
   return (
     <div className="postureWrap">
       <section className="postureCard">
-        <h2>Portfolio Execution Room</h2>
+        <div className="postureTop">
+          <div>
+            <h2>Institutional Trading Control</h2>
+            <small>Global Risk Governed Execution</small>
+          </div>
 
-        <div className="stats">
-          <div><b>Total:</b> ${snapshot.total.toFixed(2)}</div>
-          <div><b>Coinbase:</b> ${snapshot.coinbase.toFixed(2)}</div>
-          <div><b>Kraken:</b> ${snapshot.kraken.toFixed(2)}</div>
-          <div><b>Reserve:</b> ${snapshot.reserve.toFixed(2)}</div>
+          <span className={`badge ${mode === "LIVE" ? "warn" : ""}`}>
+            {mode}
+          </span>
         </div>
 
-        <div className="ctrlRow">
-          <button
-            className={`pill ${exchange === "coinbase" ? "active" : ""}`}
-            onClick={() => setExchange("coinbase")}
-          >
-            Coinbase
-          </button>
-          <button
-            className={`pill ${exchange === "kraken" ? "active" : ""}`}
-            onClick={() => setExchange("kraken")}
-          >
-            Kraken
-          </button>
+        {!globalRisk.allowed && (
+          <div className="badge bad" style={{ marginTop: 10 }}>
+            Trading Locked — {globalRisk.reason}
+          </div>
+        )}
+
+        <div className="stats">
+          <div>
+            <b>Total Capital:</b> ${totalCapital.toFixed(2)}
+          </div>
+          <div>
+            <b>Peak Capital:</b> ${peakCapital.current.toFixed(2)}
+          </div>
+          <div>
+            <b>Daily PnL:</b> ${dailyPnL.toFixed(2)}
+          </div>
+          <div>
+            <b>Trades Used:</b> {tradesUsed} / {dailyLimit}
+          </div>
         </div>
 
         <div className="ctrlRow">
@@ -116,6 +141,7 @@ export default function TradingRoom({
           >
             Scalp
           </button>
+
           <button
             className={`pill ${engineType === "session" ? "active" : ""}`}
             onClick={() => setEngineType("session")}
@@ -129,10 +155,10 @@ export default function TradingRoom({
             Risk %
             <input
               type="number"
-              value={riskPct}
+              value={baseRisk}
               min="0.1"
               step="0.1"
-              onChange={(e) => setRiskPct(Number(e.target.value))}
+              onChange={(e) => setBaseRisk(Number(e.target.value))}
             />
           </label>
 
@@ -149,20 +175,19 @@ export default function TradingRoom({
         </div>
 
         <div className="actions">
-          <button className="btn ok" onClick={executeTrade}>
-            Route Portfolio Order
+          <button
+            className="btn ok"
+            onClick={executeTrade}
+            disabled={!globalRisk.allowed}
+          >
+            Execute Trade
           </button>
         </div>
       </section>
 
       <aside className="postureCard">
-        <h3>Portfolio Stats</h3>
-        <div>Trades: {stats?.totalTrades || 0}</div>
-        <div>Win Rate: {stats?.winRate || 0}%</div>
-        <div>Total PnL: ${stats?.pnl?.toFixed(2) || "0.00"}</div>
-
-        <h3 style={{ marginTop: 20 }}>Execution Log</h3>
-        <div style={{ maxHeight: 350, overflowY: "auto" }}>
+        <h3>Execution Log</h3>
+        <div style={{ maxHeight: 400, overflowY: "auto" }}>
           {log.map((x, i) => (
             <div key={i}>
               <small>{x.t}</small>
