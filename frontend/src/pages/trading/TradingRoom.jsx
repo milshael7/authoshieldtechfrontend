@@ -22,6 +22,11 @@ export default function TradingRoom({
   const [log, setLog] = useState([]);
   const [lastConfidence, setLastConfidence] = useState(null);
 
+  const [performance, setPerformance] = useState({
+    wins: 0,
+    losses: 0,
+  });
+
   const initialCapital = 1000;
 
   const initialDistribution = allocateCapital({
@@ -44,15 +49,17 @@ export default function TradingRoom({
     setMode(parentMode.toUpperCase());
   }, [parentMode]);
 
+  useEffect(() => {
+    if (totalCapital > peakCapital.current) {
+      peakCapital.current = totalCapital;
+    }
+  }, [totalCapital]);
+
   const globalRisk = evaluateGlobalRisk({
     totalCapital,
     peakCapital: peakCapital.current,
     dailyPnL,
   });
-
-  if (totalCapital > peakCapital.current) {
-    peakCapital.current = totalCapital;
-  }
 
   function pushLog(message, confidence) {
     setLog((prev) => [
@@ -86,6 +93,7 @@ export default function TradingRoom({
       riskPct: baseRisk,
       leverage,
       humanMultiplier,
+      recentPerformance: performance,
     });
 
     if (result.blocked) {
@@ -116,6 +124,12 @@ export default function TradingRoom({
     setDailyPnL((v) => v + result.pnl);
     setLastConfidence(result.confidenceScore);
 
+    // 🔥 UPDATE PERFORMANCE
+    setPerformance((prev) => ({
+      wins: prev.wins + (result.isWin ? 1 : 0),
+      losses: result.isWin ? 0 : prev.losses + 1,
+    }));
+
     pushLog(
       `${engineType.toUpperCase()} | ${exchange} | PnL: ${result.pnl.toFixed(
         2
@@ -125,7 +139,7 @@ export default function TradingRoom({
   }
 
   function confidenceColor(score) {
-    if (!score && score !== 0) return "";
+    if (score === null || score === undefined) return "";
     if (score < 50) return "#ff4d4d";
     if (score < 75) return "#f5b942";
     return "#5EC6FF";
@@ -154,8 +168,10 @@ export default function TradingRoom({
         <div className="stats">
           <div><b>Total Capital:</b> ${totalCapital.toFixed(2)}</div>
           <div><b>Reserve:</b> ${reserve.toFixed(2)}</div>
+          <div><b>Peak Capital:</b> ${peakCapital.current.toFixed(2)}</div>
           <div><b>Daily PnL:</b> ${dailyPnL.toFixed(2)}</div>
           <div><b>Trades Used:</b> {tradesUsed} / {dailyLimit}</div>
+          <div><b>Loss Streak:</b> {performance.losses}</div>
 
           {lastConfidence !== null && (
             <div>
@@ -172,23 +188,6 @@ export default function TradingRoom({
           )}
         </div>
 
-        {/* ENGINE SELECT */}
-        <div className="ctrlRow">
-          <button
-            className={`pill ${engineType === "scalp" ? "active" : ""}`}
-            onClick={() => setEngineType("scalp")}
-          >
-            Scalp
-          </button>
-          <button
-            className={`pill ${engineType === "session" ? "active" : ""}`}
-            onClick={() => setEngineType("session")}
-          >
-            Session
-          </button>
-        </div>
-
-        {/* RISK + LEVERAGE */}
         <div className="ctrl">
           <label>
             Risk %
@@ -212,7 +211,6 @@ export default function TradingRoom({
             />
           </label>
 
-          {/* 🔥 HUMAN OVERRIDE */}
           <label>
             Human Override
             <input
