@@ -1,41 +1,44 @@
-import React, { useMemo, useState, useEffect, useRef } from "react";
-
-/**
- * TradingRoom.jsx — DUAL ENGINE QUANT ROOM
- *
- * - Execution Engine (Operator Controlled)
- * - Learning Engine (Always Running)
- * - Micro-Scalp Mode Support
- * - Capital Segmentation (UI)
- * - No-Trade Window Enforcement
- *
- * NO execution logic
- * NO automation
- */
+import React, { useMemo, useState, useEffect } from "react";
 
 export default function TradingRoom({
   mode: parentMode = "paper",
   dailyLimit = 5,
   executionState: parentExecution = "idle",
 }) {
-  /* ================= EXECUTION ENGINE ================= */
+
+  /* ================= EXECUTION ================= */
   const [mode, setMode] = useState(parentMode.toUpperCase());
   const [execution, setExecution] = useState(parentExecution);
   const [riskPct, setRiskPct] = useState(1);
-  const [tradeStyle, setTradeStyle] = useState("scalp"); // scalp | session
+  const [tradeStyle, setTradeStyle] = useState("scalp");
   const [tradesUsed, setTradesUsed] = useState(1);
 
-  /* ================= LEARNING ENGINE ================= */
-  const [learningSignals] = useState(842);
-  const [learningAccuracy] = useState(71.2);
-  const [trainingCycles] = useState(3941);
+  /* ================= ACCOUNT MODEL ================= */
+  const [accountBalance] = useState(100000);
+  const [currentExposure, setCurrentExposure] = useState(15000);
+  const [leverage, setLeverage] = useState(2);
+  const [maxDrawdownPct] = useState(15);
 
-  /* ================= CAPITAL NODES ================= */
-  const [capitalNodes] = useState({
-    coinbase: 40000,
-    kraken: 35000,
-    reserve: 25000,
-  });
+  /* ================= DERIVED CALCS ================= */
+  const effectiveExposure = useMemo(
+    () => currentExposure * leverage,
+    [currentExposure, leverage]
+  );
+
+  const riskPerTradeAmount = useMemo(
+    () => (accountBalance * riskPct) / 100,
+    [accountBalance, riskPct]
+  );
+
+  const drawdownLimit = useMemo(
+    () => (accountBalance * maxDrawdownPct) / 100,
+    [accountBalance, maxDrawdownPct]
+  );
+
+  const liquidationBuffer = useMemo(
+    () => accountBalance - effectiveExposure,
+    [accountBalance, effectiveExposure]
+  );
 
   /* ================= NO TRADE WINDOW ================= */
   const tradingAllowed = useMemo(() => {
@@ -48,25 +51,8 @@ export default function TradingRoom({
     return true;
   }, []);
 
-  /* ================= LOG ================= */
-  const [log, setLog] = useState([
-    { t: new Date().toLocaleTimeString(), m: "Quant control room online." },
-  ]);
-
-  const pushLog = (message) => {
-    setLog((prev) =>
-      [{ t: new Date().toLocaleTimeString(), m: message }, ...prev].slice(0, 100)
-    );
-  };
-
-  /* ================= SYNC ================= */
-  useEffect(() => {
-    setMode(parentMode.toUpperCase());
-  }, [parentMode]);
-
-  useEffect(() => {
-    setExecution(parentExecution);
-  }, [parentExecution]);
+  useEffect(() => setMode(parentMode.toUpperCase()), [parentMode]);
+  useEffect(() => setExecution(parentExecution), [parentExecution]);
 
   /* ================= UI ================= */
   return (
@@ -77,68 +63,44 @@ export default function TradingRoom({
 
         <div className="postureTop">
           <div>
-            <h2 style={{ color: "#7ec8ff" }}>Quant Execution Engine</h2>
-            <small>Operator-controlled micro & session trading</small>
+            <h2 style={{ color: "#7ec8ff" }}>
+              Quant Execution Engine
+            </h2>
+            <small>Micro & session trade supervision</small>
           </div>
-
           <span className={`badge ${mode === "LIVE" ? "warn" : ""}`}>
             {mode}
           </span>
         </div>
 
-        {/* WINDOW STATUS */}
         {!tradingAllowed && (
           <p style={{ color: "#ff7a7a", marginTop: 12 }}>
             Trading window closed (Fri 9PM → Sat 9PM)
           </p>
         )}
 
-        {/* STATUS STRIP */}
         <div className="stats">
-          <div>
-            <b>Status:</b>{" "}
-            <span className={`badge ${execution === "executing" ? "ok" : ""}`}>
-              {execution.toUpperCase()}
-            </span>
-          </div>
-
-          <div>
-            <b>Trades Used:</b> {tradesUsed} / {dailyLimit}
-          </div>
-
-          <div>
-            <b>Risk:</b> {riskPct}%
-          </div>
-
-          <div>
-            <b>Style:</b> {tradeStyle.toUpperCase()}
-          </div>
+          <div><b>Status:</b> {execution}</div>
+          <div><b>Trades:</b> {tradesUsed}/{dailyLimit}</div>
+          <div><b>Risk:</b> {riskPct}%</div>
+          <div><b>Style:</b> {tradeStyle}</div>
         </div>
 
-        {/* TRADE STYLE */}
         <div className="ctrlRow">
           <button
             className={`pill ${tradeStyle === "scalp" ? "active" : ""}`}
-            onClick={() => {
-              setTradeStyle("scalp");
-              pushLog("Micro-scalp mode (2–3s execution) enabled.");
-            }}
+            onClick={() => setTradeStyle("scalp")}
           >
             Micro Scalp
           </button>
-
           <button
             className={`pill ${tradeStyle === "session" ? "active" : ""}`}
-            onClick={() => {
-              setTradeStyle("session");
-              pushLog("Session trade mode enabled.");
-            }}
+            onClick={() => setTradeStyle("session")}
           >
             Session
           </button>
         </div>
 
-        {/* RISK */}
         <div className="ctrl">
           <label>
             Risk %
@@ -147,36 +109,27 @@ export default function TradingRoom({
               min="0.1"
               step="0.1"
               value={riskPct}
-              onChange={(e) => {
-                setRiskPct(e.target.value);
-                pushLog(`Risk adjusted to ${e.target.value}%`);
-              }}
+              onChange={(e) => setRiskPct(Number(e.target.value))}
             />
           </label>
         </div>
 
-        {/* EXECUTION ACTIONS */}
         <div className="actions">
           <button
             className="btn warn"
             disabled={!tradingAllowed}
-            onClick={() => {
-              setExecution("paused");
-              pushLog("Execution paused by operator.");
-            }}
+            onClick={() => setExecution("paused")}
           >
             Pause
           </button>
 
           <button
             className="btn ok"
-            disabled={
-              tradesUsed >= dailyLimit || !tradingAllowed
-            }
+            disabled={tradesUsed >= dailyLimit || !tradingAllowed}
             onClick={() => {
               setExecution("executing");
               setTradesUsed((v) => v + 1);
-              pushLog("Simulated trade executed.");
+              setCurrentExposure((v) => v + riskPerTradeAmount);
             }}
           >
             Execute
@@ -188,45 +141,67 @@ export default function TradingRoom({
       {/* ================= RIGHT PANEL ================= */}
       <aside className="postureCard">
 
-        <h3 style={{ color: "#7ec8ff" }}>Learning Engine (Always Active)</h3>
-        <p className="muted">
-          This engine continues training regardless of execution window.
-        </p>
+        <h3 style={{ color: "#7ec8ff" }}>
+          Exposure & Leverage Model
+        </h3>
 
         <div className="stats">
           <div>
-            <b>Signals Processed:</b> {learningSignals}
+            <b>Balance:</b> ${accountBalance.toLocaleString()}
           </div>
+
           <div>
-            <b>Accuracy:</b> {learningAccuracy}%
+            <b>Exposure:</b> ${currentExposure.toLocaleString()}
           </div>
+
           <div>
-            <b>Training Cycles:</b> {trainingCycles}
+            <b>Leverage:</b>
+            <input
+              type="number"
+              min="1"
+              max="10"
+              value={leverage}
+              onChange={(e) => setLeverage(Number(e.target.value))}
+              style={{ width: 60, marginLeft: 8 }}
+            />
+            x
+          </div>
+
+          <div>
+            <b>Effective Exposure:</b> $
+            {effectiveExposure.toLocaleString()}
+          </div>
+
+          <div>
+            <b>Risk / Trade:</b> $
+            {riskPerTradeAmount.toFixed(2)}
+          </div>
+
+          <div>
+            <b>Drawdown Limit:</b> $
+            {drawdownLimit.toLocaleString()}
+          </div>
+
+          <div>
+            <b>Liquidation Buffer:</b>{" "}
+            <span style={{
+              color:
+                liquidationBuffer < accountBalance * 0.2
+                  ? "#ff7a7a"
+                  : "#7ec8ff"
+            }}>
+              ${liquidationBuffer.toLocaleString()}
+            </span>
           </div>
         </div>
 
-        <hr style={{ opacity: 0.2, margin: "20px 0" }} />
-
-        <h4>Capital Nodes</h4>
-        <small>
-          Coinbase: ${capitalNodes.coinbase.toLocaleString()} <br />
-          Kraken: ${capitalNodes.kraken.toLocaleString()} <br />
-          Reserve: ${capitalNodes.reserve.toLocaleString()}
-        </small>
-
-        <hr style={{ opacity: 0.2, margin: "20px 0" }} />
-
-        <h4>Activity Log</h4>
-        <div style={{ maxHeight: 260, overflowY: "auto" }}>
-          {log.map((x, i) => (
-            <div key={i} style={{ marginBottom: 6 }}>
-              <span style={{ opacity: 0.5 }}>{x.t}</span>
-              <div>{x.m}</div>
-            </div>
-          ))}
-        </div>
+        <p className="muted" style={{ marginTop: 12 }}>
+          Effective exposure reflects leveraged capital. 
+          Liquidation buffer shows remaining capital after exposure.
+        </p>
 
       </aside>
+
     </div>
   );
 }
