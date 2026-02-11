@@ -4,6 +4,7 @@ import { isTradingWindowOpen } from "./engines/TimeGovernor";
 import { applyGovernance } from "./engines/GovernanceEngine";
 import { checkVolatility } from "./engines/VolatilityGovernor";
 import { evaluateConfidence } from "./engines/ConfidenceEngine";
+import { evaluateDrawdown } from "./engines/DrawdownEngine";
 
 export default function TradingRoom({
   mode: parentMode = "paper",
@@ -11,23 +12,17 @@ export default function TradingRoom({
 }) {
   const [mode, setMode] = useState(parentMode.toUpperCase());
   const [engineType, setEngineType] = useState("scalp");
-  const [adaptiveRiskPct, setAdaptiveRiskPct] = useState(1);
+  const [baseRisk, setBaseRisk] = useState(1);
   const [leverage, setLeverage] = useState(1);
   const [tradesUsed, setTradesUsed] = useState(0);
   const [log, setLog] = useState([]);
-  const [lastConfidence, setLastConfidence] = useState(null);
-
-  const [allocation, setAllocation] = useState({
-    scalp: 500,
-    session: 500,
-    total: 1000,
-  });
+  const [equityHistory, setEquityHistory] = useState([1000]);
+  const [currentEquity, setCurrentEquity] = useState(1000);
 
   const humanCaps = {
     maxRiskPct: 2,
     maxLeverage: 10,
-    maxDrawdownPct: 15,
-    maxConsecutiveLosses: 3,
+    maxDrawdownPct: 20,
   };
 
   useEffect(() => {
@@ -59,63 +54,62 @@ export default function TradingRoom({
     }
 
     const confidenceCheck = evaluateConfidence(engineType);
-    setLastConfidence(confidenceCheck.score);
-
     if (!confidenceCheck.approved) {
       pushLog(`Blocked — Confidence ${confidenceCheck.score}%`);
       return;
     }
 
-    const engineCapital =
-      engineType === "scalp"
-        ? allocation.scalp
-        : allocation.session;
+    const drawdownCheck = evaluateDrawdown({
+      equityHistory,
+      currentEquity,
+      maxDrawdownPct: humanCaps.maxDrawdownPct,
+    });
+
+    if (!drawdownCheck.approved) {
+      pushLog(drawdownCheck.reason);
+      return;
+    }
 
     const governance = applyGovernance({
       engineType,
-      balance: engineCapital,
+      balance: currentEquity,
       requestedRisk:
-        adaptiveRiskPct *
+        baseRisk *
         volatilityCheck.riskModifier *
-        confidenceCheck.modifier,
+        confidenceCheck.modifier *
+        drawdownCheck.riskModifier,
       requestedLeverage: leverage,
       humanCaps,
     });
 
     if (!governance.approved) {
-      pushLog(`Blocked — ${governance.reason}`);
+      pushLog(governance.reason);
       return;
     }
 
     const result = executeEngine({
       engineType,
-      balance: engineCapital,
+      balance: currentEquity,
       riskPct: governance.effectiveRisk,
       leverage: governance.effectiveLeverage,
     });
 
-    const updatedCapital = result.newBalance;
+    const newEquity = result.newBalance;
 
-    const updatedAllocation =
-      engineType === "scalp"
-        ? { ...allocation, scalp: updatedCapital }
-        : { ...allocation, session: updatedCapital };
-
-    setAllocation({
-      ...updatedAllocation,
-      total:
-        updatedAllocation.scalp +
-        updatedAllocation.session,
-    });
-
+    setCurrentEquity(newEquity);
+    setEquityHistory((prev) => [...prev, newEquity]);
     setTradesUsed((v) => v + 1);
 
     pushLog(
-      `${engineType.toUpperCase()} | Confidence: ${confidenceCheck.score}% | PnL: ${result.pnl.toFixed(
+      `${engineType.toUpperCase()} | PnL: ${result.pnl.toFixed(
         2
-      )}`
+      )} | Equity: ${newEquity.toFixed(2)}`
     );
   }
+
+  const peak = Math.max(...equityHistory);
+  const drawdown =
+    peak > 0 ? ((peak - currentEquity) / peak) * 100 : 0;
 
   return (
     <div className="postureWrap">
@@ -123,9 +117,7 @@ export default function TradingRoom({
         <div className="postureTop">
           <div>
             <h2>Trading Control Room</h2>
-            <small>
-              Volatility + Confidence + Governance Active
-            </small>
+            <small>Equity + Drawdown Protection Active</small>
           </div>
           <span className={`badge ${mode === "LIVE" ? "warn" : ""}`}>
             {mode}
@@ -133,13 +125,15 @@ export default function TradingRoom({
         </div>
 
         <div className="stats">
-          <div><b>Total:</b> ${allocation.total.toFixed(2)}</div>
-          <div><b>Scalp:</b> ${allocation.scalp.toFixed(2)}</div>
-          <div><b>Session:</b> ${allocation.session.toFixed(2)}</div>
-          <div><b>Trades:</b> {tradesUsed} / {dailyLimit}</div>
-          {lastConfidence !== null && (
-            <div><b>Last Confidence:</b> {lastConfidence}%</div>
-          )}
+          <div><b>Equity:</b> ${currentEquity.toFixed(2)}</div>
+          <div><b>Peak:</b> ${peak.toFixed(2)}</div>
+          <div>
+            <b>Drawdown:</b>{" "}
+            <span style={{ color: drawdown > 10 ? "#ff6b6b" : "" }}>
+              {drawdown.toFixed(2)}%
+            </span>
+          </div>
+          <div><b>Trades:</b> {tradesUsed}/{dailyLimit}</div>
         </div>
 
         <div className="ctrlRow">
@@ -162,12 +156,10 @@ export default function TradingRoom({
             Base Risk %
             <input
               type="number"
-              value={adaptiveRiskPct}
+              value={baseRisk}
               min="0.1"
               step="0.1"
-              onChange={(e) =>
-                setAdaptiveRiskPct(Number(e.target.value))
-              }
+              onChange={(e) => setBaseRisk(Number(e.target.value))}
             />
           </label>
 
@@ -178,9 +170,7 @@ export default function TradingRoom({
               value={leverage}
               min="1"
               max="20"
-              onChange={(e) =>
-                setLeverage(Number(e.target.value))
-              }
+              onChange={(e) => setLeverage(Number(e.target.value))}
             />
           </label>
         </div>
