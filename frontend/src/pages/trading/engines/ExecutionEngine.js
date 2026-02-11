@@ -5,6 +5,7 @@ import {
   calculateVolatility,
   volatilityPositionModifier,
 } from "./VolatilityEngine";
+import { confirmMultiTimeframe } from "./MultiTimeframeEngine";
 
 export function executeEngine({
   engineType,
@@ -26,34 +27,40 @@ export function executeEngine({
   const cappedRisk = Math.min(riskPct, humanCaps.maxRiskPct);
   const cappedLeverage = Math.min(leverage, humanCaps.maxLeverage);
 
-  const priceHistory = generateSyntheticPrices(60);
+  const shortHistory = generateSyntheticPrices(60);
+  const longHistory = generateSyntheticPrices(200);
 
-  const regime = detectRegime(priceHistory);
-  const volatility = calculateVolatility(priceHistory);
+  const regime = detectRegime(longHistory);
+  const volatility = calculateVolatility(shortHistory);
   const volatilityModifier =
     volatilityPositionModifier(volatility);
 
-  const signal = generateSignal({
-    priceHistory,
+  const shortSignal = generateSignal({
+    priceHistory: shortHistory,
     engineType,
   });
 
-  if (signal.direction === "neutral") {
-    return { blocked: true, reason: "No strong signal" };
+  const longSignal = generateSignal({
+    priceHistory: longHistory,
+    engineType,
+  });
+
+  const confirmation = confirmMultiTimeframe({
+    shortSignal,
+    longSignal,
+  });
+
+  if (!confirmation.confirmed) {
+    return {
+      blocked: true,
+      reason: confirmation.reason,
+    };
   }
 
   const drawdownPct =
     ((performance.peak - balance) / performance.peak) * 100;
 
-  let baseConfidence = signal.confidence;
-
-  if (regime === "uptrend" && signal.direction === "long") {
-    baseConfidence += 0.05;
-  }
-
-  if (regime === "downtrend" && signal.direction === "short") {
-    baseConfidence += 0.05;
-  }
+  let baseConfidence = shortSignal.confidence;
 
   if (regime === "range") {
     baseConfidence -= 0.05;
@@ -66,16 +73,14 @@ export function executeEngine({
     drawdownPct,
   });
 
-  /* ================= LOSING STREAK PROTECTION ================= */
-
   let streakModifier = 1;
 
   if (performance.losingStreak >= 3) {
-    streakModifier = 0.7; // reduce risk 30%
+    streakModifier = 0.7;
   }
 
   if (performance.losingStreak >= 5) {
-    streakModifier = 0.5; // cut risk in half
+    streakModifier = 0.5;
   }
 
   if (performance.losingStreak >= 7) {
