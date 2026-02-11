@@ -22,10 +22,9 @@ export default function TradingRoom({
   const [log, setLog] = useState([]);
   const [lastConfidence, setLastConfidence] = useState(null);
 
-  const [performance, setPerformance] = useState({
-    wins: 0,
-    losses: 0,
-  });
+  const [currentDate, setCurrentDate] = useState(
+    new Date().toDateString()
+  );
 
   const initialCapital = 1000;
 
@@ -49,17 +48,40 @@ export default function TradingRoom({
     setMode(parentMode.toUpperCase());
   }, [parentMode]);
 
+  /* ================= DAILY RESET ================= */
+
   useEffect(() => {
-    if (totalCapital > peakCapital.current) {
-      peakCapital.current = totalCapital;
-    }
-  }, [totalCapital]);
+    const interval = setInterval(() => {
+      const today = new Date().toDateString();
+      if (today !== currentDate) {
+        setTradesUsed(0);
+        setDailyPnL(0);
+        setCurrentDate(today);
+
+        setLog((prev) => [
+          {
+            t: new Date().toLocaleTimeString(),
+            m: "🔄 Daily reset executed.",
+          },
+          ...prev,
+        ]);
+      }
+    }, 60000); // check every minute
+
+    return () => clearInterval(interval);
+  }, [currentDate]);
+
+  /* ================= GLOBAL RISK ================= */
 
   const globalRisk = evaluateGlobalRisk({
     totalCapital,
     peakCapital: peakCapital.current,
     dailyPnL,
   });
+
+  if (totalCapital > peakCapital.current) {
+    peakCapital.current = totalCapital;
+  }
 
   function pushLog(message, confidence) {
     setLog((prev) => [
@@ -93,7 +115,6 @@ export default function TradingRoom({
       riskPct: baseRisk,
       leverage,
       humanMultiplier,
-      recentPerformance: performance,
     });
 
     if (result.blocked) {
@@ -124,12 +145,6 @@ export default function TradingRoom({
     setDailyPnL((v) => v + result.pnl);
     setLastConfidence(result.confidenceScore);
 
-    // 🔥 UPDATE PERFORMANCE
-    setPerformance((prev) => ({
-      wins: prev.wins + (result.isWin ? 1 : 0),
-      losses: result.isWin ? 0 : prev.losses + 1,
-    }));
-
     pushLog(
       `${engineType.toUpperCase()} | ${exchange} | PnL: ${result.pnl.toFixed(
         2
@@ -139,7 +154,7 @@ export default function TradingRoom({
   }
 
   function confidenceColor(score) {
-    if (score === null || score === undefined) return "";
+    if (!score && score !== 0) return "";
     if (score < 50) return "#ff4d4d";
     if (score < 75) return "#f5b942";
     return "#5EC6FF";
@@ -159,19 +174,11 @@ export default function TradingRoom({
           </span>
         </div>
 
-        {!globalRisk.allowed && (
-          <div className="badge bad" style={{ marginTop: 10 }}>
-            Trading Locked — {globalRisk.reason}
-          </div>
-        )}
-
         <div className="stats">
           <div><b>Total Capital:</b> ${totalCapital.toFixed(2)}</div>
           <div><b>Reserve:</b> ${reserve.toFixed(2)}</div>
-          <div><b>Peak Capital:</b> ${peakCapital.current.toFixed(2)}</div>
           <div><b>Daily PnL:</b> ${dailyPnL.toFixed(2)}</div>
           <div><b>Trades Used:</b> {tradesUsed} / {dailyLimit}</div>
-          <div><b>Loss Streak:</b> {performance.losses}</div>
 
           {lastConfidence !== null && (
             <div>
@@ -186,47 +193,6 @@ export default function TradingRoom({
               </span>
             </div>
           )}
-        </div>
-
-        <div className="ctrl">
-          <label>
-            Risk %
-            <input
-              type="number"
-              value={baseRisk}
-              min="0.1"
-              step="0.1"
-              onChange={(e) => setBaseRisk(Number(e.target.value))}
-            />
-          </label>
-
-          <label>
-            Leverage
-            <input
-              type="number"
-              value={leverage}
-              min="1"
-              max="20"
-              onChange={(e) => setLeverage(Number(e.target.value))}
-            />
-          </label>
-
-          <label>
-            Human Override
-            <input
-              type="range"
-              min="0.5"
-              max="1"
-              step="0.05"
-              value={humanMultiplier}
-              onChange={(e) =>
-                setHumanMultiplier(Number(e.target.value))
-              }
-            />
-            <div style={{ fontSize: 12 }}>
-              Multiplier: {(humanMultiplier * 100).toFixed(0)}%
-            </div>
-          </label>
         </div>
 
         <div className="actions">
@@ -244,19 +210,9 @@ export default function TradingRoom({
         <h3>Execution Log</h3>
         <div style={{ maxHeight: 400, overflowY: "auto" }}>
           {log.map((x, i) => (
-            <div key={i} style={{ marginBottom: 10 }}>
+            <div key={i}>
               <small>{x.t}</small>
               <div>{x.m}</div>
-              {x.confidence !== undefined && (
-                <div
-                  style={{
-                    fontSize: 12,
-                    color: confidenceColor(x.confidence),
-                  }}
-                >
-                  Confidence: {x.confidence}%
-                </div>
-              )}
             </div>
           ))}
         </div>
