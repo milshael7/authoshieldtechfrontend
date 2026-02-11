@@ -1,6 +1,10 @@
 import { generateSignal } from "./SignalEngine";
 import { adjustConfidence } from "./AdaptiveConfidence";
 import { detectRegime } from "./RegimeEngine";
+import {
+  calculateVolatility,
+  volatilityPositionModifier,
+} from "./VolatilityEngine";
 
 export function executeEngine({
   engineType,
@@ -21,6 +25,10 @@ export function executeEngine({
 
   const regime = detectRegime(priceHistory);
 
+  const volatility = calculateVolatility(priceHistory);
+  const volatilityModifier =
+    volatilityPositionModifier(volatility);
+
   const signal = generateSignal({
     priceHistory,
     engineType,
@@ -35,7 +43,6 @@ export function executeEngine({
 
   let baseConfidence = signal.confidence;
 
-  // Regime Bias Adjustment
   if (regime === "uptrend" && signal.direction === "long") {
     baseConfidence += 0.05;
   }
@@ -56,7 +63,9 @@ export function executeEngine({
   });
 
   const effectiveRisk =
-    cappedRisk * adaptiveConfidence;
+    cappedRisk *
+    adaptiveConfidence *
+    volatilityModifier;
 
   const positionSize =
     (balance * effectiveRisk * cappedLeverage) / 100;
@@ -70,6 +79,13 @@ export function executeEngine({
 
   const newBalance = balance + pnl;
 
+  if (newBalance < humanCaps.capitalFloor) {
+    return {
+      blocked: true,
+      reason: "Capital floor hit",
+    };
+  }
+
   return {
     pnl,
     newBalance,
@@ -77,7 +93,7 @@ export function executeEngine({
     positionSize,
     confidence: adaptiveConfidence,
     regime,
-    direction: signal.direction,
+    volatility,
   };
 }
 
