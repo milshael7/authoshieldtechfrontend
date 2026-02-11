@@ -4,18 +4,19 @@ import TradingRoom from "./trading/TradingRoom.jsx";
 import "../styles/platform.css";
 
 /**
- * Trading.jsx — DUAL ENGINE OVERSIGHT (PHASE 2)
+ * Trading.jsx — DUAL ENGINE GOVERNANCE (PHASE 3)
  *
  * STRUCTURE:
- * - Execution Engine (Live / Paper)
- * - Learning Engine (Always Running)
- * - Trading Window Enforcement
- * - Capital Distribution Overview
+ * - AI = 100% strategy engine
+ * - Human = Override authority
+ * - Dual capital segmentation
+ * - Weekend lock
+ * - Learning engine always active
  *
- * STILL:
- * - No execution logic
- * - No API keys
- * - No automation
+ * NO:
+ * - Real execution
+ * - API keys
+ * - Automation
  */
 
 export default function Trading() {
@@ -24,31 +25,33 @@ export default function Trading() {
   /* ================= EXECUTION ENGINE ================= */
   const [mode, setMode] = useState("paper"); // paper | live
   const [dailyLimit, setDailyLimit] = useState(5);
-  const [executionState, setExecutionState] = useState("idle");
   const [tradesUsed, setTradesUsed] = useState(1);
 
+  /* ================= HUMAN OVERRIDE CONTROL ================= */
+  const [overrideRiskPct, setOverrideRiskPct] = useState(20); // human override %
+  const [overrideActive, setOverrideActive] = useState(false);
+
   /* ================= LEARNING ENGINE ================= */
-  const [learningStatus] = useState("active"); // always active (UI only)
+  const [learningStatus] = useState("active");
   const [simulatedTrades] = useState(143);
   const [accuracy] = useState(67.4);
 
   /* ================= TRADING WINDOW ================= */
   const tradingAllowed = useMemo(() => {
     const now = new Date();
-    const day = now.getDay(); // 0=Sun ... 5=Fri 6=Sat
+    const day = now.getDay();
     const hour = now.getHours();
 
-    if (day === 5 && hour >= 21) return false; // Friday after 9pm
-    if (day === 6 && hour < 21) return false;  // Saturday before 9pm
+    if (day === 5 && hour >= 21) return false; // Fri after 9PM
+    if (day === 6 && hour < 21) return false;  // Sat before 9PM
     return true;
   }, []);
 
-  /* ================= CAPITAL UI ================= */
+  /* ================= CAPITAL DISTRIBUTION ================= */
   const capital = {
     total: 100000,
-    coinbase: 40000,
-    kraken: 35000,
-    reserve: 25000,
+    execution: 80000,  // 80% AI controlled
+    reserve: 20000,    // 20% human-controlled buffer
   };
 
   return (
@@ -58,9 +61,11 @@ export default function Trading() {
       <section className="postureCard" style={{ marginBottom: 20 }}>
         <div className="postureTop">
           <div>
-            <h2 style={{ color: "#7ec8ff" }}>Quant Trading Oversight</h2>
+            <h2 style={{ color: "#7ec8ff" }}>
+              Quant Trading Oversight
+            </h2>
             <small>
-              Dual-engine supervision: execution & learning intelligence
+              AI-driven execution with human override governance
             </small>
           </div>
 
@@ -69,7 +74,7 @@ export default function Trading() {
           </span>
         </div>
 
-        {/* ================= ENGINE STATUS GRID ================= */}
+        {/* ================= STATUS GRID ================= */}
         <div
           style={{
             marginTop: 16,
@@ -80,7 +85,7 @@ export default function Trading() {
         >
           {/* EXECUTION ENGINE */}
           <div>
-            <b>Execution Engine</b>
+            <b>Execution Engine (AI)</b>
             <div style={{ marginTop: 8 }}>
               <span className={`badge ${tradingAllowed ? "ok" : "bad"}`}>
                 {tradingAllowed ? "Window Open" : "Trading Paused"}
@@ -89,6 +94,39 @@ export default function Trading() {
             <div style={{ marginTop: 8 }}>
               Trades: {tradesUsed} / {dailyLimit}
             </div>
+            <small>AI controls 100% of strategy logic</small>
+          </div>
+
+          {/* HUMAN OVERRIDE */}
+          <div>
+            <b>Human Override</b>
+            <div style={{ marginTop: 8 }}>
+              <span className={`badge ${overrideActive ? "warn" : ""}`}>
+                {overrideActive ? "ACTIVE" : "Monitoring"}
+              </span>
+            </div>
+
+            <div style={{ marginTop: 8 }}>
+              Risk Override %
+              <input
+                type="number"
+                min="1"
+                max="50"
+                value={overrideRiskPct}
+                onChange={(e) =>
+                  setOverrideRiskPct(Number(e.target.value))
+                }
+                style={{ width: "100%", marginTop: 6 }}
+              />
+            </div>
+
+            <button
+              className="pill warn"
+              style={{ marginTop: 8 }}
+              onClick={() => setOverrideActive(!overrideActive)}
+            >
+              {overrideActive ? "Disable Override" : "Enable Override"}
+            </button>
           </div>
 
           {/* LEARNING ENGINE */}
@@ -103,18 +141,18 @@ export default function Trading() {
               Simulated Trades: {simulatedTrades}
             </div>
             <div>Signal Accuracy: {accuracy}%</div>
+            <small>Runs 24/7 — never stops learning</small>
           </div>
 
-          {/* CAPITAL OVERVIEW */}
+          {/* CAPITAL */}
           <div>
-            <b>Capital Distribution</b>
+            <b>Capital Governance</b>
             <div style={{ marginTop: 8 }}>
               Total: ${capital.total.toLocaleString()}
             </div>
             <small>
-              Coinbase: ${capital.coinbase.toLocaleString()} <br />
-              Kraken: ${capital.kraken.toLocaleString()} <br />
-              Reserve: ${capital.reserve.toLocaleString()}
+              AI Execution: ${capital.execution.toLocaleString()} <br />
+              Human Reserve: ${capital.reserve.toLocaleString()}
             </small>
           </div>
 
@@ -140,8 +178,8 @@ export default function Trading() {
         </div>
 
         <p className="muted" style={{ marginTop: 16, fontSize: 13 }}>
-          Execution engine can pause. Learning engine never stops.
-          Capital is segmented and risk-governed.
+          AI operates independently. Human override adjusts exposure only.
+          Weekend lock enforced. Learning engine always active.
         </p>
       </section>
 
@@ -170,7 +208,11 @@ export default function Trading() {
       {/* ================= CONTENT ================= */}
       {tab === "market" && (
         <section className="postureCard">
-          <Market mode={mode} dailyLimit={dailyLimit} tradesUsed={tradesUsed} />
+          <Market
+            mode={mode}
+            dailyLimit={dailyLimit}
+            tradesUsed={tradesUsed}
+          />
         </section>
       )}
 
@@ -179,7 +221,8 @@ export default function Trading() {
           <TradingRoom
             mode={mode}
             dailyLimit={dailyLimit}
-            executionState={executionState}
+            overrideActive={overrideActive}
+            overrideRiskPct={overrideRiskPct}
           />
         </section>
       )}
@@ -199,14 +242,14 @@ export default function Trading() {
               <span className="dot ok" />
               <div>
                 <b>Signal Accuracy</b>
-                <small>Learning engine prediction performance</small>
+                <small>Learning engine performance</small>
               </div>
             </li>
             <li>
               <span className="dot warn" />
               <div>
                 <b>Risk Exposure</b>
-                <small>Position sizing &amp; drawdown analysis</small>
+                <small>AI exposure vs human override ratio</small>
               </div>
             </li>
           </ul>
