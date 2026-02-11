@@ -21,12 +21,14 @@ export default function TradingRoom({
     total: 1000,
   });
 
+  const [equityHistory, setEquityHistory] = useState([1000]);
+  const [peakEquity, setPeakEquity] = useState(1000);
+
   const [performance, setPerformance] = useState({
     scalp: { wins: 0, losses: 0, pnl: 0 },
     session: { wins: 0, losses: 0, pnl: 0 },
   });
 
-  /* ================= HUMAN CAPS ================= */
   const humanCaps = {
     maxRiskPct: 2,
     maxLeverage: 10,
@@ -45,30 +47,14 @@ export default function TradingRoom({
     ]);
   }
 
-  function rebalanceCapital(updated) {
-    const floor = 100;
+  function calculateDrawdown(currentEquity) {
+    const newPeak = Math.max(peakEquity, currentEquity);
+    setPeakEquity(newPeak);
 
-    let { scalp, session } = updated;
+    const drawdownPct =
+      ((newPeak - currentEquity) / newPeak) * 100;
 
-    if (scalp < floor && session > floor * 2) {
-      const transfer = floor;
-      scalp += transfer;
-      session -= transfer;
-      pushLog("Capital rebalanced → Session → Scalp");
-    }
-
-    if (session < floor && scalp > floor * 2) {
-      const transfer = floor;
-      session += transfer;
-      scalp -= transfer;
-      pushLog("Capital rebalanced → Scalp → Session");
-    }
-
-    return {
-      scalp,
-      session,
-      total: scalp + session,
-    };
+    return drawdownPct;
   }
 
   function executeTrade() {
@@ -87,7 +73,6 @@ export default function TradingRoom({
         ? allocation.scalp
         : allocation.session;
 
-    /* ================= GOVERNANCE CHECK ================= */
     const governance = applyGovernance({
       engineType,
       balance: engineCapital,
@@ -102,7 +87,6 @@ export default function TradingRoom({
       return;
     }
 
-    /* ================= EXECUTION ================= */
     const result = executeEngine({
       engineType,
       balance: engineCapital,
@@ -124,9 +108,23 @@ export default function TradingRoom({
             session: updatedCapital,
           };
 
-    const rebalanced = rebalanceCapital(updatedAllocation);
+    const newTotal =
+      updatedAllocation.scalp +
+      updatedAllocation.session;
 
-    setAllocation(rebalanced);
+    const drawdown = calculateDrawdown(newTotal);
+
+    if (drawdown > humanCaps.maxDrawdownPct) {
+      pushLog("⚠ Drawdown limit breached — Defensive Mode Activated");
+    }
+
+    setAllocation({
+      ...updatedAllocation,
+      total: newTotal,
+    });
+
+    setEquityHistory((prev) => [...prev, newTotal]);
+
     setTradesUsed((v) => v + 1);
 
     setPerformance((prev) => {
@@ -146,11 +144,10 @@ export default function TradingRoom({
     pushLog(
       `${engineType.toUpperCase()} trade | PnL: ${pnl.toFixed(
         2
-      )} | Risk Used: ${governance.effectiveRisk}%`
+      )} | Equity: ${newTotal.toFixed(2)}`
     );
   }
 
-  /* ================= CONTINUOUS LEARNING ================= */
   useEffect(() => {
     const interval = setInterval(() => {
       setLearningCycles((v) => v + 1);
@@ -159,13 +156,16 @@ export default function TradingRoom({
     return () => clearInterval(interval);
   }, []);
 
+  const drawdownPct =
+    ((peakEquity - allocation.total) / peakEquity) * 100;
+
   return (
     <div className="postureWrap">
       <section className="postureCard">
         <div className="postureTop">
           <div>
             <h2>Trading Control Room</h2>
-            <small>Dual Engine + Governance Layer</small>
+            <small>Dual Engine + Governance + Equity Monitor</small>
           </div>
 
           <span className={`badge ${mode === "LIVE" ? "warn" : ""}`}>
@@ -173,25 +173,13 @@ export default function TradingRoom({
           </span>
         </div>
 
-        {!isTradingWindowOpen() && (
-          <div className="badge warn" style={{ marginTop: 10 }}>
-            Weekend Lock Active — Learning Mode Only
-          </div>
-        )}
-
         <div className="stats">
-          <div>
-            <b>Total Capital:</b> ${allocation.total.toFixed(2)}
+          <div><b>Total Capital:</b> ${allocation.total.toFixed(2)}</div>
+          <div><b>Peak Equity:</b> ${peakEquity.toFixed(2)}</div>
+          <div style={{ color: drawdownPct > 10 ? "red" : "inherit" }}>
+            <b>Drawdown:</b> {drawdownPct.toFixed(2)}%
           </div>
-          <div style={{ color: "#5EC6FF" }}>
-            <b>Scalp Engine:</b> ${allocation.scalp.toFixed(2)}
-          </div>
-          <div>
-            <b>Session Engine:</b> ${allocation.session.toFixed(2)}
-          </div>
-          <div>
-            <b>Trades Used:</b> {tradesUsed} / {dailyLimit}
-          </div>
+          <div><b>Trades Used:</b> {tradesUsed} / {dailyLimit}</div>
         </div>
 
         <div className="ctrlRow">
@@ -235,37 +223,28 @@ export default function TradingRoom({
         </div>
 
         <div className="actions">
-          <button
-            className="btn ok"
-            onClick={executeTrade}
-            disabled={!isTradingWindowOpen()}
-          >
+          <button className="btn ok" onClick={executeTrade}>
             Execute Trade
           </button>
         </div>
 
         <div style={{ marginTop: 15, fontSize: 12, opacity: 0.7 }}>
-          Continuous Learning Cycles: {learningCycles}
+          Learning Cycles: {learningCycles}
         </div>
       </section>
 
       <aside className="postureCard">
-        <h3>Engine Performance</h3>
-
-        <div style={{ marginBottom: 15 }}>
-          <b>Scalp:</b> Wins {performance.scalp.wins} | Losses{" "}
-          {performance.scalp.losses} | PnL{" "}
-          {performance.scalp.pnl.toFixed(2)}
+        <h3>Equity Curve</h3>
+        <div style={{ maxHeight: 200, overflowY: "auto" }}>
+          {equityHistory.map((e, i) => (
+            <div key={i}>
+              {i}: ${e.toFixed(2)}
+            </div>
+          ))}
         </div>
 
-        <div style={{ marginBottom: 20 }}>
-          <b>Session:</b> Wins {performance.session.wins} | Losses{" "}
-          {performance.session.losses} | PnL{" "}
-          {performance.session.pnl.toFixed(2)}
-        </div>
-
-        <h3>Execution Log</h3>
-        <div style={{ maxHeight: 350, overflowY: "auto" }}>
+        <h3 style={{ marginTop: 20 }}>Execution Log</h3>
+        <div style={{ maxHeight: 200, overflowY: "auto" }}>
           {log.map((x, i) => (
             <div key={i}>
               <small>{x.t}</small>
