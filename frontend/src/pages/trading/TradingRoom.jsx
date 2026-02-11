@@ -1,5 +1,7 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import { executeEngine } from "./engines/ExecutionEngine";
+import { rebalancePortfolio } from "./engines/PortfolioAllocator";
+import { evaluateGlobalRisk } from "./engines/RiskGovernor";
 import { isTradingWindowOpen } from "./engines/TimeGovernor";
 
 export default function TradingRoom({
@@ -8,9 +10,11 @@ export default function TradingRoom({
 }) {
   const [mode, setMode] = useState(parentMode.toUpperCase());
   const [engineType, setEngineType] = useState("scalp");
-  const [baseRisk, setBaseRisk] = useState(1);
+  const [riskPct, setRiskPct] = useState(1);
   const [leverage, setLeverage] = useState(1);
   const [tradesUsed, setTradesUsed] = useState(0);
+  const [systemLocked, setSystemLocked] = useState(false);
+  const [lockReason, setLockReason] = useState("");
   const [log, setLog] = useState([]);
 
   const [allocation, setAllocation] = useState({
@@ -24,9 +28,6 @@ export default function TradingRoom({
     session: { wins: 0, losses: 0, pnl: 0 },
   });
 
-  const [engineHealth, setEngineHealth] = useState("stable");
-  const [confidence, setConfidence] = useState(0.8);
-
   useEffect(() => {
     setMode(parentMode.toUpperCase());
   }, [parentMode]);
@@ -38,17 +39,14 @@ export default function TradingRoom({
     ]);
   }
 
-  const currentPerf = performance[engineType];
-
-  const winRate = useMemo(() => {
-    const total = currentPerf.wins + currentPerf.losses;
-    if (total === 0) return 0;
-    return (currentPerf.wins / total) * 100;
-  }, [currentPerf]);
-
   function executeTrade() {
     if (!isTradingWindowOpen()) {
-      pushLog("Execution blocked — Weekend lock active.");
+      pushLog("Blocked — Weekend protection active.");
+      return;
+    }
+
+    if (systemLocked) {
+      pushLog("Execution blocked — System locked.");
       return;
     }
 
@@ -57,160 +55,145 @@ export default function TradingRoom({
       return;
     }
 
-    const balance =
+    const engineCapital =
       engineType === "scalp"
         ? allocation.scalp
         : allocation.session;
 
     const result = executeEngine({
       engineType,
-      balance,
-      riskPct: baseRisk,
+      balance: engineCapital,
+      riskPct,
       leverage,
-      confidence,
-      performance: currentPerf,
     });
 
     if (result.blocked) {
-      pushLog(`Trade blocked: ${result.reason}`);
+      pushLog("Trade blocked by engine safeguards.");
       return;
     }
 
-    const updatedBalance = result.newBalance;
-
     const updatedAllocation =
       engineType === "scalp"
-        ? {
-            ...allocation,
-            scalp: updatedBalance,
-            total: updatedBalance + allocation.session,
-          }
-        : {
-            ...allocation,
-            session: updatedBalance,
-            total: allocation.scalp + updatedBalance,
-          };
+        ? { ...allocation, scalp: result.newBalance }
+        : { ...allocation, session: result.newBalance };
 
-    setAllocation(updatedAllocation);
-    setTradesUsed((v) => v + 1);
-    setEngineHealth(result.engineHealth);
-    setConfidence(result.adaptiveConfidence);
+    const rebalanced = rebalancePortfolio(
+      updatedAllocation,
+      performance
+    );
+
+    setAllocation(rebalanced);
 
     setPerformance((prev) => {
-      const perf = prev[engineType];
       const isWin = result.isWin;
+      const enginePerf = prev[engineType];
 
       return {
         ...prev,
         [engineType]: {
-          wins: perf.wins + (isWin ? 1 : 0),
-          losses: perf.losses + (!isWin ? 1 : 0),
-          pnl: perf.pnl + result.pnl,
+          wins: enginePerf.wins + (isWin ? 1 : 0),
+          losses: enginePerf.losses + (!isWin ? 1 : 0),
+          pnl: enginePerf.pnl + result.pnl,
         },
       };
     });
 
+    setTradesUsed((v) => v + 1);
+
     pushLog(
       `${engineType.toUpperCase()} | PnL: ${result.pnl.toFixed(
         2
-      )} | Health: ${result.engineHealth}`
+      )}`
     );
-  }
 
-  const capitalPressure =
-    allocation.total < 600
-      ? "high"
-      : allocation.total < 800
-      ? "moderate"
-      : "normal";
+    /* ================= GLOBAL RISK CHECK ================= */
+
+    const riskState = evaluateGlobalRisk({
+      allocation: rebalanced,
+      performance,
+    });
+
+    if (riskState.locked) {
+      setSystemLocked(true);
+      setLockReason(riskState.reason);
+      pushLog(`SYSTEM LOCKED → ${riskState.reason}`);
+    }
+  }
 
   return (
     <div className="postureWrap">
       <section className="postureCard">
         <div className="postureTop">
           <div>
-            <h2>Quant Execution Engine</h2>
-            <small>Adaptive dual-engine control</small>
+            <h2>Unified Trading Engine</h2>
+            <small>Execution · Allocation · Governance</small>
           </div>
 
-          <span className={`badge ${mode === "LIVE" ? "warn" : ""}`}>
-            {mode}
+          <span
+            className={`badge ${
+              systemLocked
+                ? "bad"
+                : mode === "LIVE"
+                ? "warn"
+                : ""
+            }`}
+          >
+            {systemLocked ? "LOCKED" : mode}
           </span>
         </div>
 
         {!isTradingWindowOpen() && (
           <div className="badge warn" style={{ marginTop: 10 }}>
-            Weekend Lock — Learning Only
+            Weekend Lock — Learning Mode Active
           </div>
         )}
 
-        {/* ENGINE METRICS */}
+        {systemLocked && (
+          <div className="badge bad" style={{ marginTop: 10 }}>
+            {lockReason}
+          </div>
+        )}
+
         <div className="stats">
           <div>
-            <b>Total Capital:</b> ${allocation.total.toFixed(2)}
+            <b>Total:</b> ${allocation.total.toFixed(2)}
           </div>
           <div>
-            <b>Win Rate:</b> {winRate.toFixed(1)}%
+            <b>Scalp:</b> ${allocation.scalp.toFixed(2)}
           </div>
           <div>
-            <b>AI Confidence:</b>{" "}
-            {(confidence * 100).toFixed(0)}%
+            <b>Session:</b> ${allocation.session.toFixed(2)}
           </div>
           <div>
-            <b>Engine Health:</b>{" "}
-            <span className={`badge ${
-              engineHealth === "aggressive"
-                ? "ok"
-                : engineHealth === "recovering"
-                ? "warn"
-                : engineHealth === "critical"
-                ? "bad"
-                : ""
-            }`}>
-              {engineHealth.toUpperCase()}
-            </span>
+            <b>Trades:</b> {tradesUsed} / {dailyLimit}
           </div>
         </div>
 
-        <div style={{ marginTop: 10 }}>
-          <b>Capital Pressure:</b>{" "}
-          <span className={`badge ${
-            capitalPressure === "high"
-              ? "bad"
-              : capitalPressure === "moderate"
-              ? "warn"
-              : "ok"
-          }`}>
-            {capitalPressure.toUpperCase()}
-          </span>
-        </div>
-
-        <div className="ctrlRow" style={{ marginTop: 20 }}>
+        <div className="ctrlRow">
           <button
             className={`pill ${engineType === "scalp" ? "active" : ""}`}
             onClick={() => setEngineType("scalp")}
           >
-            Scalp Engine
+            Scalp
           </button>
+
           <button
             className={`pill ${engineType === "session" ? "active" : ""}`}
             onClick={() => setEngineType("session")}
           >
-            Session Engine
+            Session
           </button>
         </div>
 
         <div className="ctrl">
           <label>
-            Base Risk %
+            Risk %
             <input
               type="number"
-              value={baseRisk}
+              value={riskPct}
               min="0.1"
               step="0.1"
-              onChange={(e) =>
-                setBaseRisk(Number(e.target.value))
-              }
+              onChange={(e) => setRiskPct(Number(e.target.value))}
             />
           </label>
 
@@ -221,23 +204,25 @@ export default function TradingRoom({
               value={leverage}
               min="1"
               max="20"
-              onChange={(e) =>
-                setLeverage(Number(e.target.value))
-              }
+              onChange={(e) => setLeverage(Number(e.target.value))}
             />
           </label>
         </div>
 
         <div className="actions">
-          <button className="btn ok" onClick={executeTrade}>
+          <button
+            className="btn ok"
+            onClick={executeTrade}
+            disabled={!isTradingWindowOpen() || systemLocked}
+          >
             Execute Trade
           </button>
         </div>
       </section>
 
       <aside className="postureCard">
-        <h3>Execution Log</h3>
-        <div style={{ maxHeight: 350, overflowY: "auto" }}>
+        <h3>System Log</h3>
+        <div style={{ maxHeight: 400, overflowY: "auto" }}>
           {log.map((x, i) => (
             <div key={i}>
               <small>{x.t}</small>
