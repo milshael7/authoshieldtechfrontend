@@ -1,5 +1,6 @@
 import { generateSignal } from "./SignalEngine";
 import { adjustConfidence } from "./AdaptiveConfidence";
+import { detectRegime } from "./RegimeEngine";
 
 export function executeEngine({
   engineType,
@@ -18,6 +19,8 @@ export function executeEngine({
 
   const priceHistory = generateSyntheticPrices(60);
 
+  const regime = detectRegime(priceHistory);
+
   const signal = generateSignal({
     priceHistory,
     engineType,
@@ -30,8 +33,23 @@ export function executeEngine({
   const drawdownPct =
     ((performance.peak - balance) / performance.peak) * 100;
 
+  let baseConfidence = signal.confidence;
+
+  // Regime Bias Adjustment
+  if (regime === "uptrend" && signal.direction === "long") {
+    baseConfidence += 0.05;
+  }
+
+  if (regime === "downtrend" && signal.direction === "short") {
+    baseConfidence += 0.05;
+  }
+
+  if (regime === "range") {
+    baseConfidence -= 0.05;
+  }
+
   const adaptiveConfidence = adjustConfidence({
-    baseConfidence: signal.confidence,
+    baseConfidence,
     wins: performance.wins,
     losses: performance.losses,
     drawdownPct,
@@ -58,6 +76,7 @@ export function executeEngine({
     isWin,
     positionSize,
     confidence: adaptiveConfidence,
+    regime,
     direction: signal.direction,
   };
 }
