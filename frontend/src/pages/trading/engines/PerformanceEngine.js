@@ -1,41 +1,84 @@
-// Performance Engine
-// Adaptive AI Confidence Model
+// PerformanceEngine.js
+// Institutional performance analytics engine
 
-export function calculateConfidence({
-  wins,
-  losses,
-  pnl,
-  baseConfidence = 0.8,
-}) {
-  const total = wins + losses;
-
-  if (total === 0) return baseConfidence;
-
-  const winRate = wins / total;
-
-  let confidence = baseConfidence;
-
-  /* ===== Win Rate Influence ===== */
-  if (winRate > 0.6) {
-    confidence += 0.05;
+export function evaluatePerformance(trades = []) {
+  if (!trades.length) {
+    return {
+      winRate: 0,
+      profitFactor: 0,
+      averageWin: 0,
+      averageLoss: 0,
+      expectancy: 0,
+      maxDrawdown: 0,
+      sharpe: 0,
+    };
   }
 
-  if (winRate < 0.45) {
-    confidence -= 0.08;
-  }
+  const wins = trades.filter(t => t.pnl > 0);
+  const losses = trades.filter(t => t.pnl < 0);
 
-  /* ===== PnL Influence ===== */
-  if (pnl < 0) {
-    confidence -= 0.05;
-  }
+  const totalPnL = trades.reduce((a, b) => a + b.pnl, 0);
+  const grossProfit = wins.reduce((a, b) => a + b.pnl, 0);
+  const grossLoss = Math.abs(losses.reduce((a, b) => a + b.pnl, 0));
 
-  if (pnl > 0 && winRate > 0.55) {
-    confidence += 0.03;
-  }
+  const winRate = wins.length / trades.length;
 
-  /* ===== Hard Bounds ===== */
-  if (confidence > 0.95) confidence = 0.95;
-  if (confidence < 0.5) confidence = 0.5;
+  const averageWin =
+    wins.length > 0
+      ? grossProfit / wins.length
+      : 0;
 
-  return Number(confidence.toFixed(3));
+  const averageLoss =
+    losses.length > 0
+      ? grossLoss / losses.length
+      : 0;
+
+  const profitFactor =
+    grossLoss > 0
+      ? grossProfit / grossLoss
+      : grossProfit;
+
+  const expectancy =
+    winRate * averageWin -
+    (1 - winRate) * averageLoss;
+
+  /* ================= MAX DRAWDOWN ================= */
+
+  let peak = 0;
+  let maxDrawdown = 0;
+  let equity = 0;
+
+  trades.forEach(t => {
+    equity += t.pnl;
+    if (equity > peak) peak = equity;
+    const dd = peak - equity;
+    if (dd > maxDrawdown) maxDrawdown = dd;
+  });
+
+  /* ================= SHARPE (simplified) ================= */
+
+  const mean =
+    totalPnL / trades.length;
+
+  const variance =
+    trades.reduce((sum, t) => {
+      return sum + Math.pow(t.pnl - mean, 2);
+    }, 0) / trades.length;
+
+  const stdDev = Math.sqrt(variance);
+
+  const sharpe =
+    stdDev !== 0
+      ? mean / stdDev
+      : 0;
+
+  return {
+    winRate,
+    profitFactor,
+    averageWin,
+    averageLoss,
+    expectancy,
+    maxDrawdown,
+    sharpe,
+  };
 }
