@@ -1,5 +1,10 @@
 import React, { useState, useEffect, useRef } from "react";
 import { executeEngine } from "./engines/ExecutionEngine";
+import {
+  allocateCapital,
+  rebalanceCapital,
+  calculateTotalCapital,
+} from "./engines/CapitalAllocator";
 import { evaluateGlobalRisk } from "./engines/GlobalRiskGovernor";
 
 export default function TradingRoom({
@@ -8,29 +13,32 @@ export default function TradingRoom({
 }) {
   const [mode, setMode] = useState(parentMode.toUpperCase());
   const [engineType, setEngineType] = useState("scalp");
-
-  /* ================= AI + HUMAN GOVERNANCE ================= */
-
-  const AI_CONFIDENCE = 1; // AI always 100%
-  const [humanMultiplier, setHumanMultiplier] = useState(1); 
-  // 1 = normal
-  // 0.8 = reduce exposure
-  // 1.2 = increase exposure
-
   const [baseRisk, setBaseRisk] = useState(1);
   const [leverage, setLeverage] = useState(1);
-
-  const [allocation, setAllocation] = useState({
-    scalp: 500,
-    session: 500,
-  });
 
   const [dailyPnL, setDailyPnL] = useState(0);
   const [tradesUsed, setTradesUsed] = useState(0);
   const [log, setLog] = useState([]);
 
-  const peakCapital = useRef(1000);
-  const totalCapital = allocation.scalp + allocation.session;
+  /* ================= INITIAL CAPITAL ================= */
+
+  const initialCapital = 1000;
+
+  const initialDistribution = allocateCapital({
+    totalCapital: initialCapital,
+  });
+
+  const [reserve, setReserve] = useState(initialDistribution.reserve);
+  const [allocation, setAllocation] = useState(
+    initialDistribution.allocation
+  );
+
+  const peakCapital = useRef(initialCapital);
+
+  const totalCapital = calculateTotalCapital(
+    allocation,
+    reserve
+  );
 
   useEffect(() => {
     setMode(parentMode.toUpperCase());
@@ -55,6 +63,8 @@ export default function TradingRoom({
     ]);
   }
 
+  /* ================= EXECUTION ================= */
+
   function executeTrade() {
     if (!globalRisk.allowed) {
       pushLog(`Blocked: ${globalRisk.reason}`);
@@ -66,18 +76,17 @@ export default function TradingRoom({
       return;
     }
 
+    // We trade from Coinbase only (can expand later)
+    const exchange = "coinbase";
+
     const engineCapital =
-      engineType === "scalp"
-        ? allocation.scalp
-        : allocation.session;
+      allocation[engineType][exchange];
 
     const result = executeEngine({
       engineType,
       balance: engineCapital,
       riskPct: baseRisk,
       leverage,
-      confidence: AI_CONFIDENCE,
-      humanMultiplier,
     });
 
     if (result.blocked) {
@@ -85,23 +94,33 @@ export default function TradingRoom({
       return;
     }
 
-    const updatedCapital = result.newBalance;
+    const updatedAllocation = {
+      ...allocation,
+      [engineType]: {
+        ...allocation[engineType],
+        [exchange]: result.newBalance,
+      },
+    };
 
-    const updatedAllocation =
-      engineType === "scalp"
-        ? { ...allocation, scalp: updatedCapital }
-        : { ...allocation, session: updatedCapital };
+    const rebalanced = rebalanceCapital({
+      allocation: updatedAllocation,
+      reserve,
+    });
 
-    setAllocation(updatedAllocation);
+    setAllocation(rebalanced.allocation);
+    setReserve(rebalanced.reserve);
+
     setTradesUsed((v) => v + 1);
     setDailyPnL((v) => v + result.pnl);
 
     pushLog(
-      `${engineType.toUpperCase()} trade | PnL: ${result.pnl.toFixed(
+      `${engineType.toUpperCase()} | ${exchange} | PnL: ${result.pnl.toFixed(
         2
-      )} | AI 100% | Human Override x${humanMultiplier}`
+      )}`
     );
   }
+
+  /* ================= UI ================= */
 
   return (
     <div className="postureWrap">
@@ -109,7 +128,7 @@ export default function TradingRoom({
         <div className="postureTop">
           <div>
             <h2>Institutional Trading Control</h2>
-            <small>AI Dominant • Human Override Enabled</small>
+            <small>Allocator + Global Risk Governed</small>
           </div>
 
           <span className={`badge ${mode === "LIVE" ? "warn" : ""}`}>
@@ -123,11 +142,12 @@ export default function TradingRoom({
           </div>
         )}
 
-        {/* ================= CAPITAL ================= */}
-
         <div className="stats">
           <div>
             <b>Total Capital:</b> ${totalCapital.toFixed(2)}
+          </div>
+          <div>
+            <b>Reserve:</b> ${reserve.toFixed(2)}
           </div>
           <div>
             <b>Peak Capital:</b> ${peakCapital.current.toFixed(2)}
@@ -139,8 +159,6 @@ export default function TradingRoom({
             <b>Trades Used:</b> {tradesUsed} / {dailyLimit}
           </div>
         </div>
-
-        {/* ================= ENGINE SELECT ================= */}
 
         <div className="ctrlRow">
           <button
@@ -158,11 +176,9 @@ export default function TradingRoom({
           </button>
         </div>
 
-        {/* ================= RISK CONTROLS ================= */}
-
         <div className="ctrl">
           <label>
-            Base Risk %
+            Risk %
             <input
               type="number"
               value={baseRisk}
@@ -183,30 +199,6 @@ export default function TradingRoom({
             />
           </label>
         </div>
-
-        {/* ================= HUMAN OVERRIDE ================= */}
-
-        <div className="ctrl" style={{ marginTop: 15 }}>
-          <label>
-            Human Override Multiplier
-            <input
-              type="range"
-              min="0.5"
-              max="1.5"
-              step="0.1"
-              value={humanMultiplier}
-              onChange={(e) =>
-                setHumanMultiplier(Number(e.target.value))
-              }
-            />
-          </label>
-
-          <div style={{ marginTop: 6, fontSize: 13 }}>
-            Current Override: x{humanMultiplier}
-          </div>
-        </div>
-
-        {/* ================= EXECUTE ================= */}
 
         <div className="actions">
           <button
