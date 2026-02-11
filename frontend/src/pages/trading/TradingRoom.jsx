@@ -1,207 +1,158 @@
 import React, { useMemo, useState, useEffect } from "react";
+import { executeEngine } from "../../trading/engines/EngineController";
+
+/**
+ * TradingRoom.jsx — ENGINE CONNECTED
+ * - Uses Scalp + Session engines
+ * - Human execution only
+ * - No automation
+ */
 
 export default function TradingRoom({
   mode: parentMode = "paper",
   dailyLimit = 5,
-  executionState: parentExecution = "idle",
 }) {
-
-  /* ================= EXECUTION ================= */
   const [mode, setMode] = useState(parentMode.toUpperCase());
-  const [execution, setExecution] = useState(parentExecution);
   const [riskPct, setRiskPct] = useState(1);
-  const [tradeStyle, setTradeStyle] = useState("scalp");
-  const [tradesUsed, setTradesUsed] = useState(1);
+  const [leverage, setLeverage] = useState(5);
+  const [engineType, setEngineType] = useState("scalp");
+  const [balance, setBalance] = useState(1000);
+  const [tradesUsed, setTradesUsed] = useState(0);
+  const [log, setLog] = useState([]);
 
-  /* ================= ACCOUNT MODEL ================= */
-  const [accountBalance] = useState(100000);
-  const [currentExposure, setCurrentExposure] = useState(15000);
-  const [leverage, setLeverage] = useState(2);
-  const [maxDrawdownPct] = useState(15);
+  useEffect(() => {
+    setMode(parentMode.toUpperCase());
+  }, [parentMode]);
 
-  /* ================= DERIVED CALCS ================= */
-  const effectiveExposure = useMemo(
-    () => currentExposure * leverage,
-    [currentExposure, leverage]
-  );
+  const pushLog = (message) => {
+    setLog((prev) =>
+      [{ t: new Date().toLocaleTimeString(), m: message }, ...prev].slice(0, 100)
+    );
+  };
 
-  const riskPerTradeAmount = useMemo(
-    () => (accountBalance * riskPct) / 100,
-    [accountBalance, riskPct]
-  );
+  const stats = useMemo(() => {
+    return {
+      balance: balance.toFixed(2),
+      tradesUsed,
+    };
+  }, [balance, tradesUsed]);
 
-  const drawdownLimit = useMemo(
-    () => (accountBalance * maxDrawdownPct) / 100,
-    [accountBalance, maxDrawdownPct]
-  );
+  function executeTrade() {
+    if (tradesUsed >= dailyLimit) {
+      pushLog("Daily limit reached.");
+      return;
+    }
 
-  const liquidationBuffer = useMemo(
-    () => accountBalance - effectiveExposure,
-    [accountBalance, effectiveExposure]
-  );
+    const result = executeEngine({
+      engineType,
+      balance,
+      riskPct,
+      leverage,
+    });
 
-  /* ================= NO TRADE WINDOW ================= */
-  const tradingAllowed = useMemo(() => {
-    const now = new Date();
-    const day = now.getDay();
-    const hour = now.getHours();
+    setBalance(result.newBalance);
+    setTradesUsed((v) => v + 1);
 
-    if (day === 5 && hour >= 21) return false;
-    if (day === 6 && hour < 21) return false;
-    return true;
-  }, []);
+    pushLog(
+      `${result.style.toUpperCase()} trade | PnL: ${result.pnl.toFixed(
+        2
+      )} | New Balance: ${result.newBalance.toFixed(2)}`
+    );
+  }
 
-  useEffect(() => setMode(parentMode.toUpperCase()), [parentMode]);
-  useEffect(() => setExecution(parentExecution), [parentExecution]);
-
-  /* ================= UI ================= */
   return (
     <div className="postureWrap">
-
-      {/* ================= LEFT PANEL ================= */}
+      {/* LEFT PANEL */}
       <section className="postureCard">
-
         <div className="postureTop">
           <div>
-            <h2 style={{ color: "#7ec8ff" }}>
-              Quant Execution Engine
-            </h2>
-            <small>Micro & session trade supervision</small>
+            <h2>Trading Control Room</h2>
+            <small>Engine-based execution</small>
           </div>
+
           <span className={`badge ${mode === "LIVE" ? "warn" : ""}`}>
             {mode}
           </span>
         </div>
 
-        {!tradingAllowed && (
-          <p style={{ color: "#ff7a7a", marginTop: 12 }}>
-            Trading window closed (Fri 9PM → Sat 9PM)
-          </p>
-        )}
-
-        <div className="stats">
-          <div><b>Status:</b> {execution}</div>
-          <div><b>Trades:</b> {tradesUsed}/{dailyLimit}</div>
-          <div><b>Risk:</b> {riskPct}%</div>
-          <div><b>Style:</b> {tradeStyle}</div>
-        </div>
-
+        {/* ENGINE SELECT */}
         <div className="ctrlRow">
           <button
-            className={`pill ${tradeStyle === "scalp" ? "active" : ""}`}
-            onClick={() => setTradeStyle("scalp")}
+            className={`pill ${engineType === "scalp" ? "active" : ""}`}
+            onClick={() => setEngineType("scalp")}
           >
-            Micro Scalp
+            Scalp Engine
           </button>
+
           <button
-            className={`pill ${tradeStyle === "session" ? "active" : ""}`}
-            onClick={() => setTradeStyle("session")}
+            className={`pill ${engineType === "session" ? "active" : ""}`}
+            onClick={() => setEngineType("session")}
           >
-            Session
+            Session Engine
           </button>
         </div>
 
+        {/* RISK */}
         <div className="ctrl">
           <label>
             Risk %
             <input
               type="number"
+              value={riskPct}
               min="0.1"
               step="0.1"
-              value={riskPct}
               onChange={(e) => setRiskPct(Number(e.target.value))}
+            />
+          </label>
+
+          <label>
+            Leverage
+            <input
+              type="number"
+              value={leverage}
+              min="1"
+              max="50"
+              onChange={(e) => setLeverage(Number(e.target.value))}
             />
           </label>
         </div>
 
+        {/* EXECUTION */}
         <div className="actions">
           <button
-            className="btn warn"
-            disabled={!tradingAllowed}
-            onClick={() => setExecution("paused")}
-          >
-            Pause
-          </button>
-
-          <button
             className="btn ok"
-            disabled={tradesUsed >= dailyLimit || !tradingAllowed}
-            onClick={() => {
-              setExecution("executing");
-              setTradesUsed((v) => v + 1);
-              setCurrentExposure((v) => v + riskPerTradeAmount);
-            }}
+            disabled={tradesUsed >= dailyLimit}
+            onClick={executeTrade}
           >
-            Execute
+            Execute Trade
           </button>
         </div>
 
+        {tradesUsed >= dailyLimit && (
+          <p className="muted">Daily trade limit reached.</p>
+        )}
+
+        {/* STATS */}
+        <div style={{ marginTop: 20 }}>
+          <b>Balance:</b> ${stats.balance}
+          <br />
+          <b>Trades Used:</b> {stats.tradesUsed} / {dailyLimit}
+        </div>
       </section>
 
-      {/* ================= RIGHT PANEL ================= */}
+      {/* RIGHT PANEL */}
       <aside className="postureCard">
+        <h3>Execution Log</h3>
 
-        <h3 style={{ color: "#7ec8ff" }}>
-          Exposure & Leverage Model
-        </h3>
-
-        <div className="stats">
-          <div>
-            <b>Balance:</b> ${accountBalance.toLocaleString()}
-          </div>
-
-          <div>
-            <b>Exposure:</b> ${currentExposure.toLocaleString()}
-          </div>
-
-          <div>
-            <b>Leverage:</b>
-            <input
-              type="number"
-              min="1"
-              max="10"
-              value={leverage}
-              onChange={(e) => setLeverage(Number(e.target.value))}
-              style={{ width: 60, marginLeft: 8 }}
-            />
-            x
-          </div>
-
-          <div>
-            <b>Effective Exposure:</b> $
-            {effectiveExposure.toLocaleString()}
-          </div>
-
-          <div>
-            <b>Risk / Trade:</b> $
-            {riskPerTradeAmount.toFixed(2)}
-          </div>
-
-          <div>
-            <b>Drawdown Limit:</b> $
-            {drawdownLimit.toLocaleString()}
-          </div>
-
-          <div>
-            <b>Liquidation Buffer:</b>{" "}
-            <span style={{
-              color:
-                liquidationBuffer < accountBalance * 0.2
-                  ? "#ff7a7a"
-                  : "#7ec8ff"
-            }}>
-              ${liquidationBuffer.toLocaleString()}
-            </span>
-          </div>
+        <div style={{ maxHeight: 420, overflowY: "auto" }}>
+          {log.map((x, i) => (
+            <div key={i} style={{ marginBottom: 10 }}>
+              <small>{x.t}</small>
+              <div>{x.m}</div>
+            </div>
+          ))}
         </div>
-
-        <p className="muted" style={{ marginTop: 12 }}>
-          Effective exposure reflects leveraged capital. 
-          Liquidation buffer shows remaining capital after exposure.
-        </p>
-
       </aside>
-
     </div>
   );
 }
