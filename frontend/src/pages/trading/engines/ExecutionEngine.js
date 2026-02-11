@@ -1,25 +1,22 @@
-// ExecutionEngine.js
-// Signal-driven position engine (No random bias)
-
 import { generateSignal } from "./SignalEngine";
+import { adjustConfidence } from "./AdaptiveConfidence";
 
 export function executeEngine({
   engineType,
   balance,
   riskPct,
   leverage,
+  performance = { wins: 0, losses: 0, peak: balance },
   humanCaps = {
     maxRiskPct: 2,
     maxLeverage: 10,
-    maxDrawdownPct: 20,
     capitalFloor: 100,
   },
 }) {
   const cappedRisk = Math.min(riskPct, humanCaps.maxRiskPct);
   const cappedLeverage = Math.min(leverage, humanCaps.maxLeverage);
 
-  // Simulated market history
-  const priceHistory = generateSyntheticPrices(50);
+  const priceHistory = generateSyntheticPrices(60);
 
   const signal = generateSignal({
     priceHistory,
@@ -27,22 +24,27 @@ export function executeEngine({
   });
 
   if (signal.direction === "neutral") {
-    return {
-      blocked: true,
-      reason: "No strong signal",
-    };
+    return { blocked: true, reason: "No strong signal" };
   }
 
+  const drawdownPct =
+    ((performance.peak - balance) / performance.peak) * 100;
+
+  const adaptiveConfidence = adjustConfidence({
+    baseConfidence: signal.confidence,
+    wins: performance.wins,
+    losses: performance.losses,
+    drawdownPct,
+  });
+
   const effectiveRisk =
-    cappedRisk *
-    signal.confidence;
+    cappedRisk * adaptiveConfidence;
 
   const positionSize =
     (balance * effectiveRisk * cappedLeverage) / 100;
 
-  // Signal probability model
   const isWin =
-    Math.random() < signal.confidence;
+    Math.random() < adaptiveConfidence;
 
   const pnl = isWin
     ? positionSize * 0.8
@@ -50,22 +52,12 @@ export function executeEngine({
 
   const newBalance = balance + pnl;
 
-  if (newBalance < humanCaps.capitalFloor) {
-    return {
-      pnl,
-      newBalance: humanCaps.capitalFloor,
-      floorTriggered: true,
-      isWin,
-      positionSize,
-    };
-  }
-
   return {
     pnl,
     newBalance,
     isWin,
     positionSize,
-    confidence: signal.confidence,
+    confidence: adaptiveConfidence,
     direction: signal.direction,
   };
 }
