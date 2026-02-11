@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { executeEngine } from "./engines/ExecutionEngine";
-import { ExchangeManager } from "./exchanges/ExchangeManager";
+import { CapitalAllocator } from "./capital/CapitalAllocator";
 import { OrderLedger } from "./ledger/OrderLedger";
 import { DrawdownGovernor } from "./risk/DrawdownGovernor";
 
@@ -8,23 +8,16 @@ export default function TradingRoom({
   mode: parentMode = "paper",
   dailyLimit = 5,
 }) {
-  const [mode, setMode] = useState(parentMode.toLowerCase());
   const [engineType, setEngineType] = useState("scalp");
+  const [exchange, setExchange] = useState("coinbase");
   const [riskPct, setRiskPct] = useState(1);
   const [leverage, setLeverage] = useState(1);
   const [tradesUsed, setTradesUsed] = useState(0);
   const [log, setLog] = useState([]);
-  const [stats, setStats] = useState(null);
-  const [peakBalance, setPeakBalance] = useState(10000);
 
-  const exchangeManager = new ExchangeManager({ mode });
+  const allocator = new CapitalAllocator({});
   const ledger = new OrderLedger();
   const governor = new DrawdownGovernor();
-
-  useEffect(() => {
-    setMode(parentMode.toLowerCase());
-    setStats(ledger.getStats());
-  }, [parentMode]);
 
   function pushLog(message) {
     setLog((prev) => [
@@ -33,105 +26,87 @@ export default function TradingRoom({
     ]);
   }
 
-  async function executeTrade() {
+  function executeTrade() {
     if (tradesUsed >= dailyLimit) {
       pushLog("Daily trade limit reached.");
       return;
     }
 
-    const statsNow = ledger.getStats();
-    const currentBalance = 10000 + (statsNow.pnl || 0);
-
-    if (currentBalance > peakBalance) {
-      setPeakBalance(currentBalance);
-    }
+    const balance = allocator.getBalance(exchange);
+    const total = allocator.getTotal();
 
     const protection = governor.evaluate({
-      peakBalance,
-      currentBalance,
+      peakBalance: total,
+      currentBalance: total,
       riskPct,
       leverage,
     });
 
     if (protection.paused) {
-      pushLog("Drawdown protection triggered → Trading paused.");
+      pushLog("Portfolio paused due to drawdown.");
       return;
-    }
-
-    if (protection.action === "throttled") {
-      pushLog("Risk throttled due to drawdown.");
     }
 
     const decision = executeEngine({
       engineType,
-      balance: currentBalance,
+      balance,
       riskPct: protection.adjustedRisk,
       leverage: protection.adjustedLeverage,
     });
 
     if (decision.blocked) {
-      pushLog(`Execution blocked: ${decision.reason}`);
+      pushLog(`Blocked: ${decision.reason}`);
       return;
     }
 
-    const order = await exchangeManager.executeOrder({
-      exchange: "coinbase",
-      symbol: "BTCUSDT",
-      side: decision.isWin ? "buy" : "sell",
-      size: decision.positionSize,
-    });
+    allocator.applyPnL(exchange, decision.pnl);
+    allocator.rebalance();
 
     ledger.record({
       engine: engineType,
-      exchange: order.exchange || "paper",
-      side: order.side,
-      size: order.size,
+      exchange,
+      side: decision.isWin ? "buy" : "sell",
+      size: decision.positionSize,
       pnl: decision.pnl,
     });
 
     setTradesUsed((v) => v + 1);
-    setStats(ledger.getStats());
 
     pushLog(
-      `Trade executed | PnL: ${decision.pnl.toFixed(2)} | DD: ${protection.drawdownPct.toFixed(
+      `${exchange.toUpperCase()} | ${engineType.toUpperCase()} | PnL: ${decision.pnl.toFixed(
         2
-      )}%`
+      )}`
     );
   }
 
-  function resetLedger() {
-    ledger.clear();
-    setStats(ledger.getStats());
-    setPeakBalance(10000);
-    pushLog("Ledger cleared. Peak reset.");
-  }
+  const snapshot = allocator.snapshot();
+  const stats = ledger.getStats();
 
   return (
     <div className="postureWrap">
       <section className="postureCard">
-        <div className="postureTop">
-          <div>
-            <h2>Institutional Control Room</h2>
-            <small>Ledger + Drawdown Governance</small>
-          </div>
-          <span className={`badge ${mode === "live" ? "warn" : ""}`}>
-            {mode.toUpperCase()}
-          </span>
-        </div>
+        <h2>Portfolio Execution Room</h2>
 
         <div className="stats">
-          <div>
-            <b>Trades:</b> {tradesUsed} / {dailyLimit}
-          </div>
-          <div>
-            <b>Win Rate:</b> {stats?.winRate || 0}%
-          </div>
-          <div>
-            <b>Total PnL:</b> ${stats?.pnl?.toFixed(2) || "0.00"}
-          </div>
-          <div>
-            <b>Peak Balance:</b> ${peakBalance.toFixed(2)}
-          </div>
+          <div><b>Total:</b> ${snapshot.total.toFixed(2)}</div>
+          <div><b>Coinbase:</b> ${snapshot.coinbase.toFixed(2)}</div>
+          <div><b>Kraken:</b> ${snapshot.kraken.toFixed(2)}</div>
+          <div><b>Reserve:</b> ${snapshot.reserve.toFixed(2)}</div>
+        </div>
+
+        <div className="ctrlRow">
+          <button
+            className={`pill ${exchange === "coinbase" ? "active" : ""}`}
+            onClick={() => setExchange("coinbase")}
+          >
+            Coinbase
+          </button>
+          <button
+            className={`pill ${exchange === "kraken" ? "active" : ""}`}
+            onClick={() => setExchange("kraken")}
+          >
+            Kraken
+          </button>
         </div>
 
         <div className="ctrlRow">
@@ -151,7 +126,7 @@ export default function TradingRoom({
 
         <div className="ctrl">
           <label>
-            Base Risk %
+            Risk %
             <input
               type="number"
               value={riskPct}
@@ -175,17 +150,19 @@ export default function TradingRoom({
 
         <div className="actions">
           <button className="btn ok" onClick={executeTrade}>
-            Route Order
-          </button>
-          <button className="btn warn" onClick={resetLedger}>
-            Reset Ledger
+            Route Portfolio Order
           </button>
         </div>
       </section>
 
       <aside className="postureCard">
-        <h3>Execution Log</h3>
-        <div style={{ maxHeight: 400, overflowY: "auto" }}>
+        <h3>Portfolio Stats</h3>
+        <div>Trades: {stats?.totalTrades || 0}</div>
+        <div>Win Rate: {stats?.winRate || 0}%</div>
+        <div>Total PnL: ${stats?.pnl?.toFixed(2) || "0.00"}</div>
+
+        <h3 style={{ marginTop: 20 }}>Execution Log</h3>
+        <div style={{ maxHeight: 350, overflowY: "auto" }}>
           {log.map((x, i) => (
             <div key={i}>
               <small>{x.t}</small>
