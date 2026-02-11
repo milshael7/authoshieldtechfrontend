@@ -15,13 +15,12 @@ export default function TradingRoom({
   const [engineType, setEngineType] = useState("scalp");
   const [baseRisk, setBaseRisk] = useState(1);
   const [leverage, setLeverage] = useState(1);
+  const [humanMultiplier, setHumanMultiplier] = useState(1);
 
   const [dailyPnL, setDailyPnL] = useState(0);
   const [tradesUsed, setTradesUsed] = useState(0);
   const [log, setLog] = useState([]);
   const [lastConfidence, setLastConfidence] = useState(null);
-
-  /* ================= INITIAL CAPITAL ================= */
 
   const initialCapital = 1000;
 
@@ -45,8 +44,6 @@ export default function TradingRoom({
     setMode(parentMode.toUpperCase());
   }, [parentMode]);
 
-  /* ================= GLOBAL RISK CHECK ================= */
-
   const globalRisk = evaluateGlobalRisk({
     totalCapital,
     peakCapital: peakCapital.current,
@@ -68,8 +65,6 @@ export default function TradingRoom({
     ]);
   }
 
-  /* ================= EXECUTION ================= */
-
   function executeTrade() {
     if (!globalRisk.allowed) {
       pushLog(`Blocked: ${globalRisk.reason}`);
@@ -82,7 +77,6 @@ export default function TradingRoom({
     }
 
     const exchange = "coinbase";
-
     const engineCapital =
       allocation[engineType][exchange];
 
@@ -91,6 +85,7 @@ export default function TradingRoom({
       balance: engineCapital,
       riskPct: baseRisk,
       leverage,
+      humanMultiplier,
     });
 
     if (result.blocked) {
@@ -129,13 +124,11 @@ export default function TradingRoom({
     );
   }
 
-  /* ================= UI ================= */
-
   function confidenceColor(score) {
     if (!score && score !== 0) return "";
     if (score < 50) return "#ff4d4d";
     if (score < 75) return "#f5b942";
-    return "#5EC6FF"; // light blue high confidence
+    return "#5EC6FF";
   }
 
   return (
@@ -159,21 +152,11 @@ export default function TradingRoom({
         )}
 
         <div className="stats">
-          <div>
-            <b>Total Capital:</b> ${totalCapital.toFixed(2)}
-          </div>
-          <div>
-            <b>Reserve:</b> ${reserve.toFixed(2)}
-          </div>
-          <div>
-            <b>Peak Capital:</b> ${peakCapital.current.toFixed(2)}
-          </div>
-          <div>
-            <b>Daily PnL:</b> ${dailyPnL.toFixed(2)}
-          </div>
-          <div>
-            <b>Trades Used:</b> {tradesUsed} / {dailyLimit}
-          </div>
+          <div><b>Total Capital:</b> ${totalCapital.toFixed(2)}</div>
+          <div><b>Reserve:</b> ${reserve.toFixed(2)}</div>
+          <div><b>Daily PnL:</b> ${dailyPnL.toFixed(2)}</div>
+          <div><b>Trades Used:</b> {tradesUsed} / {dailyLimit}</div>
+
           {lastConfidence !== null && (
             <div>
               <b>Last Confidence:</b>{" "}
@@ -189,6 +172,7 @@ export default function TradingRoom({
           )}
         </div>
 
+        {/* ENGINE SELECT */}
         <div className="ctrlRow">
           <button
             className={`pill ${engineType === "scalp" ? "active" : ""}`}
@@ -196,7 +180,6 @@ export default function TradingRoom({
           >
             Scalp
           </button>
-
           <button
             className={`pill ${engineType === "session" ? "active" : ""}`}
             onClick={() => setEngineType("session")}
@@ -205,6 +188,7 @@ export default function TradingRoom({
           </button>
         </div>
 
+        {/* RISK + LEVERAGE */}
         <div className="ctrl">
           <label>
             Risk %
@@ -226,6 +210,24 @@ export default function TradingRoom({
               max="20"
               onChange={(e) => setLeverage(Number(e.target.value))}
             />
+          </label>
+
+          {/* 🔥 HUMAN OVERRIDE */}
+          <label>
+            Human Override
+            <input
+              type="range"
+              min="0.5"
+              max="1"
+              step="0.05"
+              value={humanMultiplier}
+              onChange={(e) =>
+                setHumanMultiplier(Number(e.target.value))
+              }
+            />
+            <div style={{ fontSize: 12 }}>
+              Multiplier: {(humanMultiplier * 100).toFixed(0)}%
+            </div>
           </label>
         </div>
 
