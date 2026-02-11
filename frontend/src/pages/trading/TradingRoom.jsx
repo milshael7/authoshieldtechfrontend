@@ -1,22 +1,24 @@
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { executeEngine } from "../../trading/engines/EngineController";
-
-/**
- * TradingRoom.jsx — ENGINE CONNECTED
- * - Uses Scalp + Session engines
- * - Human execution only
- * - No automation
- */
+import {
+  allocateCapital,
+  rebalanceCapital,
+} from "../../trading/engines/CapitalController";
 
 export default function TradingRoom({
   mode: parentMode = "paper",
   dailyLimit = 5,
 }) {
   const [mode, setMode] = useState(parentMode.toUpperCase());
+  const [masterCapital, setMasterCapital] = useState(1000);
+  const [allocationPct, setAllocationPct] = useState(50);
+  const [allocation, setAllocation] = useState(
+    allocateCapital(1000, 50)
+  );
+
   const [riskPct, setRiskPct] = useState(1);
   const [leverage, setLeverage] = useState(5);
   const [engineType, setEngineType] = useState("scalp");
-  const [balance, setBalance] = useState(1000);
   const [tradesUsed, setTradesUsed] = useState(0);
   const [log, setLog] = useState([]);
 
@@ -24,18 +26,15 @@ export default function TradingRoom({
     setMode(parentMode.toUpperCase());
   }, [parentMode]);
 
-  const pushLog = (message) => {
+  useEffect(() => {
+    setAllocation(allocateCapital(masterCapital, allocationPct));
+  }, [masterCapital, allocationPct]);
+
+  function pushLog(message) {
     setLog((prev) =>
       [{ t: new Date().toLocaleTimeString(), m: message }, ...prev].slice(0, 100)
     );
-  };
-
-  const stats = useMemo(() => {
-    return {
-      balance: balance.toFixed(2),
-      tradesUsed,
-    };
-  }, [balance, tradesUsed]);
+  }
 
   function executeTrade() {
     if (tradesUsed >= dailyLimit) {
@@ -43,36 +42,87 @@ export default function TradingRoom({
       return;
     }
 
+    const engineCapital =
+      engineType === "scalp" ? allocation.scalp : allocation.session;
+
     const result = executeEngine({
       engineType,
-      balance,
+      balance: engineCapital,
       riskPct,
       leverage,
     });
 
-    setBalance(result.newBalance);
+    const updatedCapital = result.newBalance;
+
+    const newAllocation =
+      engineType === "scalp"
+        ? {
+            ...allocation,
+            scalp: updatedCapital,
+            total:
+              updatedCapital + allocation.session,
+          }
+        : {
+            ...allocation,
+            session: updatedCapital,
+            total:
+              allocation.scalp + updatedCapital,
+          };
+
+    setAllocation(newAllocation);
+    setMasterCapital(newAllocation.total);
     setTradesUsed((v) => v + 1);
 
     pushLog(
-      `${result.style.toUpperCase()} trade | PnL: ${result.pnl.toFixed(
+      `${engineType.toUpperCase()} trade | PnL: ${result.pnl.toFixed(
         2
-      )} | New Balance: ${result.newBalance.toFixed(2)}`
+      )} | Engine Balance: ${updatedCapital.toFixed(2)}`
     );
   }
 
   return (
     <div className="postureWrap">
-      {/* LEFT PANEL */}
       <section className="postureCard">
         <div className="postureTop">
           <div>
-            <h2>Trading Control Room</h2>
-            <small>Engine-based execution</small>
+            <h2>Capital Allocation Control</h2>
+            <small>Separated engine capital</small>
           </div>
-
           <span className={`badge ${mode === "LIVE" ? "warn" : ""}`}>
             {mode}
           </span>
+        </div>
+
+        {/* MASTER CAPITAL */}
+        <div style={{ marginBottom: 16 }}>
+          <b>Master Capital</b>
+          <input
+            type="number"
+            value={masterCapital}
+            onChange={(e) =>
+              setMasterCapital(Number(e.target.value))
+            }
+          />
+        </div>
+
+        {/* ALLOCATION */}
+        <div style={{ marginBottom: 16 }}>
+          <b>Scalp Allocation %</b>
+          <input
+            type="number"
+            value={allocationPct}
+            min="0"
+            max="100"
+            onChange={(e) =>
+              setAllocationPct(Number(e.target.value))
+            }
+          />
+        </div>
+
+        <div style={{ marginBottom: 16 }}>
+          <b>Scalp:</b> ${allocation.scalp.toFixed(2)}
+          <br />
+          <b>Session:</b> ${allocation.session.toFixed(2)}
         </div>
 
         {/* ENGINE SELECT */}
@@ -83,7 +133,6 @@ export default function TradingRoom({
           >
             Scalp Engine
           </button>
-
           <button
             className={`pill ${engineType === "session" ? "active" : ""}`}
             onClick={() => setEngineType("session")}
@@ -92,32 +141,7 @@ export default function TradingRoom({
           </button>
         </div>
 
-        {/* RISK */}
-        <div className="ctrl">
-          <label>
-            Risk %
-            <input
-              type="number"
-              value={riskPct}
-              min="0.1"
-              step="0.1"
-              onChange={(e) => setRiskPct(Number(e.target.value))}
-            />
-          </label>
-
-          <label>
-            Leverage
-            <input
-              type="number"
-              value={leverage}
-              min="1"
-              max="50"
-              onChange={(e) => setLeverage(Number(e.target.value))}
-            />
-          </label>
-        </div>
-
-        {/* EXECUTION */}
+        {/* EXECUTE */}
         <div className="actions">
           <button
             className="btn ok"
@@ -128,25 +152,16 @@ export default function TradingRoom({
           </button>
         </div>
 
-        {tradesUsed >= dailyLimit && (
-          <p className="muted">Daily trade limit reached.</p>
-        )}
-
-        {/* STATS */}
         <div style={{ marginTop: 20 }}>
-          <b>Balance:</b> ${stats.balance}
-          <br />
-          <b>Trades Used:</b> {stats.tradesUsed} / {dailyLimit}
+          <b>Total Balance:</b> ${masterCapital.toFixed(2)}
         </div>
       </section>
 
-      {/* RIGHT PANEL */}
       <aside className="postureCard">
         <h3>Execution Log</h3>
-
         <div style={{ maxHeight: 420, overflowY: "auto" }}>
           {log.map((x, i) => (
-            <div key={i} style={{ marginBottom: 10 }}>
+            <div key={i}>
               <small>{x.t}</small>
               <div>{x.m}</div>
             </div>
