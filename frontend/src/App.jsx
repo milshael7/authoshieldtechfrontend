@@ -1,5 +1,5 @@
 // frontend/src/App.jsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import {
   BrowserRouter,
   Routes,
@@ -9,23 +9,27 @@ import {
 } from "react-router-dom";
 import { getSavedUser } from "./lib/api.js";
 
-// Layouts
+/* ================= LAYOUTS ================= */
+
 import AdminLayout from "./layouts/AdminLayout.jsx";
 import ManagerLayout from "./layouts/ManagerLayout.jsx";
 import CompanyLayout from "./layouts/CompanyLayout.jsx";
 import SmallCompanyLayout from "./layouts/SmallCompanyLayout.jsx";
 import UserLayout from "./layouts/UserLayout.jsx";
 
-// Public Pages
+/* ================= PUBLIC ================= */
+
 import Landing from "./pages/public/Landing.jsx";
 import Pricing from "./pages/public/Pricing.jsx";
 import Signup from "./pages/public/Signup.jsx";
+import Login from "./pages/Login.jsx";
 
-// Admin Pages
+/* ================= ADMIN ================= */
+
 import AdminPricing from "./pages/admin/AdminPricing.jsx";
 
-// Auth / App Pages
-import Login from "./pages/Login.jsx";
+/* ================= APP PAGES ================= */
+
 import Trading from "./pages/Trading.jsx";
 import Posture from "./pages/Posture.jsx";
 import Assets from "./pages/Assets.jsx";
@@ -39,15 +43,18 @@ import Notifications from "./pages/Notifications.jsx";
 import NotFound from "./pages/NotFound.jsx";
 
 /* =========================================================
-   ROLE GUARDS — SAFE & PUBLIC-AWARE
+   ROLE UTILITIES
    ========================================================= */
 
-function RequireRole({ allow, children }) {
-  const user = getSavedUser();
+function normalizeRole(role) {
+  return String(role || "").toLowerCase();
+}
+
+function RoleGuard({ user, allow, children }) {
   if (!user) return <Navigate to="/login" replace />;
 
-  const role = String(user.role || "").toLowerCase();
-  const allowed = allow.map((r) => r.toLowerCase());
+  const role = normalizeRole(user.role);
+  const allowed = allow.map(normalizeRole);
 
   if (!allowed.includes(role)) {
     return <Navigate to="/404" replace />;
@@ -56,46 +63,58 @@ function RequireRole({ allow, children }) {
   return children;
 }
 
-function RequireAdmin({ children }) {
-  const user = getSavedUser();
-  if (!user) return <Navigate to="/login" replace />;
-
-  if (String(user.role || "").toLowerCase() !== "admin") {
-    return <Navigate to="/404" replace />;
-  }
-
-  return children;
-}
-
 /* =========================================================
-   ROUTER CORE (PUBLIC-SAFE)
+   ROUTER CORE
    ========================================================= */
 
 function AppRoutes({ user }) {
   const location = useLocation();
-  const role = String(user?.role || "").toLowerCase();
+  const role = normalizeRole(user?.role);
 
-  const isPublicPath =
-    location.pathname === "/" ||
-    location.pathname.startsWith("/pricing") ||
-    location.pathname.startsWith("/signup") ||
-    location.pathname.startsWith("/login");
+  const isPublicPath = useMemo(() => {
+    return (
+      location.pathname === "/" ||
+      location.pathname.startsWith("/pricing") ||
+      location.pathname.startsWith("/signup") ||
+      location.pathname.startsWith("/login")
+    );
+  }, [location.pathname]);
+
+  function defaultRedirect() {
+    if (!user) return "/login";
+
+    switch (role) {
+      case "admin":
+        return "/admin";
+      case "manager":
+        return "/manager";
+      case "company":
+        return "/company";
+      case "small_company":
+        return "/small-company";
+      default:
+        return "/user";
+    }
+  }
 
   return (
     <Routes>
+
       {/* ================= PUBLIC ================= */}
+
       <Route path="/" element={<Landing />} />
       <Route path="/pricing" element={<Pricing />} />
       <Route path="/signup" element={<Signup />} />
       <Route path="/login" element={<Login />} />
 
       {/* ================= ADMIN ================= */}
+
       <Route
         path="/admin/*"
         element={
-          <RequireRole allow={["admin"]}>
+          <RoleGuard user={user} allow={["admin"]}>
             <AdminLayout />
-          </RequireRole>
+          </RoleGuard>
         }
       >
         <Route index element={<Posture scope="global" />} />
@@ -103,42 +122,22 @@ function AppRoutes({ user }) {
         <Route path="threats" element={<Threats />} />
         <Route path="incidents" element={<Incidents />} />
         <Route path="vulnerabilities" element={<Vulnerabilities />} />
-        <Route
-          path="compliance"
-          element={
-            <RequireAdmin>
-              <Compliance />
-            </RequireAdmin>
-          }
-        />
-        <Route
-          path="policies"
-          element={
-            <RequireAdmin>
-              <Policies />
-            </RequireAdmin>
-          }
-        />
+        <Route path="compliance" element={<Compliance />} />
+        <Route path="policies" element={<Policies />} />
         <Route path="reports" element={<Reports />} />
         <Route path="trading" element={<Trading mode="admin" />} />
         <Route path="notifications" element={<Notifications />} />
-        <Route
-          path="pricing"
-          element={
-            <RequireAdmin>
-              <AdminPricing />
-            </RequireAdmin>
-          }
-        />
+        <Route path="pricing" element={<AdminPricing />} />
       </Route>
 
       {/* ================= MANAGER ================= */}
+
       <Route
         path="/manager/*"
         element={
-          <RequireRole allow={["admin", "manager"]}>
+          <RoleGuard user={user} allow={["admin", "manager"]}>
             <ManagerLayout />
-          </RequireRole>
+          </RoleGuard>
         }
       >
         <Route index element={<Posture scope="manager" />} />
@@ -151,12 +150,13 @@ function AppRoutes({ user }) {
       </Route>
 
       {/* ================= COMPANY ================= */}
+
       <Route
         path="/company/*"
         element={
-          <RequireRole allow={["admin", "company"]}>
+          <RoleGuard user={user} allow={["admin", "company"]}>
             <CompanyLayout />
-          </RequireRole>
+          </RoleGuard>
         }
       >
         <Route index element={<Posture scope="company" />} />
@@ -168,12 +168,13 @@ function AppRoutes({ user }) {
       </Route>
 
       {/* ================= SMALL COMPANY ================= */}
+
       <Route
         path="/small-company/*"
         element={
-          <RequireRole allow={["small_company"]}>
+          <RoleGuard user={user} allow={["small_company"]}>
             <SmallCompanyLayout />
-          </RequireRole>
+          </RoleGuard>
         }
       >
         <Route index element={<Posture scope="small_company" />} />
@@ -185,12 +186,13 @@ function AppRoutes({ user }) {
       </Route>
 
       {/* ================= USER ================= */}
+
       <Route
         path="/user/*"
         element={
-          <RequireRole allow={["individual", "user"]}>
+          <RoleGuard user={user} allow={["individual", "user"]}>
             <UserLayout />
-          </RequireRole>
+          </RoleGuard>
         }
       >
         <Route index element={<Posture scope="individual" />} />
@@ -198,27 +200,18 @@ function AppRoutes({ user }) {
       </Route>
 
       {/* ================= FALLBACK ================= */}
+
       <Route path="/404" element={<NotFound />} />
+
       <Route
         path="*"
         element={
-          isPublicPath ? (
-            <Navigate to="/" replace />
-          ) : !user ? (
-            <Navigate to="/login" replace />
-          ) : role === "admin" ? (
-            <Navigate to="/admin" replace />
-          ) : role === "manager" ? (
-            <Navigate to="/manager" replace />
-          ) : role === "company" ? (
-            <Navigate to="/company" replace />
-          ) : role === "small_company" ? (
-            <Navigate to="/small-company" replace />
-          ) : (
-            <Navigate to="/user" replace />
-          )
+          isPublicPath
+            ? <Navigate to="/" replace />
+            : <Navigate to={defaultRedirect()} replace />
         }
       />
+
     </Routes>
   );
 }
@@ -228,8 +221,8 @@ function AppRoutes({ user }) {
    ========================================================= */
 
 export default function App() {
-  const [ready, setReady] = useState(false);
   const [user, setUser] = useState(null);
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     const u = getSavedUser();
