@@ -9,8 +9,14 @@ import "./styles/main.css";
 import "./styles/layout.css";
 
 /* =========================================================
-   ROOT ERROR BOUNDARY — BOOT SAFETY
-   Prevents blank / blue screens on runtime errors
+   ENVIRONMENT DETECTION
+   ========================================================= */
+
+const isDev = import.meta.env.DEV;
+const isProd = import.meta.env.PROD;
+
+/* =========================================================
+   ROOT ERROR BOUNDARY — DEPLOY SAFE
    ========================================================= */
 
 class RootErrorBoundary extends React.Component {
@@ -24,8 +30,12 @@ class RootErrorBoundary extends React.Component {
   }
 
   componentDidCatch(error, info) {
-    // Log only — no side effects
-    console.error("🔥 Application bootstrap error:", error, info);
+    if (isDev) {
+      console.error("🔥 Bootstrap Error:", error, info);
+    }
+
+    // 🔮 Future: send to monitoring service
+    // sendToMonitoring(error, info);
   }
 
   render() {
@@ -37,30 +47,34 @@ class RootErrorBoundary extends React.Component {
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            padding: 32,
+            padding: 40,
             background: "#0b1220",
-            color: "white",
+            color: "#ffffff",
             fontFamily:
               "system-ui,-apple-system,Segoe UI,Roboto,Arial",
           }}
         >
-          <div style={{ maxWidth: 520 }}>
-            <h1 style={{ marginBottom: 12 }}>
-              Application Error
+          <div style={{ maxWidth: 540 }}>
+            <h1 style={{ marginBottom: 14 }}>
+              AutoShield Platform Error
             </h1>
-            <p style={{ opacity: 0.8, marginBottom: 16 }}>
-              The application failed to load correctly.
-              This is a client-side error, not a deployment failure.
+
+            <p style={{ opacity: 0.8, marginBottom: 18 }}>
+              The application encountered an unexpected client-side error.
+              Please refresh the page or contact support.
             </p>
-            <pre
-              style={{
-                whiteSpace: "pre-wrap",
-                fontSize: 12,
-                opacity: 0.7,
-              }}
-            >
-              {String(this.state.error)}
-            </pre>
+
+            {isDev && (
+              <pre
+                style={{
+                  whiteSpace: "pre-wrap",
+                  fontSize: 12,
+                  opacity: 0.7,
+                }}
+              >
+                {String(this.state.error)}
+              </pre>
+            )}
           </div>
         </div>
       );
@@ -80,7 +94,9 @@ if (!rootEl) {
   throw new Error("Root element #root not found");
 }
 
-ReactDOM.createRoot(rootEl).render(
+const root = ReactDOM.createRoot(rootEl);
+
+root.render(
   <React.StrictMode>
     <RootErrorBoundary>
       <AppShell>
