@@ -4,33 +4,34 @@ import {
   allocateCapital,
   rebalanceCapital,
   calculateTotalCapital,
-  routeToBestExchange,
+  rotateCapitalByPerformance,
 } from "./engines/CapitalAllocator";
 import { evaluateGlobalRisk } from "./engines/GlobalRiskGovernor";
 import {
   updatePerformance,
   getPerformanceStats,
+  getAllPerformanceStats,
 } from "./engines/PerformanceEngine";
-import {
-  isAuthorized,
-  getRolePermissions,
-} from "./engines/AuthorityEngine";
 
 export default function TradingRoom({
   mode: parentMode = "paper",
   dailyLimit = 5,
 }) {
+  /* ================= STATE ================= */
+
   const [mode, setMode] = useState(parentMode.toUpperCase());
   const [engineType, setEngineType] = useState("scalp");
   const [baseRisk, setBaseRisk] = useState(1);
   const [leverage, setLeverage] = useState(1);
   const [humanMultiplier, setHumanMultiplier] = useState(1);
-  const [role, setRole] = useState("owner"); // owner | admin | trader | viewer
+  const [productionMode] = useState(true);
 
   const [dailyPnL, setDailyPnL] = useState(0);
   const [tradesUsed, setTradesUsed] = useState(0);
   const [log, setLog] = useState([]);
   const [lastConfidence, setLastConfidence] = useState(null);
+
+  /* ================= INITIAL CAPITAL ================= */
 
   const initialCapital = 1000;
 
@@ -44,13 +45,17 @@ export default function TradingRoom({
   );
 
   const peakCapital = useRef(initialCapital);
-  const totalCapital = calculateTotalCapital(allocation, reserve);
+
+  const totalCapital = calculateTotalCapital(
+    allocation,
+    reserve
+  );
 
   useEffect(() => {
     setMode(parentMode.toUpperCase());
   }, [parentMode]);
 
-  const permissions = getRolePermissions(role);
+  /* ================= GLOBAL RISK ================= */
 
   const globalRisk = evaluateGlobalRisk({
     totalCapital,
@@ -66,85 +71,102 @@ export default function TradingRoom({
     setLog((prev) => [
       {
         t: new Date().toLocaleTimeString(),
-        m: `[${role.toUpperCase()}] ${message}`,
+        m: message,
         confidence,
       },
       ...prev,
     ]);
   }
 
+  /* ================= EXECUTION ================= */
+
   function executeTrade() {
-    if (!isAuthorized(role, "canTrade")) {
-      pushLog("Unauthorized trade attempt.");
-      return;
+    try {
+      if (!productionMode) {
+        pushLog("Production mode disabled.");
+        return;
+      }
+
+      if (!globalRisk.allowed) {
+        pushLog(`Blocked: ${globalRisk.reason}`);
+        return;
+      }
+
+      if (tradesUsed >= dailyLimit) {
+        pushLog("Daily trade count limit reached.");
+        return;
+      }
+
+      const exchange = "coinbase";
+
+      const engineCapital =
+        allocation[engineType][exchange];
+
+      const performanceStats =
+        getPerformanceStats(engineType);
+
+      const result = executeEngine({
+        engineType,
+        balance: engineCapital,
+        riskPct: baseRisk,
+        leverage,
+        humanMultiplier,
+        recentPerformance: performanceStats,
+      });
+
+      if (result.blocked) {
+        pushLog(
+          `Blocked: ${result.reason}`,
+          result.confidenceScore
+        );
+        return;
+      }
+
+      /* ===== Update Performance ===== */
+      updatePerformance(
+        engineType,
+        result.pnl,
+        result.isWin
+      );
+
+      /* ===== Update Capital ===== */
+      const updatedAllocation = {
+        ...allocation,
+        [engineType]: {
+          ...allocation[engineType],
+          [exchange]: result.newBalance,
+        },
+      };
+
+      /* ===== Rebalance ===== */
+      const rebalanced = rebalanceCapital({
+        allocation: updatedAllocation,
+        reserve,
+      });
+
+      /* ===== Rotate by Performance ===== */
+      const rotated = rotateCapitalByPerformance({
+        allocation: rebalanced.allocation,
+        performanceStats: getAllPerformanceStats(),
+      });
+
+      setAllocation(rotated);
+      setReserve(rebalanced.reserve);
+
+      setTradesUsed((v) => v + 1);
+      setDailyPnL((v) => v + result.pnl);
+      setLastConfidence(result.confidenceScore);
+
+      pushLog(
+        `${engineType.toUpperCase()} | ${exchange} | PnL: ${result.pnl.toFixed(
+          2
+        )}`,
+        result.confidenceScore
+      );
+    } catch (error) {
+      console.error("Execution Failure:", error);
+      pushLog("System protected against execution failure.");
     }
-
-    if (!globalRisk.allowed) {
-      pushLog(`Blocked: ${globalRisk.reason}`);
-      return;
-    }
-
-    if (tradesUsed >= dailyLimit) {
-      pushLog("Daily trade count limit reached.");
-      return;
-    }
-
-    const performanceStats = getPerformanceStats(engineType);
-
-    const exchangePerformance = {
-      coinbase: Math.random(),
-      kraken: Math.random(),
-    };
-
-    const exchange = routeToBestExchange({
-      allocation,
-      engineType,
-      exchangePerformance,
-    });
-
-    const engineCapital =
-      allocation[engineType][exchange];
-
-    const result = executeEngine({
-      engineType,
-      balance: engineCapital,
-      riskPct: baseRisk,
-      leverage,
-      humanMultiplier,
-      recentPerformance: performanceStats,
-    });
-
-    if (result.blocked) {
-      pushLog(`Blocked: ${result.reason}`, result.confidenceScore);
-      return;
-    }
-
-    updatePerformance(engineType, result.pnl, result.isWin);
-
-    const updatedAllocation = {
-      ...allocation,
-      [engineType]: {
-        ...allocation[engineType],
-        [exchange]: result.newBalance,
-      },
-    };
-
-    const rebalanced = rebalanceCapital({
-      allocation: updatedAllocation,
-      reserve,
-    });
-
-    setAllocation(rebalanced.allocation);
-    setReserve(rebalanced.reserve);
-
-    setTradesUsed((v) => v + 1);
-    setDailyPnL((v) => v + result.pnl);
-    setLastConfidence(result.confidenceScore);
-
-    pushLog(
-      `${engineType.toUpperCase()} | ${exchange} | PnL: ${result.pnl.toFixed(2)}`,
-      result.confidenceScore
-    );
   }
 
   function confidenceColor(score) {
@@ -154,31 +176,29 @@ export default function TradingRoom({
     return "#5EC6FF";
   }
 
+  /* ================= UI ================= */
+
   return (
     <div className="postureWrap">
       <section className="postureCard">
         <div className="postureTop">
           <div>
-            <h2>Institutional Trading Authority Panel</h2>
-            <small>Role-Based Execution Governance</small>
+            <h2>Institutional Trading Control</h2>
+            <small>
+              Adaptive AI + Capital Rotation + Risk Lock
+            </small>
           </div>
+
           <span className={`badge ${mode === "LIVE" ? "warn" : ""}`}>
             {mode}
           </span>
         </div>
 
-        {/* ROLE SWITCH */}
-        <div className="ctrlRow">
-          <select
-            value={role}
-            onChange={(e) => setRole(e.target.value)}
-          >
-            <option value="owner">Owner</option>
-            <option value="admin">Admin</option>
-            <option value="trader">Trader</option>
-            <option value="viewer">Viewer</option>
-          </select>
-        </div>
+        {!globalRisk.allowed && (
+          <div className="badge bad" style={{ marginTop: 10 }}>
+            Trading Locked — {globalRisk.reason}
+          </div>
+        )}
 
         <div className="stats">
           <div><b>Total Capital:</b> ${totalCapital.toFixed(2)}</div>
@@ -205,7 +225,7 @@ export default function TradingRoom({
           <button
             className="btn ok"
             onClick={executeTrade}
-            disabled={!permissions.canTrade}
+            disabled={!globalRisk.allowed || !productionMode}
           >
             Execute Trade
           </button>
@@ -213,10 +233,10 @@ export default function TradingRoom({
       </section>
 
       <aside className="postureCard">
-        <h3>Authority Audit Log</h3>
+        <h3>Execution Log</h3>
         <div style={{ maxHeight: 400, overflowY: "auto" }}>
           {log.map((x, i) => (
-            <div key={i}>
+            <div key={i} style={{ marginBottom: 8 }}>
               <small>{x.t}</small>
               <div>{x.m}</div>
               {x.confidence !== undefined && (
