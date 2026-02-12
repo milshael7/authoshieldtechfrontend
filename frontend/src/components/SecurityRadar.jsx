@@ -28,9 +28,9 @@ export default function SecurityRadar(){
         const data = await res.json().catch(() => ({}));
         if(!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
         setPosture(data.posture);
-        setStatus("OK");
+        setStatus("LIVE");
       }catch(e){
-        setStatus(`Error: ${e?.message || "failed"}`);
+        setStatus("ERROR");
       }
     }
 
@@ -42,7 +42,6 @@ export default function SecurityRadar(){
   const domains = useMemo(() => posture?.domains || [], [posture]);
   const maxIssues = useMemo(() => Math.max(1, ...domains.map(d => Number(d.issues)||0)), [domains]);
 
-  // Draw radar
   useEffect(() => {
     const canvas = canvasRef.current;
     if(!canvas) return;
@@ -58,20 +57,24 @@ export default function SecurityRadar(){
 
     ctx.clearRect(0,0,cssW,cssH);
 
-    // background panel
-    ctx.fillStyle = "rgba(0,0,0,0.22)";
+    /* ===== BACKGROUND DEPTH ===== */
+    const bg = ctx.createLinearGradient(0,0,0,cssH);
+    bg.addColorStop(0,"rgba(20,25,35,0.7)");
+    bg.addColorStop(1,"rgba(10,14,20,0.85)");
+    ctx.fillStyle = bg;
     ctx.fillRect(0,0,cssW,cssH);
 
-    const n = domains.length || 9;
-    const cx = cssW * 0.50;
-    const cy = cssH * 0.52;
-    const R  = Math.min(cssW, cssH) * 0.32;
+    const n = domains.length || 6;
+    const cx = cssW * 0.5;
+    const cy = cssH * 0.55;
+    const R  = Math.min(cssW, cssH) * 0.34;
 
-    // grid rings
-    ctx.strokeStyle = "rgba(255,255,255,0.10)";
+    /* ===== GRID ===== */
+    ctx.strokeStyle = "rgba(255,255,255,0.08)";
     ctx.lineWidth = 1;
+
     for(let k=1;k<=5;k++){
-      const r = (R * k)/5;
+      const r = (R*k)/5;
       ctx.beginPath();
       for(let i=0;i<n;i++){
         const a = (Math.PI*2*i)/n - Math.PI/2;
@@ -83,26 +86,26 @@ export default function SecurityRadar(){
       ctx.stroke();
     }
 
-    // axes
     for(let i=0;i<n;i++){
       const a = (Math.PI*2*i)/n - Math.PI/2;
       ctx.beginPath();
-      ctx.moveTo(cx, cy);
+      ctx.moveTo(cx,cy);
       ctx.lineTo(cx + Math.cos(a)*R, cy + Math.sin(a)*R);
       ctx.stroke();
     }
 
     if(!domains.length){
       ctx.fillStyle = "rgba(255,255,255,0.7)";
-      ctx.font = "14px system-ui, -apple-system, Segoe UI, Roboto, Arial";
-      ctx.fillText("No posture data yet.", 16, 24);
+      ctx.font = "14px system-ui";
+      ctx.fillText("No posture data yet.", 20, 30);
       return;
     }
 
-    // polygon (coverage)
-    ctx.fillStyle = "rgba(122,167,255,0.18)";
-    ctx.strokeStyle = "rgba(122,167,255,0.85)";
+    /* ===== COVERAGE SHAPE ===== */
+    ctx.fillStyle = "rgba(122,167,255,0.25)";
+    ctx.strokeStyle = "rgba(122,167,255,0.95)";
     ctx.lineWidth = 2;
+
     ctx.beginPath();
     for(let i=0;i<n;i++){
       const d = domains[i];
@@ -116,7 +119,7 @@ export default function SecurityRadar(){
     ctx.fill();
     ctx.stroke();
 
-    // points (issues)
+    /* ===== ISSUE DOTS ===== */
     for(let i=0;i<n;i++){
       const d = domains[i];
       const cov = clamp((Number(d.coverage)||0)/100, 0, 1);
@@ -125,71 +128,83 @@ export default function SecurityRadar(){
 
       const x = cx + Math.cos(a)*R*cov;
       const y = cy + Math.sin(a)*R*cov;
-
       const sz = 3 + (issues/maxIssues)*6;
 
-      ctx.fillStyle = issues > 0 ? "rgba(255,90,95,0.95)" : "rgba(43,213,118,0.95)";
+      ctx.fillStyle = issues > 0 ? "#ff5a5f" : "#2bd576";
       ctx.beginPath();
-      ctx.arc(x, y, sz, 0, Math.PI*2);
+      ctx.arc(x,y,sz,0,Math.PI*2);
       ctx.fill();
-
-      ctx.strokeStyle = "rgba(0,0,0,0.35)";
-      ctx.lineWidth = 1;
-      ctx.stroke();
     }
 
-    // title
-    ctx.fillStyle = "rgba(255,255,255,0.9)";
-    ctx.font = "700 14px system-ui, -apple-system, Segoe UI, Roboto, Arial";
-    ctx.fillText("Security Coverage Map", 16, 24);
+    /* ===== AXIS LABELS ===== */
+    ctx.fillStyle = "rgba(255,255,255,0.75)";
+    ctx.font = "12px system-ui";
 
-    // legend
-    ctx.fillStyle = "rgba(255,255,255,0.65)";
-    ctx.font = "12px system-ui, -apple-system, Segoe UI, Roboto, Arial";
-    ctx.fillText("Blue shape = coverage • Red/Green dots = issues", 16, 44);
+    domains.forEach((d,i)=>{
+      const a = (Math.PI*2*i)/n - Math.PI/2;
+      const lx = cx + Math.cos(a)*(R+18);
+      const ly = cy + Math.sin(a)*(R+18);
+      ctx.fillText(d.label, lx-20, ly);
+    });
 
   }, [domains, maxIssues]);
 
+  const avgCoverage = domains.length
+    ? Math.round(domains.reduce((a,b)=>a+Number(b.coverage||0),0)/domains.length)
+    : 0;
+
   return (
     <div className="card">
-      <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", gap:10}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
         <div>
-          <b>Coverage & Issues by Security Control</b>
+          <b>Security Coverage Radar</b>
           <div className="muted" style={{fontSize:12}}>
-            Status: {status}{posture?.updatedAt ? ` • Updated: ${new Date(posture.updatedAt).toLocaleTimeString()}` : ""}
+            Average Coverage: {avgCoverage}% • {domains.length} Controls
           </div>
         </div>
-        <span className={`badge ${status==="OK" ? "ok" : ""}`}>{status==="OK" ? "LIVE" : "…"}</span>
+        <span className={`badge ${status==="LIVE"?"ok":""}`}>
+          {status}
+        </span>
       </div>
 
-      <div style={{marginTop:12, height:360}}>
-        <canvas ref={canvasRef} style={{width:"100%", height:"100%", borderRadius:14, border:"1px solid rgba(255,255,255,0.10)"}} />
+      <div style={{marginTop:14,height:380}}>
+        <canvas
+          ref={canvasRef}
+          style={{
+            width:"100%",
+            height:"100%",
+            borderRadius:18,
+            border:"1px solid rgba(255,255,255,0.10)"
+          }}
+        />
       </div>
 
-      <div style={{marginTop:12}}>
-        <div className="tableWrap">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Control</th>
-                <th>Coverage</th>
-                <th>Issues</th>
+      <div style={{marginTop:14}}>
+        <table className="table">
+          <thead>
+            <tr>
+              <th>Control</th>
+              <th>Coverage</th>
+              <th>Issues</th>
+            </tr>
+          </thead>
+          <tbody>
+            {domains.map(d=>(
+              <tr key={d.key}>
+                <td>{d.label}</td>
+                <td>{fmtPct(d.coverage)}</td>
+                <td>{d.issues}</td>
               </tr>
-            </thead>
-            <tbody>
-              {domains.map((d) => (
-                <tr key={d.key}>
-                  <td>{d.label}</td>
-                  <td>{fmtPct(d.coverage)}</td>
-                  <td>{d.issues}</td>
-                </tr>
-              ))}
-              {domains.length === 0 && (
-                <tr><td colSpan="3" className="muted">No data yet.</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+            ))}
+            {!domains.length && (
+              <tr>
+                <td colSpan="3" className="muted">
+                  No posture data yet.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
     </div>
   );
