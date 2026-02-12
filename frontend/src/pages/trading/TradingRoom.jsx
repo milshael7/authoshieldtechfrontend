@@ -12,14 +12,11 @@ import {
   getPerformanceStats,
   getAllPerformanceStats,
 } from "./engines/PerformanceEngine";
-import { detectMarketRegime } from "./engines/MarketRegimeEngine";
 
 export default function TradingRoom({
   mode: parentMode = "paper",
   dailyLimit = 5,
 }) {
-  /* ================= STATE ================= */
-
   const [mode, setMode] = useState(parentMode.toUpperCase());
   const [engineType, setEngineType] = useState("scalp");
   const [baseRisk, setBaseRisk] = useState(1);
@@ -30,20 +27,18 @@ export default function TradingRoom({
   const [tradesUsed, setTradesUsed] = useState(0);
   const [log, setLog] = useState([]);
   const [lastConfidence, setLastConfidence] = useState(null);
-  const [cooldown, setCooldown] = useState(false);
-  const [currentDate, setCurrentDate] = useState(new Date().toDateString());
-  const [regime, setRegime] = useState("neutral");
-
-  /* ================= INITIAL CAPITAL ================= */
 
   const initialCapital = 1000;
+  const profitLockPercent = 0.5; // 🔒 50% profit lock
 
   const initialDistribution = allocateCapital({
     totalCapital: initialCapital,
   });
 
   const [reserve, setReserve] = useState(initialDistribution.reserve);
-  const [allocation, setAllocation] = useState(initialDistribution.allocation);
+  const [allocation, setAllocation] = useState(
+    initialDistribution.allocation
+  );
 
   const peakCapital = useRef(initialCapital);
 
@@ -52,32 +47,6 @@ export default function TradingRoom({
   useEffect(() => {
     setMode(parentMode.toUpperCase());
   }, [parentMode]);
-
-  /* ================= DAILY RESET ================= */
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const today = new Date().toDateString();
-      if (today !== currentDate) {
-        setTradesUsed(0);
-        setDailyPnL(0);
-        setCurrentDate(today);
-        pushLog("🔄 Daily reset executed.");
-      }
-    }, 60000);
-
-    return () => clearInterval(interval);
-  }, [currentDate]);
-
-  /* ================= MARKET REGIME ================= */
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setRegime(detectMarketRegime());
-    }, 15000);
-
-    return () => clearInterval(interval);
-  }, []);
 
   /* ================= GLOBAL RISK ================= */
 
@@ -91,26 +60,47 @@ export default function TradingRoom({
     peakCapital.current = totalCapital;
   }
 
-  function pushLog(message, confidence, metadata) {
+  function pushLog(message, confidence) {
     setLog((prev) => [
       {
         t: new Date().toLocaleTimeString(),
         m: message,
         confidence,
-        metadata,
       },
       ...prev,
     ]);
   }
 
+  /* ================= PROFIT LOCK SYSTEM ================= */
+
+  function lockProfitsIfNeeded(updatedAllocation) {
+    const currentTotal = calculateTotalCapital(updatedAllocation, reserve);
+
+    if (currentTotal > peakCapital.current) {
+      const profit = currentTotal - peakCapital.current;
+      const lockedAmount = profit * profitLockPercent;
+
+      peakCapital.current = currentTotal;
+
+      pushLog(
+        `🔒 Profit Locked: $${lockedAmount.toFixed(2)} moved to reserve`
+      );
+
+      return {
+        allocation: updatedAllocation,
+        reserve: reserve + lockedAmount,
+      };
+    }
+
+    return {
+      allocation: updatedAllocation,
+      reserve,
+    };
+  }
+
   /* ================= EXECUTION ================= */
 
   function executeTrade() {
-    if (cooldown) {
-      pushLog("Cooldown active after loss streak.");
-      return;
-    }
-
     if (!globalRisk.allowed) {
       pushLog(`Blocked: ${globalRisk.reason}`);
       return;
@@ -126,19 +116,11 @@ export default function TradingRoom({
 
     const performanceStats = getPerformanceStats(engineType);
 
-    /* ==== Volatility Adaptive Leverage ==== */
-    const volatilityAdjustedLeverage =
-      regime === "high_volatility"
-        ? leverage * 0.6
-        : regime === "trending"
-        ? leverage * 1.1
-        : leverage;
-
     const result = executeEngine({
       engineType,
       balance: engineCapital,
       riskPct: baseRisk,
-      leverage: volatilityAdjustedLeverage,
+      leverage,
       humanMultiplier,
       recentPerformance: performanceStats,
     });
@@ -148,16 +130,8 @@ export default function TradingRoom({
       return;
     }
 
-    /* ==== Update Performance ==== */
     updatePerformance(engineType, result.pnl, result.isWin);
 
-    if (!result.isWin && performanceStats.losses >= 2) {
-      setCooldown(true);
-      setTimeout(() => setCooldown(false), 10000);
-      pushLog("⚠ Cooldown triggered after loss streak.");
-    }
-
-    /* ==== Capital Update ==== */
     const updatedAllocation = {
       ...allocation,
       [engineType]: {
@@ -176,33 +150,18 @@ export default function TradingRoom({
       performanceStats: getAllPerformanceStats(),
     });
 
-    /* ==== Reserve Auto Deployment ==== */
-    let updatedReserve = rebalanced.reserve;
-    if (updatedReserve > 300 && dailyPnL > 50) {
-      rotated[engineType][exchange] += 50;
-      updatedReserve -= 50;
-      pushLog("💰 Reserve deployed to performing engine.");
-    }
+    const locked = lockProfitsIfNeeded(rotated);
 
-    /* ==== Hedge Logic ==== */
-    if (regime === "high_volatility" && engineType === "session") {
-      rotated["scalp"][exchange] += 20;
-      pushLog("🛡 Hedge capital rotated to scalp engine.");
-    }
-
-    setAllocation(rotated);
-    setReserve(updatedReserve);
+    setAllocation(locked.allocation);
+    setReserve(locked.reserve);
 
     setTradesUsed((v) => v + 1);
     setDailyPnL((v) => v + result.pnl);
     setLastConfidence(result.confidenceScore);
 
     pushLog(
-      `${engineType.toUpperCase()} | ${exchange} | PnL: ${result.pnl.toFixed(
-        2
-      )}`,
-      result.confidenceScore,
-      result.metadata
+      `${engineType.toUpperCase()} | ${exchange} | PnL: ${result.pnl.toFixed(2)}`,
+      result.confidenceScore
     );
   }
 
@@ -213,16 +172,15 @@ export default function TradingRoom({
     return "#5EC6FF";
   }
 
-  /* ================= UI ================= */
-
   return (
     <div className="postureWrap">
       <section className="postureCard">
         <div className="postureTop">
           <div>
             <h2>Institutional Trading Control</h2>
-            <small>Full Adaptive AI + Capital Intelligence</small>
+            <small>Adaptive AI + Capital Lock Protection</small>
           </div>
+
           <span className={`badge ${mode === "LIVE" ? "warn" : ""}`}>
             {mode}
           </span>
@@ -234,22 +192,16 @@ export default function TradingRoom({
           </div>
         )}
 
-        {cooldown && (
-          <div className="badge warn" style={{ marginTop: 10 }}>
-            Cooldown Active
-          </div>
-        )}
-
         <div className="stats">
-          <div><b>Total:</b> ${totalCapital.toFixed(2)}</div>
+          <div><b>Total Capital:</b> ${totalCapital.toFixed(2)}</div>
           <div><b>Reserve:</b> ${reserve.toFixed(2)}</div>
+          <div><b>Peak Capital:</b> ${peakCapital.current.toFixed(2)}</div>
           <div><b>Daily PnL:</b> ${dailyPnL.toFixed(2)}</div>
-          <div><b>Trades:</b> {tradesUsed} / {dailyLimit}</div>
-          <div><b>Regime:</b> {regime}</div>
+          <div><b>Trades Used:</b> {tradesUsed} / {dailyLimit}</div>
 
           {lastConfidence !== null && (
             <div>
-              <b>Confidence:</b>{" "}
+              <b>Last Confidence:</b>{" "}
               <span
                 style={{
                   color: confidenceColor(lastConfidence),
@@ -266,7 +218,7 @@ export default function TradingRoom({
           <button
             className="btn ok"
             onClick={executeTrade}
-            disabled={!globalRisk.allowed || cooldown}
+            disabled={!globalRisk.allowed}
           >
             Execute Trade
           </button>
