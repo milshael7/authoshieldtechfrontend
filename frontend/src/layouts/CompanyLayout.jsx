@@ -1,12 +1,5 @@
 // frontend/src/layouts/CompanyLayout.jsx
-// Company Layout — SOC Visibility Baseline (PHASE 1 CLEAN)
-//
-// RULES ENFORCED:
-// - NO topbar (handled globally)
-// - Sidebar + content only
-// - Scroll-safe
-// - Advisory-only assistant
-// - No AI branding text
+// Company Layout — SOC Command Architecture (PHASE 2)
 
 import React, { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
@@ -17,8 +10,13 @@ import "../styles/layout.css";
 
 export default function CompanyLayout() {
   const navigate = useNavigate();
+
   const [menuOpen, setMenuOpen] = useState(false);
   const [advisorOpen, setAdvisorOpen] = useState(false);
+
+  // 🧠 NEW: layout modes
+  const [layoutMode, setLayoutMode] = useState("standard");
+  // standard | focus | command
 
   function logout() {
     clearToken();
@@ -26,10 +24,23 @@ export default function CompanyLayout() {
     navigate("/login");
   }
 
+  function cycleLayoutMode() {
+    setLayoutMode((prev) => {
+      if (prev === "standard") return "focus";
+      if (prev === "focus") return "command";
+      return "standard";
+    });
+  }
+
+  const isCommand = layoutMode === "command";
+  const isFocus = layoutMode === "focus";
+
   return (
-    <div className={`layout-root ${menuOpen ? "sidebar-open" : ""}`}>
+    <div
+      className={`layout-root ${menuOpen ? "sidebar-open" : ""} layout-${layoutMode}`}
+    >
       {/* ================= MOBILE OVERLAY ================= */}
-      {menuOpen && (
+      {menuOpen && !isCommand && (
         <div
           className="sidebar-overlay"
           onClick={() => setMenuOpen(false)}
@@ -37,85 +48,86 @@ export default function CompanyLayout() {
       )}
 
       {/* ================= SIDEBAR ================= */}
-      <aside className="layout-sidebar company">
-        <div className="layout-brand">
-          <Logo size="md" />
-          <span className="muted" style={{ fontSize: 12 }}>
-            Company Visibility
-          </span>
-        </div>
+      {!isCommand && (
+        <aside className={`layout-sidebar company ${isFocus ? "collapsed" : ""}`}>
+          <div className="layout-brand">
+            <Logo size="md" />
+            <span className="muted" style={{ fontSize: 12 }}>
+              Company Visibility
+            </span>
+          </div>
 
-        <nav className="layout-nav">
-          <NavLink to="/company" end onClick={() => setMenuOpen(false)}>
-            Security Overview
-          </NavLink>
+          <nav className="layout-nav">
+            <NavLink to="/company" end>
+              Security Overview
+            </NavLink>
+            <NavLink to="/company/assets">Assets</NavLink>
+            <NavLink to="/company/threats">Threats</NavLink>
+            <NavLink to="/company/incidents">Incidents</NavLink>
+            <NavLink to="/company/reports">Reports</NavLink>
+            <NavLink to="/company/notifications">
+              Notifications
+            </NavLink>
+          </nav>
 
-          <NavLink to="/company/assets" onClick={() => setMenuOpen(false)}>
-            Assets
-          </NavLink>
-
-          <NavLink to="/company/threats" onClick={() => setMenuOpen(false)}>
-            Threats
-          </NavLink>
-
-          <NavLink to="/company/incidents" onClick={() => setMenuOpen(false)}>
-            Incidents
-          </NavLink>
-
-          <NavLink to="/company/reports" onClick={() => setMenuOpen(false)}>
-            Reports
-          </NavLink>
-
-          <NavLink
-            to="/company/notifications"
-            onClick={() => setMenuOpen(false)}
-          >
-            Notifications
-          </NavLink>
-        </nav>
-
-        <button className="btn logout-btn" onClick={logout}>
-          Log out
-        </button>
-      </aside>
+          <button className="btn logout-btn" onClick={logout}>
+            Log out
+          </button>
+        </aside>
+      )}
 
       {/* ================= MAIN ================= */}
-      <main className="layout-main">
+      <main className={`layout-main ${isCommand ? "command-main" : ""}`}>
+        
+        {/* ===== MODE SWITCHER ===== */}
+        <div className="layout-mode-toggle">
+          <button className="btn small" onClick={cycleLayoutMode}>
+            {layoutMode === "standard" && "Switch to Focus"}
+            {layoutMode === "focus" && "Switch to Command"}
+            {layoutMode === "command" && "Back to Standard"}
+          </button>
+        </div>
+
         {/* ================= CONTENT ================= */}
-        <section className="layout-content">
+        <section
+          className={`layout-content ${
+            isCommand ? "command-content" : ""
+          }`}
+        >
           <Outlet />
         </section>
 
-        {/* ================= ADVISOR (VISIBILITY ONLY) ================= */}
-        <section
-          className={`ai-drawer ${advisorOpen ? "open" : ""}`}
-          aria-hidden={!advisorOpen}
-        >
-          <div className="ai-drawer-handle">
-            <button
-              className="ai-toggle"
-              onClick={() => setAdvisorOpen(v => !v)}
-            >
-              {advisorOpen
-                ? "▼ Hide Advisor"
-                : "▲ Show Security Advisor"}
-            </button>
-          </div>
-
-          <div
-            className="ai-drawer-body"
-            style={{ overflow: "auto" }} // 🔑 FIX: allow scroll + input
+        {/* ================= ADVISOR ================= */}
+        {!isCommand && (
+          <section
+            className={`ai-drawer ${advisorOpen ? "open" : ""}`}
           >
-            <AuthoDevPanel
-              title="Security Advisor"
-              getContext={() => ({
-                role: "company",
-                mode: "advisory",
-                location: window.location.pathname,
-              })}
-            />
-          </div>
-        </section>
+            <div className="ai-drawer-handle">
+              <button
+                className="ai-toggle"
+                onClick={() => setAdvisorOpen((v) => !v)}
+              >
+                {advisorOpen
+                  ? "▼ Hide Advisor"
+                  : "▲ Show Security Advisor"}
+              </button>
+            </div>
+
+            <div
+              className="ai-drawer-body"
+              style={{ overflow: "auto" }}
+            >
+              <AuthoDevPanel
+                title="Security Advisor"
+                getContext={() => ({
+                  role: "company",
+                  mode: "advisory",
+                  location: window.location.pathname,
+                })}
+              />
+            </div>
+          </section>
+        )}
       </main>
     </div>
   );
