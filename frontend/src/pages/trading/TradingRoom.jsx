@@ -12,11 +12,14 @@ import {
   getPerformanceStats,
   getAllPerformanceStats,
 } from "./engines/PerformanceEngine";
+import { detectMarketRegime } from "./engines/MarketRegimeEngine";
 
 export default function TradingRoom({
   mode: parentMode = "paper",
   dailyLimit = 5,
 }) {
+  /* ================= STATE ================= */
+
   const [mode, setMode] = useState(parentMode.toUpperCase());
   const [engineType, setEngineType] = useState("scalp");
   const [baseRisk, setBaseRisk] = useState(1);
@@ -27,7 +30,11 @@ export default function TradingRoom({
   const [tradesUsed, setTradesUsed] = useState(0);
   const [log, setLog] = useState([]);
   const [lastConfidence, setLastConfidence] = useState(null);
-  const [currentRegime, setCurrentRegime] = useState("neutral");
+  const [cooldown, setCooldown] = useState(false);
+  const [currentDate, setCurrentDate] = useState(new Date().toDateString());
+  const [regime, setRegime] = useState("neutral");
+
+  /* ================= INITIAL CAPITAL ================= */
 
   const initialCapital = 1000;
 
@@ -36,16 +43,41 @@ export default function TradingRoom({
   });
 
   const [reserve, setReserve] = useState(initialDistribution.reserve);
-  const [allocation, setAllocation] = useState(
-    initialDistribution.allocation
-  );
+  const [allocation, setAllocation] = useState(initialDistribution.allocation);
 
   const peakCapital = useRef(initialCapital);
+
   const totalCapital = calculateTotalCapital(allocation, reserve);
 
   useEffect(() => {
     setMode(parentMode.toUpperCase());
   }, [parentMode]);
+
+  /* ================= DAILY RESET ================= */
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const today = new Date().toDateString();
+      if (today !== currentDate) {
+        setTradesUsed(0);
+        setDailyPnL(0);
+        setCurrentDate(today);
+        pushLog("🔄 Daily reset executed.");
+      }
+    }, 60000);
+
+    return () => clearInterval(interval);
+  }, [currentDate]);
+
+  /* ================= MARKET REGIME ================= */
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setRegime(detectMarketRegime());
+    }, 15000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   /* ================= GLOBAL RISK ================= */
 
@@ -59,12 +91,13 @@ export default function TradingRoom({
     peakCapital.current = totalCapital;
   }
 
-  function pushLog(message, confidence) {
+  function pushLog(message, confidence, metadata) {
     setLog((prev) => [
       {
         t: new Date().toLocaleTimeString(),
         m: message,
         confidence,
+        metadata,
       },
       ...prev,
     ]);
@@ -73,6 +106,11 @@ export default function TradingRoom({
   /* ================= EXECUTION ================= */
 
   function executeTrade() {
+    if (cooldown) {
+      pushLog("Cooldown active after loss streak.");
+      return;
+    }
+
     if (!globalRisk.allowed) {
       pushLog(`Blocked: ${globalRisk.reason}`);
       return;
@@ -85,13 +123,22 @@ export default function TradingRoom({
 
     const exchange = "coinbase";
     const engineCapital = allocation[engineType][exchange];
+
     const performanceStats = getPerformanceStats(engineType);
+
+    /* ==== Volatility Adaptive Leverage ==== */
+    const volatilityAdjustedLeverage =
+      regime === "high_volatility"
+        ? leverage * 0.6
+        : regime === "trending"
+        ? leverage * 1.1
+        : leverage;
 
     const result = executeEngine({
       engineType,
       balance: engineCapital,
       riskPct: baseRisk,
-      leverage,
+      leverage: volatilityAdjustedLeverage,
       humanMultiplier,
       recentPerformance: performanceStats,
     });
@@ -101,8 +148,16 @@ export default function TradingRoom({
       return;
     }
 
+    /* ==== Update Performance ==== */
     updatePerformance(engineType, result.pnl, result.isWin);
 
+    if (!result.isWin && performanceStats.losses >= 2) {
+      setCooldown(true);
+      setTimeout(() => setCooldown(false), 10000);
+      pushLog("⚠ Cooldown triggered after loss streak.");
+    }
+
+    /* ==== Capital Update ==== */
     const updatedAllocation = {
       ...allocation,
       [engineType]: {
@@ -121,18 +176,33 @@ export default function TradingRoom({
       performanceStats: getAllPerformanceStats(),
     });
 
+    /* ==== Reserve Auto Deployment ==== */
+    let updatedReserve = rebalanced.reserve;
+    if (updatedReserve > 300 && dailyPnL > 50) {
+      rotated[engineType][exchange] += 50;
+      updatedReserve -= 50;
+      pushLog("💰 Reserve deployed to performing engine.");
+    }
+
+    /* ==== Hedge Logic ==== */
+    if (regime === "high_volatility" && engineType === "session") {
+      rotated["scalp"][exchange] += 20;
+      pushLog("🛡 Hedge capital rotated to scalp engine.");
+    }
+
     setAllocation(rotated);
-    setReserve(rebalanced.reserve);
+    setReserve(updatedReserve);
+
     setTradesUsed((v) => v + 1);
     setDailyPnL((v) => v + result.pnl);
     setLastConfidence(result.confidenceScore);
-    setCurrentRegime(result.regime || "neutral");
 
     pushLog(
-      `${engineType.toUpperCase()} | ${exchange} | Regime: ${
-        result.regime
-      } | PnL: ${result.pnl.toFixed(2)}`,
-      result.confidenceScore
+      `${engineType.toUpperCase()} | ${exchange} | PnL: ${result.pnl.toFixed(
+        2
+      )}`,
+      result.confidenceScore,
+      result.metadata
     );
   }
 
@@ -143,13 +213,6 @@ export default function TradingRoom({
     return "#5EC6FF";
   }
 
-  function regimeColor(regime) {
-    if (regime === "trending") return "#5EC6FF";
-    if (regime === "ranging") return "#f5b942";
-    if (regime === "high_volatility") return "#ff4d4d";
-    return "#999";
-  }
-
   /* ================= UI ================= */
 
   return (
@@ -158,9 +221,8 @@ export default function TradingRoom({
         <div className="postureTop">
           <div>
             <h2>Institutional Trading Control</h2>
-            <small>Adaptive AI + Capital Rotation + Regime Intelligence</small>
+            <small>Full Adaptive AI + Capital Intelligence</small>
           </div>
-
           <span className={`badge ${mode === "LIVE" ? "warn" : ""}`}>
             {mode}
           </span>
@@ -172,27 +234,22 @@ export default function TradingRoom({
           </div>
         )}
 
+        {cooldown && (
+          <div className="badge warn" style={{ marginTop: 10 }}>
+            Cooldown Active
+          </div>
+        )}
+
         <div className="stats">
-          <div><b>Total Capital:</b> ${totalCapital.toFixed(2)}</div>
+          <div><b>Total:</b> ${totalCapital.toFixed(2)}</div>
           <div><b>Reserve:</b> ${reserve.toFixed(2)}</div>
           <div><b>Daily PnL:</b> ${dailyPnL.toFixed(2)}</div>
-          <div><b>Trades Used:</b> {tradesUsed} / {dailyLimit}</div>
-
-          <div>
-            <b>Market Regime:</b>{" "}
-            <span
-              style={{
-                color: regimeColor(currentRegime),
-                fontWeight: 700,
-              }}
-            >
-              {currentRegime.toUpperCase()}
-            </span>
-          </div>
+          <div><b>Trades:</b> {tradesUsed} / {dailyLimit}</div>
+          <div><b>Regime:</b> {regime}</div>
 
           {lastConfidence !== null && (
             <div>
-              <b>Last Confidence:</b>{" "}
+              <b>Confidence:</b>{" "}
               <span
                 style={{
                   color: confidenceColor(lastConfidence),
@@ -209,7 +266,7 @@ export default function TradingRoom({
           <button
             className="btn ok"
             onClick={executeTrade}
-            disabled={!globalRisk.allowed}
+            disabled={!globalRisk.allowed || cooldown}
           >
             Execute Trade
           </button>
