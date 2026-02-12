@@ -12,6 +12,13 @@ function fmtPct(n){
   return `${Math.round(x)}%`;
 }
 
+function gradeFromScore(score){
+  if(score >= 90) return "A";
+  if(score >= 80) return "B";
+  if(score >= 65) return "C";
+  return "D";
+}
+
 export default function SecurityRadar(){
   const [status, setStatus] = useState("Loading…");
   const [posture, setPosture] = useState(null);
@@ -42,6 +49,39 @@ export default function SecurityRadar(){
   const domains = useMemo(() => posture?.domains || [], [posture]);
   const maxIssues = useMemo(() => Math.max(1, ...domains.map(d => Number(d.issues)||0)), [domains]);
 
+  /* =============================
+     SCORE ENGINE
+     ============================= */
+
+  const scoreData = useMemo(() => {
+    if(!domains.length){
+      return { score: 0, avgCoverage: 0, totalIssues: 0, grade: "—" };
+    }
+
+    const avgCoverage =
+      domains.reduce((a,b)=>a+Number(b.coverage||0),0)/domains.length;
+
+    const totalIssues =
+      domains.reduce((a,b)=>a+Number(b.issues||0),0);
+
+    // Issue pressure reduces score slightly
+    const issuePenalty = Math.min(totalIssues * 1.5, 25);
+
+    const score = clamp(avgCoverage - issuePenalty, 0, 100);
+
+    return {
+      score: Math.round(score),
+      avgCoverage: Math.round(avgCoverage),
+      totalIssues,
+      grade: gradeFromScore(score)
+    };
+
+  }, [domains]);
+
+  /* =============================
+     RADAR DRAW
+     ============================= */
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if(!canvas) return;
@@ -57,10 +97,9 @@ export default function SecurityRadar(){
 
     ctx.clearRect(0,0,cssW,cssH);
 
-    /* ===== BACKGROUND DEPTH ===== */
     const bg = ctx.createLinearGradient(0,0,0,cssH);
     bg.addColorStop(0,"rgba(20,25,35,0.7)");
-    bg.addColorStop(1,"rgba(10,14,20,0.85)");
+    bg.addColorStop(1,"rgba(10,14,20,0.9)");
     ctx.fillStyle = bg;
     ctx.fillRect(0,0,cssW,cssH);
 
@@ -69,7 +108,6 @@ export default function SecurityRadar(){
     const cy = cssH * 0.55;
     const R  = Math.min(cssW, cssH) * 0.34;
 
-    /* ===== GRID ===== */
     ctx.strokeStyle = "rgba(255,255,255,0.08)";
     ctx.lineWidth = 1;
 
@@ -101,7 +139,6 @@ export default function SecurityRadar(){
       return;
     }
 
-    /* ===== COVERAGE SHAPE ===== */
     ctx.fillStyle = "rgba(122,167,255,0.25)";
     ctx.strokeStyle = "rgba(122,167,255,0.95)";
     ctx.lineWidth = 2;
@@ -119,7 +156,6 @@ export default function SecurityRadar(){
     ctx.fill();
     ctx.stroke();
 
-    /* ===== ISSUE DOTS ===== */
     for(let i=0;i<n;i++){
       const d = domains[i];
       const cov = clamp((Number(d.coverage)||0)/100, 0, 1);
@@ -136,32 +172,18 @@ export default function SecurityRadar(){
       ctx.fill();
     }
 
-    /* ===== AXIS LABELS ===== */
-    ctx.fillStyle = "rgba(255,255,255,0.75)";
-    ctx.font = "12px system-ui";
-
-    domains.forEach((d,i)=>{
-      const a = (Math.PI*2*i)/n - Math.PI/2;
-      const lx = cx + Math.cos(a)*(R+18);
-      const ly = cy + Math.sin(a)*(R+18);
-      ctx.fillText(d.label, lx-20, ly);
-    });
-
   }, [domains, maxIssues]);
-
-  const avgCoverage = domains.length
-    ? Math.round(domains.reduce((a,b)=>a+Number(b.coverage||0),0)/domains.length)
-    : 0;
 
   return (
     <div className="card">
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
         <div>
-          <b>Security Coverage Radar</b>
+          <b>Security Command Score</b>
           <div className="muted" style={{fontSize:12}}>
-            Average Coverage: {avgCoverage}% • {domains.length} Controls
+            Avg Coverage: {scoreData.avgCoverage}% • Issues: {scoreData.totalIssues}
           </div>
         </div>
+
         <span className={`badge ${status==="LIVE"?"ok":""}`}>
           {status}
         </span>
@@ -179,32 +201,30 @@ export default function SecurityRadar(){
         />
       </div>
 
-      <div style={{marginTop:14}}>
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Control</th>
-              <th>Coverage</th>
-              <th>Issues</th>
-            </tr>
-          </thead>
-          <tbody>
-            {domains.map(d=>(
-              <tr key={d.key}>
-                <td>{d.label}</td>
-                <td>{fmtPct(d.coverage)}</td>
-                <td>{d.issues}</td>
-              </tr>
-            ))}
-            {!domains.length && (
-              <tr>
-                <td colSpan="3" className="muted">
-                  No posture data yet.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+      <div style={{
+        marginTop:18,
+        display:"flex",
+        justifyContent:"space-between",
+        alignItems:"center"
+      }}>
+        <div>
+          <div style={{fontSize:14}}>Overall Security Score</div>
+          <div style={{fontSize:28,fontWeight:900}}>
+            {scoreData.score}/100
+          </div>
+        </div>
+
+        <div style={{
+          fontSize:36,
+          fontWeight:900,
+          color:
+            scoreData.grade === "A" ? "#2bd576" :
+            scoreData.grade === "B" ? "#5EC6FF" :
+            scoreData.grade === "C" ? "#ffd166" :
+            "#ff5a5f"
+        }}>
+          {scoreData.grade}
+        </div>
       </div>
     </div>
   );
