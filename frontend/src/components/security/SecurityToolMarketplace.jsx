@@ -1,75 +1,61 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 
 /*
   SecurityToolMarketplace
-  Enterprise Tool Deployment Panel
-  Institutional-grade UI
-  Production-safe (UI only)
+  Connected to backend score engine
 */
 
-const TOOL_CATALOG = [
-  {
-    id: "edr",
-    name: "Endpoint Detection & Response",
-    category: "Endpoint",
-    description:
-      "Real-time behavioral monitoring, ransomware blocking, and device-level threat response.",
-    riskLevel: "critical",
-  },
-  {
-    id: "itdr",
-    name: "Identity Threat Detection",
-    category: "Identity",
-    description:
-      "Detect credential abuse, privilege escalation, and anomalous login behavior.",
-    riskLevel: "high",
-  },
-  {
-    id: "email",
-    name: "Email Protection",
-    category: "Email Security",
-    description:
-      "AI-driven phishing detection, spoof protection, and malicious attachment blocking.",
-    riskLevel: "high",
-  },
-  {
-    id: "data",
-    name: "Cloud Data Shield",
-    category: "Cloud",
-    description:
-      "Continuous scanning for exposed storage, misconfigurations, and data leaks.",
-    riskLevel: "medium",
-  },
-  {
-    id: "sat",
-    name: "Security Awareness Training",
-    category: "Training",
-    description:
-      "Phishing simulations and employee training performance monitoring.",
-    riskLevel: "medium",
-  },
-  {
-    id: "darkweb",
-    name: "Dark Web Monitoring",
-    category: "Threat Intel",
-    description:
-      "Monitor credential leaks and compromised data across underground sources.",
-    riskLevel: "medium",
-  },
-];
+function apiBase() {
+  return (
+    (import.meta.env.VITE_API_BASE ||
+      import.meta.env.VITE_BACKEND_URL ||
+      "").trim()
+  );
+}
 
 export default function SecurityToolMarketplace() {
-  const [installed, setInstalled] = useState({});
+  const [tools, setTools] = useState([]);
   const [search, setSearch] = useState("");
+  const [loading, setLoading] = useState(true);
 
-  function toggleInstall(id) {
-    setInstalled((prev) => ({
-      ...prev,
-      [id]: !prev[id],
-    }));
+  const base = apiBase();
+
+  async function loadTools() {
+    if (!base) return;
+    try {
+      const res = await fetch(`${base}/api/security/tools`, {
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setTools(data.tools || []);
+      }
+    } catch {}
+    setLoading(false);
   }
 
-  const filteredTools = TOOL_CATALOG.filter((tool) =>
+  async function toggleInstall(tool) {
+    if (!base) return;
+
+    const endpoint = tool.installed
+      ? `/api/security/tools/${tool.id}/uninstall`
+      : `/api/security/tools/${tool.id}/install`;
+
+    try {
+      await fetch(`${base}${endpoint}`, {
+        method: "POST",
+        credentials: "include",
+      });
+
+      loadTools(); // refresh state after change
+    } catch {}
+  }
+
+  useEffect(() => {
+    loadTools();
+  }, []);
+
+  const filteredTools = tools.filter((tool) =>
     tool.name.toLowerCase().includes(search.toLowerCase())
   );
 
@@ -81,7 +67,6 @@ export default function SecurityToolMarketplace() {
           Deploy, activate, and manage enterprise-grade security modules.
         </small>
 
-        {/* Search Bar */}
         <div style={{ marginTop: 16 }}>
           <input
             type="text"
@@ -101,54 +86,40 @@ export default function SecurityToolMarketplace() {
         </div>
       </div>
 
+      {loading && <div className="muted">Loading tools...</div>}
+
       <div className="toolGrid">
-        {filteredTools.map((tool) => {
-          const isInstalled = installed[tool.id];
-
-          return (
-            <div key={tool.id} className="toolCard">
-              <div className="toolHeader">
-                <div>
-                  <b>{tool.name}</b>
-                  <div className="toolCategory">
-                    {tool.category}
-                  </div>
+        {filteredTools.map((tool) => (
+          <div key={tool.id} className="toolCard">
+            <div className="toolHeader">
+              <div>
+                <b>{tool.name}</b>
+                <div className="toolCategory">
+                  {tool.domain?.toUpperCase()}
                 </div>
-
-                <span
-                  className={`badge ${
-                    isInstalled ? "ok" : ""
-                  }`}
-                >
-                  {isInstalled ? "Installed" : "Available"}
-                </span>
               </div>
 
-              <div className="toolDesc">
-                {tool.description}
-              </div>
-
-              <div className="toolMeta">
-                <span className={`risk ${tool.riskLevel}`}>
-                  {tool.riskLevel.toUpperCase()} PRIORITY
-                </span>
-              </div>
-
-              <div className="toolActions">
-                <button
-                  className={`btn ${
-                    isInstalled ? "warn" : "ok"
-                  }`}
-                  onClick={() => toggleInstall(tool.id)}
-                >
-                  {isInstalled ? "Uninstall" : "Install"}
-                </button>
-              </div>
+              <span className={`badge ${tool.installed ? "ok" : ""}`}>
+                {tool.installed ? "Installed" : "Available"}
+              </span>
             </div>
-          );
-        })}
 
-        {filteredTools.length === 0 && (
+            <div className="toolDesc">
+              Domain: {tool.domain}
+            </div>
+
+            <div className="toolActions">
+              <button
+                className={`btn ${tool.installed ? "warn" : "ok"}`}
+                onClick={() => toggleInstall(tool)}
+              >
+                {tool.installed ? "Uninstall" : "Install"}
+              </button>
+            </div>
+          </div>
+        ))}
+
+        {!loading && filteredTools.length === 0 && (
           <div className="muted">
             No matching security controls found.
           </div>
