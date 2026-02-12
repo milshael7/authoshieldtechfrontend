@@ -1,11 +1,16 @@
+// ExchangeManager.js
+// Hardened Institutional Exchange Execution Layer
+
 import { PaperExchange } from "./PaperExchange";
 import { CoinbaseExchange } from "./CoinbaseExchange";
 import { KrakenExchange } from "./KrakenExchange";
-import { keyVault } from "../KeyVault";
 
 export class ExchangeManager {
   constructor({ mode = "paper" }) {
     this.mode = mode;
+    this.cooldownMs = 3000; // 3 second execution lock
+    this.lastExecution = 0;
+    this.killSwitch = false;
 
     this.exchanges = {
       paper: new PaperExchange(),
@@ -14,13 +19,23 @@ export class ExchangeManager {
     };
   }
 
-  setMode(mode) {
-    this.mode = mode;
+  /* ================= KILL SWITCH ================= */
+
+  enableKillSwitch() {
+    this.killSwitch = true;
   }
+
+  disableKillSwitch() {
+    this.killSwitch = false;
+  }
+
+  /* ================= EXCHANGE SELECT ================= */
 
   getExchange(name) {
     return this.exchanges[name];
   }
+
+  /* ================= SAFE EXECUTION ================= */
 
   async executeOrder({
     exchange,
@@ -28,48 +43,42 @@ export class ExchangeManager {
     side,
     size,
   }) {
-    /* ================= PAPER MODE ================= */
-
-    if (this.mode === "paper") {
-      const paper = this.getExchange("paper");
-
-      const result = await paper.placeOrder({
-        symbol,
-        side,
-        size,
-      });
-
-      return {
-        ...result,
-        executionMode: "paper",
-      };
+    if (this.killSwitch) {
+      throw new Error("Kill switch active. Trading halted.");
     }
 
-    /* ================= LIVE MODE ================= */
+    const now = Date.now();
 
-    // Validate key
-    const key = keyVault.getKey(exchange);
-
-    if (!key) {
-      throw new Error(
-        `Exchange ${exchange} not enabled`
-      );
+    if (now - this.lastExecution < this.cooldownMs) {
+      throw new Error("Execution cooldown active.");
     }
 
-    const ex = this.getExchange(exchange);
+    this.lastExecution = now;
+
+    const ex = this.getExchange(
+      this.mode === "paper" ? "paper" : exchange
+    );
+
+    if (!ex) {
+      throw new Error("Exchange not available.");
+    }
+
+    const orderId = `${symbol}-${Date.now()}`;
 
     const result = await ex.placeOrder({
       symbol,
       side,
       size,
-      apiKey: key.apiKey,
-      secret: key.secret,
+      clientOrderId: orderId,
     });
 
     return {
       ...result,
-      executionMode: "live",
-      exchange,
+      metadata: {
+        exchange: this.mode === "paper" ? "paper" : exchange,
+        orderId,
+        timestamp: new Date().toISOString(),
+      },
     };
   }
 }
