@@ -22,7 +22,7 @@ export function detectMarketRegime() {
    - Controls risk scaling
 ================================================== */
 
-export function getRegimeConfig(engineType, regime) {
+export function getRegimeBias(engineType, regime) {
   const table = {
     trending: {
       scalp: { winRate: 0.48, riskModifier: 1.05 },
@@ -42,5 +42,5 @@ export function getRegimeConfig(engineType, regime) {
     },
   };
 
-  return table[regime][engineType];
+  return table[regime][engineType].winRate;
 }
