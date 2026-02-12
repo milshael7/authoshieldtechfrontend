@@ -1,58 +1,73 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import Market from "./trading/Market.jsx";
 import TradingRoom from "./trading/TradingRoom.jsx";
 import "../styles/platform.css";
 
 /**
- * Trading.jsx — DUAL ENGINE GOVERNANCE (PHASE 3)
- *
- * STRUCTURE:
- * - AI = 100% strategy engine
- * - Human = Override authority
- * - Dual capital segmentation
- * - Weekend lock
- * - Learning engine always active
- *
- * NO:
- * - Real execution
- * - API keys
- * - Automation
+ * Trading.jsx — DUAL ENGINE GOVERNANCE (STABLE BUILD)
  */
 
 export default function Trading() {
+
   const [tab, setTab] = useState("market");
 
   /* ================= EXECUTION ENGINE ================= */
-  const [mode, setMode] = useState("paper"); // paper | live
-  const [dailyLimit, setDailyLimit] = useState(5);
+
+  const [mode, setMode] = useState("paper");
+  const [dailyLimit] = useState(5);
   const [tradesUsed, setTradesUsed] = useState(1);
 
   /* ================= HUMAN OVERRIDE CONTROL ================= */
-  const [overrideRiskPct, setOverrideRiskPct] = useState(20); // human override %
+
+  const [overrideRiskPct, setOverrideRiskPct] = useState(20);
   const [overrideActive, setOverrideActive] = useState(false);
 
   /* ================= LEARNING ENGINE ================= */
+
   const [learningStatus] = useState("active");
   const [simulatedTrades] = useState(143);
   const [accuracy] = useState(67.4);
 
-  /* ================= TRADING WINDOW ================= */
-  const tradingAllowed = useMemo(() => {
-    const now = new Date();
-    const day = now.getDay();
-    const hour = now.getHours();
+  /* ================= TRADING WINDOW (AUTO REFRESH) ================= */
 
-    if (day === 5 && hour >= 21) return false; // Fri after 9PM
-    if (day === 6 && hour < 21) return false;  // Sat before 9PM
-    return true;
+  const [now, setNow] = useState(Date.now());
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setNow(Date.now());
+    }, 60 * 60 * 1000); // refresh hourly
+    return () => clearInterval(timer);
   }, []);
 
-  /* ================= CAPITAL DISTRIBUTION ================= */
-  const capital = {
+  const tradingAllowed = useMemo(() => {
+    const current = new Date(now);
+    const day = current.getDay();
+    const hour = current.getHours();
+
+    if (day === 5 && hour >= 21) return false;
+    if (day === 6 && hour < 21) return false;
+
+    return true;
+  }, [now]);
+
+  /* ================= CAPITAL (STABLE OBJECT) ================= */
+
+  const capital = useMemo(() => ({
     total: 100000,
-    execution: 80000,  // 80% AI controlled
-    reserve: 20000,    // 20% human-controlled buffer
-  };
+    execution: 80000,
+    reserve: 20000,
+  }), []);
+
+  /* ================= SAFE OVERRIDE HANDLER ================= */
+
+  function handleRiskChange(value) {
+    const num = Number(value);
+    if (Number.isNaN(num)) return;
+    const clamped = Math.max(1, Math.min(50, num));
+    setOverrideRiskPct(clamped);
+  }
+
+  /* ================= UI ================= */
 
   return (
     <div className="postureWrap">
@@ -113,9 +128,7 @@ export default function Trading() {
                 min="1"
                 max="50"
                 value={overrideRiskPct}
-                onChange={(e) =>
-                  setOverrideRiskPct(Number(e.target.value))
-                }
+                onChange={(e) => handleRiskChange(e.target.value)}
                 style={{ width: "100%", marginTop: 6 }}
               />
             </div>
@@ -123,7 +136,7 @@ export default function Trading() {
             <button
               className="pill warn"
               style={{ marginTop: 8 }}
-              onClick={() => setOverrideActive(!overrideActive)}
+              onClick={() => setOverrideActive(prev => !prev)}
             >
               {overrideActive ? "Disable Override" : "Enable Override"}
             </button>
@@ -206,6 +219,7 @@ export default function Trading() {
       </div>
 
       {/* ================= CONTENT ================= */}
+
       {tab === "market" && (
         <section className="postureCard">
           <Market
@@ -223,6 +237,7 @@ export default function Trading() {
             dailyLimit={dailyLimit}
             overrideActive={overrideActive}
             overrideRiskPct={overrideRiskPct}
+            setTradesUsed={setTradesUsed}
           />
         </section>
       )}
@@ -255,6 +270,7 @@ export default function Trading() {
           </ul>
         </section>
       )}
+
     </div>
   );
 }
