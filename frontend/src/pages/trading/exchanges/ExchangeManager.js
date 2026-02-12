@@ -1,7 +1,9 @@
+// ExchangeManager.js
+// Smart Multi-Exchange Routing Layer
+
 import { PaperExchange } from "./PaperExchange";
 import { CoinbaseExchange } from "./CoinbaseExchange";
 import { KrakenExchange } from "./KrakenExchange";
-import { keyVault } from "../engines/KeyVault";
 
 export class ExchangeManager {
   constructor({ mode = "paper" }) {
@@ -12,19 +14,33 @@ export class ExchangeManager {
       coinbase: new CoinbaseExchange(),
       kraken: new KrakenExchange(),
     };
+
+    this.exchangeHealth = {
+      coinbase: 1,
+      kraken: 1,
+    };
   }
 
-  getExchange(name) {
-    return this.exchanges[name];
+  /* ================= HEALTH SCORING ================= */
+
+  updateHealth(exchange, score) {
+    this.exchangeHealth[exchange] = score;
   }
+
+  getBestExchange() {
+    const entries = Object.entries(this.exchangeHealth);
+    entries.sort((a, b) => b[1] - a[1]);
+    return entries[0][0];
+  }
+
+  /* ================= SMART ROUTE ================= */
 
   async executeOrder({
-    exchange,
+    preferredExchange,
     symbol,
     side,
     size,
   }) {
-    /* ================= PAPER MODE ================= */
     if (this.mode === "paper") {
       return this.exchanges.paper.placeOrder({
         symbol,
@@ -33,23 +49,36 @@ export class ExchangeManager {
       });
     }
 
-    /* ================= LIVE MODE ================= */
+    const routeExchange =
+      preferredExchange || this.getBestExchange();
 
-    // Require key before execution
-    const key = keyVault.getKey(exchange);
+    try {
+      const result = await this.exchanges[
+        routeExchange
+      ].placeOrder({
+        symbol,
+        side,
+        size,
+      });
 
-    const ex = this.getExchange(exchange);
+      return result;
+    } catch (err) {
+      // fallback to next best exchange
+      const fallback = Object.keys(this.exchangeHealth)
+        .filter((ex) => ex !== routeExchange)
+        .sort(
+          (a, b) =>
+            this.exchangeHealth[b] -
+            this.exchangeHealth[a]
+        )[0];
 
-    if (!ex) {
-      throw new Error(`Exchange ${exchange} not found`);
+      if (!fallback) throw err;
+
+      return this.exchanges[fallback].placeOrder({
+        symbol,
+        side,
+        size,
+      });
     }
-
-    return ex.placeOrder({
-      symbol,
-      side,
-      size,
-      apiKey: key.apiKey,
-      secret: key.secret,
-    });
   }
 }
