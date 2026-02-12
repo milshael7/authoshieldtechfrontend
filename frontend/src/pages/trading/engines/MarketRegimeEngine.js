@@ -1,6 +1,6 @@
 // MarketRegimeEngine.js
-// Simulated Market Condition Detector
-// Later replace with real volatility + trend logic
+// Adaptive Market Regime Model
+// Structured for ExecutionEngine integration
 
 export function detectMarketRegime() {
   const regimes = [
@@ -16,23 +16,29 @@ export function detectMarketRegime() {
   return regime;
 }
 
-export function getRegimeBias(engineType, regime) {
+/* ==================================================
+   Regime Bias Table
+   - Controls win probability bias
+   - Controls risk scaling
+================================================== */
+
+export function getRegimeConfig(engineType, regime) {
   const table = {
     trending: {
-      scalp: 0.48,
-      session: 0.62,
+      scalp: { winRate: 0.48, riskModifier: 1.05 },
+      session: { winRate: 0.62, riskModifier: 1.15 },
     },
     ranging: {
-      scalp: 0.58,
-      session: 0.50,
+      scalp: { winRate: 0.58, riskModifier: 1.1 },
+      session: { winRate: 0.50, riskModifier: 0.9 },
     },
     high_volatility: {
-      scalp: 0.45,
-      session: 0.55,
+      scalp: { winRate: 0.45, riskModifier: 0.75 },
+      session: { winRate: 0.55, riskModifier: 0.85 },
     },
     neutral: {
-      scalp: 0.52,
-      session: 0.55,
+      scalp: { winRate: 0.52, riskModifier: 1 },
+      session: { winRate: 0.55, riskModifier: 1 },
     },
   };
 
