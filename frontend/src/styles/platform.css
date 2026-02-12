@@ -1,18 +1,14 @@
 /* =========================================================
-   AUTOSHIELD PLATFORM UI — ENTERPRISE AUTHORITY EDITION
-   File: frontend/src/styles/platform.css
+   AUTOSHIELD PLATFORM UI — INSTITUTIONAL HARDENED
+   FINAL TRUST-GRADE VERSION
    ========================================================= */
 
-/* =============================
-   BASE VARIABLES
-   ============================= */
 :root{
   --p-bg: rgba(255,255,255,.05);
-  --p-bg-soft: rgba(0,0,0,.45);
+  --p-bg-soft: rgba(0,0,0,.40);
   --p-border: rgba(255,255,255,.12);
 
   --p-accent: #5EC6FF;
-  --p-accent-strong: #3aa6ff;
   --p-accent-soft: rgba(94,198,255,.18);
 
   --p-ok: #2bd576;
@@ -20,29 +16,14 @@
   --p-bad: #ff5a5f;
 
   --p-text: rgba(255,255,255,.96);
-  --p-muted: rgba(255,255,255,.6);
+  --p-muted: rgba(255,255,255,.60);
 
-  --p-radius: 18px;
-  --p-radius-sm: 12px;
-
-  --p-glow: 0 0 22px rgba(94,198,255,.25);
+  --p-radius: 20px;
+  --p-radius-sm: 14px;
 }
 
 /* =============================
-   GLOBAL TEXT POLISH
-   ============================= */
-body{
-  color:var(--p-text);
-  font-family: Inter, system-ui, -apple-system, sans-serif;
-  letter-spacing:.2px;
-}
-
-small{
-  color:var(--p-muted);
-}
-
-/* =============================
-   PLATFORM CARDS
+   BASE CARDS
    ============================= */
 .platformCard,
 .postureCard,
@@ -55,15 +36,14 @@ small{
     );
   border:1px solid var(--p-border);
   border-radius:var(--p-radius);
-  padding:22px;
+  padding:26px;
   backdrop-filter: blur(8px);
-  transition:all .25s ease;
+  transition: all .25s ease;
 }
 
 .platformCard:hover,
 .postureCard:hover{
-  border-color:rgba(94,198,255,.35);
-  box-shadow:var(--p-glow);
+  border-color: var(--p-accent-soft);
 }
 
 /* =============================
@@ -72,7 +52,7 @@ small{
 .postureWrap{
   display:grid;
   grid-template-columns:minmax(0,1fr) 420px;
-  gap:24px;
+  gap:28px;
   align-items:start;
 }
 
@@ -83,13 +63,29 @@ small{
 }
 
 /* =============================
-   KPI STRIP
+   HEADER
+   ============================= */
+.postureTop{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:20px;
+  flex-wrap:wrap;
+}
+
+.postureTop h2{
+  font-weight:900;
+  letter-spacing:.5px;
+}
+
+/* =============================
+   KPI GRID
    ============================= */
 .kpiGrid{
   display:grid;
   grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
   gap:18px;
-  margin-bottom:24px;
+  margin:26px 0;
 }
 
 .kpiCard{
@@ -102,12 +98,17 @@ small{
   border:1px solid var(--p-border);
   border-radius:var(--p-radius-sm);
   padding:16px;
-  transition:all .25s ease;
+  transition:.2s ease;
 }
 
 .kpiCard:hover{
-  border-color:var(--p-accent);
-  box-shadow:var(--p-glow);
+  border-color: var(--p-accent-soft);
+}
+
+.kpiCard small{
+  font-size:12px;
+  color:var(--p-muted);
+  letter-spacing:.5px;
 }
 
 .kpiCard b{
@@ -118,156 +119,90 @@ small{
 }
 
 /* =============================
-   HEADER STRIP
+   STATS BLOCK
    ============================= */
-.postureTop{
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  gap:20px;
-  flex-wrap:wrap;
+.stats{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
+  gap:14px;
+  margin-top:10px;
+  font-size:14px;
+}
+
+.stats b{
+  font-weight:700;
+}
+
+/* =============================
+   BUTTONS
+   ============================= */
+.btn{
+  padding:10px 18px;
+  border-radius:999px;
+  font-weight:700;
+  border:1px solid var(--p-border);
+  cursor:pointer;
+  transition:.2s ease;
+  background:rgba(255,255,255,.06);
+  color:var(--p-text);
+}
+
+.btn.ok{
+  background:rgba(43,213,118,.15);
+  color:var(--p-ok);
+}
+
+.btn.warn{
+  background:rgba(255,209,102,.18);
+  color:var(--p-warn);
+}
+
+.btn:hover{
+  transform:translateY(-1px);
+  opacity:.9;
 }
 
 /* =============================
    BADGES
    ============================= */
 .badge{
+  display:inline-block;
   padding:5px 12px;
   border-radius:999px;
   font-size:12px;
-  font-weight:800;
+  font-weight:900;
   border:1px solid var(--p-border);
   background:rgba(0,0,0,.45);
-}
-
-.badge.ok{
-  background:rgba(43,213,118,.18);
-  color:var(--p-ok);
-  border-color:rgba(43,213,118,.4);
 }
 
 .badge.warn{
   background:rgba(255,209,102,.18);
   color:var(--p-warn);
-  border-color:rgba(255,209,102,.4);
 }
 
-.badge.bad{
-  background:rgba(255,90,95,.15);
-  color:var(--p-bad);
-  border-color:rgba(255,90,95,.4);
-}
-
-/* =============================
-   BUTTON SYSTEM
-   ============================= */
-.btn{
-  border:none;
-  border-radius:12px;
-  padding:10px 18px;
-  font-weight:800;
-  cursor:pointer;
-  transition:all .2s ease;
-}
-
-.btn.ok{
-  background:linear-gradient(
-    90deg,
-    var(--p-accent),
-    var(--p-accent-strong)
-  );
-  color:#000;
-}
-
-.btn.ok:hover{
-  transform:translateY(-2px);
-  box-shadow:0 6px 20px rgba(94,198,255,.4);
-}
-
-.pill{
-  padding:6px 14px;
-  border-radius:999px;
-  border:1px solid var(--p-border);
-  background:rgba(255,255,255,.05);
-  cursor:pointer;
-  font-weight:700;
-  transition:all .2s ease;
-}
-
-.pill.active{
-  background:var(--p-accent-soft);
-  border-color:var(--p-accent);
-  color:var(--p-accent);
+.badge.ok{
+  background:rgba(43,213,118,.18);
+  color:var(--p-ok);
 }
 
 /* =============================
-   METERS
+   EXECUTION LOG
    ============================= */
-.meter{
-  width:100%;
-  height:10px;
-  border-radius:999px;
-  background:rgba(255,255,255,.08);
-  overflow:hidden;
-  margin:14px 0;
-}
-
-.meter > div{
-  height:100%;
-  background:
-    linear-gradient(
-      90deg,
-      var(--p-accent),
-      #9db7ff
-    );
-}
-
-/* =============================
-   LISTS
-   ============================= */
-.list{
-  list-style:none;
-  padding:0;
-  margin:0;
-  display:flex;
-  flex-direction:column;
-  gap:14px;
-}
-
-.list li{
-  display:flex;
-  gap:12px;
-  align-items:flex-start;
-}
-
-.dot{
-  width:10px;
-  height:10px;
-  border-radius:50%;
-  margin-top:6px;
-  background:var(--p-muted);
-}
-
-.dot.ok{ background:var(--p-ok); }
-.dot.warn{ background:var(--p-warn); }
-.dot.bad{ background:var(--p-bad); }
-
-/* =============================
-   ERROR STATE
-   ============================= */
-.error{
-  color:var(--p-bad);
+.postureCard aside{
   font-size:13px;
 }
 
+.postureCard small{
+  color:var(--p-muted);
+}
+
 /* =============================
-   MOBILE TUNING
+   MOBILE POLISH
    ============================= */
 @media (max-width:768px){
   .platformCard,
-  .postureCard,
-  .card{
-    padding:16px;
+  .postureCard{
+    padding:18px;
   }
 
   .kpiCard b{
