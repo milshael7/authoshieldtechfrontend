@@ -1,9 +1,12 @@
 // ExecutionEngine.js
 // Institutional Adaptive Execution Engine
-// AI full control | Human caps only | Regime aware
+// AI full control | Human caps only | Regime + Adaptive logic
 
 import { evaluateConfidence } from "./ConfidenceEngine";
-import { detectMarketRegime, getRegimeBias } from "./MarketRegimeEngine";
+import {
+  detectMarketRegime,
+  getRegimeBias,
+} from "./MarketRegimeEngine";
 
 export function executeEngine({
   engineType,
@@ -83,9 +86,7 @@ export function executeEngine({
   /* ================= POSITION SIZING ================= */
 
   const volatilityFactor =
-    regime === "high_volatility"
-      ? randomBetween(0.7, 1.4)
-      : engineType === "scalp"
+    engineType === "scalp"
       ? randomBetween(0.8, 1.2)
       : randomBetween(0.9, 1.1);
 
@@ -99,12 +100,12 @@ export function executeEngine({
   const confidenceBoost =
     (confidenceData.score - 50) / 1000;
 
+  const combinedBias =
+    regimeBias + confidenceBoost;
+
   const adjustedBias = Math.min(
-    0.7,
-    Math.max(
-      0.4,
-      regimeBias + confidenceBoost
-    )
+    0.68,
+    Math.max(0.42, combinedBias)
   );
 
   const isWin = Math.random() < adjustedBias;
@@ -152,6 +153,7 @@ export function executeEngine({
       adaptiveLeverageReduction,
       adjustedBias,
       lossStreak,
+      regimeBias,
     },
   };
 }
