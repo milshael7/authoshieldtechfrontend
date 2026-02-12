@@ -133,10 +133,11 @@ export default function TradingRoom({
     setDailyPnL((v) => v + result.pnl);
     setLastConfidence(result.confidenceScore);
 
+    /* 🔥 UPGRADED LOG WITH REGIME */
     pushLog(
-      `${engineType.toUpperCase()} | ${exchange} | PnL: ${result.pnl.toFixed(
-        2
-      )}`,
+      `${engineType.toUpperCase()} | ${exchange} | Regime: ${
+        result.regime || "N/A"
+      } | PnL: ${result.pnl.toFixed(2)}`,
       result.confidenceScore
     );
   }
