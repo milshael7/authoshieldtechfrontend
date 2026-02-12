@@ -1,102 +1,165 @@
-// frontend/src/components/IncidentBoard.jsx
-// Executive Incident Response Board
-// SOC-grade UI
-// No backend required yet
-
 import React, { useState } from "react";
+import IncidentModal from "./IncidentModal";
 
-const MOCK_CASES = [
+const SAMPLE_INCIDENTS = [
   {
-    id: "INC-1042",
-    company: "Atlas Financial",
-    severity: "high",
-    status: "Investigating",
-    analyst: "J. Carter",
-    summary: "Suspicious login attempt from foreign IP.",
-    updated: "10 mins ago",
-  },
-  {
-    id: "INC-1038",
-    company: "NovaTech Systems",
+    id: 1,
+    title: "Suspicious Login Attempt",
     severity: "medium",
-    status: "Open",
-    analyst: "M. Silva",
-    summary: "Malware signature detected on endpoint.",
-    updated: "45 mins ago",
+    status: "open",
+    description:
+      "Multiple failed login attempts detected from unusual IP range.",
   },
   {
-    id: "INC-1021",
-    company: "BrightCore Health",
+    id: 2,
+    title: "Malware Detected on Endpoint",
+    severity: "high",
+    status: "investigating",
+    description:
+      "Endpoint flagged by EDR engine with potential trojan behavior.",
+  },
+  {
+    id: 3,
+    title: "Phishing Email Clicked",
     severity: "low",
-    status: "Resolved",
-    analyst: "A. Reed",
-    summary: "Phishing email reported and contained.",
-    updated: "2 hrs ago",
+    status: "resolved",
+    description:
+      "User interacted with known phishing domain. Credentials reset.",
   },
 ];
 
 export default function IncidentBoard() {
-  const [cases] = useState(MOCK_CASES);
+  const [incidents] = useState(SAMPLE_INCIDENTS);
+  const [selected, setSelected] = useState(null);
+  const [filter, setFilter] = useState("all");
+
+  const filtered = incidents.filter((i) =>
+    filter === "all" ? true : i.severity === filter
+  );
 
   return (
-    <div className="postureCard">
-      <h3>Incident Response Board</h3>
-      <small className="muted">
-        Active security investigations across tenant environments
-      </small>
+    <div className="card">
+      <div style={header}>
+        <div>
+          <b>Incident Board</b>
+          <div className="muted" style={{ fontSize: 12 }}>
+            Active security investigations
+          </div>
+        </div>
 
-      <div style={{ marginTop: 20 }}>
-        <table className="table">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Company</th>
-              <th>Severity</th>
-              <th>Status</th>
-              <th>Analyst</th>
-              <th>Last Update</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            {cases.map((c) => (
-              <tr key={c.id}>
-                <td><b>{c.id}</b></td>
-                <td>{c.company}</td>
-                <td>
-                  <span style={severityStyle(c.severity)}>
-                    {c.severity.toUpperCase()}
-                  </span>
-                </td>
-                <td>{c.status}</td>
-                <td>{c.analyst}</td>
-                <td className="muted">{c.updated}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div style={filters}>
+          {["all", "high", "medium", "low"].map((f) => (
+            <button
+              key={f}
+              style={filterBtn(filter === f)}
+              onClick={() => setFilter(f)}
+            >
+              {f.toUpperCase()}
+            </button>
+          ))}
+        </div>
       </div>
+
+      <div style={list}>
+        {filtered.map((incident) => (
+          <div
+            key={incident.id}
+            style={card(incident.severity)}
+            onClick={() => setSelected(incident)}
+          >
+            <div style={rowTop}>
+              <b>{incident.title}</b>
+              <span style={severityBadge(incident.severity)}>
+                {incident.severity}
+              </span>
+            </div>
+
+            <div style={meta}>
+              Status: {incident.status}
+            </div>
+          </div>
+        ))}
+
+        {filtered.length === 0 && (
+          <div className="muted">No incidents for this filter.</div>
+        )}
+      </div>
+
+      <IncidentModal
+        incident={selected}
+        onClose={() => setSelected(null)}
+      />
     </div>
   );
 }
 
-function severityStyle(sev) {
+/* ================= STYLES ================= */
+
+const header = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  marginBottom: 16,
+};
+
+const filters = {
+  display: "flex",
+  gap: 6,
+};
+
+const filterBtn = (active) => ({
+  padding: "4px 10px",
+  fontSize: 12,
+  borderRadius: 999,
+  border: "1px solid rgba(255,255,255,0.2)",
+  background: active ? "rgba(122,167,255,0.25)" : "transparent",
+  color: "#fff",
+  cursor: "pointer",
+});
+
+const list = {
+  display: "flex",
+  flexDirection: "column",
+  gap: 12,
+};
+
+const card = (severity) => ({
+  padding: 14,
+  borderRadius: 14,
+  background: "rgba(0,0,0,0.35)",
+  border:
+    severity === "high"
+      ? "1px solid #ff5a5f"
+      : severity === "medium"
+      ? "1px solid #ffd166"
+      : "1px solid #2bd576",
+  cursor: "pointer",
+});
+
+const rowTop = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+};
+
+const meta = {
+  marginTop: 6,
+  fontSize: 12,
+  opacity: 0.7,
+};
+
+function severityBadge(sev) {
   return {
-    padding: "4px 10px",
+    fontSize: 11,
+    padding: "4px 8px",
     borderRadius: 999,
-    fontSize: 12,
-    fontWeight: 700,
     background:
-      sev === "high"
-        ? "rgba(255,90,95,0.25)"
-        : sev === "medium"
-        ? "rgba(255,209,102,0.25)"
-        : "rgba(43,213,118,0.25)",
-    color:
       sev === "high"
         ? "#ff5a5f"
         : sev === "medium"
         ? "#ffd166"
         : "#2bd576",
+    color: "#000",
+    fontWeight: 700,
   };
 }
