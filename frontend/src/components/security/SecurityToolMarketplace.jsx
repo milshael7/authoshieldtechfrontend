@@ -2,7 +2,8 @@ import React, { useEffect, useState } from "react";
 
 /*
   SecurityToolMarketplace
-  Connected to backend score engine
+  Enterprise Tool Deployment Panel
+  LIVE Backend Connected
 */
 
 function apiBase() {
@@ -14,25 +15,38 @@ function apiBase() {
 }
 
 export default function SecurityToolMarketplace() {
-  const [tools, setTools] = useState([]);
-  const [search, setSearch] = useState("");
-  const [loading, setLoading] = useState(true);
-
   const base = apiBase();
+
+  const [tools, setTools] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+
+  /* ================= LOAD TOOLS ================= */
 
   async function loadTools() {
     if (!base) return;
+
     try {
       const res = await fetch(`${base}/api/security/tools`, {
         credentials: "include",
       });
+
       const data = await res.json();
       if (data.ok) {
-        setTools(data.tools || []);
+        setTools(data.tools);
       }
-    } catch {}
-    setLoading(false);
+    } catch {
+      setTools([]);
+    } finally {
+      setLoading(false);
+    }
   }
+
+  useEffect(() => {
+    loadTools();
+  }, []);
+
+  /* ================= INSTALL / UNINSTALL ================= */
 
   async function toggleInstall(tool) {
     if (!base) return;
@@ -47,17 +61,20 @@ export default function SecurityToolMarketplace() {
         credentials: "include",
       });
 
-      loadTools(); // refresh state after change
+      await loadTools();
+
+      // 🔥 Notify radar instantly
+      window.dispatchEvent(new Event("security:refresh"));
     } catch {}
   }
 
-  useEffect(() => {
-    loadTools();
-  }, []);
+  /* ================= FILTER ================= */
 
   const filteredTools = tools.filter((tool) =>
     tool.name.toLowerCase().includes(search.toLowerCase())
   );
+
+  /* ================= UI ================= */
 
   return (
     <div className="postureCard">
@@ -86,7 +103,7 @@ export default function SecurityToolMarketplace() {
         </div>
       </div>
 
-      {loading && <div className="muted">Loading tools...</div>}
+      {loading && <div className="muted">Loading security modules…</div>}
 
       <div className="toolGrid">
         {filteredTools.map((tool) => (
@@ -105,7 +122,7 @@ export default function SecurityToolMarketplace() {
             </div>
 
             <div className="toolDesc">
-              Domain: {tool.domain}
+              Security domain coverage module.
             </div>
 
             <div className="toolActions">
