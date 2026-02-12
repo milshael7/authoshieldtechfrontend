@@ -42,7 +42,8 @@
 }
 
 .platformCard:hover,
-.postureCard:hover{
+.postureCard:hover,
+.card:hover{
   border-color: var(--p-accent-soft);
 }
 
@@ -157,6 +158,11 @@
   color:var(--p-warn);
 }
 
+.btn.primary{
+  background: var(--p-accent-soft);
+  color: var(--p-accent);
+}
+
 .btn:hover{
   transform:translateY(-1px);
   opacity:.9;
@@ -185,15 +191,67 @@
   color:var(--p-ok);
 }
 
-/* =============================
-   EXECUTION LOG
-   ============================= */
-.postureCard aside{
-  font-size:13px;
+/* =========================================================
+   SECURITY TOOL MARKETPLACE (ENTERPRISE GRADE)
+   ========================================================= */
+
+.toolGrid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(280px,1fr));
+  gap:22px;
+  margin-top:24px;
 }
 
-.postureCard small{
+.toolCard{
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255,255,255,.06),
+      rgba(0,0,0,.55)
+    );
+  border:1px solid var(--p-border);
+  border-radius:var(--p-radius-sm);
+  padding:20px;
+  display:flex;
+  flex-direction:column;
+  justify-content:space-between;
+  gap:16px;
+  transition:all .25s ease;
+}
+
+.toolCard:hover{
+  border-color: var(--p-accent-soft);
+  transform: translateY(-3px);
+}
+
+.toolHeader{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:16px;
+}
+
+.toolTitle{
+  font-weight:800;
+}
+
+.toolCategory{
+  font-size:12px;
   color:var(--p-muted);
+  margin-top:6px;
+  letter-spacing:.4px;
+}
+
+.toolDesc{
+  font-size:14px;
+  line-height:1.6;
+  color:var(--p-muted);
+}
+
+.toolActions{
+  display:flex;
+  justify-content:flex-end;
+  margin-top:8px;
 }
 
 /* =============================
