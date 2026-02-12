@@ -6,16 +6,15 @@ import {
   calculateTotalCapital,
   rotateCapitalByPerformance,
 } from "./engines/CapitalAllocator";
-import { evaluateGlobalRisk } from "./engines/GlobalRiskGovernor";
+import {
+  evaluateGlobalRisk,
+  setManualLock,
+} from "./engines/GlobalRiskGovernor";
 import {
   updatePerformance,
   getPerformanceStats,
   getAllPerformanceStats,
 } from "./engines/PerformanceEngine";
-import {
-  recordTrade,
-  getEngineTrades,
-} from "./engines/TradeLedger";
 
 export default function TradingRoom({
   mode: parentMode = "paper",
@@ -31,6 +30,7 @@ export default function TradingRoom({
   const [tradesUsed, setTradesUsed] = useState(0);
   const [log, setLog] = useState([]);
   const [lastConfidence, setLastConfidence] = useState(null);
+  const [systemLocked, setSystemLocked] = useState(false);
 
   const initialCapital = 1000;
 
@@ -45,10 +45,7 @@ export default function TradingRoom({
 
   const peakCapital = useRef(initialCapital);
 
-  const totalCapital = calculateTotalCapital(
-    allocation,
-    reserve
-  );
+  const totalCapital = calculateTotalCapital(allocation, reserve);
 
   useEffect(() => {
     setMode(parentMode.toUpperCase());
@@ -77,6 +74,20 @@ export default function TradingRoom({
     ]);
   }
 
+  /* ================= MANUAL LOCK ================= */
+
+  function handleLock() {
+    setManualLock(true);
+    setSystemLocked(true);
+    pushLog("🚨 Manual system lock activated.");
+  }
+
+  function handleUnlock() {
+    setManualLock(false);
+    setSystemLocked(false);
+    pushLog("✅ Manual system lock released.");
+  }
+
   /* ================= EXECUTION ================= */
 
   function executeTrade() {
@@ -91,11 +102,9 @@ export default function TradingRoom({
     }
 
     const exchange = "coinbase";
-    const engineCapital =
-      allocation[engineType][exchange];
+    const engineCapital = allocation[engineType][exchange];
 
-    const performanceStats =
-      getPerformanceStats(engineType);
+    const performanceStats = getPerformanceStats(engineType);
 
     const result = executeEngine({
       engineType,
@@ -107,30 +116,12 @@ export default function TradingRoom({
     });
 
     if (result.blocked) {
-      pushLog(
-        `Blocked: ${result.reason}`,
-        result.confidenceScore
-      );
+      pushLog(`Blocked: ${result.reason}`, result.confidenceScore);
       return;
     }
 
-    /* ===== Record Trade in Ledger ===== */
-    recordTrade(engineType, {
-      pnl: result.pnl,
-      confidence: result.confidenceScore,
-      positionSize: result.positionSize,
-      effectiveRisk: result.effectiveRisk,
-      win: result.isWin,
-    });
+    updatePerformance(engineType, result.pnl, result.isWin);
 
-    /* ===== Update Performance Memory ===== */
-    updatePerformance(
-      engineType,
-      result.pnl,
-      result.isWin
-    );
-
-    /* ===== Update Capital ===== */
     const updatedAllocation = {
       ...allocation,
       [engineType]: {
@@ -179,54 +170,38 @@ export default function TradingRoom({
         <div className="postureTop">
           <div>
             <h2>Institutional Trading Control</h2>
-            <small>
-              Adaptive AI + Capital Rotation +
-              Institutional Ledger
-            </small>
+            <small>Adaptive AI + Capital Rotation</small>
           </div>
 
-          <span
-            className={`badge ${
-              mode === "LIVE" ? "warn" : ""
-            }`}
-          >
+          <span className={`badge ${mode === "LIVE" ? "warn" : ""}`}>
             {mode}
           </span>
         </div>
 
         {!globalRisk.allowed && (
-          <div
-            className="badge bad"
-            style={{ marginTop: 10 }}
-          >
+          <div className="badge bad" style={{ marginTop: 10 }}>
             Trading Locked — {globalRisk.reason}
           </div>
         )}
 
+        {systemLocked && (
+          <div className="badge bad" style={{ marginTop: 10 }}>
+            🚨 MANUAL LOCK ACTIVE
+          </div>
+        )}
+
         <div className="stats">
-          <div>
-            <b>Total Capital:</b> $
-            {totalCapital.toFixed(2)}
-          </div>
-          <div>
-            <b>Reserve:</b> ${reserve.toFixed(2)}
-          </div>
-          <div>
-            <b>Daily PnL:</b> $
-            {dailyPnL.toFixed(2)}
-          </div>
-          <div>
-            <b>Trades Used:</b> {tradesUsed} /{" "}
-            {dailyLimit}
-          </div>
+          <div><b>Total Capital:</b> ${totalCapital.toFixed(2)}</div>
+          <div><b>Reserve:</b> ${reserve.toFixed(2)}</div>
+          <div><b>Daily PnL:</b> ${dailyPnL.toFixed(2)}</div>
+          <div><b>Trades Used:</b> {tradesUsed} / {dailyLimit}</div>
 
           {lastConfidence !== null && (
             <div>
               <b>Last Confidence:</b>{" "}
               <span
                 style={{
-                  color:
-                    confidenceColor(lastConfidence),
+                  color: confidenceColor(lastConfidence),
                   fontWeight: 700,
                 }}
               >
@@ -236,38 +211,47 @@ export default function TradingRoom({
           )}
         </div>
 
-        <div className="actions">
+        <div className="actions" style={{ marginTop: 20 }}>
           <button
             className="btn ok"
             onClick={executeTrade}
-            disabled={!globalRisk.allowed}
+            disabled={!globalRisk.allowed || systemLocked}
           >
             Execute Trade
           </button>
+
+          {!systemLocked ? (
+            <button
+              className="btn warn"
+              onClick={handleLock}
+              style={{ marginLeft: 12 }}
+            >
+              Emergency Lock
+            </button>
+          ) : (
+            <button
+              className="btn ok"
+              onClick={handleUnlock}
+              style={{ marginLeft: 12 }}
+            >
+              Unlock System
+            </button>
+          )}
         </div>
       </section>
 
       <aside className="postureCard">
         <h3>Execution Log</h3>
-        <div
-          style={{
-            maxHeight: 400,
-            overflowY: "auto",
-          }}
-        >
+        <div style={{ maxHeight: 400, overflowY: "auto" }}>
           {log.map((x, i) => (
-            <div
-              key={i}
-              style={{ marginBottom: 8 }}
-            >
+            <div key={i} style={{ marginBottom: 8 }}>
               <small>{x.t}</small>
               <div>{x.m}</div>
               {x.confidence !== undefined && (
                 <div
                   style={{
                     fontSize: 12,
-                    color:
-                      confidenceColor(x.confidence),
+                    color: confidenceColor(x.confidence),
                   }}
                 >
                   Confidence: {x.confidence}%
