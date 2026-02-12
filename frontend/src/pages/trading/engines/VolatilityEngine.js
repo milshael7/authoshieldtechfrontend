@@ -1,29 +1,45 @@
 // VolatilityEngine.js
-// ATR-style volatility adjustment
+// Simulated volatility regime detector
 
-export function calculateVolatility(priceHistory = []) {
-  if (priceHistory.length < 2) return 1;
+export function evaluateVolatility(engineType) {
+  // Simulated market volatility score (0–100)
+  const volatilityScore = Math.floor(Math.random() * 100);
 
-  let totalMove = 0;
-
-  for (let i = 1; i < priceHistory.length; i++) {
-    const move =
-      Math.abs(priceHistory[i] - priceHistory[i - 1]) /
-      priceHistory[i - 1];
-    totalMove += move;
+  // Extreme volatility → block trading
+  if (volatilityScore > 85) {
+    return {
+      allowed: false,
+      regime: "extreme",
+      multiplier: 0,
+      score: volatilityScore,
+    };
   }
 
-  const avgMove = totalMove / (priceHistory.length - 1);
+  // High volatility → defensive
+  if (volatilityScore > 65) {
+    return {
+      allowed: true,
+      regime: "high",
+      multiplier: 0.7,
+      score: volatilityScore,
+    };
+  }
 
-  return avgMove;
-}
+  // Normal volatility
+  if (volatilityScore > 35) {
+    return {
+      allowed: true,
+      regime: "normal",
+      multiplier: 1,
+      score: volatilityScore,
+    };
+  }
 
-export function volatilityPositionModifier(volatility) {
-  // Lower volatility → increase position slightly
-  // Higher volatility → decrease exposure
-
-  if (volatility < 0.005) return 1.2;
-  if (volatility < 0.01) return 1.0;
-  if (volatility < 0.02) return 0.8;
-  return 0.6;
+  // Low volatility (good for scalping)
+  return {
+    allowed: true,
+    regime: "low",
+    multiplier: engineType === "scalp" ? 1.1 : 0.9,
+    score: volatilityScore,
+  };
 }
