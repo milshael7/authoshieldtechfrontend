@@ -4,13 +4,14 @@ import {
   allocateCapital,
   rebalanceCapital,
   calculateTotalCapital,
+  rotateCapitalByPerformance,
 } from "./engines/CapitalAllocator";
 import { evaluateGlobalRisk } from "./engines/GlobalRiskGovernor";
-import { updatePerformance, getPerformanceStats } from "./engines/PerformanceEngine";
 import {
-  evaluateSystemState,
-  resetSystemLock,
-} from "./engines/SystemGovernor";
+  updatePerformance,
+  getPerformanceStats,
+  getAllPerformanceStats,
+} from "./engines/PerformanceEngine";
 
 export default function TradingRoom({
   mode: parentMode = "paper",
@@ -39,26 +40,12 @@ export default function TradingRoom({
   );
 
   const peakCapital = useRef(initialCapital);
+
   const totalCapital = calculateTotalCapital(allocation, reserve);
 
   useEffect(() => {
     setMode(parentMode.toUpperCase());
   }, [parentMode]);
-
-  /* ================= SYSTEM GOVERNOR ================= */
-
-  const systemState = evaluateSystemState({
-    totalCapital,
-    peakCapital: peakCapital.current,
-    dailyPnL,
-  });
-
-  /* Auto reduce risk if needed */
-  useEffect(() => {
-    if (systemState.status === "reduced") {
-      setHumanMultiplier(0.7);
-    }
-  }, [systemState.status]);
 
   /* ================= GLOBAL RISK ================= */
 
@@ -86,11 +73,6 @@ export default function TradingRoom({
   /* ================= EXECUTION ================= */
 
   function executeTrade() {
-    if (systemState.status === "locked") {
-      pushLog(`SYSTEM LOCKED: ${systemState.lockReason}`);
-      return;
-    }
-
     if (!globalRisk.allowed) {
       pushLog(`Blocked: ${globalRisk.reason}`);
       return;
@@ -120,8 +102,10 @@ export default function TradingRoom({
       return;
     }
 
+    /* ===== Update Performance Memory ===== */
     updatePerformance(engineType, result.pnl, result.isWin);
 
+    /* ===== Update Capital ===== */
     const updatedAllocation = {
       ...allocation,
       [engineType]: {
@@ -130,12 +114,19 @@ export default function TradingRoom({
       },
     };
 
+    /* ===== Floor Rebalance ===== */
     const rebalanced = rebalanceCapital({
       allocation: updatedAllocation,
       reserve,
     });
 
-    setAllocation(rebalanced.allocation);
+    /* ===== Performance Rotation ===== */
+    const rotated = rotateCapitalByPerformance({
+      allocation: rebalanced.allocation,
+      performanceStats: getAllPerformanceStats(),
+    });
+
+    setAllocation(rotated);
     setReserve(rebalanced.reserve);
 
     setTradesUsed((v) => v + 1);
@@ -157,18 +148,7 @@ export default function TradingRoom({
     return "#5EC6FF";
   }
 
-  function systemColor() {
-    switch (systemState.status) {
-      case "warning":
-        return "#f5b942";
-      case "reduced":
-        return "#ff884d";
-      case "locked":
-        return "#ff4d4d";
-      default:
-        return "#5EC6FF";
-    }
-  }
+  /* ================= UI ================= */
 
   return (
     <div className="postureWrap">
@@ -176,28 +156,18 @@ export default function TradingRoom({
         <div className="postureTop">
           <div>
             <h2>Institutional Trading Control</h2>
-            <small>Adaptive AI + Capital Governance</small>
+            <small>Adaptive AI + Capital Rotation</small>
           </div>
 
-          <span
-            className="badge"
-            style={{ backgroundColor: systemColor() }}
-          >
-            SYSTEM: {systemState.status.toUpperCase()}
+          <span className={`badge ${mode === "LIVE" ? "warn" : ""}`}>
+            {mode}
           </span>
         </div>
 
-        {systemState.status === "locked" && (
-          <button
-            className="btn warn"
-            onClick={() => {
-              resetSystemLock();
-              pushLog("System manually reset.");
-            }}
-            style={{ marginBottom: 15 }}
-          >
-            Manual Unlock
-          </button>
+        {!globalRisk.allowed && (
+          <div className="badge bad" style={{ marginTop: 10 }}>
+            Trading Locked — {globalRisk.reason}
+          </div>
         )}
 
         <div className="stats">
@@ -225,10 +195,7 @@ export default function TradingRoom({
           <button
             className="btn ok"
             onClick={executeTrade}
-            disabled={
-              systemState.status === "locked" ||
-              !globalRisk.allowed
-            }
+            disabled={!globalRisk.allowed}
           >
             Execute Trade
           </button>
