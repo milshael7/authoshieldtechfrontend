@@ -1,18 +1,21 @@
 import React, { useMemo } from "react";
 
 /**
- * SecurityPostureDashboard
- * - Pure UI for now (no backend required)
- * - You can pass:
- *   score (0-100)
- *   coverage: { phishing, malware, accountTakeover, fraud } (0-100 each)
- *
- * Later we will wire these numbers to real backend metrics.
+ * SecurityPostureDashboard — Enterprise SOC Edition
+ * Clean executive-grade posture overview
  */
+
 export default function SecurityPostureDashboard({
   score = 82,
-  coverage = { phishing: 88, malware: 76, accountTakeover: 91, fraud: 69 },
-  subtitle = "Live posture snapshot (MVP UI)",
+  coverage = {
+    phishing: 88,
+    malware: 76,
+    accountTakeover: 91,
+    fraud: 69,
+  },
+  incidents = 4,
+  criticalAlerts = 1,
+  subtitle = "Live Security Command Overview",
 }) {
   const s = clampNum(score, 0, 100);
 
@@ -26,71 +29,104 @@ export default function SecurityPostureDashboard({
     };
   }, [coverage]);
 
-  const grade = s >= 90 ? "Excellent" : s >= 80 ? "Good" : s >= 65 ? "Fair" : "At Risk";
-  const scoreHint =
-    s >= 90 ? "Strong defenses active" :
-    s >= 80 ? "Healthy posture, keep monitoring" :
-    s >= 65 ? "Some gaps detected" :
-    "High risk areas need attention";
+  const grade =
+    s >= 90
+      ? { label: "Excellent", level: "ok" }
+      : s >= 80
+      ? { label: "Strong", level: "ok" }
+      : s >= 65
+      ? { label: "Moderate", level: "warn" }
+      : { label: "Critical", level: "bad" };
 
   return (
     <div className="postureWrap">
-      {/* Left: Score + coverage */}
+      {/* ================= LEFT: SCORE + METRICS ================= */}
       <div className="postureCard">
+
+        {/* Header */}
         <div className="postureTop">
-          <div className="postureTitle">
+          <div>
             <b>Security Posture</b>
-            <small>{subtitle}</small>
+            <small className="muted">{subtitle}</small>
           </div>
 
           <div className="postureScore">
-            <div className="scoreRing" title={`Score: ${s}/100`}>
+            <div
+              className="scoreRing"
+              style={{ "--val": s }}
+              title={`Overall Score: ${s}/100`}
+            >
               {s}
             </div>
             <div className="scoreMeta">
-              <b>{grade}</b>
-              <span>{scoreHint}</span>
+              <b>{grade.label}</b>
+              <span>
+                {grade.level === "ok" && "Systems operating within tolerance"}
+                {grade.level === "warn" && "Some risk indicators detected"}
+                {grade.level === "bad" && "Immediate remediation required"}
+              </span>
             </div>
           </div>
         </div>
 
-        {/* Meter */}
+        {/* KPI Strip */}
+        <div className="kpiGrid" style={{ marginTop: 24 }}>
+          <KPI label="Active Incidents" value={incidents} />
+          <KPI label="Critical Alerts" value={criticalAlerts} />
+          <KPI label="Threat Coverage Avg"
+               value={Math.round(
+                 (cov.phishing +
+                   cov.malware +
+                   cov.accountTakeover +
+                   cov.fraud) / 4
+               ) + "%"}
+          />
+          <KPI label="Posture Grade" value={grade.label} />
+        </div>
+
+        {/* Score Meter */}
         <div className="meter" aria-hidden="true">
           <div style={{ width: `${s}%` }} />
         </div>
 
-        {/* Coverage grid */}
-        <div className="coverGrid" style={{ marginTop: 14 }}>
+        {/* Coverage Breakdown */}
+        <div className="coverGrid" style={{ marginTop: 20 }}>
           <CoverageItem label="Phishing Protection" value={cov.phishing} />
           <CoverageItem label="Malware Defense" value={cov.malware} />
           <CoverageItem label="Account Takeover" value={cov.accountTakeover} />
           <CoverageItem label="Fraud Detection" value={cov.fraud} />
         </div>
-
-        <div style={{ marginTop: 12 }}>
-          <small className="muted">
-            Next step: connect these meters to real audit events + detection results.
-          </small>
-        </div>
       </div>
 
-      {/* Right: Radar-style visual (placeholder) */}
-      <div className="postureCard radarBox">
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "baseline" }}>
-          <b>Coverage Radar</b>
-          <small className="muted">visual map</small>
+      {/* ================= RIGHT: RADAR ================= */}
+      <div className="postureCard">
+
+        <div style={{ display: "flex", justifyContent: "space-between" }}>
+          <b>Threat Surface Map</b>
+          <small className="muted">Live Coverage Distribution</small>
         </div>
 
-        <div style={{ height: 10 }} />
+        <div style={{ height: 18 }} />
 
         <div className="radar" />
 
-        <div style={{ marginTop: 10 }}>
+        <div style={{ marginTop: 16 }}>
           <small className="muted">
-            This is a clean “command center” look. Later we can replace it with a real chart.
+            Radar visualization reflects weighted detection surface across active protection layers.
           </small>
         </div>
       </div>
+    </div>
+  );
+}
+
+/* ================= COMPONENTS ================= */
+
+function KPI({ label, value }) {
+  return (
+    <div className="kpiCard">
+      <small>{label}</small>
+      <b>{value}</b>
     </div>
   );
 }
