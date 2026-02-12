@@ -1,9 +1,7 @@
-// ExchangeManager.js
-// Smart Multi-Exchange Routing Layer
-
 import { PaperExchange } from "./PaperExchange";
 import { CoinbaseExchange } from "./CoinbaseExchange";
 import { KrakenExchange } from "./KrakenExchange";
+import { keyVault } from "../KeyVault";
 
 export class ExchangeManager {
   constructor({ mode = "paper" }) {
@@ -14,71 +12,64 @@ export class ExchangeManager {
       coinbase: new CoinbaseExchange(),
       kraken: new KrakenExchange(),
     };
-
-    this.exchangeHealth = {
-      coinbase: 1,
-      kraken: 1,
-    };
   }
 
-  /* ================= HEALTH SCORING ================= */
-
-  updateHealth(exchange, score) {
-    this.exchangeHealth[exchange] = score;
+  setMode(mode) {
+    this.mode = mode;
   }
 
-  getBestExchange() {
-    const entries = Object.entries(this.exchangeHealth);
-    entries.sort((a, b) => b[1] - a[1]);
-    return entries[0][0];
+  getExchange(name) {
+    return this.exchanges[name];
   }
-
-  /* ================= SMART ROUTE ================= */
 
   async executeOrder({
-    preferredExchange,
+    exchange,
     symbol,
     side,
     size,
   }) {
+    /* ================= PAPER MODE ================= */
+
     if (this.mode === "paper") {
-      return this.exchanges.paper.placeOrder({
+      const paper = this.getExchange("paper");
+
+      const result = await paper.placeOrder({
         symbol,
         side,
         size,
       });
+
+      return {
+        ...result,
+        executionMode: "paper",
+      };
     }
 
-    const routeExchange =
-      preferredExchange || this.getBestExchange();
+    /* ================= LIVE MODE ================= */
 
-    try {
-      const result = await this.exchanges[
-        routeExchange
-      ].placeOrder({
-        symbol,
-        side,
-        size,
-      });
+    // Validate key
+    const key = keyVault.getKey(exchange);
 
-      return result;
-    } catch (err) {
-      // fallback to next best exchange
-      const fallback = Object.keys(this.exchangeHealth)
-        .filter((ex) => ex !== routeExchange)
-        .sort(
-          (a, b) =>
-            this.exchangeHealth[b] -
-            this.exchangeHealth[a]
-        )[0];
-
-      if (!fallback) throw err;
-
-      return this.exchanges[fallback].placeOrder({
-        symbol,
-        side,
-        size,
-      });
+    if (!key) {
+      throw new Error(
+        `Exchange ${exchange} not enabled`
+      );
     }
+
+    const ex = this.getExchange(exchange);
+
+    const result = await ex.placeOrder({
+      symbol,
+      side,
+      size,
+      apiKey: key.apiKey,
+      secret: key.secret,
+    });
+
+    return {
+      ...result,
+      executionMode: "live",
+      exchange,
+    };
   }
 }
