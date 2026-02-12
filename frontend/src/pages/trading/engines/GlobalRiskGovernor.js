@@ -1,95 +1,58 @@
 // GlobalRiskGovernor.js
-// Institutional Circuit Breaker System
+// Institutional Capital Protection Layer
+// Controls system-level trade permission
 
-let circuitState = {
-  locked: false,
-  reason: null,
-  cooldownUntil: null,
-};
+let manualLock = false;
+
+export function setManualLock(state) {
+  manualLock = state;
+}
 
 export function evaluateGlobalRisk({
   totalCapital,
   peakCapital,
   dailyPnL,
-  volatility = 0.5,
   maxDailyLossPct = 5,
-  maxDrawdownPct = 20,
-  volatilityLimit = 0.85,
-  cooldownMinutes = 30,
+  maxTotalDrawdownPct = 15,
 }) {
-  const now = Date.now();
-
-  /* ================= COOLDOWN CHECK ================= */
-
-  if (circuitState.cooldownUntil && now < circuitState.cooldownUntil) {
+  if (manualLock) {
     return {
       allowed: false,
-      reason: `Cooldown active until ${new Date(
-        circuitState.cooldownUntil
-      ).toLocaleTimeString()}`,
+      reason: "Manual system lock enabled",
     };
   }
 
-  /* ================= DAILY LOSS LIMIT ================= */
+  /* ================= TOTAL DRAWDOWN ================= */
 
-  const dailyLossPct =
-    peakCapital > 0
-      ? (-dailyPnL / peakCapital) * 100
-      : 0;
-
-  if (dailyLossPct > maxDailyLossPct) {
-    lockSystem("Daily loss limit exceeded", cooldownMinutes);
-  }
-
-  /* ================= MAX DRAWDOWN ================= */
-
-  const drawdownPct =
+  const totalDrawdownPct =
     peakCapital > 0
       ? ((peakCapital - totalCapital) / peakCapital) * 100
       : 0;
 
-  if (drawdownPct > maxDrawdownPct) {
-    lockSystem("Max drawdown exceeded", cooldownMinutes);
-  }
-
-  /* ================= VOLATILITY SPIKE ================= */
-
-  if (volatility > volatilityLimit) {
-    lockSystem("Extreme market volatility", 15);
-  }
-
-  if (circuitState.locked) {
+  if (totalDrawdownPct >= maxTotalDrawdownPct) {
     return {
       allowed: false,
-      reason: circuitState.reason,
+      reason: "Max total drawdown exceeded",
     };
   }
 
-  return { allowed: true };
-}
+  /* ================= DAILY LOSS ================= */
 
-/* ================= MANUAL EMERGENCY LOCK ================= */
+  const dailyLossPct =
+    peakCapital > 0
+      ? (Math.abs(dailyPnL) / peakCapital) * 100
+      : 0;
 
-export function emergencyLock(reason = "Manual emergency stop") {
-  circuitState.locked = true;
-  circuitState.reason = reason;
-  circuitState.cooldownUntil = null;
-}
+  if (dailyPnL < 0 && dailyLossPct >= maxDailyLossPct) {
+    return {
+      allowed: false,
+      reason: "Max daily loss exceeded",
+    };
+  }
 
-/* ================= RESET ================= */
-
-export function resetCircuit() {
-  circuitState.locked = false;
-  circuitState.reason = null;
-  circuitState.cooldownUntil = null;
-}
-
-/* ================= INTERNAL ================= */
-
-function lockSystem(reason, cooldownMinutes) {
-  circuitState.locked = true;
-  circuitState.reason = reason;
-
-  circuitState.cooldownUntil =
-    Date.now() + cooldownMinutes * 60 * 1000;
+  return {
+    allowed: true,
+    totalDrawdownPct,
+    dailyLossPct,
+  };
 }
