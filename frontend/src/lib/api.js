@@ -1,13 +1,5 @@
-// frontend/src/lib/api.js
 /* =========================================================
-   AUTOSHIELD FRONTEND API LAYER — SOC BASELINE (LOCKED)
-
-   Purpose:
-   - Thin, predictable API wrapper
-   - Maps backend responses to frontend contracts
-   - Handles auth, refresh, and errors centrally
-   - NO UI
-   - NO business logic
+   AUTOSHIELD FRONTEND API LAYER — ENTERPRISE HARDENED
    ========================================================= */
 
 const API_BASE = (
@@ -16,8 +8,13 @@ const API_BASE = (
   ""
 ).trim();
 
+if (!API_BASE && import.meta.env.PROD) {
+  console.error("⚠️ API_BASE not defined in production build.");
+}
+
 const TOKEN_KEY = "as_token";
 const USER_KEY = "as_user";
+const REQUEST_TIMEOUT = 15000; // 15s
 
 /* =============================
    TOKEN & USER STORAGE
@@ -50,6 +47,17 @@ function joinUrl(base, path) {
 }
 
 /* =============================
+   TIMEOUT WRAPPER
+   ============================= */
+
+function withTimeout(promise, ms = REQUEST_TIMEOUT) {
+  const timeout = new Promise((_, reject) =>
+    setTimeout(() => reject(new Error("Request timeout")), ms)
+  );
+  return Promise.race([promise, timeout]);
+}
+
+/* =============================
    CORE REQUEST WRAPPER
    ============================= */
 
@@ -58,63 +66,85 @@ async function req(
   { method = "GET", body, auth = true, headers: extraHeaders = {} } = {},
   retry = true
 ) {
-  const headers = { "Content-Type": "application/json", ...extraHeaders };
+  const headers = {
+    "Content-Type": "application/json",
+    ...extraHeaders,
+  };
 
   if (auth) {
     const token = getToken();
     if (token) headers.Authorization = `Bearer ${token}`;
   }
 
-  const res = await fetch(joinUrl(API_BASE, path), {
-    method,
-    headers,
-    credentials: "include",
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  });
+  try {
+    const res = await withTimeout(
+      fetch(joinUrl(API_BASE, path), {
+        method,
+        headers,
+        credentials: "include",
+        body: body !== undefined ? JSON.stringify(body) : undefined,
+      })
+    );
 
-  const data = await res.json().catch(() => ({}));
+    const data = await res.json().catch(() => ({}));
 
-  // ---------- TOKEN REFRESH ----------
-  if (res.status === 401 && auth && retry) {
-    try {
-      const refreshRes = await fetch(
-        joinUrl(API_BASE, "/api/auth/refresh"),
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${getToken()}`,
-          },
+    /* ---------- TOKEN REFRESH ---------- */
+    if (res.status === 401 && auth && retry) {
+      try {
+        const refreshRes = await withTimeout(
+          fetch(joinUrl(API_BASE, "/api/auth/refresh"), {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${getToken()}`,
+            },
+            credentials: "include",
+          })
+        );
+
+        const refreshData = await refreshRes.json().catch(() => ({}));
+
+        if (refreshRes.ok && refreshData.token) {
+          setToken(refreshData.token);
+          if (refreshData.user) saveUser(refreshData.user);
+
+          return req(
+            path,
+            { method, body, auth, headers: extraHeaders },
+            false
+          );
         }
-      );
-
-      const refreshData = await refreshRes.json();
-
-      if (refreshRes.ok && refreshData.token) {
-        setToken(refreshData.token);
-        if (refreshData.user) saveUser(refreshData.user);
-
-        return req(path, { method, body, auth, headers: extraHeaders }, false);
+      } catch {
+        // Refresh failed
       }
-    } catch {
-      // fall through
+
+      clearToken();
+      clearUser();
+      throw new Error("Session expired");
     }
 
-    clearToken();
-    clearUser();
-    throw new Error("Session expired");
-  }
+    if (!res.ok) {
+      throw new Error(
+        data?.error ||
+          data?.message ||
+          `Request failed (${res.status})`
+      );
+    }
 
-  if (!res.ok) {
+    return data;
+  } catch (err) {
+    if (err.message === "Session expired") throw err;
+
     throw new Error(
-      data?.error || data?.message || `Request failed (${res.status})`
+      err.message === "Request timeout"
+        ? "Network timeout. Please try again."
+        : "Network error. Please check connection."
     );
   }
-
-  return data;
 }
 
 /* =============================
-   API SURFACE (SOC ALIGNED)
+   API SURFACE
    ============================= */
 
 export const api = {
@@ -133,7 +163,7 @@ export const api = {
       auth: false,
     }),
 
-  /* -------- USER / ME -------- */
+  /* -------- USER -------- */
   meNotifications: () => req("/api/me/notifications"),
   markMyNotificationRead: (id) =>
     req(`/api/me/notifications/${id}/read`, { method: "POST" }),
@@ -181,7 +211,9 @@ export const api = {
   companyMe: () => req("/api/company/me"),
   companyNotifications: () => req("/api/company/notifications"),
   companyMarkRead: (id) =>
-    req(`/api/company/notifications/${id}/read`, { method: "POST" }),
+    req(`/api/company/notifications/${id}/read`, {
+      method: "POST",
+    }),
 
   /* -------- AI -------- */
   aiChat: (message, context) =>
