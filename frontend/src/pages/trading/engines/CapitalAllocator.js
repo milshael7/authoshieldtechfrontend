@@ -1,9 +1,9 @@
 // CapitalAllocator.js
-// Institutional Capital Distribution + Smart Exchange Routing
+// Global Capital Distribution + Smart Rebalancing + Performance Rotation
 
-/* ======================================================
-   INITIAL ALLOCATION
-====================================================== */
+/* ===========================================
+   INITIAL DISTRIBUTION
+=========================================== */
 
 export function allocateCapital({
   totalCapital,
@@ -26,12 +26,31 @@ export function allocateCapital({
     });
   });
 
-  return { reserve, allocation };
+  return {
+    reserve,
+    allocation,
+  };
 }
 
-/* ======================================================
-   SMART REBALANCE
-====================================================== */
+/* ===========================================
+   TOTAL CAPITAL
+=========================================== */
+
+export function calculateTotalCapital(allocation, reserve) {
+  let total = reserve;
+
+  Object.keys(allocation).forEach((engine) => {
+    Object.keys(allocation[engine]).forEach((exchange) => {
+      total += allocation[engine][exchange];
+    });
+  });
+
+  return total;
+}
+
+/* ===========================================
+   FLOOR REBALANCE
+=========================================== */
 
 export function rebalanceCapital({
   allocation,
@@ -56,48 +75,36 @@ export function rebalanceCapital({
   };
 }
 
-/* ======================================================
-   TOTAL CAPITAL CALCULATION
-====================================================== */
+/* ===========================================
+   PERFORMANCE ROTATION
+=========================================== */
 
-export function calculateTotalCapital(allocation, reserve) {
-  let total = reserve;
-
-  Object.keys(allocation).forEach((engine) => {
-    Object.keys(allocation[engine]).forEach((exchange) => {
-      total += allocation[engine][exchange];
-    });
-  });
-
-  return total;
-}
-
-/* ======================================================
-   SMART EXCHANGE ROUTER
-====================================================== */
-
-export function chooseExchange({
+export function rotateCapitalByPerformance({
   allocation,
-  engineType,
-  exchangePerformance,
-  humanOverride = null,
+  performanceStats,
+  shiftPct = 0.05, // 5% shift
 }) {
-  if (humanOverride) return humanOverride;
+  const updated = JSON.parse(JSON.stringify(allocation));
 
-  const exchanges = Object.keys(allocation[engineType]);
+  const scalpPnL = performanceStats.scalp.pnl;
+  const sessionPnL = performanceStats.session.pnl;
 
-  // Rank by performance first, capital second
-  const ranked = exchanges.sort((a, b) => {
-    const perfA = exchangePerformance[a] || 0;
-    const perfB = exchangePerformance[b] || 0;
+  if (scalpPnL === sessionPnL) {
+    return updated;
+  }
 
-    if (perfA !== perfB) return perfB - perfA;
+  const winner = scalpPnL > sessionPnL ? "scalp" : "session";
+  const loser = winner === "scalp" ? "session" : "scalp";
 
-    return (
-      allocation[engineType][b] -
-      allocation[engineType][a]
-    );
+  Object.keys(updated[winner]).forEach((exchange) => {
+    const loserCapital = updated[loser][exchange];
+    const shiftAmount = loserCapital * shiftPct;
+
+    if (loserCapital > shiftAmount) {
+      updated[loser][exchange] -= shiftAmount;
+      updated[winner][exchange] += shiftAmount;
+    }
   });
 
-  return ranked[0];
+  return updated;
 }
