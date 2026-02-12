@@ -1,6 +1,5 @@
 // frontend/src/components/SecurityFeedPanel.jsx
-// Step 19 — Live Cybersecurity Feed Panel
-// AuthoDev 6.5 • Professional • Long-form • Shareable • Speakable
+// SOC Live Threat Intelligence Stream — Enterprise Grade
 
 import React, { useEffect, useState } from "react";
 
@@ -43,67 +42,82 @@ export default function SecurityFeedPanel() {
 
   useEffect(() => {
     load();
-    const t = setInterval(load, 5000); // live refresh
+    const t = setInterval(load, 5000);
     return () => clearInterval(t);
   }, []);
 
   return (
-    <div style={panel}>
-      <h3 style={title}>Live Security Activity</h3>
+    <div className="platformCard" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <h3 style={{ margin: 0 }}>Live Security Operations Feed</h3>
+        <small style={{ opacity: 0.6 }}>Real-time threat intelligence</small>
+      </div>
 
-      {loading && <div style={muted}>Loading security events…</div>}
+      {loading && <div style={{ opacity: 0.6 }}>Loading security events…</div>}
 
       {!loading && events.length === 0 && (
-        <div style={muted}>No security events detected yet.</div>
+        <div style={{ opacity: 0.6 }}>No active threats detected.</div>
       )}
 
-      <div style={list}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         {events.map((e) => {
-          const explanation = `
-Security Alert (${e.severity.toUpperCase()})
-
-Time:
-${formatTime(e.iso)}
-
-What happened:
-${e.description}
-
-Source:
-${e.source || "Unknown"}
-
-Target:
-${e.target || "Not specified"}
-
-AuthoDev 6.5 assessment:
-This event was detected and logged by the AutoShield security engine.
-Based on severity and context, it ${
-            e.severity === "high"
-              ? "requires immediate attention"
-              : "should be reviewed and monitored"
-          }.
-`.trim();
+          const severity = (e.severity || "low").toLowerCase();
+          const explanation = buildExplanation(e);
 
           return (
-            <div key={e.id} style={card}>
-              <div style={meta}>
-                <b>{e.type}</b>
-                <span style={badge(e.severity)}>{e.severity}</span>
-              </div>
+            <div
+              key={e.id}
+              style={{
+                display: "flex",
+                border: "1px solid rgba(255,255,255,.12)",
+                borderRadius: 16,
+                overflow: "hidden",
+                background: "rgba(0,0,0,.35)",
+              }}
+            >
+              {/* Severity Bar */}
+              <div style={severityBar(severity)} />
 
-              <div style={body}>
-                <p style={text}>{explanation}</p>
-              </div>
+              <div style={{ flex: 1, padding: 16 }}>
+                {/* Header */}
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                  <div>
+                    <b>{e.type}</b>
+                    <div style={{ fontSize: 12, opacity: 0.6 }}>
+                      {formatTime(e.iso)} • {e.source || "Unknown Source"}
+                    </div>
+                  </div>
 
-              {/* ===== ACTION BAR (LIKE YOUR SCREENSHOT) ===== */}
-              <div style={actions}>
-                <button style={iconBtn} onClick={() => copy(explanation)}>
-                  📋 Copy
-                </button>
-                <button style={iconBtn} onClick={() => speak(explanation)}>
-                  🔊 Speak
-                </button>
-                <button style={iconBtn}>👍</button>
-                <button style={iconBtn}>👎</button>
+                  <div style={severityBadge(severity)}>
+                    {severity.toUpperCase()}
+                  </div>
+                </div>
+
+                {/* Structured Body */}
+                <div style={{ fontSize: 14, lineHeight: 1.6 }}>
+                  <div><b>Description:</b> {e.description}</div>
+                  <div><b>Target:</b> {e.target || "Not specified"}</div>
+                  <div><b>Assessment:</b> {assessmentText(severity)}</div>
+                </div>
+
+                {/* Action Bar */}
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 14,
+                    marginTop: 14,
+                    borderTop: "1px solid rgba(255,255,255,.08)",
+                    paddingTop: 10,
+                    fontSize: 13,
+                  }}
+                >
+                  <button style={actionBtn} onClick={() => copy(explanation)}>
+                    Copy Report
+                  </button>
+                  <button style={actionBtn} onClick={() => speak(explanation)}>
+                    Read Aloud
+                  </button>
+                </div>
               </div>
             </div>
           );
@@ -113,82 +127,70 @@ Based on severity and context, it ${
   );
 }
 
+/* ================= TEXT LOGIC ================= */
+
+function buildExplanation(e) {
+  return `
+Security Event: ${e.type}
+Severity: ${e.severity}
+Time: ${new Date(e.iso).toLocaleString()}
+Source: ${e.source || "Unknown"}
+Target: ${e.target || "Not specified"}
+
+Description:
+${e.description}
+
+Assessment:
+${assessmentText(e.severity)}
+`.trim();
+}
+
+function assessmentText(severity) {
+  const s = (severity || "").toLowerCase();
+  if (s === "critical") return "Immediate containment and investigation required.";
+  if (s === "high") return "High priority threat. Rapid review recommended.";
+  if (s === "medium") return "Monitor and validate activity.";
+  return "Low risk. Logged for awareness.";
+}
+
 /* ================= STYLES ================= */
 
-const panel = {
-  display: "flex",
-  flexDirection: "column",
-  gap: 12,
-};
+function severityBar(sev) {
+  const colors = {
+    critical: "#ff2e2e",
+    high: "#ff5a5f",
+    medium: "#ffd166",
+    low: "#2bd576",
+  };
 
-const title = {
-  fontSize: 18,
-  fontWeight: 800,
-};
+  return {
+    width: 6,
+    background: colors[sev] || colors.low,
+  };
+}
 
-const muted = {
-  opacity: 0.6,
-  fontSize: 14,
-};
+function severityBadge(sev) {
+  const colors = {
+    critical: "#ff2e2e",
+    high: "#ff5a5f",
+    medium: "#ffd166",
+    low: "#2bd576",
+  };
 
-const list = {
-  display: "flex",
-  flexDirection: "column",
-  gap: 14,
-};
-
-const card = {
-  background: "rgba(0,0,0,0.35)",
-  border: "1px solid rgba(255,255,255,0.12)",
-  borderRadius: 16,
-  padding: 14,
-};
-
-const meta = {
-  display: "flex",
-  justifyContent: "space-between",
-  alignItems: "center",
-  marginBottom: 8,
-};
-
-const body = {
-  fontSize: 14,
-  lineHeight: 1.6,
-};
-
-const text = {
-  whiteSpace: "pre-wrap",
-};
-
-const actions = {
-  display: "flex",
-  gap: 10,
-  marginTop: 10,
-  borderTop: "1px solid rgba(255,255,255,0.1)",
-  paddingTop: 8,
-};
-
-const iconBtn = {
-  background: "transparent",
-  border: "none",
-  color: "#fff",
-  cursor: "pointer",
-  fontSize: 13,
-  opacity: 0.85,
-};
-
-function badge(sev) {
   return {
     padding: "4px 10px",
     borderRadius: 999,
     fontSize: 12,
-    fontWeight: 700,
-    background:
-      sev === "high"
-        ? "#ff5a5f"
-        : sev === "medium"
-        ? "#ffd166"
-        : "#2bd576",
+    fontWeight: 800,
+    background: colors[sev] || colors.low,
     color: "#000",
   };
 }
+
+const actionBtn = {
+  background: "transparent",
+  border: "none",
+  cursor: "pointer",
+  fontWeight: 600,
+  opacity: 0.85,
+};
