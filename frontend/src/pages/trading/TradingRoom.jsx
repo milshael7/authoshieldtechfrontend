@@ -11,6 +11,10 @@ import {
   updatePerformance,
   getPerformanceStats,
 } from "./engines/PerformanceEngine";
+import {
+  isAuthorized,
+  getRolePermissions,
+} from "./engines/AuthorityEngine";
 
 export default function TradingRoom({
   mode: parentMode = "paper",
@@ -21,6 +25,7 @@ export default function TradingRoom({
   const [baseRisk, setBaseRisk] = useState(1);
   const [leverage, setLeverage] = useState(1);
   const [humanMultiplier, setHumanMultiplier] = useState(1);
+  const [role, setRole] = useState("owner"); // owner | admin | trader | viewer
 
   const [dailyPnL, setDailyPnL] = useState(0);
   const [tradesUsed, setTradesUsed] = useState(0);
@@ -39,12 +44,13 @@ export default function TradingRoom({
   );
 
   const peakCapital = useRef(initialCapital);
-
   const totalCapital = calculateTotalCapital(allocation, reserve);
 
   useEffect(() => {
     setMode(parentMode.toUpperCase());
   }, [parentMode]);
+
+  const permissions = getRolePermissions(role);
 
   const globalRisk = evaluateGlobalRisk({
     totalCapital,
@@ -60,7 +66,7 @@ export default function TradingRoom({
     setLog((prev) => [
       {
         t: new Date().toLocaleTimeString(),
-        m: message,
+        m: `[${role.toUpperCase()}] ${message}`,
         confidence,
       },
       ...prev,
@@ -68,6 +74,11 @@ export default function TradingRoom({
   }
 
   function executeTrade() {
+    if (!isAuthorized(role, "canTrade")) {
+      pushLog("Unauthorized trade attempt.");
+      return;
+    }
+
     if (!globalRisk.allowed) {
       pushLog(`Blocked: ${globalRisk.reason}`);
       return;
@@ -80,7 +91,6 @@ export default function TradingRoom({
 
     const performanceStats = getPerformanceStats(engineType);
 
-    // Simulated exchange performance scores
     const exchangePerformance = {
       coinbase: Math.random(),
       kraken: Math.random(),
@@ -132,9 +142,7 @@ export default function TradingRoom({
     setLastConfidence(result.confidenceScore);
 
     pushLog(
-      `${engineType.toUpperCase()} | ${exchange} | ${result.regime} | PnL: ${result.pnl.toFixed(
-        2
-      )}`,
+      `${engineType.toUpperCase()} | ${exchange} | PnL: ${result.pnl.toFixed(2)}`,
       result.confidenceScore
     );
   }
@@ -151,12 +159,25 @@ export default function TradingRoom({
       <section className="postureCard">
         <div className="postureTop">
           <div>
-            <h2>Institutional Trading Control</h2>
-            <small>Adaptive AI + Multi-Exchange Routing</small>
+            <h2>Institutional Trading Authority Panel</h2>
+            <small>Role-Based Execution Governance</small>
           </div>
           <span className={`badge ${mode === "LIVE" ? "warn" : ""}`}>
             {mode}
           </span>
+        </div>
+
+        {/* ROLE SWITCH */}
+        <div className="ctrlRow">
+          <select
+            value={role}
+            onChange={(e) => setRole(e.target.value)}
+          >
+            <option value="owner">Owner</option>
+            <option value="admin">Admin</option>
+            <option value="trader">Trader</option>
+            <option value="viewer">Viewer</option>
+          </select>
         </div>
 
         <div className="stats">
@@ -184,7 +205,7 @@ export default function TradingRoom({
           <button
             className="btn ok"
             onClick={executeTrade}
-            disabled={!globalRisk.allowed}
+            disabled={!permissions.canTrade}
           >
             Execute Trade
           </button>
@@ -192,7 +213,7 @@ export default function TradingRoom({
       </section>
 
       <aside className="postureCard">
-        <h3>Execution Log</h3>
+        <h3>Authority Audit Log</h3>
         <div style={{ maxHeight: 400, overflowY: "auto" }}>
           {log.map((x, i) => (
             <div key={i}>
