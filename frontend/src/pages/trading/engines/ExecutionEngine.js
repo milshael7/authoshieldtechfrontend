@@ -1,8 +1,9 @@
 // ExecutionEngine.js
 // Institutional Adaptive Execution Engine
-// AI full control | Human caps only | Adaptive multi-layer logic
+// AI full control | Human caps | Regime aware | Cooldown enabled
 
 import { evaluateConfidence } from "./ConfidenceEngine";
+import { detectMarketRegime, getRegimeBias } from "./MarketRegimeEngine";
 
 export function executeEngine({
   engineType,
@@ -26,6 +27,22 @@ export function executeEngine({
     };
   }
 
+  const lossStreak = recentPerformance.losses || 0;
+  const winStreak = recentPerformance.wins || 0;
+  const cumulativePnL = recentPerformance.pnl || 0;
+
+  /* ================= COOLDOWN MODE ================= */
+
+  const cooldownActive = lossStreak >= 4;
+
+  if (cooldownActive) {
+    return {
+      blocked: true,
+      reason: "Cooldown active after consecutive losses",
+      confidenceScore: 0,
+    };
+  }
+
   /* ================= CONFIDENCE ================= */
 
   const confidenceData = evaluateConfidence({
@@ -41,13 +58,12 @@ export function executeEngine({
     };
   }
 
-  /* ================= PERFORMANCE METRICS ================= */
+  /* ================= REGIME DETECTION ================= */
 
-  const lossStreak = recentPerformance.losses || 0;
-  const winStreak = recentPerformance.wins || 0;
-  const cumulativePnL = recentPerformance.pnl || 0;
+  const regime = detectMarketRegime();
+  const regimeBias = getRegimeBias(engineType, regime);
 
-  /* ================= LOSS STREAK ADAPTATION ================= */
+  /* ================= ADAPTIVE RISK ================= */
 
   const adaptiveRiskReduction =
     lossStreak >= 3 ? 0.6 :
@@ -55,24 +71,13 @@ export function executeEngine({
     lossStreak === 1 ? 0.9 :
     1;
 
-  const adaptiveLeverageReduction =
-    lossStreak >= 3 ? 0.5 :
-    lossStreak === 2 ? 0.7 :
-    1;
-
-  /* ================= WIN STREAK BOOST ================= */
-
   const winBoost =
     winStreak >= 3 ? 1.15 :
     winStreak === 2 ? 1.08 :
     1;
 
-  /* ================= RECOVERY MODE ================= */
-
   const recoveryMode =
     cumulativePnL < 0 ? 0.85 : 1;
-
-  /* ================= HUMAN CAPS ================= */
 
   const cappedRisk = Math.min(riskPct, humanCaps.maxRiskPct);
   const cappedLeverage = Math.min(leverage, humanCaps.maxLeverage);
@@ -85,11 +90,6 @@ export function executeEngine({
     confidenceData.modifier *
     humanMultiplier;
 
-  const finalLeverage =
-    cappedLeverage * adaptiveLeverageReduction;
-
-  /* ================= POSITION SIZING ================= */
-
   const volatilityFactor =
     engineType === "scalp"
       ? randomBetween(0.8, 1.2)
@@ -98,19 +98,16 @@ export function executeEngine({
   const effectiveRisk = finalRisk * volatilityFactor;
 
   const positionSize =
-    (balance * effectiveRisk * finalLeverage) / 100;
+    (balance * effectiveRisk * cappedLeverage) / 100;
 
   /* ================= PROBABILITY MODEL ================= */
-
-  const baseBias =
-    engineType === "scalp" ? 0.52 : 0.55;
 
   const confidenceBoost =
     (confidenceData.score - 50) / 1000;
 
   const adjustedBias = Math.min(
     0.7,
-    Math.max(0.4, baseBias + confidenceBoost)
+    Math.max(0.4, regimeBias + confidenceBoost)
   );
 
   const isWin = Math.random() < adjustedBias;
@@ -120,8 +117,6 @@ export function executeEngine({
     : -positionSize * randomBetween(0.3, 0.7);
 
   const newBalance = balance + pnl;
-
-  /* ================= DRAWDOWN PROTECTION ================= */
 
   const drawdownPct =
     balance > 0
@@ -135,8 +130,6 @@ export function executeEngine({
       confidenceScore: confidenceData.score,
     };
   }
-
-  /* ================= CAPITAL FLOOR ================= */
 
   const finalBalance =
     newBalance < humanCaps.capitalFloor
@@ -152,11 +145,9 @@ export function executeEngine({
     positionSize,
     isWin,
     metadata: {
-      adaptiveRiskReduction,
-      adaptiveLeverageReduction,
-      winBoost,
-      recoveryMode,
+      regime,
       adjustedBias,
+      cooldownActive,
       lossStreak,
       winStreak,
     },
