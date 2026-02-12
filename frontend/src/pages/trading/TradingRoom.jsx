@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { executeEngine } from "./engines/ExecutionEngine";
 import {
   allocateCapital,
@@ -21,11 +21,15 @@ export default function TradingRoom({
   mode: parentMode = "paper",
   dailyLimit = 5,
 }) {
+
+  /* ================= CORE STATE ================= */
+
   const [mode, setMode] = useState(parentMode.toUpperCase());
-  const [engineType, setEngineType] = useState("scalp");
-  const [baseRisk, setBaseRisk] = useState(1);
-  const [leverage, setLeverage] = useState(1);
-  const [humanMultiplier, setHumanMultiplier] = useState(1);
+  const [engineType] = useState("scalp");
+
+  const [baseRisk] = useState(1);
+  const [leverage] = useState(1);
+  const [humanMultiplier] = useState(1);
 
   const [dailyPnL, setDailyPnL] = useState(0);
   const [tradesUsed, setTradesUsed] = useState(0);
@@ -35,42 +39,62 @@ export default function TradingRoom({
 
   const initialCapital = 1000;
 
-  const initialDistribution = allocateCapital({
-    totalCapital: initialCapital,
-  });
+  /* ================= CAPITAL INIT (SAFE) ================= */
+
+  const initialDistribution = useMemo(() => {
+    return allocateCapital({ totalCapital: initialCapital });
+  }, []);
 
   const [reserve, setReserve] = useState(initialDistribution.reserve);
-  const [allocation, setAllocation] = useState(
-    initialDistribution.allocation
-  );
+  const [allocation, setAllocation] = useState(initialDistribution.allocation);
 
   const peakCapital = useRef(initialCapital);
-  const totalCapital = calculateTotalCapital(allocation, reserve);
+
+  const totalCapital = useMemo(() => {
+    return calculateTotalCapital(allocation, reserve);
+  }, [allocation, reserve]);
+
+  /* ================= MODE SYNC ================= */
 
   useEffect(() => {
     setMode(parentMode.toUpperCase());
   }, [parentMode]);
 
-  const globalRisk = evaluateGlobalRisk({
-    totalCapital,
-    peakCapital: peakCapital.current,
-    dailyPnL,
-  });
+  /* ================= PEAK UPDATE SAFE ================= */
 
-  if (totalCapital > peakCapital.current) {
-    peakCapital.current = totalCapital;
-  }
+  useEffect(() => {
+    if (totalCapital > peakCapital.current) {
+      peakCapital.current = totalCapital;
+    }
+  }, [totalCapital]);
 
-  function pushLog(message, confidence) {
-    setLog((prev) => [
-      {
-        t: new Date().toLocaleTimeString(),
-        m: message,
-        confidence,
-      },
-      ...prev,
-    ]);
-  }
+  /* ================= GLOBAL RISK ================= */
+
+  const globalRisk = useMemo(() => {
+    return evaluateGlobalRisk({
+      totalCapital,
+      peakCapital: peakCapital.current,
+      dailyPnL,
+    });
+  }, [totalCapital, dailyPnL]);
+
+  /* ================= LOGGING ================= */
+
+  const pushLog = useCallback((message, confidence) => {
+    setLog((prev) => {
+      const next = [
+        {
+          t: new Date().toLocaleTimeString(),
+          m: message,
+          confidence,
+        },
+        ...prev,
+      ];
+      return next.slice(0, 200); // limit memory
+    });
+  }, []);
+
+  /* ================= LOCK CONTROL ================= */
 
   function handleLock() {
     setManualLock(true);
@@ -84,7 +108,15 @@ export default function TradingRoom({
     pushLog("✅ Manual system lock released.");
   }
 
+  /* ================= EXECUTION ================= */
+
   function executeTrade() {
+
+    if (systemLocked) {
+      pushLog("System locked.");
+      return;
+    }
+
     if (!globalRisk.allowed) {
       pushLog(`Blocked: ${globalRisk.reason}`);
       return;
@@ -96,7 +128,14 @@ export default function TradingRoom({
     }
 
     const exchange = "coinbase";
-    const engineCapital = allocation[engineType][exchange];
+
+    const engineCapital =
+      allocation?.[engineType]?.[exchange] ?? 0;
+
+    if (!engineCapital) {
+      pushLog("No capital allocated to engine.");
+      return;
+    }
 
     const performanceStats = getPerformanceStats(engineType);
 
@@ -108,6 +147,11 @@ export default function TradingRoom({
       humanMultiplier,
       recentPerformance: performanceStats,
     });
+
+    if (!result || typeof result !== "object") {
+      pushLog("Engine error.");
+      return;
+    }
 
     if (result.blocked) {
       pushLog(`Blocked: ${result.reason}`, result.confidenceScore);
@@ -142,26 +186,32 @@ export default function TradingRoom({
     setLastConfidence(result.confidenceScore);
 
     pushLog(
-      `${engineType.toUpperCase()} | ${exchange} | PnL: ${result.pnl.toFixed(
-        2
-      )}`,
+      `${engineType.toUpperCase()} | ${exchange} | PnL: ${result.pnl.toFixed(2)}`,
       result.confidenceScore
     );
   }
 
-  const allStats = evaluatePerformance(
-    Object.values(getAllPerformanceStats()).flatMap((e) => e.trades || [])
-  );
+  /* ================= PERFORMANCE SUMMARY ================= */
+
+  const allStats = useMemo(() => {
+    return evaluatePerformance(
+      Object.values(getAllPerformanceStats())
+        .flatMap((e) => e.trades || [])
+    );
+  }, [tradesUsed]);
 
   function confidenceColor(score) {
-    if (!score && score !== 0) return "";
+    if (score === null || score === undefined) return "";
     if (score < 50) return "#ff4d4d";
     if (score < 75) return "#f5b942";
     return "#5EC6FF";
   }
 
+  /* ================= UI ================= */
+
   return (
     <div className="postureWrap">
+
       <section className="postureCard">
         <div className="postureTop">
           <div>
@@ -173,6 +223,8 @@ export default function TradingRoom({
             {mode}
           </span>
         </div>
+
+        {/* ===== KPIs ===== */}
 
         <div className="kpiGrid">
           <div className="kpiCard">
@@ -201,6 +253,8 @@ export default function TradingRoom({
           </div>
         </div>
 
+        {/* ===== CAPITAL ===== */}
+
         <div className="stats">
           <div><b>Total Capital:</b> ${totalCapital.toFixed(2)}</div>
           <div><b>Reserve:</b> ${reserve.toFixed(2)}</div>
@@ -222,11 +276,17 @@ export default function TradingRoom({
           )}
         </div>
 
+        {/* ===== ACTIONS ===== */}
+
         <div className="actions" style={{ marginTop: 20 }}>
           <button
             className="btn ok"
             onClick={executeTrade}
-            disabled={!globalRisk.allowed || systemLocked}
+            disabled={
+              systemLocked ||
+              !globalRisk.allowed ||
+              tradesUsed >= dailyLimit
+            }
           >
             Execute Trade
           </button>
@@ -249,7 +309,10 @@ export default function TradingRoom({
             </button>
           )}
         </div>
+
       </section>
+
+      {/* ===== LOG PANEL ===== */}
 
       <aside className="postureCard">
         <h3>Execution Log</h3>
@@ -272,6 +335,7 @@ export default function TradingRoom({
           ))}
         </div>
       </aside>
+
     </div>
   );
 }
