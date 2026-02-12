@@ -1,9 +1,9 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 
 /*
   SecurityToolMarketplace
   Enterprise Tool Deployment Panel
-  LIVE Backend Connected
+  Production Hardened
 */
 
 function apiBase() {
@@ -19,53 +19,73 @@ export default function SecurityToolMarketplace() {
 
   const [tools, setTools] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [busyId, setBusyId] = useState(null);
+  const [error, setError] = useState(null);
   const [search, setSearch] = useState("");
 
   /* ================= LOAD TOOLS ================= */
 
-  async function loadTools() {
-    if (!base) return;
+  const loadTools = useCallback(async () => {
+    if (!base) {
+      setError("API base not configured");
+      setLoading(false);
+      return;
+    }
 
     try {
+      setError(null);
+
       const res = await fetch(`${base}/api/security/tools`, {
         credentials: "include",
       });
 
       const data = await res.json();
-      if (data.ok) {
-        setTools(data.tools);
+
+      if (!res.ok || !data.ok) {
+        throw new Error("Failed to load tools");
       }
-    } catch {
+
+      setTools(data.tools || []);
+    } catch (err) {
       setTools([]);
+      setError("Unable to load security modules");
     } finally {
       setLoading(false);
     }
-  }
+  }, [base]);
 
   useEffect(() => {
     loadTools();
-  }, []);
+  }, [loadTools]);
 
   /* ================= INSTALL / UNINSTALL ================= */
 
   async function toggleInstall(tool) {
-    if (!base) return;
+    if (!base || busyId) return;
+
+    setBusyId(tool.id);
 
     const endpoint = tool.installed
       ? `/api/security/tools/${tool.id}/uninstall`
       : `/api/security/tools/${tool.id}/install`;
 
     try {
-      await fetch(`${base}${endpoint}`, {
+      const res = await fetch(`${base}${endpoint}`, {
         method: "POST",
         credentials: "include",
       });
 
+      if (!res.ok) throw new Error();
+
       await loadTools();
 
-      // 🔥 Notify radar instantly
+      // 🔥 Notify radar + score panel to refresh immediately
       window.dispatchEvent(new Event("security:refresh"));
-    } catch {}
+    } catch {
+      setError("Action failed. Please retry.");
+    } finally {
+      setBusyId(null);
+    }
   }
 
   /* ================= FILTER ================= */
@@ -105,6 +125,12 @@ export default function SecurityToolMarketplace() {
 
       {loading && <div className="muted">Loading security modules…</div>}
 
+      {error && (
+        <div style={{ marginBottom: 12, color: "#ff5a5f" }}>
+          {error}
+        </div>
+      )}
+
       <div className="toolGrid">
         {filteredTools.map((tool) => (
           <div key={tool.id} className="toolCard">
@@ -128,9 +154,14 @@ export default function SecurityToolMarketplace() {
             <div className="toolActions">
               <button
                 className={`btn ${tool.installed ? "warn" : "ok"}`}
+                disabled={busyId === tool.id}
                 onClick={() => toggleInstall(tool)}
               >
-                {tool.installed ? "Uninstall" : "Install"}
+                {busyId === tool.id
+                  ? "Processing..."
+                  : tool.installed
+                  ? "Uninstall"
+                  : "Install"}
               </button>
             </div>
           </div>
