@@ -17,8 +17,11 @@ export default function TradingRoom({
   mode: parentMode = "paper",
   dailyLimit = 5,
 }) {
+  /* ================= CORE STATE ================= */
+
   const [mode, setMode] = useState(parentMode.toUpperCase());
   const [engineType, setEngineType] = useState("scalp");
+
   const [baseRisk, setBaseRisk] = useState(1);
   const [leverage, setLeverage] = useState(1);
   const [humanMultiplier, setHumanMultiplier] = useState(1);
@@ -27,7 +30,6 @@ export default function TradingRoom({
   const [tradesUsed, setTradesUsed] = useState(0);
   const [log, setLog] = useState([]);
   const [lastConfidence, setLastConfidence] = useState(null);
-  const [lastRegime, setLastRegime] = useState(null);
 
   const initialCapital = 1000;
 
@@ -36,8 +38,9 @@ export default function TradingRoom({
   });
 
   const [reserve, setReserve] = useState(initialDistribution.reserve);
-  const [allocation, setAllocation] =
-    useState(initialDistribution.allocation);
+  const [allocation, setAllocation] = useState(
+    initialDistribution.allocation
+  );
 
   const peakCapital = useRef(initialCapital);
 
@@ -46,6 +49,8 @@ export default function TradingRoom({
   useEffect(() => {
     setMode(parentMode.toUpperCase());
   }, [parentMode]);
+
+  /* ================= GLOBAL RISK ================= */
 
   const globalRisk = evaluateGlobalRisk({
     totalCapital,
@@ -57,17 +62,18 @@ export default function TradingRoom({
     peakCapital.current = totalCapital;
   }
 
-  function pushLog(message, confidence, regime) {
+  function pushLog(message, confidence) {
     setLog((prev) => [
       {
         t: new Date().toLocaleTimeString(),
         m: message,
         confidence,
-        regime,
       },
       ...prev,
     ]);
   }
+
+  /* ================= EXECUTION ================= */
 
   function executeTrade() {
     if (!globalRisk.allowed) {
@@ -83,8 +89,7 @@ export default function TradingRoom({
     const exchange = "coinbase";
     const engineCapital = allocation[engineType][exchange];
 
-    const performanceStats =
-      getPerformanceStats(engineType);
+    const performanceStats = getPerformanceStats(engineType);
 
     const result = executeEngine({
       engineType,
@@ -96,11 +101,7 @@ export default function TradingRoom({
     });
 
     if (result.blocked) {
-      pushLog(
-        `Blocked: ${result.reason}`,
-        result.confidenceScore,
-        result.regime
-      );
+      pushLog(`Blocked: ${result.reason}`, result.confidenceScore);
       return;
     }
 
@@ -130,117 +131,219 @@ export default function TradingRoom({
     setTradesUsed((v) => v + 1);
     setDailyPnL((v) => v + result.pnl);
     setLastConfidence(result.confidenceScore);
-    setLastRegime(result.regime);
 
     pushLog(
       `${engineType.toUpperCase()} | ${exchange} | PnL: ${result.pnl.toFixed(2)}`,
-      result.confidenceScore,
-      result.regime
+      result.confidenceScore
     );
   }
 
-  function heatColor(value) {
-    if (value > 0.6) return "#5EC6FF";
-    if (value > 0.4) return "#f5b942";
-    return "#ff4d4d";
+  function confidenceColor(score) {
+    if (!score && score !== 0) return "";
+    if (score < 50) return "#d64545";
+    if (score < 75) return "#c89b3c";
+    return "#2f80ed";
   }
 
-  const allStats = getAllPerformanceStats();
+  /* ================= UI ================= */
 
   return (
-    <div className="postureWrap">
-      <section className="postureCard">
-        <div className="postureTop">
-          <div>
-            <h2>Quant Command Center</h2>
-            <small>
-              Adaptive AI | Capital Rotation | Regime Aware
-            </small>
-          </div>
+    <div style={{ display: "flex", gap: 20 }}>
 
-          <span className={`badge ${mode === "LIVE" ? "warn" : ""}`}>
-            {mode}
-          </span>
+      {/* ===== LEFT PANEL ===== */}
+      <section
+        style={{
+          flex: 2,
+          background: "#ffffff",
+          padding: 25,
+          borderRadius: 12,
+          boxShadow: "0 4px 18px rgba(0,0,0,0.05)",
+        }}
+      >
+        <div style={{ marginBottom: 20 }}>
+          <h2 style={{ marginBottom: 4 }}>Institutional Trading Control</h2>
+          <div style={{ color: "#6b7280", fontSize: 14 }}>
+            Adaptive AI • Capital Rotation • Global Risk Governance
+          </div>
         </div>
 
         {!globalRisk.allowed && (
-          <div className="badge bad" style={{ marginTop: 10 }}>
+          <div
+            style={{
+              background: "#fdecea",
+              color: "#b91c1c",
+              padding: 12,
+              borderRadius: 8,
+              marginBottom: 20,
+            }}
+          >
             Trading Locked — {globalRisk.reason}
           </div>
         )}
 
-        <div className="stats">
-          <div><b>Total Capital:</b> ${totalCapital.toFixed(2)}</div>
-          <div><b>Reserve:</b> ${reserve.toFixed(2)}</div>
-          <div><b>Daily PnL:</b> ${dailyPnL.toFixed(2)}</div>
-          <div><b>Trades Used:</b> {tradesUsed} / {dailyLimit}</div>
-
-          {lastConfidence !== null && (
-            <div>
-              <b>Confidence:</b>{" "}
-              <span style={{
-                color: heatColor(lastConfidence / 100),
-                fontWeight: 700
-              }}>
-                {lastConfidence}%
-              </span>
-            </div>
-          )}
-
-          {lastRegime && (
-            <div>
-              <b>Market Regime:</b>{" "}
-              <span style={{ color: "#7ec8ff" }}>
-                {lastRegime}
-              </span>
-            </div>
-          )}
+        {/* ===== STATS GRID ===== */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+            gap: 15,
+            marginBottom: 25,
+          }}
+        >
+          <Stat label="Total Capital" value={`$${totalCapital.toFixed(2)}`} />
+          <Stat label="Reserve" value={`$${reserve.toFixed(2)}`} />
+          <Stat label="Daily PnL" value={`$${dailyPnL.toFixed(2)}`} />
+          <Stat label="Trades Used" value={`${tradesUsed} / ${dailyLimit}`} />
         </div>
 
-        <div className="actions">
-          <button
-            className="btn ok"
-            onClick={executeTrade}
-            disabled={!globalRisk.allowed}
-          >
-            Execute Trade
-          </button>
-        </div>
-      </section>
-
-      <aside className="postureCard">
-        <h3>Engine Heat Map</h3>
-
-        {Object.keys(allStats).map((engine) => {
-          const stats = allStats[engine];
-          return (
-            <div
-              key={engine}
+        {lastConfidence !== null && (
+          <div style={{ marginBottom: 25 }}>
+            <strong>Last Confidence:</strong>{" "}
+            <span
               style={{
-                marginBottom: 14,
-                padding: 10,
-                borderLeft: `4px solid ${heatColor(stats.winRate)}`,
-                background: "rgba(255,255,255,0.03)",
+                color: confidenceColor(lastConfidence),
+                fontWeight: 600,
               }}
             >
-              <b>{engine.toUpperCase()}</b>
-              <div>Win Rate: {(stats.winRate * 100).toFixed(1)}%</div>
-              <div>Profit Factor: {stats.profitFactor.toFixed(2)}</div>
-              <div>Sharpe: {stats.sharpe.toFixed(2)}</div>
-            </div>
-          );
-        })}
+              {lastConfidence}%
+            </span>
+          </div>
+        )}
 
-        <h3 style={{ marginTop: 20 }}>Execution Log</h3>
-        <div style={{ maxHeight: 350, overflowY: "auto" }}>
-          {log.map((x, i) => (
-            <div key={i} style={{ marginBottom: 8 }}>
-              <small>{x.t}</small>
-              <div>{x.m}</div>
-            </div>
-          ))}
+        {/* ===== CONTROLS ===== */}
+        <div style={{ display: "flex", gap: 15, marginBottom: 20 }}>
+          <button
+            onClick={() => setEngineType("scalp")}
+            style={engineType === "scalp" ? activeBtn : btn}
+          >
+            Scalp Engine
+          </button>
+          <button
+            onClick={() => setEngineType("session")}
+            style={engineType === "session" ? activeBtn : btn}
+          >
+            Session Engine
+          </button>
         </div>
+
+        <div style={{ display: "grid", gap: 15, marginBottom: 20 }}>
+          <Input
+            label="Risk %"
+            value={baseRisk}
+            onChange={(v) => setBaseRisk(v)}
+          />
+          <Input
+            label="Leverage"
+            value={leverage}
+            onChange={(v) => setLeverage(v)}
+          />
+        </div>
+
+        <button
+          onClick={executeTrade}
+          disabled={!globalRisk.allowed}
+          style={{
+            background: "#2f80ed",
+            color: "#fff",
+            padding: "12px 20px",
+            border: "none",
+            borderRadius: 8,
+            fontWeight: 600,
+            cursor: "pointer",
+          }}
+        >
+          Execute Trade
+        </button>
+      </section>
+
+      {/* ===== RIGHT PANEL ===== */}
+      <aside
+        style={{
+          flex: 1,
+          background: "#f9fafb",
+          padding: 20,
+          borderRadius: 12,
+          maxHeight: 600,
+          overflowY: "auto",
+        }}
+      >
+        <h3 style={{ marginBottom: 15 }}>Execution Log</h3>
+
+        {log.map((x, i) => (
+          <div
+            key={i}
+            style={{
+              marginBottom: 12,
+              paddingBottom: 10,
+              borderBottom: "1px solid #e5e7eb",
+            }}
+          >
+            <small style={{ color: "#9ca3af" }}>{x.t}</small>
+            <div>{x.m}</div>
+            {x.confidence !== undefined && (
+              <div
+                style={{
+                  fontSize: 12,
+                  color: confidenceColor(x.confidence),
+                }}
+              >
+                Confidence: {x.confidence}%
+              </div>
+            )}
+          </div>
+        ))}
       </aside>
     </div>
   );
 }
+
+/* ===== UI COMPONENTS ===== */
+
+function Stat({ label, value }) {
+  return (
+    <div
+      style={{
+        background: "#f3f4f6",
+        padding: 15,
+        borderRadius: 10,
+      }}
+    >
+      <div style={{ fontSize: 12, color: "#6b7280" }}>{label}</div>
+      <div style={{ fontSize: 18, fontWeight: 600 }}>{value}</div>
+    </div>
+  );
+}
+
+function Input({ label, value, onChange }) {
+  return (
+    <div>
+      <div style={{ fontSize: 13, marginBottom: 5 }}>{label}</div>
+      <input
+        type="number"
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        style={{
+          width: "100%",
+          padding: 8,
+          borderRadius: 6,
+          border: "1px solid #d1d5db",
+        }}
+      />
+    </div>
+  );
+}
+
+const btn = {
+  padding: "10px 16px",
+  borderRadius: 8,
+  border: "1px solid #d1d5db",
+  background: "#fff",
+  cursor: "pointer",
+};
+
+const activeBtn = {
+  ...btn,
+  background: "#2f80ed",
+  color: "#fff",
+  border: "none",
+};
