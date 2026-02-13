@@ -1,5 +1,6 @@
 // CapitalAllocator.js
 // Institutional Capital Allocation + Rotation
+// Stable export-safe version
 
 /* ================= INITIAL ALLOCATION ================= */
 
@@ -32,12 +33,12 @@ export function allocateCapital({
 
 /* ================= TOTAL CAPITAL ================= */
 
-export function calculateTotalCapital(allocation, reserve) {
+export function calculateTotalCapital(allocation = {}, reserve = 0) {
   let total = reserve;
 
   Object.values(allocation).forEach((engine) => {
     Object.values(engine).forEach((amount) => {
-      total += amount;
+      total += Number(amount) || 0;
     });
   });
 
@@ -47,8 +48,8 @@ export function calculateTotalCapital(allocation, reserve) {
 /* ================= FLOOR REBALANCE ================= */
 
 export function rebalanceCapital({
-  allocation,
-  reserve,
+  allocation = {},
+  reserve = 0,
   floor = 100,
   boostAmount = 200,
 }) {
@@ -76,25 +77,25 @@ export function rebalanceCapital({
 /* ================= PERFORMANCE ROTATION ================= */
 
 export function rotateCapitalByPerformance({
-  allocation,
+  allocation = {},
   performanceStats = {},
 }) {
   const updated = JSON.parse(JSON.stringify(allocation));
 
   Object.keys(updated).forEach((engine) => {
     const stats = performanceStats[engine];
+
     if (!stats) return;
 
-    const winRate = stats.total
-      ? stats.wins / stats.total
-      : 0.5;
+    const winRate =
+      stats.total && stats.total > 0
+        ? stats.wins / stats.total
+        : 0.5;
 
-    const multiplier =
-      winRate > 0.6
-        ? 1.1
-        : winRate < 0.4
-        ? 0.9
-        : 1;
+    let multiplier = 1;
+
+    if (winRate > 0.6) multiplier = 1.1;
+    if (winRate < 0.4) multiplier = 0.9;
 
     Object.keys(updated[engine]).forEach((exchange) => {
       updated[engine][exchange] *= multiplier;
