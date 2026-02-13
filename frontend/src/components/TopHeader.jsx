@@ -4,22 +4,33 @@ import { getSavedUser, clearToken, clearUser } from "../lib/api";
 import "../styles/layout.css";
 
 /**
- * Global Top Header
- * - Always visible
- * - Handles logo routing
- * - Handles room switching
- * - No AI branding
+ * Global Top Header (HARDENED)
+ * Safe against:
+ * - Corrupted localStorage
+ * - Missing role
+ * - Undefined user
+ * - Bad route state
  */
 
 export default function TopHeader() {
   const navigate = useNavigate();
   const location = useLocation();
-  const user = getSavedUser();
 
-  if (!user) return null;
+  /* ================= SAFE USER LOAD ================= */
 
-  const role = String(user.role || "").toLowerCase();
-  const path = location.pathname;
+  let user = null;
+
+  try {
+    user = getSavedUser();
+  } catch (e) {
+    console.error("TopHeader user load error:", e);
+    user = null;
+  }
+
+  if (!user || typeof user !== "object") return null;
+
+  const role = String(user?.role || "").toLowerCase();
+  const path = String(location?.pathname || "");
 
   /* ================= ROOM DEFINITIONS ================= */
 
@@ -51,26 +62,38 @@ export default function TopHeader() {
     },
   ];
 
-  const availableRooms = ROOMS.filter((r) => r.roles.includes(role));
+  const availableRooms = ROOMS.filter((r) =>
+    Array.isArray(r.roles) ? r.roles.includes(role) : false
+  );
 
   /* ================= HELPERS ================= */
 
   function getCurrentRoom() {
-    const found = ROOMS.find((r) => path.startsWith(r.path));
+    const found = ROOMS.find((r) =>
+      typeof r.path === "string" ? path.startsWith(r.path) : false
+    );
     return found ? found.label : "Dashboard";
   }
 
   function handleLogoClick() {
-    if (role === "admin") navigate("/admin");
-    else if (role === "company") navigate("/company");
-    else if (role === "small_company") navigate("/small-company");
-    else navigate("/user");
+    try {
+      if (role === "admin") navigate("/admin");
+      else if (role === "company") navigate("/company");
+      else if (role === "small_company") navigate("/small-company");
+      else navigate("/user");
+    } catch (e) {
+      console.error("Logo navigation error:", e);
+    }
   }
 
   function logout() {
-    clearToken();
-    clearUser();
-    navigate("/login");
+    try {
+      clearToken();
+      clearUser();
+      navigate("/login");
+    } catch (e) {
+      console.error("Logout error:", e);
+    }
   }
 
   /* ================= RENDER ================= */
@@ -78,7 +101,6 @@ export default function TopHeader() {
   return (
     <header className="top-header">
       <div className="top-header-left">
-        {/* LOGO */}
         <button className="logo-btn" onClick={handleLogoClick}>
           <span className="logo-mark">A</span>
           <span className="logo-text">AutoShield</span>
@@ -88,7 +110,6 @@ export default function TopHeader() {
       </div>
 
       <div className="top-header-right">
-        {/* ROOM SWITCHER */}
         {availableRooms.length > 1 && (
           <select
             className="room-switcher"
@@ -97,7 +118,13 @@ export default function TopHeader() {
               const room = availableRooms.find(
                 (r) => r.label === e.target.value
               );
-              if (room) navigate(room.path);
+              if (room) {
+                try {
+                  navigate(room.path);
+                } catch (err) {
+                  console.error("Room switch error:", err);
+                }
+              }
             }}
           >
             {availableRooms.map((r) => (
@@ -108,8 +135,9 @@ export default function TopHeader() {
           </select>
         )}
 
-        {/* USER */}
-        <span className="user-role">{user.role}</span>
+        <span className="user-role">
+          {String(user?.role || "User")}
+        </span>
 
         <button className="btn logout-btn" onClick={logout}>
           Log out
