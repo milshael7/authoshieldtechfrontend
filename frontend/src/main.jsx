@@ -1,4 +1,5 @@
 // frontend/src/main.jsx
+
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App.jsx";
@@ -9,14 +10,24 @@ import "./styles/main.css";
 import "./styles/layout.css";
 
 /* =========================================================
-   ENVIRONMENT DETECTION
-   ========================================================= */
+   GLOBAL ERROR LISTENERS (RUNTIME DETECTION)
+========================================================= */
 
-const isDev = import.meta.env.DEV;
+window.addEventListener("error", (e) => {
+  const message = e?.error?.message || e?.message || "Unknown error";
+  alert("JS ERROR: " + message);
+  console.error("Global Error:", e);
+});
+
+window.addEventListener("unhandledrejection", (e) => {
+  const message = e?.reason?.message || e?.reason || "Unknown promise error";
+  alert("PROMISE ERROR: " + message);
+  console.error("Unhandled Promise Rejection:", e);
+});
 
 /* =========================================================
-   ROOT ERROR BOUNDARY — DEBUG ENABLED
-   ========================================================= */
+   ROOT ERROR BOUNDARY
+========================================================= */
 
 class RootErrorBoundary extends React.Component {
   constructor(props) {
@@ -29,7 +40,7 @@ class RootErrorBoundary extends React.Component {
   }
 
   componentDidCatch(error, info) {
-    console.error("🔥 Bootstrap Error:", error, info);
+    console.error("🔥 React Crash:", error, info);
   }
 
   render() {
@@ -48,7 +59,7 @@ class RootErrorBoundary extends React.Component {
               "system-ui,-apple-system,Segoe UI,Roboto,Arial",
           }}
         >
-          <div style={{ maxWidth: 600 }}>
+          <div style={{ maxWidth: 540 }}>
             <h1 style={{ marginBottom: 14 }}>
               AutoShield Platform Error
             </h1>
@@ -57,15 +68,11 @@ class RootErrorBoundary extends React.Component {
               A runtime error occurred. Details below:
             </p>
 
-            {/* 🔥 SHOW ERROR IN PRODUCTION TOO */}
             <pre
               style={{
                 whiteSpace: "pre-wrap",
                 fontSize: 12,
-                background: "#111827",
-                padding: 16,
-                borderRadius: 8,
-                overflowX: "auto",
+                opacity: 0.8,
               }}
             >
               {String(this.state.error)}
@@ -81,7 +88,7 @@ class RootErrorBoundary extends React.Component {
 
 /* =========================================================
    BOOTSTRAP
-   ========================================================= */
+========================================================= */
 
 const rootEl = document.getElementById("root");
 
