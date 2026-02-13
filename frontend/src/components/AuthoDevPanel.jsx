@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
 import { readAloud } from "./ReadAloud";
-import { getSavedUser } from "../lib/api";
 
 /* ================= SAFE HELPERS ================= */
 
@@ -24,8 +23,16 @@ function getRoomId() {
   return path || "root";
 }
 
+function getSavedUserLocal() {
+  try {
+    return JSON.parse(localStorage.getItem("as_user") || "null");
+  } catch {
+    return null;
+  }
+}
+
 function getStorageKey() {
-  const user = getSavedUser();
+  const user = getSavedUserLocal();
   const tenantId = user?.companyId || user?.company || "unknown";
   const roomId = getRoomId();
   return `authodev.panel.${tenantId}.${roomId}`;
@@ -56,15 +63,13 @@ export default function AuthoDevPanel({
   endpoint = "/api/ai/chat",
   getContext,
 }) {
-  const user = getSavedUser();
+  const user = getSavedUserLocal();
   const storageKey = getStorageKey();
 
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const bottomRef = useRef(null);
-
-  /* ================= SAFE LOAD ================= */
 
   useEffect(() => {
     try {
@@ -78,13 +83,9 @@ export default function AuthoDevPanel({
     }
   }, [storageKey]);
 
-  /* ================= SAFE SAVE ================= */
-
   useEffect(() => {
     safeLocalSet(storageKey, JSON.stringify({ messages }));
   }, [messages, storageKey]);
-
-  /* ================= SEND ================= */
 
   async function sendMessage() {
     if (!input.trim() || loading) return;
@@ -148,8 +149,6 @@ export default function AuthoDevPanel({
       );
     }
   }
-
-  /* ================= UI ================= */
 
   return (
     <div className="authodev-panel">
