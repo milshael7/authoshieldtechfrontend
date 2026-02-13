@@ -2,21 +2,28 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, setToken, saveUser } from "../lib/api.js";
 
-/* =========================================================
-   TOKEN EXTRACTION (RESILIENT)
-========================================================= */
-
 function extractToken(result) {
   if (!result) return "";
 
-  return (
-    result.token ||
-    result.jwt ||
-    result.access_token ||
-    result.accessToken ||
-    result?.data?.token ||
-    ""
-  );
+  // Support nested responses
+  if (result.token) return result.token;
+  if (result.jwt) return result.jwt;
+  if (result.access_token) return result.access_token;
+  if (result.accessToken) return result.accessToken;
+
+  if (result.data?.token) return result.data.token;
+  if (result.data?.accessToken) return result.data.accessToken;
+
+  return "";
+}
+
+function extractUser(result) {
+  if (!result) return null;
+
+  if (result.user) return result.user;
+  if (result.data?.user) return result.data.user;
+
+  return null;
 }
 
 export default function Login() {
@@ -29,10 +36,6 @@ export default function Login() {
   const [resetPass, setResetPass] = useState("");
   const [loading, setLoading] = useState(false);
 
-  /* =========================================================
-     LOGIN SUBMIT
-  ========================================================= */
-
   const submit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -40,26 +43,22 @@ export default function Login() {
     try {
       const result = await api.login(email, password);
 
-      console.log("Login response:", result);
+      console.log("LOGIN RESPONSE:", result);
 
       const token = extractToken(result);
+      const user = extractUser(result);
 
-      // ✅ If token exists → store it
-      if (token) {
-        setToken(token);
-      }
-
-      // ✅ If user exists → store it
-      if (result?.user) {
-        saveUser(result.user);
-      }
-
-      // 🚨 If neither token nor user returned
-      if (!token && !result?.user) {
+      if (!token) {
         throw new Error("Invalid login response from server");
       }
 
-      const role = String(result?.user?.role || "").toLowerCase();
+      setToken(token);
+
+      if (user) {
+        saveUser(user);
+      }
+
+      const role = String(user?.role || "").toLowerCase();
 
       if (role === "admin") navigate("/admin");
       else if (role === "manager") navigate("/manager");
@@ -73,10 +72,6 @@ export default function Login() {
     }
   };
 
-  /* =========================================================
-     RESET PASSWORD
-  ========================================================= */
-
   const reset = async (e) => {
     e.preventDefault();
     try {
@@ -87,10 +82,6 @@ export default function Login() {
       alert(err?.message || "Reset failed");
     }
   };
-
-  /* =========================================================
-     UI
-  ========================================================= */
 
   return (
     <div
@@ -179,16 +170,6 @@ export default function Login() {
               </small>
             </form>
           )}
-        </div>
-      </div>
-
-      <div className="col" style={{ maxWidth: 420 }}>
-        <div className="card">
-          <h3 style={{ marginTop: 0 }}>Trial ($19.99 / 30 days)</h3>
-          <small>
-            Text-only experience with Read Aloud. AutoProtect add-on is separate.
-            No public AI branding.
-          </small>
         </div>
       </div>
     </div>
