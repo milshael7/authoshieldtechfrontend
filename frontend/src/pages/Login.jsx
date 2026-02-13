@@ -1,44 +1,164 @@
-const submit = async (e) => {
-  e.preventDefault();
-  setLoading(true);
+// frontend/src/pages/Login.jsx
 
-  try {
-    const result = await api.login(email, password);
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { api, setToken, saveUser } from "../lib/api.js";
 
-    console.log("LOGIN RESPONSE:", result);
+export default function Login() {
+  const navigate = useNavigate();
 
-    // 🔎 Try multiple possible shapes
-    const token =
-      result?.token ||
-      result?.jwt ||
-      result?.access_token ||
-      result?.accessToken ||
-      result?.data?.token ||
-      result?.data?.access_token ||
-      "";
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [mode, setMode] = useState("login");
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetPass, setResetPass] = useState("");
+  const [loading, setLoading] = useState(false);
 
-    const user =
-      result?.user ||
-      result?.data?.user ||
-      null;
+  const submit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
 
-    if (!token) {
-      throw new Error("Invalid login response from server");
+    try {
+      const result = await api.login(email, password);
+
+      console.log("LOGIN RESPONSE:", result);
+
+      // Flexible token detection
+      const token =
+        result?.token ||
+        result?.jwt ||
+        result?.access_token ||
+        result?.accessToken ||
+        result?.data?.token ||
+        result?.data?.access_token ||
+        "";
+
+      const user =
+        result?.user ||
+        result?.data?.user ||
+        null;
+
+      if (!token) {
+        throw new Error("Invalid login response from server");
+      }
+
+      setToken(token);
+      if (user) saveUser(user);
+
+      const role = String(user?.role || "").toLowerCase();
+
+      if (role === "admin") navigate("/admin");
+      else if (role === "manager") navigate("/manager");
+      else if (role === "company") navigate("/company");
+      else navigate("/user");
+
+    } catch (err) {
+      alert(err?.message || "Login failed");
+    } finally {
+      setLoading(false);
     }
+  };
 
-    setToken(token);
-    if (user) saveUser(user);
+  const reset = async (e) => {
+    e.preventDefault();
+    try {
+      await api.resetPassword(resetEmail, resetPass);
+      alert("Password updated. Now sign in.");
+      setMode("login");
+    } catch (err) {
+      alert(err?.message || "Reset failed");
+    }
+  };
 
-    const role = String(user?.role || "").toLowerCase();
+  return (
+    <div
+      className="row"
+      style={{
+        minHeight: "100svh",
+        alignItems: "center",
+      }}
+    >
+      <div className="col" style={{ maxWidth: 420, margin: "0 auto" }}>
+        <div className="card">
+          <h2 style={{ marginTop: 0 }}>
+            {mode === "login" ? "Sign in" : "Reset password"}
+          </h2>
 
-    if (role === "admin") navigate("/admin");
-    else if (role === "manager") navigate("/manager");
-    else if (role === "company") navigate("/company");
-    else navigate("/user");
+          {mode === "login" ? (
+            <form onSubmit={submit}>
+              <input
+                placeholder="Email"
+                value={email}
+                autoComplete="email"
+                onChange={(e) => setEmail(e.target.value)}
+              />
+              <div style={{ height: 12 }} />
 
-  } catch (err) {
-    alert(err?.message || "Login failed");
-  } finally {
-    setLoading(false);
-  }
-};
+              <input
+                type="password"
+                placeholder="Password"
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+              <div style={{ height: 16 }} />
+
+              <button type="submit" disabled={loading}>
+                {loading ? "Signing in…" : "Sign in"}
+              </button>
+
+              <div style={{ height: 14 }} />
+
+              <small>
+                <a
+                  href="#"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setMode("reset");
+                  }}
+                >
+                  Reset password
+                </a>
+              </small>
+            </form>
+          ) : (
+            <form onSubmit={reset}>
+              <input
+                placeholder="Email"
+                value={resetEmail}
+                autoComplete="email"
+                onChange={(e) => setResetEmail(e.target.value)}
+              />
+              <div style={{ height: 12 }} />
+
+              <input
+                type="password"
+                placeholder="New password"
+                autoComplete="new-password"
+                value={resetPass}
+                onChange={(e) => setResetPass(e.target.value)}
+              />
+              <div style={{ height: 16 }} />
+
+              <button type="submit">Set new password</button>
+
+              <div style={{ height: 14 }} />
+
+              <small>
+                <a
+                  href="#"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setMode("login");
+                  }}
+                >
+                  Back
+                </a>
+              </small>
+            </form>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
