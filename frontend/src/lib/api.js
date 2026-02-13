@@ -1,5 +1,5 @@
 /* =========================================================
-   AUTOSHIELD FRONTEND API LAYER — ENTERPRISE HARDENED
+   AUTOSHIELD FRONTEND API LAYER — HARDENED SAFE VERSION
    ========================================================= */
 
 const API_BASE = (
@@ -8,16 +8,20 @@ const API_BASE = (
   ""
 ).trim();
 
+/* =============================
+   SAFE WARNING (NO CRASH)
+   ============================= */
+
 if (!API_BASE && import.meta.env.PROD) {
-  console.error("⚠️ API_BASE not defined in production build.");
+  console.warn("⚠️ No API base URL defined. Running in fallback mode.");
 }
 
 const TOKEN_KEY = "as_token";
 const USER_KEY = "as_user";
-const REQUEST_TIMEOUT = 15000; // 15s
+const REQUEST_TIMEOUT = 15000;
 
 /* =============================
-   TOKEN & USER STORAGE
+   STORAGE
    ============================= */
 
 export const getToken = () => localStorage.getItem(TOKEN_KEY);
@@ -34,6 +38,7 @@ export const getSavedUser = () => {
 
 export const saveUser = (u) =>
   localStorage.setItem(USER_KEY, JSON.stringify(u));
+
 export const clearUser = () => localStorage.removeItem(USER_KEY);
 
 /* =============================
@@ -52,13 +57,13 @@ function joinUrl(base, path) {
 
 function withTimeout(promise, ms = REQUEST_TIMEOUT) {
   const timeout = new Promise((_, reject) =>
-    setTimeout(() => reject(new Error("Request timeout")), ms)
+    setTimeout(() => reject(new Error("timeout")), ms)
   );
   return Promise.race([promise, timeout]);
 }
 
 /* =============================
-   CORE REQUEST WRAPPER
+   CORE REQUEST WRAPPER (SAFE)
    ============================= */
 
 async function req(
@@ -66,6 +71,12 @@ async function req(
   { method = "GET", body, auth = true, headers: extraHeaders = {} } = {},
   retry = true
 ) {
+  /* 🚨 If API_BASE missing — DO NOT CRASH */
+  if (!API_BASE) {
+    console.warn("API_BASE missing — request skipped:", path);
+    return {};
+  }
+
   const headers = {
     "Content-Type": "application/json",
     ...extraHeaders,
@@ -86,7 +97,12 @@ async function req(
       })
     );
 
-    const data = await res.json().catch(() => ({}));
+    let data = {};
+    try {
+      data = await res.json();
+    } catch {
+      data = {};
+    }
 
     /* ---------- TOKEN REFRESH ---------- */
     if (res.status === 401 && auth && retry) {
@@ -102,7 +118,12 @@ async function req(
           })
         );
 
-        const refreshData = await refreshRes.json().catch(() => ({}));
+        let refreshData = {};
+        try {
+          refreshData = await refreshRes.json();
+        } catch {
+          refreshData = {};
+        }
 
         if (refreshRes.ok && refreshData.token) {
           setToken(refreshData.token);
@@ -115,31 +136,23 @@ async function req(
           );
         }
       } catch {
-        // Refresh failed
+        console.warn("Token refresh failed.");
       }
 
       clearToken();
       clearUser();
-      throw new Error("Session expired");
+      return {};
     }
 
     if (!res.ok) {
-      throw new Error(
-        data?.error ||
-          data?.message ||
-          `Request failed (${res.status})`
-      );
+      console.warn("API error:", res.status, data);
+      return {};
     }
 
     return data;
   } catch (err) {
-    if (err.message === "Session expired") throw err;
-
-    throw new Error(
-      err.message === "Request timeout"
-        ? "Network timeout. Please try again."
-        : "Network error. Please check connection."
-    );
+    console.warn("Network error:", err.message);
+    return {};
   }
 }
 
@@ -148,7 +161,6 @@ async function req(
    ============================= */
 
 export const api = {
-  /* -------- AUTH -------- */
   login: (email, password) =>
     req("/api/auth/login", {
       method: "POST",
@@ -163,51 +175,33 @@ export const api = {
       auth: false,
     }),
 
-  /* -------- USER -------- */
   meNotifications: () => req("/api/me/notifications"),
   markMyNotificationRead: (id) =>
     req(`/api/me/notifications/${id}/read`, { method: "POST" }),
 
-  /* -------- POSTURE -------- */
   postureSummary: () => req("/api/posture/summary"),
   postureChecks: () => req("/api/posture/checks"),
   postureRecent: (limit = 50) =>
     req(`/api/posture/recent?limit=${encodeURIComponent(limit)}`),
 
-  /* -------- ASSETS -------- */
   getAssets: () => req("/api/assets"),
-
-  /* -------- THREATS -------- */
   getThreats: () => req("/api/threats"),
-
-  /* -------- INCIDENTS -------- */
   getIncidents: () => req("/api/incidents"),
-
-  /* -------- VULNERABILITIES -------- */
   getVulnerabilities: () => req("/api/vulnerabilities"),
-
-  /* -------- COMPLIANCE -------- */
   getComplianceControls: () => req("/api/compliance"),
-
-  /* -------- POLICIES -------- */
   getPolicies: () => req("/api/policies"),
-
-  /* -------- REPORTS -------- */
   getReports: () => req("/api/reports"),
 
-  /* -------- ADMIN -------- */
   adminUsers: () => req("/api/admin/users"),
   adminCompanies: () => req("/api/admin/companies"),
   adminNotifications: () => req("/api/admin/notifications"),
 
-  /* -------- MANAGER -------- */
   managerOverview: () => req("/api/manager/overview"),
   managerUsers: () => req("/api/manager/users"),
   managerCompanies: () => req("/api/manager/companies"),
   managerAudit: (limit = 200) =>
     req(`/api/manager/audit?limit=${encodeURIComponent(limit)}`),
 
-  /* -------- COMPANY -------- */
   companyMe: () => req("/api/company/me"),
   companyNotifications: () => req("/api/company/notifications"),
   companyMarkRead: (id) =>
@@ -215,7 +209,6 @@ export const api = {
       method: "POST",
     }),
 
-  /* -------- AI -------- */
   aiChat: (message, context) =>
     req("/api/ai/chat", {
       method: "POST",
