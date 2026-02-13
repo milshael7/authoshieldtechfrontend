@@ -1,7 +1,9 @@
 // CapitalAllocator.js
 // Institutional Capital Allocation + Rotation
 
-/* ================= INITIAL ALLOCATION ================= */
+/* =========================================================
+   INITIAL ALLOCATION
+========================================================= */
 
 export function allocateCapital({
   totalCapital,
@@ -30,7 +32,9 @@ export function allocateCapital({
   };
 }
 
-/* ================= TOTAL ================= */
+/* =========================================================
+   TOTAL CAPITAL
+========================================================= */
 
 export function calculateTotalCapital(allocation, reserve) {
   let total = reserve;
@@ -44,7 +48,9 @@ export function calculateTotalCapital(allocation, reserve) {
   return total;
 }
 
-/* ================= FLOOR REBALANCE ================= */
+/* =========================================================
+   FLOOR REBALANCE
+========================================================= */
 
 export function rebalanceCapital({
   allocation,
@@ -57,7 +63,10 @@ export function rebalanceCapital({
 
   Object.keys(updated).forEach((engine) => {
     Object.keys(updated[engine]).forEach((exchange) => {
-      if (updated[engine][exchange] < floor && updatedReserve > boostAmount) {
+      if (
+        updated[engine][exchange] < floor &&
+        updatedReserve >= boostAmount
+      ) {
         updated[engine][exchange] += boostAmount;
         updatedReserve -= boostAmount;
       }
@@ -70,56 +79,55 @@ export function rebalanceCapital({
   };
 }
 
-/* ================= PERFORMANCE ROTATION ================= */
-/* THIS WAS MISSING — THIS CAUSED BUILD FAILURE */
+/* =========================================================
+   PERFORMANCE ROTATION (NEW)
+   Moves small % toward better performing engines
+========================================================= */
 
 export function rotateCapitalByPerformance({
   allocation,
-  performanceStats = {},
-  boostPct = 0.1,
+  performanceStats,
+  rotationPct = 0.05, // 5% shift
 }) {
   const updated = JSON.parse(JSON.stringify(allocation));
 
-  Object.keys(updated).forEach((engine) => {
-    const stats = performanceStats[engine];
+  const engines = Object.keys(updated);
 
-    if (!stats || !stats.trades || stats.trades.length === 0) return;
+  if (!engines.length) return allocation;
 
-    const wins = stats.trades.filter(t => t.isWin).length;
-    const winRate = wins / stats.trades.length;
+  // Calculate simple score per engine
+  const scores = {};
 
-    Object.keys(updated[engine]).forEach((exchange) => {
-      if (winRate > 0.6) {
-        updated[engine][exchange] *= (1 + boostPct);
-      } else if (winRate < 0.4) {
-        updated[engine][exchange] *= (1 - boostPct);
-      }
-    });
+  engines.forEach((engine) => {
+    const stats = performanceStats?.[engine];
+    if (!stats || !stats.total) {
+      scores[engine] = 0;
+      return;
+    }
+
+    const winRate =
+      stats.total > 0 ? stats.wins / stats.total : 0;
+
+    scores[engine] = winRate;
+  });
+
+  const bestEngine = engines.reduce((a, b) =>
+    scores[a] > scores[b] ? a : b
+  );
+
+  const worstEngine = engines.reduce((a, b) =>
+    scores[a] < scores[b] ? a : b
+  );
+
+  if (bestEngine === worstEngine) return allocation;
+
+  Object.keys(updated[worstEngine]).forEach((exchange) => {
+    const amount = updated[worstEngine][exchange];
+    const shift = amount * rotationPct;
+
+    updated[worstEngine][exchange] -= shift;
+    updated[bestEngine][exchange] += shift;
   });
 
   return updated;
-}
-
-/* ================= ROUTE TO BEST EXCHANGE ================= */
-
-export function routeToBestExchange({
-  allocation,
-  engineType,
-  exchangePerformance,
-}) {
-  const engineAlloc = allocation[engineType];
-
-  let bestExchange = null;
-  let bestScore = -Infinity;
-
-  Object.keys(engineAlloc).forEach((exchange) => {
-    const perf = exchangePerformance?.[exchange] || 0;
-
-    if (perf > bestScore) {
-      bestScore = perf;
-      bestExchange = exchange;
-    }
-  });
-
-  return bestExchange;
 }
