@@ -1,26 +1,39 @@
 // frontend/src/shell/AppShell.jsx
-// AutoShield Tech — Application Shell (FINAL HARDENED)
-//
-// PURPOSE:
-// - Global background mounting
-// - Global top header mounting
-// - Brand watermark layer
-// - Single visual wrapper for entire platform
-// - Z-index & render safety boundary
-//
-// HARD RULES (ENFORCED):
-// - NO routing
-// - NO layouts
-// - NO business logic
-// - NO state
-//
-// This file is INFRASTRUCTURE. Keep it stable.
+// AutoShield Tech — Application Shell (CRASH SAFE HARDENED)
 
 import React from "react";
 import BackgroundLayer from "../components/BackgroundLayer.jsx";
 import BrandMark from "../components/BrandMark.jsx";
 import TopHeader from "../components/TopHeader.jsx";
 import "../styles/background.css";
+
+/* =========================================================
+   SAFE WRAPPER (prevents visual layers from crashing app)
+========================================================= */
+
+class SafeRender extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { failed: false };
+  }
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  componentDidCatch(error) {
+    console.error("Shell Layer Crash:", error);
+  }
+
+  render() {
+    if (this.state.failed) return null;
+    return this.props.children;
+  }
+}
+
+/* =========================================================
+   APP SHELL
+========================================================= */
 
 export default function AppShell({ children }) {
   return (
@@ -30,13 +43,13 @@ export default function AppShell({ children }) {
         position: "relative",
         minHeight: "100svh",
         width: "100%",
-        backgroundColor: "#0B0E14", // hard fallback
-        isolation: "isolate",       // z-index safety (Safari fix)
+        backgroundColor: "#0B0E14",
+        isolation: "isolate",
         display: "flex",
         flexDirection: "column",
       }}
     >
-      {/* ===== BACKGROUND LAYER (VISUAL ONLY) ===== */}
+      {/* ===== BACKGROUND LAYER ===== */}
       <div
         aria-hidden="true"
         style={{
@@ -46,10 +59,12 @@ export default function AppShell({ children }) {
           pointerEvents: "none",
         }}
       >
-        <BackgroundLayer />
+        <SafeRender>
+          <BackgroundLayer />
+        </SafeRender>
       </div>
 
-      {/* ===== BRAND WATERMARK (VISUAL ONLY) ===== */}
+      {/* ===== BRAND WATERMARK ===== */}
       <div
         aria-hidden="true"
         style={{
@@ -59,7 +74,9 @@ export default function AppShell({ children }) {
           pointerEvents: "none",
         }}
       >
-        <BrandMark />
+        <SafeRender>
+          <BrandMark />
+        </SafeRender>
       </div>
 
       {/* ===== GLOBAL TOP HEADER ===== */}
@@ -71,7 +88,9 @@ export default function AppShell({ children }) {
           width: "100%",
         }}
       >
-        <TopHeader />
+        <SafeRender>
+          <TopHeader />
+        </SafeRender>
       </div>
 
       {/* ===== APPLICATION UI ===== */}
@@ -82,7 +101,7 @@ export default function AppShell({ children }) {
           zIndex: 10,
           flex: 1,
           width: "100%",
-          overflow: "auto", // ✅ FIXES: cannot scroll / cannot type
+          overflow: "auto",
         }}
       >
         {children}
