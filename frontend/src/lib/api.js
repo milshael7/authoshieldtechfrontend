@@ -1,15 +1,11 @@
 /* =========================================================
-   AUTOSHIELD FRONTEND API LAYER — FIXED EXPORT VERSION
+   AUTOSHIELD FRONTEND API LAYER — CLEAN PRODUCTION VERSION
    ========================================================= */
 
-const API_BASE = (
-  import.meta.env.VITE_API_BASE ||
-  import.meta.env.VITE_BACKEND_URL ||
-  ""
-).trim();
+const API_BASE = import.meta.env.VITE_API_BASE?.trim();
 
-if (!API_BASE && import.meta.env.PROD) {
-  console.error("❌ API_BASE not defined in production.");
+if (!API_BASE) {
+  console.error("❌ VITE_API_BASE is missing");
 }
 
 const TOKEN_KEY = "as_token";
@@ -53,11 +49,12 @@ export function clearUser() {
    ============================= */
 
 function joinUrl(base, path) {
-  const b = String(base || "").replace(/\/+$/, "");
-  const p = String(path || "").startsWith("/")
+  const cleanBase = String(base || "").replace(/\/+$/, "");
+  const cleanPath = String(path || "").startsWith("/")
     ? path
     : `/${path}`;
-  return b ? `${b}${p}` : p;
+
+  return `${cleanBase}${cleanPath}`;
 }
 
 /* =============================
@@ -111,6 +108,7 @@ async function req(
       data = {};
     }
 
+    /* ---------- TOKEN REFRESH ---------- */
     if (res.status === 401 && auth && retry) {
       try {
         const refreshRes = await withTimeout(
@@ -154,7 +152,6 @@ async function req(
     }
 
     return data;
-
   } catch (err) {
     if (err.message === "Session expired") throw err;
 
