@@ -1,9 +1,7 @@
 // CapitalAllocator.js
 // Institutional Capital Allocation + Rotation
 
-/* =========================================================
-   INITIAL ALLOCATION
-========================================================= */
+/* ================= INITIAL ALLOCATION ================= */
 
 export function allocateCapital({
   totalCapital,
@@ -32,9 +30,7 @@ export function allocateCapital({
   };
 }
 
-/* =========================================================
-   TOTAL CAPITAL
-========================================================= */
+/* ================= TOTAL CAPITAL ================= */
 
 export function calculateTotalCapital(allocation, reserve) {
   let total = reserve;
@@ -48,9 +44,7 @@ export function calculateTotalCapital(allocation, reserve) {
   return total;
 }
 
-/* =========================================================
-   FLOOR REBALANCE
-========================================================= */
+/* ================= FLOOR REBALANCE ================= */
 
 export function rebalanceCapital({
   allocation,
@@ -79,54 +73,32 @@ export function rebalanceCapital({
   };
 }
 
-/* =========================================================
-   PERFORMANCE ROTATION (NEW)
-   Moves small % toward better performing engines
-========================================================= */
+/* ================= PERFORMANCE ROTATION ================= */
 
 export function rotateCapitalByPerformance({
   allocation,
-  performanceStats,
-  rotationPct = 0.05, // 5% shift
+  performanceStats = {},
 }) {
   const updated = JSON.parse(JSON.stringify(allocation));
 
-  const engines = Object.keys(updated);
+  Object.keys(updated).forEach((engine) => {
+    const stats = performanceStats[engine];
+    if (!stats) return;
 
-  if (!engines.length) return allocation;
+    const winRate = stats.total
+      ? stats.wins / stats.total
+      : 0.5;
 
-  // Calculate simple score per engine
-  const scores = {};
+    const multiplier =
+      winRate > 0.6
+        ? 1.1
+        : winRate < 0.4
+        ? 0.9
+        : 1;
 
-  engines.forEach((engine) => {
-    const stats = performanceStats?.[engine];
-    if (!stats || !stats.total) {
-      scores[engine] = 0;
-      return;
-    }
-
-    const winRate =
-      stats.total > 0 ? stats.wins / stats.total : 0;
-
-    scores[engine] = winRate;
-  });
-
-  const bestEngine = engines.reduce((a, b) =>
-    scores[a] > scores[b] ? a : b
-  );
-
-  const worstEngine = engines.reduce((a, b) =>
-    scores[a] < scores[b] ? a : b
-  );
-
-  if (bestEngine === worstEngine) return allocation;
-
-  Object.keys(updated[worstEngine]).forEach((exchange) => {
-    const amount = updated[worstEngine][exchange];
-    const shift = amount * rotationPct;
-
-    updated[worstEngine][exchange] -= shift;
-    updated[bestEngine][exchange] += shift;
+    Object.keys(updated[engine]).forEach((exchange) => {
+      updated[engine][exchange] *= multiplier;
+    });
   });
 
   return updated;
