@@ -13,10 +13,9 @@ import "./styles/layout.css";
    ========================================================= */
 
 const isDev = import.meta.env.DEV;
-const isProd = import.meta.env.PROD;
 
 /* =========================================================
-   ROOT ERROR BOUNDARY — DEPLOY SAFE
+   ROOT ERROR BOUNDARY — DEBUG ENABLED
    ========================================================= */
 
 class RootErrorBoundary extends React.Component {
@@ -30,12 +29,7 @@ class RootErrorBoundary extends React.Component {
   }
 
   componentDidCatch(error, info) {
-    if (isDev) {
-      console.error("🔥 Bootstrap Error:", error, info);
-    }
-
-    // 🔮 Future: send to monitoring service
-    // sendToMonitoring(error, info);
+    console.error("🔥 Bootstrap Error:", error, info);
   }
 
   render() {
@@ -54,27 +48,28 @@ class RootErrorBoundary extends React.Component {
               "system-ui,-apple-system,Segoe UI,Roboto,Arial",
           }}
         >
-          <div style={{ maxWidth: 540 }}>
+          <div style={{ maxWidth: 600 }}>
             <h1 style={{ marginBottom: 14 }}>
               AutoShield Platform Error
             </h1>
 
             <p style={{ opacity: 0.8, marginBottom: 18 }}>
-              The application encountered an unexpected client-side error.
-              Please refresh the page or contact support.
+              A runtime error occurred. Details below:
             </p>
 
-            {isDev && (
-              <pre
-                style={{
-                  whiteSpace: "pre-wrap",
-                  fontSize: 12,
-                  opacity: 0.7,
-                }}
-              >
-                {String(this.state.error)}
-              </pre>
-            )}
+            {/* 🔥 SHOW ERROR IN PRODUCTION TOO */}
+            <pre
+              style={{
+                whiteSpace: "pre-wrap",
+                fontSize: 12,
+                background: "#111827",
+                padding: 16,
+                borderRadius: 8,
+                overflowX: "auto",
+              }}
+            >
+              {String(this.state.error)}
+            </pre>
           </div>
         </div>
       );
