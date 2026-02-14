@@ -32,6 +32,37 @@
   backdrop-filter: blur(10px);
 }
 
+/* =========================================================
+   🔥 SIDEBAR NAV FIX (CRITICAL)
+   Fixes horizontal link collapse
+   ========================================================= */
+
+.layout-nav{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+
+.layout-nav a{
+  display:block;
+  padding:10px 14px;
+  border-radius:8px;
+  text-decoration:none;
+  font-weight:500;
+  color:#cfd8ff;
+  transition:all .18s ease;
+}
+
+.layout-nav a:hover{
+  background:rgba(255,255,255,.06);
+}
+
+.layout-nav a.active{
+  background:rgba(120,160,255,.18);
+  color:#ffffff;
+  font-weight:600;
+}
+
 /* =============================
    MAIN COLUMN
    ============================= */
@@ -45,7 +76,7 @@
 }
 
 /* =============================
-   TOPBAR
+   TOPBAR (Reserved / Future)
    ============================= */
 .layout-topbar{
   position:sticky;
@@ -110,11 +141,11 @@
   cursor:pointer;
 }
 
-/* 🔥 FIX IS HERE */
+/* Advisor scroll fix */
 .ai-drawer-body{
   height:min(70vh,520px);
   padding:12px;
-  overflow-y:auto;     /* ✅ ENABLE SCROLL */
+  overflow-y:auto;
   overflow-x:hidden;
   overscroll-behavior:contain;
 }
@@ -178,6 +209,7 @@
   min-height:100svh;
   overflow-x:hidden;
 }
+
 /* ================= COMMAND MODE ================= */
 
 .layout-command .layout-sidebar {
