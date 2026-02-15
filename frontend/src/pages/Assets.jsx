@@ -1,30 +1,29 @@
-// frontend/src/pages/Assets.jsx
-// SOC Assets & Inventory — SOC BASELINE (UPGRADED)
-// Supports Admin / Manager / Company / Small Company / Individual
-// SAFE:
-// - Full file replacement
-// - No AI wording
-// - No business logic
-// - AutoDev 6.5–ready (passive hooks only)
-
 import React, { useEffect, useMemo, useState } from "react";
-import { api } from "../lib/api";
+import { api } from "../lib/api.js";
 
 /* ================= HELPERS ================= */
 
-function typeIcon(type) {
-  if (type === "endpoint") return "💻";
-  if (type === "user") return "👤";
-  if (type === "cloud") return "☁️";
-  if (type === "server") return "🖥️";
-  if (type === "network") return "🌐";
-  return "📦";
+function safeArray(v) {
+  return Array.isArray(v) ? v : [];
 }
 
-function riskDot(risk) {
-  if (risk === "high") return "bad";
-  if (risk === "medium") return "warn";
-  return "ok";
+function safeStr(v, fallback = "—") {
+  return typeof v === "string" && v.trim() ? v : fallback;
+}
+
+function riskColor(level) {
+  switch (String(level).toLowerCase()) {
+    case "critical":
+      return "#ff4d4d";
+    case "high":
+      return "#ff884d";
+    case "medium":
+      return "#ffd166";
+    case "low":
+      return "#2bd576";
+    default:
+      return "#999";
+  }
 }
 
 /* ================= PAGE ================= */
@@ -32,56 +31,17 @@ function riskDot(risk) {
 export default function Assets() {
   const [assets, setAssets] = useState([]);
   const [loading, setLoading] = useState(true);
-
-  const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
-  const [expanded, setExpanded] = useState(null);
+  const [sortKey, setSortKey] = useState("risk");
+  const [sortDir, setSortDir] = useState("desc");
 
   async function load() {
     setLoading(true);
     try {
-      // Placeholder until backend is wired
-      const data = await api.getAssets?.();
-      setAssets(
-        data?.assets || [
-          {
-            id: 1,
-            name: "John Smith",
-            type: "user",
-            risk: "medium",
-            status: "Active",
-            exposure: "internal",
-            ownerType: "individual",
-          },
-          {
-            id: 2,
-            name: "Workstation-023",
-            type: "endpoint",
-            risk: "high",
-            status: "Online",
-            exposure: "internal",
-            ownerType: "company",
-          },
-          {
-            id: 3,
-            name: "AWS S3 Bucket",
-            type: "cloud",
-            risk: "low",
-            status: "Monitored",
-            exposure: "external",
-            ownerType: "small-company",
-          },
-          {
-            id: 4,
-            name: "Production Server",
-            type: "server",
-            risk: "medium",
-            status: "Online",
-            exposure: "external",
-            ownerType: "company",
-          },
-        ]
-      );
+      const res = await api.assets().catch(() => ({}));
+      setAssets(safeArray(res?.assets));
+    } catch {
+      setAssets([]);
     } finally {
       setLoading(false);
     }
@@ -91,227 +51,211 @@ export default function Assets() {
     load();
   }, []);
 
-  /* ================= DERIVED ================= */
+  /* ================= FILTER + SORT ================= */
 
   const filtered = useMemo(() => {
-    return assets.filter((a) => {
-      if (filter !== "all" && a.risk !== filter) return false;
-      if (
-        search &&
-        !a.name.toLowerCase().includes(search.toLowerCase())
-      )
-        return false;
-      return true;
-    });
-  }, [assets, filter, search]);
+    let list = safeArray(assets);
 
-  const stats = useMemo(() => {
-    return {
-      total: assets.length,
-      high: assets.filter((a) => a.risk === "high").length,
-      external: assets.filter((a) => a.exposure === "external").length,
-      endpoints: assets.filter((a) => a.type === "endpoint").length,
-    };
-  }, [assets]);
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      list = list.filter((a) =>
+        JSON.stringify(a).toLowerCase().includes(q)
+      );
+    }
+
+    list = [...list].sort((a, b) => {
+      const aVal = a?.[sortKey];
+      const bVal = b?.[sortKey];
+
+      if (aVal === bVal) return 0;
+
+      if (sortDir === "asc") {
+        return aVal > bVal ? 1 : -1;
+      } else {
+        return aVal < bVal ? 1 : -1;
+      }
+    });
+
+    return list;
+  }, [assets, search, sortKey, sortDir]);
+
+  function changeSort(key) {
+    if (key === sortKey) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir("desc");
+    }
+  }
 
   /* ================= UI ================= */
 
   return (
-    <div className="postureWrap">
-      {/* ================= LEFT: ASSET INVENTORY ================= */}
-      <section className="postureCard">
-        {/* ===== HEADER ===== */}
-        <div className="postureTop">
-          <div>
-            <h2>Assets & Inventory</h2>
-            <small>
-              Users, devices, infrastructure, and cloud resources
-            </small>
-          </div>
+    <div style={{ padding: 32, display: "flex", flexDirection: "column", gap: 28 }}>
 
-          <div className="scoreMeta">
-            <b>{stats.total} Assets</b>
-            <span>
-              {stats.high} High Risk • {stats.external} Internet Facing
-            </span>
+      {/* ================= HEADER ================= */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          flexWrap: "wrap",
+          gap: 16,
+        }}
+      >
+        <div>
+          <h2 style={{ margin: 0 }}>Asset Intelligence</h2>
+          <div style={{ fontSize: 13, opacity: 0.6 }}>
+            Enterprise-wide monitored assets
           </div>
         </div>
 
-        {/* ===== CONTROLS ===== */}
+        <input
+          type="text"
+          placeholder="Search assets..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          style={{
+            width: 260,
+            padding: 10,
+            borderRadius: 10,
+            background: "rgba(255,255,255,0.05)",
+            border: "1px solid rgba(255,255,255,0.1)",
+            color: "#fff",
+          }}
+        />
+      </div>
+
+      {/* ================= SUMMARY STRIP ================= */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))",
+          gap: 20,
+        }}
+      >
+        <div className="card">
+          <div style={{ fontSize: 12, opacity: 0.6 }}>Total Assets</div>
+          <div style={{ fontSize: 26, fontWeight: 800 }}>
+            {assets.length}
+          </div>
+        </div>
+
+        <div className="card">
+          <div style={{ fontSize: 12, opacity: 0.6 }}>Critical</div>
+          <div style={{ fontSize: 26, fontWeight: 800, color: "#ff4d4d" }}>
+            {assets.filter((a) => a?.risk === "critical").length}
+          </div>
+        </div>
+
+        <div className="card">
+          <div style={{ fontSize: 12, opacity: 0.6 }}>High Risk</div>
+          <div style={{ fontSize: 26, fontWeight: 800, color: "#ff884d" }}>
+            {assets.filter((a) => a?.risk === "high").length}
+          </div>
+        </div>
+      </div>
+
+      {/* ================= TABLE ================= */}
+      <div
+        className="card"
+        style={{
+          padding: 0,
+          overflow: "hidden",
+        }}
+      >
         <div
           style={{
-            display: "flex",
-            gap: 12,
-            marginTop: 18,
-            flexWrap: "wrap",
+            overflowX: "auto",
           }}
         >
-          <input
-            placeholder="Search assets…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
+          <table
             style={{
-              flex: 1,
-              minWidth: 180,
-              padding: 8,
-              borderRadius: 8,
-              border: "1px solid var(--p-border)",
-              background: "rgba(0,0,0,.3)",
-              color: "inherit",
-            }}
-          />
-
-          <select
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-            style={{
-              padding: 8,
-              borderRadius: 8,
-              background: "rgba(0,0,0,.3)",
-              color: "inherit",
-              border: "1px solid var(--p-border)",
+              width: "100%",
+              borderCollapse: "collapse",
+              minWidth: 800,
             }}
           >
-            <option value="all">All Risks</option>
-            <option value="high">High Risk</option>
-            <option value="medium">Medium Risk</option>
-            <option value="low">Low Risk</option>
-          </select>
-        </div>
-
-        {/* ===== ASSET LIST ===== */}
-        <div className="list" style={{ marginTop: 20 }}>
-          {loading && <p className="muted">Loading assets…</p>}
-
-          {!loading &&
-            filtered.map((a) => (
-              <div key={a.id} className="card" style={{ padding: 16 }}>
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    gap: 16,
-                    cursor: "pointer",
-                  }}
-                  onClick={() =>
-                    setExpanded(expanded === a.id ? null : a.id)
-                  }
-                >
-                  <div style={{ display: "flex", gap: 12 }}>
-                    <span style={{ fontSize: 20 }}>
-                      {typeIcon(a.type)}
-                    </span>
-                    <div>
-                      <b>{a.name}</b>
-                      <small
-                        style={{
-                          display: "block",
-                          marginTop: 4,
-                          color: "var(--p-muted)",
-                        }}
-                      >
-                        {a.type} • {a.status} •{" "}
-                        {a.exposure === "external"
-                          ? "Internet Facing"
-                          : "Internal"}
-                      </small>
-                    </div>
-                  </div>
-
-                  <div style={{ textAlign: "right" }}>
-                    <span className={`dot ${riskDot(a.risk)}`} />
-                    <small
-                      style={{
-                        display: "block",
-                        marginTop: 6,
-                        fontSize: 12,
-                      }}
-                    >
-                      Risk: {a.risk}
-                    </small>
-                  </div>
-                </div>
-
-                {/* ===== EXPANDED DETAILS ===== */}
-                {expanded === a.id && (
-                  <div
+            <thead>
+              <tr style={{ background: "rgba(255,255,255,0.04)" }}>
+                {["name", "type", "owner", "risk", "lastScan"].map((col) => (
+                  <th
+                    key={col}
+                    onClick={() => changeSort(col)}
                     style={{
-                      marginTop: 14,
-                      paddingTop: 14,
-                      borderTop: "1px solid var(--p-border)",
+                      textAlign: "left",
+                      padding: "14px 18px",
                       fontSize: 13,
+                      cursor: "pointer",
+                      opacity: 0.8,
                     }}
                   >
-                    <p className="muted">
-                      • Ownership: {a.ownerType}
-                      <br />
-                      • Recent activity monitored
-                      <br />
-                      • No active incidents linked
-                      <br />
-                      • Coverage: Partial
-                    </p>
+                    {col.toUpperCase()}
+                  </th>
+                ))}
+              </tr>
+            </thead>
 
-                    <p className="muted">
-                      Actions:
-                      <br />– Review exposure
-                      <br />– Validate controls
-                      <br />– Assign remediation
-                    </p>
-                  </div>
-                )}
-              </div>
-            ))}
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan="5" style={{ padding: 20 }}>
+                    Loading assets...
+                  </td>
+                </tr>
+              ) : filtered.length === 0 ? (
+                <tr>
+                  <td colSpan="5" style={{ padding: 20 }}>
+                    No assets found.
+                  </td>
+                </tr>
+              ) : (
+                filtered.map((a, i) => (
+                  <tr
+                    key={a?.id || i}
+                    style={{
+                      borderTop:
+                        "1px solid rgba(255,255,255,0.08)",
+                    }}
+                  >
+                    <td style={{ padding: "14px 18px" }}>
+                      {safeStr(a?.name)}
+                    </td>
+
+                    <td style={{ padding: "14px 18px" }}>
+                      {safeStr(a?.type)}
+                    </td>
+
+                    <td style={{ padding: "14px 18px" }}>
+                      {safeStr(a?.owner)}
+                    </td>
+
+                    <td style={{ padding: "14px 18px" }}>
+                      <span
+                        style={{
+                          padding: "4px 10px",
+                          borderRadius: 999,
+                          fontSize: 12,
+                          fontWeight: 700,
+                          background:
+                            "rgba(255,255,255,0.05)",
+                          color: riskColor(a?.risk),
+                        }}
+                      >
+                        {safeStr(a?.risk, "unknown").toUpperCase()}
+                      </span>
+                    </td>
+
+                    <td style={{ padding: "14px 18px", opacity: 0.7 }}>
+                      {safeStr(a?.lastScan)}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
-
-        <button
-          onClick={load}
-          disabled={loading}
-          style={{ marginTop: 18 }}
-        >
-          {loading ? "Refreshing…" : "Refresh Inventory"}
-        </button>
-      </section>
-
-      {/* ================= RIGHT: ASSET INSIGHTS ================= */}
-      <aside className="postureCard">
-        <h3>Asset Exposure Overview</h3>
-        <p className="muted">
-          Focus on assets attackers can reach first.
-        </p>
-
-        <ul className="list">
-          <li>
-            <span className="dot warn" />
-            <div>
-              <b>External Exposure</b>
-              <small>Internet-facing assets detected</small>
-            </div>
-          </li>
-
-          <li>
-            <span className="dot bad" />
-            <div>
-              <b>High-Risk Assets</b>
-              <small>Immediate review recommended</small>
-            </div>
-          </li>
-
-          <li>
-            <span className="dot ok" />
-            <div>
-              <b>Discovery Active</b>
-              <small>Assets continuously monitored</small>
-            </div>
-          </li>
-        </ul>
-
-        <p className="muted" style={{ marginTop: 14 }}>
-          Ask the assistant:
-          <br />• “Which assets are most exposed?”
-          <br />• “Where should remediation start?”
-        </p>
-      </aside>
+      </div>
     </div>
   );
 }
