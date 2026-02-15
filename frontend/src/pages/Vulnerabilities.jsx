@@ -1,73 +1,45 @@
-// frontend/src/pages/Vulnerabilities.jsx
-// SOC Vulnerabilities & Exposure Management — SOC BASELINE (UPGRADED)
-// Prevention-focused • Human-driven remediation • Blueprint-aligned
-//
-// SAFE:
-// - Full file replacement
-// - UI only
-// - No automation
-// - No AI wording
-// - AutoDev 6.5 compatible (observe + recommend, never act)
-
 import React, { useEffect, useMemo, useState } from "react";
-import { api } from "../lib/api";
+import { api } from "../lib/api.js";
 
 /* ================= HELPERS ================= */
 
-function severityDot(sev) {
-  if (sev === "critical") return "bad";
-  if (sev === "high") return "warn";
-  if (sev === "medium") return "warn";
-  return "ok";
+function safeArray(v) {
+  return Array.isArray(v) ? v : [];
+}
+
+function safeStr(v, fallback = "—") {
+  return typeof v === "string" && v.trim() ? v : fallback;
+}
+
+function severityColor(level) {
+  switch (String(level).toLowerCase()) {
+    case "critical":
+      return "#ff4d4d";
+    case "high":
+      return "#ff884d";
+    case "medium":
+      return "#ffd166";
+    case "low":
+      return "#5EC6FF";
+    default:
+      return "#999";
+  }
 }
 
 /* ================= PAGE ================= */
 
 export default function Vulnerabilities() {
-  const [items, setItems] = useState([]);
+  const [vulns, setVulns] = useState([]);
+  const [selected, setSelected] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [expanded, setExpanded] = useState(null);
 
   async function load() {
     setLoading(true);
     try {
-      const data = await api.getVulnerabilities?.();
-      setItems(
-        data?.items || [
-          {
-            id: "CVE-2024-1123",
-            asset: "Workstation-023",
-            severity: "critical",
-            score: 9.8,
-            status: "Open",
-            scope: "company",
-          },
-          {
-            id: "CVE-2023-8812",
-            asset: "Production Server",
-            severity: "high",
-            score: 8.1,
-            status: "Open",
-            scope: "company",
-          },
-          {
-            id: "CVE-2022-4431",
-            asset: "Finance Server",
-            severity: "medium",
-            score: 6.4,
-            status: "Mitigated",
-            scope: "small-company",
-          },
-          {
-            id: "CVE-2021-9021",
-            asset: "User Mailbox",
-            severity: "low",
-            score: 3.2,
-            status: "Accepted",
-            scope: "individual",
-          },
-        ]
-      );
+      const res = await api.vulnerabilities().catch(() => ({}));
+      setVulns(safeArray(res?.vulnerabilities));
+    } catch {
+      setVulns([]);
     } finally {
       setLoading(false);
     }
@@ -77,228 +49,162 @@ export default function Vulnerabilities() {
     load();
   }, []);
 
-  /* ================= DERIVED ================= */
-
-  const stats = useMemo(
-    () => ({
-      total: items.length,
-      critical: items.filter((i) => i.severity === "critical").length,
-      high: items.filter((i) => i.severity === "high").length,
-      open: items.filter((i) => i.status === "Open").length,
-    }),
-    [items]
-  );
-
-  const prioritized = useMemo(() => {
-    const order = { critical: 3, high: 2, medium: 1, low: 0 };
-    return [...items].sort(
-      (a, b) =>
-        (order[b.severity] || 0) - (order[a.severity] || 0)
-    );
-  }, [items]);
+  const summary = useMemo(() => {
+    const list = safeArray(vulns);
+    return {
+      total: list.length,
+      critical: list.filter(v => v?.severity === "critical").length,
+      high: list.filter(v => v?.severity === "high").length,
+      open: list.filter(v => v?.status === "open").length,
+    };
+  }, [vulns]);
 
   /* ================= UI ================= */
 
   return (
-    <div className="postureWrap">
-      {/* ================= KPI STRIP ================= */}
-      <div className="kpiGrid">
-        <div className="kpiCard">
-          <small>Total CVEs</small>
-          <b>{stats.total}</b>
+    <div style={{ padding: 32, display: "flex", flexDirection: "column", gap: 28 }}>
+
+      {/* ================= HEADER ================= */}
+      <div>
+        <h2 style={{ margin: 0 }}>Vulnerability Command Center</h2>
+        <div style={{ fontSize: 13, opacity: 0.6 }}>
+          CVE exposure tracking and remediation workflow
         </div>
-        <div className="kpiCard">
-          <small>Critical</small>
-          <b>{stats.critical}</b>
+      </div>
+
+      {/* ================= SUMMARY ================= */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))",
+          gap: 20,
+        }}
+      >
+        <div className="card">
+          <div style={{ fontSize: 12, opacity: 0.6 }}>Total</div>
+          <div style={{ fontSize: 26, fontWeight: 800 }}>{summary.total}</div>
         </div>
-        <div className="kpiCard">
-          <small>High</small>
-          <b>{stats.high}</b>
+
+        <div className="card">
+          <div style={{ fontSize: 12, opacity: 0.6 }}>Critical</div>
+          <div style={{ fontSize: 26, fontWeight: 800, color: "#ff4d4d" }}>
+            {summary.critical}
+          </div>
         </div>
-        <div className="kpiCard">
-          <small>Open</small>
-          <b>{stats.open}</b>
+
+        <div className="card">
+          <div style={{ fontSize: 12, opacity: 0.6 }}>High</div>
+          <div style={{ fontSize: 26, fontWeight: 800, color: "#ff884d" }}>
+            {summary.high}
+          </div>
+        </div>
+
+        <div className="card">
+          <div style={{ fontSize: 12, opacity: 0.6 }}>Open</div>
+          <div style={{ fontSize: 26, fontWeight: 800, color: "#ffd166" }}>
+            {summary.open}
+          </div>
         </div>
       </div>
 
       {/* ================= MAIN GRID ================= */}
-      <div className="postureGrid">
-        {/* ===== LEFT: VULNERABILITY LIST ===== */}
-        <section className="postureCard">
-          <div className="postureTop">
-            <div>
-              <h2>Vulnerabilities & Exposure</h2>
-              <small>
-                Preventive weaknesses requiring remediation
-              </small>
-            </div>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "2fr 1fr",
+          gap: 24,
+        }}
+      >
 
-            <div className="scoreMeta">
-              <b>{stats.open} Open</b>
-              <span>
-                {stats.critical} Critical • {stats.high} High
-              </span>
-            </div>
-          </div>
+        {/* ================= LEFT PANEL ================= */}
+        <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+          <div style={{ maxHeight: 520, overflowY: "auto" }}>
 
-          <div className="list" style={{ marginTop: 20 }}>
-            {loading && (
-              <p className="muted">
-                Scanning environment for vulnerabilities…
-              </p>
-            )}
+            {loading ? (
+              <div style={{ padding: 20 }}>Loading vulnerabilities...</div>
+            ) : vulns.length === 0 ? (
+              <div style={{ padding: 20 }}>No vulnerabilities detected.</div>
+            ) : (
+              safeArray(vulns).map((v, i) => (
+                <div
+                  key={v?.id || i}
+                  onClick={() => setSelected(v)}
+                  style={{
+                    padding: 18,
+                    borderBottom: "1px solid rgba(255,255,255,0.08)",
+                    cursor: "pointer",
+                    background:
+                      selected?.id === v?.id
+                        ? "rgba(255,77,77,0.08)"
+                        : "transparent",
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <strong>{safeStr(v?.title, "Vulnerability")}</strong>
 
-            {!loading &&
-              prioritized.map((v) => (
-                <div key={v.id} className="card" style={{ padding: 16 }}>
-                  <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "auto 1fr auto",
-                      gap: 14,
-                      cursor: "pointer",
-                    }}
-                    onClick={() =>
-                      setExpanded(
-                        expanded === v.id ? null : v.id
-                      )
-                    }
-                  >
                     <span
-                      className={`dot ${severityDot(v.severity)}`}
-                    />
-
-                    <div>
-                      <b>{v.id}</b>
-                      <small
-                        style={{
-                          display: "block",
-                          marginTop: 4,
-                          color: "var(--p-muted)",
-                        }}
-                      >
-                        Asset: {v.asset}
-                      </small>
-                      <small
-                        style={{
-                          display: "block",
-                          marginTop: 2,
-                          fontSize: 12,
-                          color: "var(--p-muted)",
-                        }}
-                      >
-                        Status: {v.status} • Scope: {v.scope}
-                      </small>
-                    </div>
-
-                    <div style={{ textAlign: "right" }}>
-                      <small
-                        style={{
-                          display: "block",
-                          fontSize: 12,
-                          fontWeight: 700,
-                        }}
-                      >
-                        CVSS {v.score}
-                      </small>
-                      <small
-                        style={{
-                          display: "block",
-                          marginTop: 6,
-                          fontSize: 12,
-                        }}
-                      >
-                        {v.severity.toUpperCase()}
-                      </small>
-                    </div>
-                  </div>
-
-                  {/* ===== EXPANDED DETAILS ===== */}
-                  {expanded === v.id && (
-                    <div
                       style={{
-                        marginTop: 14,
-                        paddingTop: 14,
-                        borderTop:
-                          "1px solid var(--p-border)",
-                        fontSize: 13,
+                        fontSize: 12,
+                        fontWeight: 700,
+                        color: severityColor(v?.severity),
                       }}
                     >
-                      <p className="muted">
-                        • Known exploitable weakness
-                        <br />
-                        • Could enable privilege escalation
-                        <br />
-                        • Patch or mitigation required
-                      </p>
+                      {safeStr(v?.severity).toUpperCase()}
+                    </span>
+                  </div>
 
-                      <p className="muted">
-                        Recommended actions:
-                        <br />– Apply vendor patch
-                        <br />– Restrict exposure
-                        <br />– Validate remediation
-                      </p>
-
-                      <p className="muted">
-                        Ask the assistant:
-                        <br />– “Is this exploitable?”
-                        <br />– “What’s the safest fix?”
-                      </p>
-                    </div>
-                  )}
+                  <div style={{ fontSize: 13, opacity: 0.6, marginTop: 4 }}>
+                    Asset: {safeStr(v?.asset)} • Status: {safeStr(v?.status)}
+                  </div>
                 </div>
-              ))}
+              ))
+            )}
           </div>
+        </div>
 
-          <button
-            onClick={load}
-            disabled={loading}
-            style={{ marginTop: 18 }}
-          >
-            {loading ? "Rescanning…" : "Run Vulnerability Scan"}
-          </button>
-        </section>
+        {/* ================= RIGHT PANEL ================= */}
+        <div className="card">
+          {selected ? (
+            <>
+              <h3>{safeStr(selected?.title)}</h3>
 
-        {/* ===== RIGHT: RISK CONTEXT ===== */}
-        <aside className="postureCard">
-          <h3>Exposure Risk</h3>
-          <p className="muted">
-            Vulnerabilities are the most common breach entry
-            point.
-          </p>
-
-          <ul className="list">
-            <li>
-              <span className="dot bad" />
-              <div>
-                <b>Immediate Remediation Required</b>
-                <small>Critical CVEs are open</small>
+              <div style={{ marginBottom: 10 }}>
+                <strong>Severity: </strong>
+                <span
+                  style={{
+                    color: severityColor(selected?.severity),
+                    fontWeight: 700,
+                  }}
+                >
+                  {safeStr(selected?.severity).toUpperCase()}
+                </span>
               </div>
-            </li>
 
-            <li>
-              <span className="dot warn" />
-              <div>
-                <b>Patch Gaps Detected</b>
-                <small>Systems missing updates</small>
+              <div style={{ marginBottom: 10 }}>
+                <strong>Status:</strong> {safeStr(selected?.status)}
               </div>
-            </li>
 
-            <li>
-              <span className="dot ok" />
-              <div>
-                <b>Risk Trending Down</b>
-                <small>Mitigations in progress</small>
+              <div style={{ marginBottom: 10 }}>
+                <strong>Asset:</strong> {safeStr(selected?.asset)}
               </div>
-            </li>
-          </ul>
 
-          <p className="muted" style={{ marginTop: 14 }}>
-            Ask the assistant:
-            <br />• “What should I patch first?”
-            <br />• “Which CVEs are exploitable?”
-          </p>
-        </aside>
+              <div style={{ marginBottom: 14 }}>
+                <strong>Description:</strong>
+                <div style={{ fontSize: 14, opacity: 0.7 }}>
+                  {safeStr(selected?.description, "No details available")}
+                </div>
+              </div>
+
+              <button className="btn" style={{ marginTop: 10 }}>
+                Mark as Remediated
+              </button>
+            </>
+          ) : (
+            <div style={{ opacity: 0.6 }}>
+              Select a vulnerability to review.
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
