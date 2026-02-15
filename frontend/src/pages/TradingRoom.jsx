@@ -10,9 +10,7 @@ export default function TradingRoom() {
   const [wsStatus, setWsStatus] = useState("disconnected");
   const [loading, setLoading] = useState(true);
 
-  /* =======================================================
-     LOAD SNAPSHOTS
-  ======================================================= */
+  /* ================= LOAD SNAPSHOTS ================= */
 
   async function loadSnapshots() {
     try {
@@ -38,9 +36,7 @@ export default function TradingRoom() {
     return () => clearInterval(interval);
   }, []);
 
-  /* =======================================================
-     MARKET WEBSOCKET
-  ======================================================= */
+  /* ================= MARKET WS ================= */
 
   useEffect(() => {
     const protocol =
@@ -69,113 +65,92 @@ export default function TradingRoom() {
     return () => ws.close();
   }, []);
 
-  /* =======================================================
-     HELPERS
-  ======================================================= */
-
-  const money = (v) =>
-    v == null ? "-" : `$${Number(v).toFixed(2)}`;
-
-  const pct = (v) =>
-    v == null ? "-" : `${(Number(v) * 100).toFixed(2)}%`;
-
-  const statusColor = {
-    connected: "#5EC6FF",
-    error: "#ff4d4d",
-    disconnected: "#999",
-  };
-
-  if (loading) {
-    return (
-      <div className="layout-content">
-        <h2>Initializing Trading Command Center...</h2>
-      </div>
-    );
+  function money(v) {
+    if (v == null) return "-";
+    return `$${Number(v).toFixed(2)}`;
   }
 
-  /* =======================================================
-     UI
-  ======================================================= */
+  if (loading) {
+    return <div style={{ padding: 40 }}>Loading trading engine...</div>;
+  }
 
   return (
-    <div className="layout-content trading-room">
+    <div className="trading-room">
 
-      {/* HEADER */}
+      {/* ================= HEADER ================= */}
       <div className="trading-header">
         <h2>Trading Command Center</h2>
-        <div className="trading-status">
-          <span>Feed:</span>
-          <strong style={{ color: statusColor[wsStatus] }}>
+        <div>
+          Market Feed:{" "}
+          <strong className={
+            wsStatus === "connected"
+              ? "status-positive"
+              : wsStatus === "error"
+              ? "status-negative"
+              : "status-neutral"
+          }>
             {wsStatus.toUpperCase()}
           </strong>
         </div>
       </div>
 
-      {/* GLOBAL RISK HALT */}
+      {/* ================= RISK ALERT ================= */}
       {risk?.halted && (
         <div className="trading-alert">
-          ⚠ SYSTEM HALTED — {risk.haltReason}
+          Trading HALTED — {risk.haltReason || "Risk protection triggered"}
         </div>
       )}
 
-      {/* MAIN GRID */}
+      {/* ================= KPI SUMMARY ================= */}
       <div className="trading-grid">
 
-        {/* PAPER ENGINE */}
         <div className="trading-card">
-          <h3>Paper Engine</h3>
-          <div>Equity: {money(paper?.equity)}</div>
+          <h3>Paper Equity</h3>
+          <h1>{money(paper?.equity)}</h1>
           <div>Peak: {money(paper?.peakEquity)}</div>
           <div>Trades: {paper?.trades?.length || 0}</div>
-          <div>
-            Position:{" "}
-            {paper?.position
-              ? `${paper.position.qty} @ ${paper.position.entry}`
-              : "None"}
-          </div>
         </div>
 
-        {/* LIVE ENGINE */}
         <div className="trading-card">
-          <h3>Live Engine</h3>
-          <div>Mode: {live?.mode}</div>
-          <div>Equity: {money(live?.equity)}</div>
+          <h3>Live Equity</h3>
+          <h1>{money(live?.equity)}</h1>
           <div>Margin Used: {money(live?.marginUsed)}</div>
-          <div>
-            Maintenance: {money(live?.maintenanceRequired)}
-          </div>
           <div>
             Liquidation:{" "}
             {live?.liquidation ? (
-              <span style={{ color: "#ff4d4d" }}>YES</span>
+              <span className="status-negative">YES ⚠</span>
             ) : (
               "No"
             )}
           </div>
         </div>
 
-        {/* RISK */}
         <div className="trading-card">
-          <h3>Risk Engine</h3>
+          <h3>Risk Status</h3>
+          <h1>
+            {risk?.halted ? (
+              <span className="status-negative">HALTED</span>
+            ) : (
+              <span className="status-positive">ACTIVE</span>
+            )}
+          </h1>
+          <div>Drawdown: {(risk?.drawdown * 100 || 0).toFixed(2)}%</div>
           <div>Multiplier: {risk?.riskMultiplier?.toFixed(2)}</div>
-          <div>Drawdown: {pct(risk?.drawdown)}</div>
-          <div>Volatility Regime: {risk?.volatilityRegime}</div>
-          <div>Cooling: {risk?.cooling ? "YES" : "No"}</div>
         </div>
 
       </div>
 
-      {/* MARKET */}
-      <div className="trading-market">
+      {/* ================= MARKET TICKER ================= */}
+      <div>
         <h3>Live Market</h3>
 
         {Object.keys(prices).length === 0 ? (
-          <div className="muted">Waiting for market data...</div>
+          <div style={{ opacity: 0.6 }}>Waiting for ticks...</div>
         ) : (
           <div className="trading-market-grid">
             {Object.entries(prices).map(([symbol, price]) => (
               <div key={symbol} className="trading-ticker">
-                <strong>{symbol}</strong>
+                <span>{symbol}</span>
                 <span>{price}</span>
               </div>
             ))}
