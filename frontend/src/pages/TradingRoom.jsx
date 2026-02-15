@@ -73,147 +73,116 @@ export default function TradingRoom() {
      HELPERS
   ======================================================= */
 
-  function money(v) {
-    if (v == null) return "-";
-    return `$${Number(v).toFixed(2)}`;
-  }
+  const money = (v) =>
+    v == null ? "-" : `$${Number(v).toFixed(2)}`;
 
-  function pct(v) {
-    if (v == null) return "-";
-    return `${(Number(v) * 100).toFixed(2)}%`;
-  }
+  const pct = (v) =>
+    v == null ? "-" : `${(Number(v) * 100).toFixed(2)}%`;
 
-  function statusColor(status) {
-    if (status === "connected") return "#5EC6FF";
-    if (status === "error") return "#ff4d4d";
-    return "#999";
+  const statusColor = {
+    connected: "#5EC6FF",
+    error: "#ff4d4d",
+    disconnected: "#999",
+  };
+
+  if (loading) {
+    return (
+      <div className="layout-content">
+        <h2>Initializing Trading Command Center...</h2>
+      </div>
+    );
   }
 
   /* =======================================================
      UI
   ======================================================= */
 
-  if (loading) {
-    return (
-      <div className="postureWrap" style={{ padding: 30 }}>
-        Loading trading engine...
-      </div>
-    );
-  }
-
   return (
-    <div className="postureWrap" style={{ padding: 30 }}>
-      <h2 style={{ marginBottom: 20 }}>Trading Oversight</h2>
+    <div className="layout-content trading-room">
 
-      {/* ================= CONNECTION STATUS ================= */}
-      <div style={{ marginBottom: 30 }}>
-        <strong>Market Feed:</strong>{" "}
-        <span style={{ color: statusColor(wsStatus) }}>
-          {wsStatus.toUpperCase()}
-        </span>
+      {/* HEADER */}
+      <div className="trading-header">
+        <h2>Trading Command Center</h2>
+        <div className="trading-status">
+          <span>Feed:</span>
+          <strong style={{ color: statusColor[wsStatus] }}>
+            {wsStatus.toUpperCase()}
+          </strong>
+        </div>
       </div>
 
-      {/* ================= GRID ================= */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
-          gap: 20,
-        }}
-      >
-        {/* PAPER */}
-        <div className="card">
+      {/* GLOBAL RISK HALT */}
+      {risk?.halted && (
+        <div className="trading-alert">
+          ⚠ SYSTEM HALTED — {risk.haltReason}
+        </div>
+      )}
+
+      {/* MAIN GRID */}
+      <div className="trading-grid">
+
+        {/* PAPER ENGINE */}
+        <div className="trading-card">
           <h3>Paper Engine</h3>
-          {paper ? (
-            <>
-              <div>Equity: {money(paper.equity)}</div>
-              <div>Peak: {money(paper.peakEquity)}</div>
-              <div>Trades: {paper.trades?.length || 0}</div>
-              <div>
-                Position:{" "}
-                {paper.position
-                  ? `${paper.position.qty} @ ${paper.position.entry}`
-                  : "None"}
-              </div>
-            </>
-          ) : (
-            "Unavailable"
-          )}
+          <div>Equity: {money(paper?.equity)}</div>
+          <div>Peak: {money(paper?.peakEquity)}</div>
+          <div>Trades: {paper?.trades?.length || 0}</div>
+          <div>
+            Position:{" "}
+            {paper?.position
+              ? `${paper.position.qty} @ ${paper.position.entry}`
+              : "None"}
+          </div>
         </div>
 
-        {/* LIVE */}
-        <div className="card">
+        {/* LIVE ENGINE */}
+        <div className="trading-card">
           <h3>Live Engine</h3>
-          {live ? (
-            <>
-              <div>Mode: {live.mode}</div>
-              <div>Equity: {money(live.equity)}</div>
-              <div>Margin Used: {money(live.marginUsed)}</div>
-              <div>
-                Maintenance: {money(live.maintenanceRequired)}
-              </div>
-              <div>
-                Liquidation:{" "}
-                {live.liquidation ? (
-                  <span style={{ color: "#ff4d4d" }}>YES ⚠️</span>
-                ) : (
-                  "No"
-                )}
-              </div>
-            </>
-          ) : (
-            "Unavailable"
-          )}
+          <div>Mode: {live?.mode}</div>
+          <div>Equity: {money(live?.equity)}</div>
+          <div>Margin Used: {money(live?.marginUsed)}</div>
+          <div>
+            Maintenance: {money(live?.maintenanceRequired)}
+          </div>
+          <div>
+            Liquidation:{" "}
+            {live?.liquidation ? (
+              <span style={{ color: "#ff4d4d" }}>YES</span>
+            ) : (
+              "No"
+            )}
+          </div>
         </div>
 
         {/* RISK */}
-        <div className="card">
-          <h3>Risk Status</h3>
-          {risk ? (
-            <>
-              <div>
-                Halted:{" "}
-                {risk.halted ? (
-                  <span style={{ color: "#ff4d4d" }}>YES</span>
-                ) : (
-                  "No"
-                )}
-              </div>
-              <div>Reason: {risk.haltReason || "None"}</div>
-              <div>Multiplier: {risk.riskMultiplier?.toFixed(2)}</div>
-              <div>Drawdown: {pct(risk.drawdown)}</div>
-            </>
-          ) : (
-            "Unavailable"
-          )}
+        <div className="trading-card">
+          <h3>Risk Engine</h3>
+          <div>Multiplier: {risk?.riskMultiplier?.toFixed(2)}</div>
+          <div>Drawdown: {pct(risk?.drawdown)}</div>
+          <div>Volatility Regime: {risk?.volatilityRegime}</div>
+          <div>Cooling: {risk?.cooling ? "YES" : "No"}</div>
         </div>
+
       </div>
 
-      {/* ================= MARKET ================= */}
-      <div style={{ marginTop: 40 }}>
-        <h3>Live Market Prices</h3>
+      {/* MARKET */}
+      <div className="trading-market">
+        <h3>Live Market</h3>
 
         {Object.keys(prices).length === 0 ? (
-          <div style={{ opacity: 0.6 }}>Waiting for ticks...</div>
+          <div className="muted">Waiting for market data...</div>
         ) : (
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns:
-                "repeat(auto-fit, minmax(140px, 1fr))",
-              gap: 10,
-              marginTop: 10,
-            }}
-          >
+          <div className="trading-market-grid">
             {Object.entries(prices).map(([symbol, price]) => (
-              <div key={symbol} className="card small">
+              <div key={symbol} className="trading-ticker">
                 <strong>{symbol}</strong>
-                <div>{price}</div>
+                <span>{price}</span>
               </div>
             ))}
           </div>
         )}
       </div>
+
     </div>
   );
 }
