@@ -1,19 +1,12 @@
 /**
- * AuthoShield Tech — Official Logo Component (FINAL LOCKED)
- *
- * RESPONSIBILITY:
- * - Render official brand consistently
- * - Supports icon-only and full wordmark
- * - Dark-mode safe
- * - No routing / no state / no layout assumptions
+ * AuthoShield Tech — Official Logo Component (DEPLOY SAFE)
  */
 
 import React from "react";
-import logo from "../assets/authoshield-logo.png"; // 🔥 make sure file exists
 
 export default function Logo({
-  size = "md",        // sm | md | lg
-  variant = "full",   // full | icon
+  size = "md",
+  variant = "full",
 }) {
   const sizes = {
     sm: { icon: 28, font: 15 },
@@ -34,9 +27,9 @@ export default function Logo({
         whiteSpace: "nowrap",
       }}
     >
-      {/* Icon */}
+      {/* Logo Image (public folder) */}
       <img
-        src={logo}
+        src="/logo.png"
         alt="AuthoShield Tech"
         style={{
           width: cfg.icon,
@@ -45,7 +38,6 @@ export default function Logo({
         }}
       />
 
-      {/* Wordmark */}
       {variant === "full" && (
         <span
           style={{
