@@ -1,6 +1,6 @@
 /* =========================================================
    AUTOSHIELD CORE LAYOUT — INSTITUTIONAL STABLE BUILD
-   File: frontend/src/styles/layout.css
+   FULL INTEGRATED VERSION
    ========================================================= */
 
 .layout-root{
@@ -79,7 +79,7 @@
 }
 
 /* =========================================================
-   🔥 INSTITUTIONAL CARD SYSTEM
+   INSTITUTIONAL CARD SYSTEM
    ========================================================= */
 
 .card{
@@ -148,17 +148,9 @@
    STATUS COLORS
    ========================================================= */
 
-.status-positive{
-  color:#5EC6FF;
-}
-
-.status-negative{
-  color:#ff4d4d;
-}
-
-.status-neutral{
-  color:#999;
-}
+.status-positive{ color:#5EC6FF; }
+.status-negative{ color:#ff4d4d; }
+.status-neutral{ color:#999; }
 
 /* =========================================================
    ADVISOR DRAWER
@@ -203,19 +195,11 @@
   overscroll-behavior:contain;
 }
 
-@media (min-width:900px){
-  .ai-drawer-body{
-    height:420px;
-  }
-}
-
 /* =========================================================
    MOBILE SIDEBAR
    ========================================================= */
 
-.sidebar-overlay{
-  display:none;
-}
+.sidebar-overlay{ display:none; }
 
 @media (max-width:768px){
 
@@ -268,22 +252,97 @@
    COMMAND MODE
    ========================================================= */
 
-.layout-command .layout-sidebar {
-  display: none;
+.layout-command .layout-sidebar { display:none; }
+
+.layout-command .layout-main{
+  width:100vw;
+  margin:0;
+  padding:0;
 }
 
-.layout-command .layout-main {
-  width: 100vw;
-  margin: 0;
-  padding: 0;
+.layout-command .layout-content{
+  width:100%;
+  height:100vh;
+  padding:24px;
 }
 
-.layout-command .layout-content {
-  width: 100%;
-  height: 100vh;
-  padding: 24px;
+.layout-focus .layout-sidebar.collapsed{
+  width:70px;
 }
 
-.layout-focus .layout-sidebar.collapsed {
-  width: 70px;
+/* =========================================================
+   🔥 TRADING COMMAND CENTER
+   ========================================================= */
+
+.trading-room{
+  display:flex;
+  flex-direction:column;
+  gap:28px;
+}
+
+.trading-header{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  border-bottom:1px solid rgba(255,255,255,.08);
+  padding-bottom:12px;
+}
+
+.trading-alert{
+  background:rgba(255,70,70,.12);
+  border:1px solid rgba(255,70,70,.35);
+  padding:14px 18px;
+  border-radius:10px;
+  font-weight:600;
+  color:#ff4d4d;
+}
+
+.trading-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(280px,1fr));
+  gap:20px;
+}
+
+.trading-card{
+  background:linear-gradient(
+    180deg,
+    rgba(255,255,255,.04),
+    rgba(0,0,0,.45)
+  );
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:16px;
+  padding:20px;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  transition:all .25s ease;
+}
+
+.trading-card:hover{
+  border-color:rgba(120,160,255,.4);
+  transform:translateY(-3px);
+}
+
+.trading-market-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(140px,1fr));
+  gap:12px;
+  margin-top:14px;
+}
+
+.trading-ticker{
+  background:rgba(255,255,255,.05);
+  border:1px solid rgba(255,255,255,.08);
+  padding:12px;
+  border-radius:12px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  font-weight:600;
+  transition:all .2s ease;
+}
+
+.trading-ticker:hover{
+  background:rgba(120,160,255,.1);
+  border-color:rgba(120,160,255,.4);
 }
