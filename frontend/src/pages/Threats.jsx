@@ -1,22 +1,29 @@
-// frontend/src/pages/Threats.jsx
-// SOC Threats & Detections — SOC BASELINE (UPGRADED)
-// Analyst-first, priority-driven
-// SAFE:
-// - Full file replacement
-// - No AI wording
-// - No automation
-// - AutoDev 6.5–ready (observational + reporting only)
-
 import React, { useEffect, useMemo, useState } from "react";
-import { api } from "../lib/api";
+import { api } from "../lib/api.js";
 
 /* ================= HELPERS ================= */
 
-function sevDot(sev) {
-  if (sev === "critical") return "bad";
-  if (sev === "high") return "warn";
-  if (sev === "medium") return "warn";
-  return "ok";
+function safeArray(v) {
+  return Array.isArray(v) ? v : [];
+}
+
+function safeStr(v, fallback = "—") {
+  return typeof v === "string" && v.trim() ? v : fallback;
+}
+
+function severityColor(level) {
+  switch (String(level).toLowerCase()) {
+    case "critical":
+      return "#ff4d4d";
+    case "high":
+      return "#ff884d";
+    case "medium":
+      return "#ffd166";
+    case "low":
+      return "#2bd576";
+    default:
+      return "#999";
+  }
 }
 
 /* ================= PAGE ================= */
@@ -24,43 +31,15 @@ function sevDot(sev) {
 export default function Threats() {
   const [threats, setThreats] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [selected, setSelected] = useState(null);
 
   async function load() {
     setLoading(true);
     try {
-      // Placeholder until backend is wired
-      const data = await api.getThreats?.();
-      setThreats(
-        data?.threats || [
-          {
-            id: 1,
-            name: "Malware Detected on Endpoint",
-            severity: "critical",
-            source: "Endpoint",
-            status: "Unresolved",
-            time: "5 minutes ago",
-            scope: "company",
-          },
-          {
-            id: 2,
-            name: "Suspicious Login Activity",
-            severity: "high",
-            source: "Identity",
-            status: "Investigating",
-            time: "14 minutes ago",
-            scope: "small-company",
-          },
-          {
-            id: 3,
-            name: "Abnormal Email Behavior",
-            severity: "medium",
-            source: "Email",
-            status: "Contained",
-            time: "38 minutes ago",
-            scope: "individual",
-          },
-        ]
-      );
+      const res = await api.threats().catch(() => ({}));
+      setThreats(safeArray(res?.threats));
+    } catch {
+      setThreats([]);
     } finally {
       setLoading(false);
     }
@@ -70,180 +49,158 @@ export default function Threats() {
     load();
   }, []);
 
-  /* ================= DERIVED ================= */
-
-  const stats = useMemo(() => {
+  const summary = useMemo(() => {
+    const list = safeArray(threats);
     return {
-      critical: threats.filter((t) => t.severity === "critical").length,
-      high: threats.filter((t) => t.severity === "high").length,
-      total: threats.length,
+      total: list.length,
+      critical: list.filter(t => t?.severity === "critical").length,
+      high: list.filter(t => t?.severity === "high").length,
+      active: list.filter(t => t?.status === "active").length,
     };
-  }, [threats]);
-
-  const prioritized = useMemo(() => {
-    return [...threats].sort((a, b) => {
-      const order = { critical: 3, high: 2, medium: 1, low: 0 };
-      return (order[b.severity] || 0) - (order[a.severity] || 0);
-    });
   }, [threats]);
 
   /* ================= UI ================= */
 
   return (
-    <div className="postureWrap">
-      {/* ================= KPI STRIP ================= */}
-      <div className="kpiGrid">
-        <div className="kpiCard">
-          <small>Critical</small>
-          <b>{stats.critical}</b>
+    <div style={{ padding: 32, display: "flex", flexDirection: "column", gap: 28 }}>
+
+      {/* ================= HEADER ================= */}
+      <div>
+        <h2 style={{ margin: 0 }}>Threat Intelligence Board</h2>
+        <div style={{ fontSize: 13, opacity: 0.6 }}>
+          Real-time threat monitoring and detection feed
         </div>
-        <div className="kpiCard">
-          <small>High</small>
-          <b>{stats.high}</b>
+      </div>
+
+      {/* ================= SUMMARY STRIP ================= */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))",
+          gap: 20,
+        }}
+      >
+        <div className="card">
+          <div style={{ fontSize: 12, opacity: 0.6 }}>Total Threats</div>
+          <div style={{ fontSize: 26, fontWeight: 800 }}>{summary.total}</div>
         </div>
-        <div className="kpiCard">
-          <small>Total Active</small>
-          <b>{stats.total}</b>
+
+        <div className="card">
+          <div style={{ fontSize: 12, opacity: 0.6 }}>Critical</div>
+          <div style={{ fontSize: 26, fontWeight: 800, color: "#ff4d4d" }}>
+            {summary.critical}
+          </div>
+        </div>
+
+        <div className="card">
+          <div style={{ fontSize: 12, opacity: 0.6 }}>High</div>
+          <div style={{ fontSize: 26, fontWeight: 800, color: "#ff884d" }}>
+            {summary.high}
+          </div>
+        </div>
+
+        <div className="card">
+          <div style={{ fontSize: 12, opacity: 0.6 }}>Active</div>
+          <div style={{ fontSize: 26, fontWeight: 800 }}>
+            {summary.active}
+          </div>
         </div>
       </div>
 
       {/* ================= MAIN GRID ================= */}
-      <div className="postureGrid">
-        {/* ===== LEFT: ACTIVE THREATS ===== */}
-        <section className="postureCard">
-          <div className="postureTop">
-            <div>
-              <h2>Active Threats</h2>
-              <small>
-                Real-time detections across monitored environments
-              </small>
-            </div>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "2fr 1fr",
+          gap: 24,
+        }}
+      >
 
-            <div className="scoreMeta">
-              <b>{stats.total} Alerts</b>
-              <span>
-                {stats.critical} Critical • {stats.high} High
-              </span>
-            </div>
-          </div>
+        {/* ================= LEFT: THREAT LIST ================= */}
+        <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+          <div style={{ maxHeight: 500, overflowY: "auto" }}>
 
-          <div className="list" style={{ marginTop: 20 }}>
-            {loading && <p className="muted">Loading threats…</p>}
+            {loading ? (
+              <div style={{ padding: 20 }}>Loading threats...</div>
+            ) : threats.length === 0 ? (
+              <div style={{ padding: 20 }}>No threats detected.</div>
+            ) : (
+              safeArray(threats).map((t, i) => (
+                <div
+                  key={t?.id || i}
+                  onClick={() => setSelected(t)}
+                  style={{
+                    padding: 18,
+                    borderBottom: "1px solid rgba(255,255,255,0.08)",
+                    cursor: "pointer",
+                    background:
+                      selected?.id === t?.id
+                        ? "rgba(94,198,255,0.08)"
+                        : "transparent",
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <strong>{safeStr(t?.title, "Threat Event")}</strong>
 
-            {!loading &&
-              prioritized.map((t) => (
-                <div key={t.id} className="card" style={{ padding: 16 }}>
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      gap: 16,
-                    }}
-                  >
-                    <div>
-                      <b>{t.name}</b>
-                      <small
-                        style={{
-                          display: "block",
-                          marginTop: 4,
-                          color: "var(--p-muted)",
-                        }}
-                      >
-                        Source: {t.source} • Detected {t.time}
-                      </small>
-                      <small
-                        style={{
-                          display: "block",
-                          marginTop: 2,
-                          fontSize: 12,
-                          color: "var(--p-muted)",
-                        }}
-                      >
-                        Scope: {t.scope}
-                      </small>
-                    </div>
-
-                    <div style={{ textAlign: "right" }}>
-                      <span className={`dot ${sevDot(t.severity)}`} />
-                      <small
-                        style={{
-                          display: "block",
-                          marginTop: 6,
-                          fontSize: 12,
-                          fontWeight: 700,
-                        }}
-                      >
-                        {t.status}
-                      </small>
-                    </div>
+                    <span
+                      style={{
+                        fontSize: 12,
+                        fontWeight: 700,
+                        color: severityColor(t?.severity),
+                      }}
+                    >
+                      {safeStr(t?.severity, "unknown").toUpperCase()}
+                    </span>
                   </div>
 
-                  {/* ===== RESPONSE CONTEXT ===== */}
-                  <div
-                    style={{
-                      marginTop: 12,
-                      fontSize: 12,
-                      color: "var(--p-muted)",
-                    }}
-                  >
-                    Recommended next step:
-                    <br />– Review impact
-                    <br />– Validate containment
-                    <br />– Assign remediation owner
+                  <div style={{ fontSize: 13, opacity: 0.6, marginTop: 4 }}>
+                    {safeStr(t?.source, "Unknown source")}
                   </div>
                 </div>
-              ))}
+              ))
+            )}
           </div>
+        </div>
 
-          <button
-            onClick={load}
-            disabled={loading}
-            style={{ marginTop: 18 }}
-          >
-            {loading ? "Refreshing…" : "Refresh Threats"}
-          </button>
-        </section>
+        {/* ================= RIGHT: DETAILS ================= */}
+        <div className="card">
+          {selected ? (
+            <>
+              <h3>{safeStr(selected?.title)}</h3>
 
-        {/* ===== RIGHT: ANALYST GUIDANCE ===== */}
-        <aside className="postureCard">
-          <h3>Response Guidance</h3>
-          <p className="muted">
-            Focus on threats with highest risk and exposure.
-          </p>
-
-          <ul className="list">
-            <li>
-              <span className="dot bad" />
-              <div>
-                <b>Critical Threats</b>
-                <small>Immediate response required</small>
+              <div style={{ fontSize: 13, opacity: 0.7, marginBottom: 14 }}>
+                Severity:{" "}
+                <span
+                  style={{
+                    color: severityColor(selected?.severity),
+                    fontWeight: 700,
+                  }}
+                >
+                  {safeStr(selected?.severity).toUpperCase()}
+                </span>
               </div>
-            </li>
 
-            <li>
-              <span className="dot warn" />
-              <div>
-                <b>Ongoing Investigations</b>
-                <small>Monitor for escalation</small>
+              <div style={{ marginBottom: 14 }}>
+                {safeStr(selected?.description, "No details available.")}
               </div>
-            </li>
 
-            <li>
-              <span className="dot ok" />
-              <div>
-                <b>Contained Events</b>
-                <small>No active spread detected</small>
+              <div style={{ fontSize: 13, opacity: 0.6 }}>
+                Status: {safeStr(selected?.status)}
               </div>
-            </li>
-          </ul>
 
-          <p className="muted" style={{ marginTop: 14 }}>
-            Ask the assistant:
-            <br />• “Which threat is highest priority?”
-            <br />• “What system is most at risk?”
-            <br />• “What should be done next?”
-          </p>
-        </aside>
+              <button
+                className="btn"
+                style={{ marginTop: 20 }}
+              >
+                Investigate
+              </button>
+            </>
+          ) : (
+            <div style={{ opacity: 0.6 }}>
+              Select a threat to view details.
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
