@@ -1,6 +1,10 @@
 /* =========================================================
    AUTOSHIELD CORE LAYOUT — INSTITUTIONAL STABLE BUILD
-   FULL INTEGRATED VERSION
+   FULL HARDENED + SCROLL FIX + NAV FIX
+   ========================================================= */
+
+/* =========================================================
+   ROOT
    ========================================================= */
 
 .layout-root{
@@ -8,13 +12,14 @@
   min-height:100svh;
   width:100%;
   position:relative;
-  overflow:hidden;
+  overflow:visible; /* 🔥 FIXED — allows vertical scroll */
   z-index:1;
 }
 
-/* =============================
+/* =========================================================
    SIDEBAR
-   ============================= */
+   ========================================================= */
+
 .layout-sidebar{
   width:260px;
   background:linear-gradient(
@@ -31,6 +36,15 @@
   z-index:40;
   backdrop-filter: blur(10px);
 }
+
+/* Logo clickable cursor */
+.layout-brand{
+  cursor:pointer;
+}
+
+/* =========================================================
+   NAV
+   ========================================================= */
 
 .layout-nav{
   display:flex;
@@ -58,9 +72,10 @@
   font-weight:600;
 }
 
-/* =============================
+/* =========================================================
    MAIN COLUMN
-   ============================= */
+   ========================================================= */
+
 .layout-main{
   flex:1;
   display:flex;
@@ -68,11 +83,14 @@
   min-width:0;
   position:relative;
   z-index:2;
+  overflow:hidden;
 }
 
+/* 🔥 SCROLL FIX LIVES HERE */
 .layout-content{
   flex:1;
-  overflow:auto;
+  overflow-y:auto;
+  overflow-x:hidden;
   padding:22px;
   position:relative;
   z-index:2;
@@ -238,17 +256,6 @@
 }
 
 /* =========================================================
-   PUBLIC PAGE SAFETY
-   ========================================================= */
-
-.landing-page,
-.pricing-page,
-.signup-page{
-  min-height:100svh;
-  overflow-x:hidden;
-}
-
-/* =========================================================
    COMMAND MODE
    ========================================================= */
 
@@ -271,7 +278,7 @@
 }
 
 /* =========================================================
-   🔥 TRADING COMMAND CENTER
+   TRADING COMMAND CENTER
    ========================================================= */
 
 .trading-room{
@@ -288,39 +295,10 @@
   padding-bottom:12px;
 }
 
-.trading-alert{
-  background:rgba(255,70,70,.12);
-  border:1px solid rgba(255,70,70,.35);
-  padding:14px 18px;
-  border-radius:10px;
-  font-weight:600;
-  color:#ff4d4d;
-}
-
 .trading-grid{
   display:grid;
   grid-template-columns:repeat(auto-fit,minmax(280px,1fr));
   gap:20px;
-}
-
-.trading-card{
-  background:linear-gradient(
-    180deg,
-    rgba(255,255,255,.04),
-    rgba(0,0,0,.45)
-  );
-  border:1px solid rgba(255,255,255,.08);
-  border-radius:16px;
-  padding:20px;
-  display:flex;
-  flex-direction:column;
-  gap:10px;
-  transition:all .25s ease;
-}
-
-.trading-card:hover{
-  border-color:rgba(120,160,255,.4);
-  transform:translateY(-3px);
 }
 
 .trading-market-grid{
@@ -328,21 +306,4 @@
   grid-template-columns:repeat(auto-fit,minmax(140px,1fr));
   gap:12px;
   margin-top:14px;
-}
-
-.trading-ticker{
-  background:rgba(255,255,255,.05);
-  border:1px solid rgba(255,255,255,.08);
-  padding:12px;
-  border-radius:12px;
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  font-weight:600;
-  transition:all .2s ease;
-}
-
-.trading-ticker:hover{
-  background:rgba(120,160,255,.1);
-  border-color:rgba(120,160,255,.4);
 }
