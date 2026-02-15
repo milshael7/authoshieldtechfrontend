@@ -1,5 +1,5 @@
 /* =========================================================
-   AUTOSHIELD CORE LAYOUT — FINAL HARDENED (LOCKED)
+   AUTOSHIELD CORE LAYOUT — INSTITUTIONAL STABLE BUILD
    File: frontend/src/styles/layout.css
    ========================================================= */
 
@@ -31,11 +31,6 @@
   z-index:40;
   backdrop-filter: blur(10px);
 }
-
-/* =========================================================
-   🔥 SIDEBAR NAV FIX (CRITICAL)
-   Fixes horizontal link collapse
-   ========================================================= */
 
 .layout-nav{
   display:flex;
@@ -75,30 +70,6 @@
   z-index:2;
 }
 
-/* =============================
-   TOPBAR (Reserved / Future)
-   ============================= */
-.layout-topbar{
-  position:sticky;
-  top:0;
-  z-index:35;
-  padding:14px 20px;
-  border-bottom:1px solid rgba(255,255,255,.12);
-  background:linear-gradient(
-    180deg,
-    rgba(255,255,255,.08),
-    rgba(0,0,0,.45)
-  );
-  backdrop-filter: blur(10px);
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:14px;
-}
-
-/* =============================
-   CONTENT AREA
-   ============================= */
 .layout-content{
   flex:1;
   overflow:auto;
@@ -107,9 +78,92 @@
   z-index:2;
 }
 
-/* =============================
-   ADVISOR DRAWER (FIXED)
-   ============================= */
+/* =========================================================
+   🔥 INSTITUTIONAL CARD SYSTEM
+   ========================================================= */
+
+.card{
+  background:linear-gradient(
+    180deg,
+    rgba(255,255,255,.05),
+    rgba(0,0,0,.35)
+  );
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:14px;
+  padding:18px;
+  backdrop-filter: blur(8px);
+  transition:all .2s ease;
+}
+
+.card:hover{
+  border-color:rgba(120,160,255,.3);
+  transform:translateY(-2px);
+}
+
+.card.small{
+  padding:12px;
+  font-size:14px;
+  border-radius:10px;
+}
+
+/* =========================================================
+   BUTTON SYSTEM
+   ========================================================= */
+
+.btn{
+  padding:10px 16px;
+  border-radius:8px;
+  border:none;
+  font-weight:600;
+  cursor:pointer;
+  transition:all .2s ease;
+  background:linear-gradient(
+    180deg,
+    rgba(120,160,255,.85),
+    rgba(70,110,255,.75)
+  );
+  color:#fff;
+}
+
+.btn:hover{
+  transform:translateY(-1px);
+  opacity:.9;
+}
+
+.btn.secondary{
+  background:rgba(255,255,255,.08);
+  border:1px solid rgba(255,255,255,.1);
+  color:#cfd8ff;
+}
+
+.btn.danger{
+  background:rgba(255,70,70,.85);
+}
+
+.logout-btn{
+  margin-top:auto;
+}
+
+/* =========================================================
+   STATUS COLORS
+   ========================================================= */
+
+.status-positive{
+  color:#5EC6FF;
+}
+
+.status-negative{
+  color:#ff4d4d;
+}
+
+.status-neutral{
+  color:#999;
+}
+
+/* =========================================================
+   ADVISOR DRAWER
+   ========================================================= */
+
 .ai-drawer{
   position:sticky;
   bottom:0;
@@ -141,7 +195,6 @@
   cursor:pointer;
 }
 
-/* Advisor scroll fix */
 .ai-drawer-body{
   height:min(70vh,520px);
   padding:12px;
@@ -156,15 +209,15 @@
   }
 }
 
-/* =============================
+/* =========================================================
    MOBILE SIDEBAR
-   ============================= */
+   ========================================================= */
+
 .sidebar-overlay{
   display:none;
 }
 
 @media (max-width:768px){
-  .mobile-menu-btn{ display:block; }
 
   .layout-sidebar{
     position:fixed;
@@ -200,9 +253,10 @@
   }
 }
 
-/* =============================
+/* =========================================================
    PUBLIC PAGE SAFETY
-   ============================= */
+   ========================================================= */
+
 .landing-page,
 .pricing-page,
 .signup-page{
@@ -210,7 +264,9 @@
   overflow-x:hidden;
 }
 
-/* ================= COMMAND MODE ================= */
+/* =========================================================
+   COMMAND MODE
+   ========================================================= */
 
 .layout-command .layout-sidebar {
   display: none;
@@ -228,7 +284,6 @@
   padding: 24px;
 }
 
-/* Focus Mode */
 .layout-focus .layout-sidebar.collapsed {
   width: 70px;
 }
