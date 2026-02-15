@@ -37,7 +37,7 @@ import Reports from "./pages/Reports.jsx";
 import Notifications from "./pages/Notifications.jsx";
 import NotFound from "./pages/NotFound.jsx";
 
-/* ================= NEW: TRADING ================= */
+/* ================= TRADING ================= */
 
 import TradingRoom from "./pages/TradingRoom.jsx";
 
@@ -86,8 +86,11 @@ function AppRoutes({ user }) {
         return "/company";
       case "small_company":
         return "/small-company";
-      default:
+      case "individual":
+      case "user":
         return "/user";
+      default:
+        return "/";
     }
   }
 
@@ -117,10 +120,7 @@ function AppRoutes({ user }) {
         <Route path="compliance" element={<Compliance />} />
         <Route path="policies" element={<Policies />} />
         <Route path="reports" element={<Reports />} />
-
-        {/* 🔥 FIXED: TRADING ROUTE */}
         <Route path="trading" element={<TradingRoom />} />
-
         <Route path="notifications" element={<Notifications />} />
       </Route>
 
@@ -139,6 +139,10 @@ function AppRoutes({ user }) {
         <Route path="incidents" element={<Incidents />} />
         <Route path="vulnerabilities" element={<Vulnerabilities />} />
         <Route path="reports" element={<Reports />} />
+
+        {/* 🔥 MANAGER OWN TRADING ROUTE */}
+        <Route path="trading" element={<TradingRoom />} />
+
         <Route path="notifications" element={<Notifications />} />
       </Route>
 
