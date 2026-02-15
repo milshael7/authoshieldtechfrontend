@@ -1,144 +1,191 @@
-// frontend/src/pages/Reports.jsx
-// SOC Reports & Analytics — Phase 1
-// Executive-ready reporting & trend visibility
-// SAFE: UI-only, builds strictly on platform.css + existing layout
-
 import React, { useEffect, useMemo, useState } from "react";
+import { api } from "../lib/api.js";
+
+/* ================= HELPERS ================= */
+
+function safeArray(v) {
+  return Array.isArray(v) ? v : [];
+}
+
+function formatDate(d) {
+  if (!d) return "—";
+  try {
+    return new Date(d).toLocaleDateString();
+  } catch {
+    return "—";
+  }
+}
 
 /* ================= PAGE ================= */
 
 export default function Reports() {
+  const [reports, setReports] = useState([]);
+  const [selected, setSelected] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Placeholder data until backend reporting APIs are wired
-  const [metrics, setMetrics] = useState({
-    posture: 82,
-    incidents: 14,
-    critical: 3,
-    resolved: 21,
-  });
-
-  const [trends, setTrends] = useState([
-    { label: "Security Score", value: "▲ +6%" },
-    { label: "Incidents", value: "▼ -12%" },
-    { label: "Critical Risks", value: "▼ -1" },
-    { label: "MTTR", value: "▲ Improved" },
-  ]);
+  async function load() {
+    setLoading(true);
+    try {
+      const res = await api.reports().catch(() => ({}));
+      setReports(safeArray(res?.reports));
+    } catch {
+      setReports([]);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
-    // Simulate report load
-    const t = setTimeout(() => setLoading(false), 500);
-    return () => clearTimeout(t);
+    load();
   }, []);
 
-  const posturePct = useMemo(() => metrics.posture, [metrics]);
+  const summary = useMemo(() => {
+    return {
+      total: reports.length,
+      critical: reports.filter(r => r?.severity === "critical").length,
+      high: reports.filter(r => r?.severity === "high").length,
+      informational: reports.filter(r => r?.severity === "info").length,
+    };
+  }, [reports]);
 
   /* ================= UI ================= */
 
   return (
-    <div className="postureWrap">
-      {/* ================= LEFT: REPORT SUMMARY ================= */}
-      <section className="postureCard">
-        <div className="postureTop">
-          <div>
-            <h2>Security Reports</h2>
-            <small>
-              Executive overview and operational reporting
-            </small>
-          </div>
+    <div style={{ padding: 32, display: "flex", flexDirection: "column", gap: 28 }}>
 
-          <div className="postureScore">
-            <div
-              className="scoreRing"
-              style={{ "--val": posturePct }}
-            >
-              {posturePct}%
-            </div>
-            <div className="scoreMeta">
-              <b>Posture Score</b>
-              <span>{loading ? "Calculating…" : "Current"}</span>
-            </div>
+      {/* ================= HEADER ================= */}
+      <div>
+        <h2 style={{ margin: 0 }}>Reports Intelligence Center</h2>
+        <div style={{ fontSize: 13, opacity: 0.6 }}>
+          Executive security reports and operational summaries
+        </div>
+      </div>
+
+      {/* ================= SUMMARY ================= */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))",
+          gap: 20,
+        }}
+      >
+        <div className="card">
+          <div style={{ fontSize: 12, opacity: 0.6 }}>Total Reports</div>
+          <div style={{ fontSize: 26, fontWeight: 800 }}>{summary.total}</div>
+        </div>
+
+        <div className="card">
+          <div style={{ fontSize: 12, opacity: 0.6 }}>Critical</div>
+          <div style={{ fontSize: 26, fontWeight: 800, color: "#ff4d4d" }}>
+            {summary.critical}
           </div>
         </div>
 
-        <div className="meter">
-          <div style={{ width: `${posturePct}%` }} />
-        </div>
-
-        {/* ===== KPI BLOCK ===== */}
-        <div className="coverGrid">
-          <div>
-            <div className="coverItemTop">
-              <b>Total Incidents</b>
-              <small>{metrics.incidents}</small>
-            </div>
-            <div className="coverBar">
-              <div style={{ width: "70%" }} />
-            </div>
-          </div>
-
-          <div>
-            <div className="coverItemTop">
-              <b>Critical Findings</b>
-              <small>{metrics.critical}</small>
-            </div>
-            <div className="coverBar">
-              <div style={{ width: "35%" }} />
-            </div>
-          </div>
-
-          <div>
-            <div className="coverItemTop">
-              <b>Resolved Issues</b>
-              <small>{metrics.resolved}</small>
-            </div>
-            <div className="coverBar">
-              <div style={{ width: "85%" }} />
-            </div>
-          </div>
-
-          <div>
-            <div className="coverItemTop">
-              <b>Risk Reduction</b>
-              <small>Positive</small>
-            </div>
-            <div className="coverBar">
-              <div style={{ width: "78%" }} />
-            </div>
+        <div className="card">
+          <div style={{ fontSize: 12, opacity: 0.6 }}>High</div>
+          <div style={{ fontSize: 26, fontWeight: 800, color: "#ffd166" }}>
+            {summary.high}
           </div>
         </div>
 
-        <button style={{ marginTop: 18 }}>
-          Export Report (PDF / CSV)
-        </button>
-      </section>
+        <div className="card">
+          <div style={{ fontSize: 12, opacity: 0.6 }}>Informational</div>
+          <div style={{ fontSize: 26, fontWeight: 800, color: "#5EC6FF" }}>
+            {summary.informational}
+          </div>
+        </div>
+      </div>
 
-      {/* ================= RIGHT: TRENDS & GOVERNANCE ================= */}
-      <aside className="postureCard">
-        <h3>Trends & Governance</h3>
-        <p className="muted">
-          Directional insight for leadership and audits.
-        </p>
+      {/* ================= MAIN GRID ================= */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "2fr 1fr",
+          gap: 24,
+        }}
+      >
 
-        <ul className="list">
-          {trends.map((t) => (
-            <li key={t.label}>
-              <span className="dot ok" />
-              <div>
-                <b>{t.label}</b>
-                <small>{t.value}</small>
+        {/* ================= LEFT: REPORT LIST ================= */}
+        <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+          <div style={{ maxHeight: 520, overflowY: "auto" }}>
+
+            {loading ? (
+              <div style={{ padding: 20 }}>Loading reports...</div>
+            ) : reports.length === 0 ? (
+              <div style={{ padding: 20 }}>No reports available.</div>
+            ) : (
+              safeArray(reports).map((r, idx) => (
+                <div
+                  key={r?.id || idx}
+                  onClick={() => setSelected(r)}
+                  style={{
+                    padding: 18,
+                    borderBottom: "1px solid rgba(255,255,255,0.08)",
+                    cursor: "pointer",
+                    background:
+                      selected?.id === r?.id
+                        ? "rgba(94,198,255,0.08)"
+                        : "transparent",
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <strong>{r?.title || "Security Report"}</strong>
+
+                    <span
+                      style={{
+                        fontSize: 12,
+                        fontWeight: 700,
+                        color:
+                          r?.severity === "critical"
+                            ? "#ff4d4d"
+                            : r?.severity === "high"
+                            ? "#ffd166"
+                            : "#5EC6FF",
+                      }}
+                    >
+                      {String(r?.severity || "info").toUpperCase()}
+                    </span>
+                  </div>
+
+                  <div style={{ fontSize: 13, opacity: 0.6, marginTop: 4 }}>
+                    Created: {formatDate(r?.createdAt)}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* ================= RIGHT: DETAIL ================= */}
+        <div className="card">
+          {selected ? (
+            <>
+              <h3>{selected?.title}</h3>
+
+              <div style={{ fontSize: 13, opacity: 0.6, marginBottom: 12 }}>
+                Created: {formatDate(selected?.createdAt)}
               </div>
-            </li>
-          ))}
-        </ul>
 
-        <p className="muted" style={{ marginTop: 14 }}>
-          Use the assistant to ask:
-          <br />• “How has our security posture changed?”
-          <br />• “What should leadership focus on?”
-          <br />• “Are we improving quarter over quarter?”
-        </p>
-      </aside>
+              <div style={{ marginBottom: 18 }}>
+                {selected?.summary ||
+                  "Detailed security analysis and recommendations."}
+              </div>
+
+              <button className="btn" style={{ marginBottom: 10 }}>
+                Export PDF
+              </button>
+
+              <button className="btn" style={{ marginLeft: 10 }}>
+                Share with Executive Team
+              </button>
+            </>
+          ) : (
+            <div style={{ opacity: 0.6 }}>
+              Select a report to view executive summary.
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
