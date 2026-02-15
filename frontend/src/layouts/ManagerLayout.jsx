@@ -1,13 +1,9 @@
 // frontend/src/layouts/ManagerLayout.jsx
-// Manager Layout — Institutional Operational SOC (PHASE 3 HARDENED)
-//
-// FIXES:
-// - Relative routing
-// - Scroll-safe architecture
-// - Proper trading route
-// - Stable sidebar
-// - Clean navigation
-// - Production hardened
+// Manager Layout — Institutional Operational SOC (STABILIZED)
+// Clean relative routing
+// No cross-role leakage
+// Scroll-safe
+// Production hardened
 
 import React, { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
@@ -32,10 +28,8 @@ export default function ManagerLayout() {
   }
 
   return (
-    <div
-      className={`layout-root ${menuOpen ? "sidebar-open" : ""}`}
-      style={{ height: "100svh" }}
-    >
+    <div className={`layout-root ${menuOpen ? "sidebar-open" : ""}`}>
+
       {/* ================= MOBILE OVERLAY ================= */}
       {menuOpen && (
         <div
@@ -45,10 +39,8 @@ export default function ManagerLayout() {
       )}
 
       {/* ================= SIDEBAR ================= */}
-      <aside
-        className="layout-sidebar manager"
-        style={{ overflowY: "auto" }}
-      >
+      <aside className="layout-sidebar manager">
+
         <div className="layout-brand">
           <Logo size="md" />
           <span className="muted" style={{ fontSize: 12 }}>
@@ -82,14 +74,10 @@ export default function ManagerLayout() {
             Reports
           </NavLink>
 
-          {/* 🔥 Trading Access (Manager View) */}
-          <NavLink to="/admin/trading" onClick={closeMenu}>
-            Trading Oversight
-          </NavLink>
-
           <NavLink to="notifications" onClick={closeMenu}>
             Notifications
           </NavLink>
+
         </nav>
 
         <button className="btn logout-btn" onClick={logout}>
@@ -98,22 +86,10 @@ export default function ManagerLayout() {
       </aside>
 
       {/* ================= MAIN ================= */}
-      <main
-        className="layout-main"
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          overflow: "hidden",
-        }}
-      >
+      <main className="layout-main">
+
         {/* ================= CONTENT ================= */}
-        <section
-          className="layout-content"
-          style={{
-            flex: 1,
-            overflowY: "auto",
-          }}
-        >
+        <section className="layout-content">
           <Outlet />
         </section>
 
@@ -141,6 +117,7 @@ export default function ManagerLayout() {
             />
           </div>
         </section>
+
       </main>
     </div>
   );
