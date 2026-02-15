@@ -1,6 +1,8 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 
 const API_BASE = "/api";
+
+/* ================= HELPERS ================= */
 
 function money(v) {
   if (v == null) return "—";
@@ -12,12 +14,18 @@ function pct(v) {
   return `${(Number(v) * 100).toFixed(2)}%`;
 }
 
+/* =========================================================
+   TRADING COMMAND CENTER
+========================================================= */
+
 export default function TradingRoom() {
   const [paper, setPaper] = useState(null);
   const [live, setLive] = useState(null);
   const [risk, setRisk] = useState(null);
   const [prices, setPrices] = useState({});
   const [wsStatus, setWsStatus] = useState("disconnected");
+
+  /* ================= SNAPSHOTS ================= */
 
   async function loadSnapshots() {
     try {
@@ -37,9 +45,11 @@ export default function TradingRoom() {
 
   useEffect(() => {
     loadSnapshots();
-    const interval = setInterval(loadSnapshots, 4000);
+    const interval = setInterval(loadSnapshots, 5000);
     return () => clearInterval(interval);
   }, []);
+
+  /* ================= WEBSOCKET ================= */
 
   useEffect(() => {
     const protocol =
@@ -68,68 +78,141 @@ export default function TradingRoom() {
     return () => ws.close();
   }, []);
 
+  /* ================= DERIVED ================= */
+
   const position = paper?.position;
+  const hasPosition = !!position;
+
+  /* =========================================================
+     UI
+  ========================================================= */
 
   return (
-    <div style={{ padding: 30 }}>
-      <h2>Trading Command Center</h2>
+    <div className="trading-room">
 
-      <p>Feed Status: {wsStatus}</p>
+      {/* ================= HEADER ================= */}
 
-      <hr />
+      <div className="trading-header">
+        <h2>Trading Command Center</h2>
 
-      <h3>Live Market</h3>
-      {Object.keys(prices).length === 0 ? (
-        <p>Waiting for ticks...</p>
-      ) : (
-        Object.entries(prices).map(([symbol, price]) => (
-          <div key={symbol}>
-            {symbol}: {price}
+        <div
+          className={`badge ${
+            wsStatus === "connected"
+              ? "ok"
+              : wsStatus === "error"
+              ? "warn"
+              : ""
+          }`}
+        >
+          Feed: {wsStatus.toUpperCase()}
+        </div>
+      </div>
+
+      {/* ================= ALERT ================= */}
+
+      {risk?.halted && (
+        <div className="trading-alert">
+          Trading Halted — {risk.haltReason || "Risk Governor Active"}
+        </div>
+      )}
+
+      {/* ================= MARKET GRID ================= */}
+
+      <div className="trading-card">
+        <h3>Live Market Stream</h3>
+
+        {Object.keys(prices).length === 0 ? (
+          <div className="muted">Waiting for market ticks…</div>
+        ) : (
+          <div className="trading-market-grid">
+            {Object.entries(prices).map(([symbol, price]) => (
+              <div key={symbol} className="trading-ticker">
+                <span>{symbol}</span>
+                <span>{price}</span>
+              </div>
+            ))}
           </div>
-        ))
-      )}
+        )}
+      </div>
 
-      <hr />
+      {/* ================= MAIN GRID ================= */}
 
-      <h3>Paper Engine</h3>
-      {paper ? (
-        <>
-          <div>Equity: {money(paper.equity)}</div>
-          <div>Trades: {paper.trades?.length || 0}</div>
-        </>
-      ) : (
-        <p>Unavailable</p>
-      )}
+      <div className="trading-grid">
 
-      <hr />
+        {/* ===== PAPER ENGINE ===== */}
+        <div className="trading-card">
+          <h3>Paper Engine</h3>
 
-      <h3>Live Engine</h3>
-      {live ? (
-        <>
-          <div>Mode: {live.mode}</div>
-          <div>Equity: {money(live.equity)}</div>
-          <div>Margin Used: {money(live.marginUsed)}</div>
+          <div>Equity: {money(paper?.equity)}</div>
+          <div>Peak: {money(paper?.peakEquity)}</div>
+          <div>Trades: {paper?.trades?.length || 0}</div>
+
+          <hr style={{ opacity: 0.15 }} />
+
+          <h4>Active Position</h4>
+
+          {hasPosition ? (
+            <>
+              <div>Quantity: {position.qty}</div>
+              <div>Entry: {money(position.entry)}</div>
+            </>
+          ) : (
+            <div className="muted">No open position</div>
+          )}
+        </div>
+
+        {/* ===== LIVE ENGINE ===== */}
+        <div className="trading-card">
+          <h3>Live Engine</h3>
+
+          <div>Mode: {live?.mode || "—"}</div>
+          <div>Equity: {money(live?.equity)}</div>
+          <div>Margin Used: {money(live?.marginUsed)}</div>
+
           <div>
-            Liquidation: {live.liquidation ? "YES" : "No"}
+            Liquidation:{" "}
+            {live?.liquidation ? (
+              <span className="status-negative">YES ⚠</span>
+            ) : (
+              "No"
+            )}
           </div>
-        </>
-      ) : (
-        <p>Unavailable</p>
-      )}
+        </div>
 
-      <hr />
+        {/* ===== RISK ENGINE ===== */}
+        <div className="trading-card">
+          <h3>Risk Engine</h3>
 
-      <h3>Risk</h3>
-      {risk ? (
-        <>
-          <div>Halted: {risk.halted ? "YES" : "No"}</div>
-          <div>Reason: {risk.haltReason || "—"}</div>
-          <div>Multiplier: {risk.riskMultiplier?.toFixed(2)}</div>
-          <div>Drawdown: {pct(risk.drawdown)}</div>
-        </>
-      ) : (
-        <p>Unavailable</p>
-      )}
+          <div>
+            Halted:{" "}
+            {risk?.halted ? (
+              <span className="status-negative">YES</span>
+            ) : (
+              "No"
+            )}
+          </div>
+
+          <div>Multiplier: {risk?.riskMultiplier?.toFixed(2)}</div>
+          <div>Drawdown: {pct(risk?.drawdown)}</div>
+          <div>Reason: {risk?.haltReason || "—"}</div>
+        </div>
+
+        {/* ===== PERFORMANCE ===== */}
+        <div className="trading-card">
+          <h3>Performance Snapshot</h3>
+
+          <div>Paper Equity: {money(paper?.equity)}</div>
+          <div>Live Equity: {money(live?.equity)}</div>
+
+          <div>
+            Delta:{" "}
+            {money(
+              (live?.equity || 0) - (paper?.equity || 0)
+            )}
+          </div>
+        </div>
+
+      </div>
     </div>
   );
 }
