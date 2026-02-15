@@ -8,6 +8,7 @@ export default function TradingRoom() {
   const [risk, setRisk] = useState(null);
   const [prices, setPrices] = useState({});
   const [wsStatus, setWsStatus] = useState("disconnected");
+  const [loading, setLoading] = useState(true);
 
   /* =======================================================
      LOAD SNAPSHOTS
@@ -26,6 +27,8 @@ export default function TradingRoom() {
       if (riskRes.ok) setRisk(riskRes.risk);
     } catch (err) {
       console.error("Snapshot load failed:", err);
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -55,7 +58,7 @@ export default function TradingRoom() {
       try {
         const data = JSON.parse(msg.data);
         if (data.type === "tick") {
-          setPrices((prev) => ({
+          setPrices(prev => ({
             ...prev,
             [data.symbol]: data.price,
           }));
@@ -67,107 +70,150 @@ export default function TradingRoom() {
   }, []);
 
   /* =======================================================
+     HELPERS
+  ======================================================= */
+
+  function money(v) {
+    if (v == null) return "-";
+    return `$${Number(v).toFixed(2)}`;
+  }
+
+  function pct(v) {
+    if (v == null) return "-";
+    return `${(Number(v) * 100).toFixed(2)}%`;
+  }
+
+  function statusColor(status) {
+    if (status === "connected") return "#5EC6FF";
+    if (status === "error") return "#ff4d4d";
+    return "#999";
+  }
+
+  /* =======================================================
      UI
   ======================================================= */
 
-  return (
-    <div className="postureWrap" style={{ padding: 20 }}>
-      <h2>Trading Oversight</h2>
+  if (loading) {
+    return (
+      <div className="postureWrap" style={{ padding: 30 }}>
+        Loading trading engine...
+      </div>
+    );
+  }
 
-      <div style={{ marginBottom: 20 }}>
-        <strong>WebSocket:</strong>{" "}
-        <span
-          style={{
-            color:
-              wsStatus === "connected"
-                ? "#5EC6FF"
-                : wsStatus === "error"
-                ? "#ff4d4d"
-                : "#aaa",
-          }}
-        >
-          {wsStatus}
+  return (
+    <div className="postureWrap" style={{ padding: 30 }}>
+      <h2 style={{ marginBottom: 20 }}>Trading Oversight</h2>
+
+      {/* ================= CONNECTION STATUS ================= */}
+      <div style={{ marginBottom: 30 }}>
+        <strong>Market Feed:</strong>{" "}
+        <span style={{ color: statusColor(wsStatus) }}>
+          {wsStatus.toUpperCase()}
         </span>
       </div>
 
-      {/* ================= PAPER ================= */}
+      {/* ================= GRID ================= */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
+          gap: 20,
+        }}
+      >
+        {/* PAPER */}
+        <div className="card">
+          <h3>Paper Engine</h3>
+          {paper ? (
+            <>
+              <div>Equity: {money(paper.equity)}</div>
+              <div>Peak: {money(paper.peakEquity)}</div>
+              <div>Trades: {paper.trades?.length || 0}</div>
+              <div>
+                Position:{" "}
+                {paper.position
+                  ? `${paper.position.qty} @ ${paper.position.entry}`
+                  : "None"}
+              </div>
+            </>
+          ) : (
+            "Unavailable"
+          )}
+        </div>
 
-      <section style={{ marginBottom: 30 }}>
-        <h3>Paper Engine</h3>
-        {paper ? (
-          <div>
-            <div>Equity: ${paper.equity?.toFixed(2)}</div>
-            <div>Peak: ${paper.peakEquity?.toFixed(2)}</div>
-            <div>
-              Position:{" "}
-              {paper.position
-                ? `${paper.position.qty} @ ${paper.position.entry}`
-                : "None"}
-            </div>
-            <div>Trades: {paper.trades?.length}</div>
-          </div>
-        ) : (
-          <div>Loading...</div>
-        )}
-      </section>
+        {/* LIVE */}
+        <div className="card">
+          <h3>Live Engine</h3>
+          {live ? (
+            <>
+              <div>Mode: {live.mode}</div>
+              <div>Equity: {money(live.equity)}</div>
+              <div>Margin Used: {money(live.marginUsed)}</div>
+              <div>
+                Maintenance: {money(live.maintenanceRequired)}
+              </div>
+              <div>
+                Liquidation:{" "}
+                {live.liquidation ? (
+                  <span style={{ color: "#ff4d4d" }}>YES ⚠️</span>
+                ) : (
+                  "No"
+                )}
+              </div>
+            </>
+          ) : (
+            "Unavailable"
+          )}
+        </div>
 
-      {/* ================= LIVE ================= */}
+        {/* RISK */}
+        <div className="card">
+          <h3>Risk Status</h3>
+          {risk ? (
+            <>
+              <div>
+                Halted:{" "}
+                {risk.halted ? (
+                  <span style={{ color: "#ff4d4d" }}>YES</span>
+                ) : (
+                  "No"
+                )}
+              </div>
+              <div>Reason: {risk.haltReason || "None"}</div>
+              <div>Multiplier: {risk.riskMultiplier?.toFixed(2)}</div>
+              <div>Drawdown: {pct(risk.drawdown)}</div>
+            </>
+          ) : (
+            "Unavailable"
+          )}
+        </div>
+      </div>
 
-      <section style={{ marginBottom: 30 }}>
-        <h3>Live Engine</h3>
-        {live ? (
-          <div>
-            <div>Mode: {live.mode}</div>
-            <div>Equity: ${live.equity?.toFixed(2)}</div>
-            <div>Margin Used: ${live.marginUsed?.toFixed(2)}</div>
-            <div>
-              Maintenance Required: $
-              {live.maintenanceRequired?.toFixed(2)}
-            </div>
-            <div>
-              Liquidation Flag:{" "}
-              {live.liquidation ? "YES ⚠️" : "No"}
-            </div>
-          </div>
-        ) : (
-          <div>Loading...</div>
-        )}
-      </section>
+      {/* ================= MARKET ================= */}
+      <div style={{ marginTop: 40 }}>
+        <h3>Live Market Prices</h3>
 
-      {/* ================= RISK ================= */}
-
-      <section style={{ marginBottom: 30 }}>
-        <h3>Risk Status</h3>
-        {risk ? (
-          <div>
-            <div>Halted: {risk.halted ? "YES" : "No"}</div>
-            <div>Reason: {risk.haltReason || "None"}</div>
-            <div>
-              Risk Multiplier: {risk.riskMultiplier?.toFixed(2)}
-            </div>
-            <div>
-              Drawdown: {(risk.drawdown * 100)?.toFixed(2)}%
-            </div>
-          </div>
-        ) : (
-          <div>Loading...</div>
-        )}
-      </section>
-
-      {/* ================= MARKET PRICES ================= */}
-
-      <section>
-        <h3>Live Market</h3>
         {Object.keys(prices).length === 0 ? (
-          <div>No ticks yet...</div>
+          <div style={{ opacity: 0.6 }}>Waiting for ticks...</div>
         ) : (
-          Object.entries(prices).map(([symbol, price]) => (
-            <div key={symbol}>
-              {symbol}: {price}
-            </div>
-          ))
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns:
+                "repeat(auto-fit, minmax(140px, 1fr))",
+              gap: 10,
+              marginTop: 10,
+            }}
+          >
+            {Object.entries(prices).map(([symbol, price]) => (
+              <div key={symbol} className="card small">
+                <strong>{symbol}</strong>
+                <div>{price}</div>
+              </div>
+            ))}
+          </div>
         )}
-      </section>
+      </div>
     </div>
   );
 }
