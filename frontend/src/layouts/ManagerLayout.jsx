@@ -1,9 +1,13 @@
 // frontend/src/layouts/ManagerLayout.jsx
-// Manager Layout — Institutional Operational SOC (HARDENED)
-// Structural parity with Admin
-// Trading-aware
-// Scroll-safe
-// Advisor locked
+// Manager Layout — Institutional Operational SOC (PHASE 3 HARDENED)
+//
+// FIXES:
+// - Relative routing
+// - Scroll-safe architecture
+// - Proper trading route
+// - Stable sidebar
+// - Clean navigation
+// - Production hardened
 
 import React, { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
@@ -23,18 +27,28 @@ export default function ManagerLayout() {
     navigate("/login");
   }
 
+  function closeMenu() {
+    setMenuOpen(false);
+  }
+
   return (
-    <div className={`layout-root ${menuOpen ? "sidebar-open" : ""}`}>
+    <div
+      className={`layout-root ${menuOpen ? "sidebar-open" : ""}`}
+      style={{ height: "100svh" }}
+    >
       {/* ================= MOBILE OVERLAY ================= */}
       {menuOpen && (
         <div
           className="sidebar-overlay"
-          onClick={() => setMenuOpen(false)}
+          onClick={closeMenu}
         />
       )}
 
       {/* ================= SIDEBAR ================= */}
-      <aside className="layout-sidebar manager">
+      <aside
+        className="layout-sidebar manager"
+        style={{ overflowY: "auto" }}
+      >
         <div className="layout-brand">
           <Logo size="md" />
           <span className="muted" style={{ fontSize: 12 }}>
@@ -43,42 +57,37 @@ export default function ManagerLayout() {
         </div>
 
         <nav className="layout-nav">
-          <NavLink to="/manager" end onClick={() => setMenuOpen(false)}>
+
+          <NavLink to="." end onClick={closeMenu}>
             Security Overview
           </NavLink>
 
-          <NavLink to="/manager/assets" onClick={() => setMenuOpen(false)}>
+          <NavLink to="assets" onClick={closeMenu}>
             Assets
           </NavLink>
 
-          <NavLink to="/manager/threats" onClick={() => setMenuOpen(false)}>
+          <NavLink to="threats" onClick={closeMenu}>
             Threats
           </NavLink>
 
-          <NavLink to="/manager/incidents" onClick={() => setMenuOpen(false)}>
+          <NavLink to="incidents" onClick={closeMenu}>
             Incidents
           </NavLink>
 
-          <NavLink
-            to="/manager/vulnerabilities"
-            onClick={() => setMenuOpen(false)}
-          >
+          <NavLink to="vulnerabilities" onClick={closeMenu}>
             Vulnerabilities
           </NavLink>
 
-          <NavLink to="/manager/reports" onClick={() => setMenuOpen(false)}>
+          <NavLink to="reports" onClick={closeMenu}>
             Reports
           </NavLink>
 
           {/* 🔥 Trading Access (Manager View) */}
-          <NavLink to="/admin/trading" onClick={() => setMenuOpen(false)}>
+          <NavLink to="/admin/trading" onClick={closeMenu}>
             Trading Oversight
           </NavLink>
 
-          <NavLink
-            to="/manager/notifications"
-            onClick={() => setMenuOpen(false)}
-          >
+          <NavLink to="notifications" onClick={closeMenu}>
             Notifications
           </NavLink>
         </nav>
@@ -89,9 +98,22 @@ export default function ManagerLayout() {
       </aside>
 
       {/* ================= MAIN ================= */}
-      <main className="layout-main">
+      <main
+        className="layout-main"
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
+        }}
+      >
         {/* ================= CONTENT ================= */}
-        <section className="layout-content">
+        <section
+          className="layout-content"
+          style={{
+            flex: 1,
+            overflowY: "auto",
+          }}
+        >
           <Outlet />
         </section>
 
@@ -103,7 +125,7 @@ export default function ManagerLayout() {
           <div className="ai-drawer-handle">
             <button
               className="ai-toggle"
-              onClick={() => setAssistantOpen((v) => !v)}
+              onClick={() => setAssistantOpen(v => !v)}
             >
               {assistantOpen ? "▼ Hide Advisor" : "▲ Show Advisor"}
             </button>
