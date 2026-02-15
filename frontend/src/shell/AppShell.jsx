@@ -1,7 +1,8 @@
 /* =========================================================
-   AutoShield Tech — Application Shell (SCROLL FIXED)
-   Clean Global Layout
-   Single Scroll Authority
+   AutoShield Tech — Application Shell
+   INSTITUTIONAL SCROLL ARCHITECTURE
+   Single Scroll Authority (BODY)
+   No Nested Scroll Conflicts
    ========================================================= */
 
 import React from "react";
@@ -11,7 +12,7 @@ import TopHeader from "../components/TopHeader.jsx";
 import "../styles/background.css";
 
 /* =========================================================
-   SAFE WRAPPER
+   SAFE WRAPPER (Prevents visual layer crashes)
 ========================================================= */
 
 class SafeRender extends React.Component {
@@ -35,7 +36,11 @@ class SafeRender extends React.Component {
 }
 
 /* =========================================================
-   APP SHELL (GLOBAL FRAME)
+   APP SHELL
+   RULE:
+   - BODY handles scrolling
+   - Shell never traps overflow
+   - No overflow:auto here
 ========================================================= */
 
 export default function AppShell({ children }) {
@@ -43,14 +48,15 @@ export default function AppShell({ children }) {
     <div
       className="app-shell"
       style={{
-        minHeight: "100svh",
+        minHeight: "100vh",
         width: "100%",
         backgroundColor: "#0B0E14",
+        position: "relative",
         display: "flex",
         flexDirection: "column",
       }}
     >
-      {/* ===== BACKGROUND LAYER ===== */}
+      {/* ================= BACKGROUND ================= */}
       <div
         aria-hidden="true"
         style={{
@@ -65,7 +71,7 @@ export default function AppShell({ children }) {
         </SafeRender>
       </div>
 
-      {/* ===== BRAND WATERMARK ===== */}
+      {/* ================= BRAND WATERMARK ================= */}
       <div
         aria-hidden="true"
         style={{
@@ -80,13 +86,15 @@ export default function AppShell({ children }) {
         </SafeRender>
       </div>
 
-      {/* ===== GLOBAL TOP HEADER ===== */}
+      {/* ================= GLOBAL HEADER ================= */}
       <div
         style={{
           position: "sticky",
           top: 0,
-          zIndex: 20,
+          zIndex: 50,
           width: "100%",
+          background: "rgba(11,14,20,0.85)",
+          backdropFilter: "blur(10px)",
         }}
       >
         <SafeRender>
@@ -94,7 +102,7 @@ export default function AppShell({ children }) {
         </SafeRender>
       </div>
 
-      {/* ===== APPLICATION CONTENT ===== */}
+      {/* ================= APPLICATION CONTENT ================= */}
       <div
         className="app-shell-content"
         style={{
