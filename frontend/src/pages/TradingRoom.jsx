@@ -1,188 +1,135 @@
-  {/* =======================================================
-     HEADER
-  ======================================================= */}
+import React, { useEffect, useState } from "react";
 
-  <div className="trading-top">
-    <div>
-      <h2 style={{ margin: 0 }}>Trading Command Center</h2>
-      <div style={{ opacity: 0.6, fontSize: 13 }}>
-        Institutional Oversight Interface
-      </div>
-    </div>
+const API_BASE = "/api";
 
-    <div
-      className={`badge ${
-        wsStatus === "connected"
-          ? "ok"
-          : wsStatus === "error"
-          ? "warn"
-          : ""
-      }`}
-    >
-      Feed: {wsStatus.toUpperCase()}
-    </div>
-  </div>
+function money(v) {
+  if (v == null) return "—";
+  return `$${Number(v).toFixed(2)}`;
+}
 
-  {/* =======================================================
-     KPI STRIP
-  ======================================================= */}
+function pct(v) {
+  if (v == null) return "—";
+  return `${(Number(v) * 100).toFixed(2)}%`;
+}
 
-  <div className="kpi-strip">
-    {kpis.map(k => (
-      <div key={k.label} className="kpi-card">
-        <small>{k.label}</small>
-        <b>{k.value}</b>
-      </div>
-    ))}
-  </div>
+export default function TradingRoom() {
+  const [paper, setPaper] = useState(null);
+  const [live, setLive] = useState(null);
+  const [risk, setRisk] = useState(null);
+  const [prices, setPrices] = useState({});
+  const [wsStatus, setWsStatus] = useState("disconnected");
 
-  {/* =======================================================
-     MAIN GRID
-  ======================================================= */}
+  async function loadSnapshots() {
+    try {
+      const [paperRes, liveRes, riskRes] = await Promise.all([
+        fetch(`${API_BASE}/trading/paper/snapshot`).then(r => r.json()),
+        fetch(`${API_BASE}/trading/live/snapshot`).then(r => r.json()),
+        fetch(`${API_BASE}/trading/risk/snapshot`).then(r => r.json()),
+      ]);
 
-  <div className="dashboard-grid">
+      if (paperRes.ok) setPaper(paperRes.snapshot);
+      if (liveRes.ok) setLive(liveRes.snapshot);
+      if (riskRes.ok) setRisk(riskRes.risk);
+    } catch (e) {
+      console.error("Trading load failed", e);
+    }
+  }
 
-    {/* ================= LEFT COLUMN ================= */}
+  useEffect(() => {
+    loadSnapshots();
+    const interval = setInterval(loadSnapshots, 4000);
+    return () => clearInterval(interval);
+  }, []);
 
-    <div className="card">
-      <div className="card-title">Live Market Stream</div>
-      <div className="card-sub">
-        Real-time tick feed
-      </div>
+  useEffect(() => {
+    const protocol =
+      window.location.protocol === "https:" ? "wss:" : "ws:";
 
+    const ws = new WebSocket(
+      `${protocol}//${window.location.host}/ws/market`
+    );
+
+    ws.onopen = () => setWsStatus("connected");
+    ws.onclose = () => setWsStatus("disconnected");
+    ws.onerror = () => setWsStatus("error");
+
+    ws.onmessage = (msg) => {
+      try {
+        const data = JSON.parse(msg.data);
+        if (data.type === "tick") {
+          setPrices(prev => ({
+            ...prev,
+            [data.symbol]: data.price,
+          }));
+        }
+      } catch {}
+    };
+
+    return () => ws.close();
+  }, []);
+
+  const position = paper?.position;
+
+  return (
+    <div style={{ padding: 30 }}>
+      <h2>Trading Command Center</h2>
+
+      <p>Feed Status: {wsStatus}</p>
+
+      <hr />
+
+      <h3>Live Market</h3>
       {Object.keys(prices).length === 0 ? (
-        <div style={{ opacity: 0.6 }}>Waiting for ticks...</div>
+        <p>Waiting for ticks...</p>
       ) : (
-        <div className="trading-market-grid">
-          {Object.entries(prices).map(([symbol, price]) => (
-            <div key={symbol} className="trading-ticker">
-              <span>{symbol}</span>
-              <span>{price}</span>
-            </div>
-          ))}
-        </div>
+        Object.entries(prices).map(([symbol, price]) => (
+          <div key={symbol}>
+            {symbol}: {price}
+          </div>
+        ))
+      )}
+
+      <hr />
+
+      <h3>Paper Engine</h3>
+      {paper ? (
+        <>
+          <div>Equity: {money(paper.equity)}</div>
+          <div>Trades: {paper.trades?.length || 0}</div>
+        </>
+      ) : (
+        <p>Unavailable</p>
+      )}
+
+      <hr />
+
+      <h3>Live Engine</h3>
+      {live ? (
+        <>
+          <div>Mode: {live.mode}</div>
+          <div>Equity: {money(live.equity)}</div>
+          <div>Margin Used: {money(live.marginUsed)}</div>
+          <div>
+            Liquidation: {live.liquidation ? "YES" : "No"}
+          </div>
+        </>
+      ) : (
+        <p>Unavailable</p>
+      )}
+
+      <hr />
+
+      <h3>Risk</h3>
+      {risk ? (
+        <>
+          <div>Halted: {risk.halted ? "YES" : "No"}</div>
+          <div>Reason: {risk.haltReason || "—"}</div>
+          <div>Multiplier: {risk.riskMultiplier?.toFixed(2)}</div>
+          <div>Drawdown: {pct(risk.drawdown)}</div>
+        </>
+      ) : (
+        <p>Unavailable</p>
       )}
     </div>
-
-    {/* ================= RIGHT COLUMN ================= */}
-
-    <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
-
-      {/* ACTIVE POSITION */}
-
-      <div className="card">
-        <div className="card-title">Active Position</div>
-
-        {position ? (
-          <table className="trading-table">
-            <tbody>
-              <tr>
-                <th>Quantity</th>
-                <td>{position.qty}</td>
-              </tr>
-              <tr>
-                <th>Entry</th>
-                <td>{money(position.entry)}</td>
-              </tr>
-              <tr>
-                <th>Trades</th>
-                <td>{paper?.trades?.length || 0}</td>
-              </tr>
-              <tr>
-                <th>Paper Equity</th>
-                <td>{money(paper?.equity)}</td>
-              </tr>
-            </tbody>
-          </table>
-        ) : (
-          <div style={{ opacity: 0.6 }}>
-            No open positions
-          </div>
-        )}
-      </div>
-
-      {/* LIVE ENGINE STATUS */}
-
-      <div className="card">
-        <div className="card-title">Live Engine Status</div>
-
-        {live ? (
-          <table className="trading-table">
-            <tbody>
-              <tr>
-                <th>Mode</th>
-                <td>{live.mode}</td>
-              </tr>
-              <tr>
-                <th>Equity</th>
-                <td>{money(live.equity)}</td>
-              </tr>
-              <tr>
-                <th>Margin Used</th>
-                <td>{money(live.marginUsed)}</td>
-              </tr>
-              <tr>
-                <th>Liquidation</th>
-                <td>
-                  {live.liquidation ? (
-                    <span className="status-negative">
-                      YES ⚠
-                    </span>
-                  ) : (
-                    <span className="status-positive">
-                      No
-                    </span>
-                  )}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        ) : (
-          "Unavailable"
-        )}
-      </div>
-
-      {/* RISK CONTROL */}
-
-      <div className="card">
-        <div className="card-title">Risk Control</div>
-
-        {risk ? (
-          <table className="trading-table">
-            <tbody>
-              <tr>
-                <th>Halted</th>
-                <td>
-                  {risk.halted ? (
-                    <span className="status-negative">
-                      YES
-                    </span>
-                  ) : (
-                    <span className="status-positive">
-                      No
-                    </span>
-                  )}
-                </td>
-              </tr>
-              <tr>
-                <th>Reason</th>
-                <td>{risk.haltReason || "—"}</td>
-              </tr>
-              <tr>
-                <th>Multiplier</th>
-                <td>{risk.riskMultiplier?.toFixed(2)}</td>
-              </tr>
-              <tr>
-                <th>Drawdown</th>
-                <td>{pct(risk.drawdown)}</td>
-              </tr>
-            </tbody>
-          </table>
-        ) : (
-          "Unavailable"
-        )}
-      </div>
-
-    </div>
-  </div>
-</div>
+  );
+}
