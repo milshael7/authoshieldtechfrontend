@@ -1,14 +1,16 @@
 /**
- * AuthoShield Tech — Official Logo Component (SMART NAV ENABLED)
+ * AuthoShield Tech — Official Logo Component
+ * Smart Role-Based Navigation • Production Hardened
  */
 
-import React from "react";
+import React, { useMemo, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { getSavedUser } from "../lib/api";
 
 export default function Logo({
   size = "md",
   variant = "full",
+  forceRoute = null, // optional override
 }) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -21,7 +23,13 @@ export default function Logo({
 
   const cfg = sizes[size] || sizes.md;
 
-  function resolveHomeRoute() {
+  /* =====================================================
+     RESOLVE HOME ROUTE
+  ===================================================== */
+
+  const resolvedHome = useMemo(() => {
+    if (forceRoute) return forceRoute;
+
     const user = getSavedUser();
     if (!user?.role) return "/";
 
@@ -42,20 +50,28 @@ export default function Logo({
       default:
         return "/";
     }
-  }
+  }, [forceRoute]);
 
-  function handleClick() {
-    const target = resolveHomeRoute();
+  /* =====================================================
+     CLICK HANDLER
+  ===================================================== */
 
-    if (location.pathname !== target) {
-      navigate(target);
+  const handleClick = useCallback(() => {
+    if (location.pathname !== resolvedHome) {
+      navigate(resolvedHome);
     }
-  }
+  }, [location.pathname, resolvedHome, navigate]);
+
+  /* =====================================================
+     UI
+  ===================================================== */
 
   return (
     <div
       className="authoshield-logo"
       onClick={handleClick}
+      role="button"
+      aria-label="Go to dashboard home"
       style={{
         display: "flex",
         alignItems: "center",
@@ -65,7 +81,6 @@ export default function Logo({
         cursor: "pointer",
       }}
     >
-      {/* Logo Image */}
       <img
         src="/logo.png"
         alt="AuthoShield Tech"
