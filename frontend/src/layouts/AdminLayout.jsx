@@ -1,9 +1,9 @@
 // frontend/src/layouts/AdminLayout.jsx
-// Admin Layout — Institutional Stable Build
+// Admin Layout — FULL SOC CONTROL (PHASE 4 HARDENED)
+// Includes Vulnerability Center
 // Scroll-safe
-// Clean routing
-// No forced height hacks
-// Production hardened
+// Clean navigation
+// Production ready
 
 import React, { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
@@ -29,15 +29,12 @@ export default function AdminLayout() {
 
   return (
     <div className={`layout-root ${menuOpen ? "sidebar-open" : ""}`}>
-
-      {/* ================= MOBILE OVERLAY ================= */}
       {menuOpen && (
         <div className="sidebar-overlay" onClick={closeMenu} />
       )}
 
       {/* ================= SIDEBAR ================= */}
       <aside className="layout-sidebar admin">
-
         <div className="layout-brand">
           <Logo size="md" />
           <span className="muted" style={{ fontSize: 12 }}>
@@ -67,6 +64,11 @@ export default function AdminLayout() {
             Vulnerabilities
           </NavLink>
 
+          {/* 🔥 NEW */}
+          <NavLink to="vulnerability-center" onClick={closeMenu}>
+            Vulnerability Center
+          </NavLink>
+
           <NavLink to="compliance" onClick={closeMenu}>
             Compliance
           </NavLink>
@@ -80,7 +82,7 @@ export default function AdminLayout() {
           </NavLink>
 
           <NavLink to="trading" onClick={closeMenu}>
-            Trading Oversight
+            Trading Command
           </NavLink>
 
           <NavLink to="notifications" onClick={closeMenu}>
@@ -105,16 +107,13 @@ export default function AdminLayout() {
 
       {/* ================= MAIN ================= */}
       <main className="layout-main">
-
-        {/* ================= CONTENT ================= */}
         <section className="layout-content">
           <Outlet />
         </section>
 
-        {/* ================= ADVISOR DRAWER ================= */}
+        {/* ================= ADVISOR ================= */}
         <section
           className={`ai-drawer ${assistantOpen ? "open" : ""}`}
-          aria-hidden={!assistantOpen}
         >
           <div className="ai-drawer-handle">
             <button
@@ -135,7 +134,6 @@ export default function AdminLayout() {
             />
           </div>
         </section>
-
       </main>
     </div>
   );
