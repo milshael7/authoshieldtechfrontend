@@ -13,33 +13,24 @@ function pct(n) {
   return Math.max(0, Math.min(100, Math.round(x)));
 }
 
-function statusColor(status) {
-  switch (String(status).toLowerCase()) {
-    case "compliant":
-      return "#5EC6FF";
-    case "partial":
-      return "#ffd166";
-    case "non_compliant":
-      return "#ff4d4d";
-    default:
-      return "#999";
-  }
+function scoreFrom(framework = {}) {
+  const total = framework?.totalControls || 0;
+  const compliant = framework?.compliantControls || 0;
+  if (!total) return 0;
+  return Math.round((compliant / total) * 100);
 }
 
 /* ================= PAGE ================= */
 
 export default function Compliance() {
   const [frameworks, setFrameworks] = useState([]);
-  const [selected, setSelected] = useState(null);
   const [loading, setLoading] = useState(true);
 
   async function load() {
     setLoading(true);
     try {
-      const res = await api.compliance().catch(() => ({}));
-      setFrameworks(safeArray(res?.frameworks));
-    } catch {
-      setFrameworks([]);
+      const data = await api.compliance().catch(() => ({}));
+      setFrameworks(safeArray(data?.frameworks));
     } finally {
       setLoading(false);
     }
@@ -49,14 +40,15 @@ export default function Compliance() {
     load();
   }, []);
 
-  const summary = useMemo(() => {
-    const list = safeArray(frameworks);
-    return {
-      total: list.length,
-      compliant: list.filter(f => f?.status === "compliant").length,
-      partial: list.filter(f => f?.status === "partial").length,
-      non: list.filter(f => f?.status === "non_compliant").length,
-    };
+  const totalFrameworks = frameworks.length;
+
+  const averageScore = useMemo(() => {
+    if (!frameworks.length) return 0;
+    const sum = frameworks.reduce(
+      (acc, f) => acc + scoreFrom(f),
+      0
+    );
+    return Math.round(sum / frameworks.length);
   }, [frameworks]);
 
   /* ================= UI ================= */
@@ -64,160 +56,155 @@ export default function Compliance() {
   return (
     <div style={{ padding: 32, display: "flex", flexDirection: "column", gap: 28 }}>
 
-      {/* ================= HEADER ================= */}
+      {/* HEADER */}
       <div>
-        <h2 style={{ margin: 0 }}>Compliance Command Board</h2>
+        <h2 style={{ margin: 0 }}>Compliance Command Center</h2>
         <div style={{ fontSize: 13, opacity: 0.6 }}>
-          Regulatory posture across enterprise security frameworks
+          Regulatory alignment & audit readiness overview
         </div>
       </div>
 
-      {/* ================= SUMMARY ================= */}
+      {/* SUMMARY STRIP */}
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))",
-          gap: 20,
+          gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))",
+          gap: 18
         }}
       >
         <div className="card">
-          <div style={{ fontSize: 12, opacity: 0.6 }}>Frameworks</div>
-          <div style={{ fontSize: 26, fontWeight: 800 }}>{summary.total}</div>
-        </div>
-
-        <div className="card">
-          <div style={{ fontSize: 12, opacity: 0.6 }}>Compliant</div>
-          <div style={{ fontSize: 26, fontWeight: 800, color: "#5EC6FF" }}>
-            {summary.compliant}
+          <div style={{ fontSize: 12, opacity: 0.6 }}>
+            Frameworks Tracked
+          </div>
+          <div style={{ fontSize: 26, fontWeight: 800 }}>
+            {totalFrameworks}
           </div>
         </div>
 
         <div className="card">
-          <div style={{ fontSize: 12, opacity: 0.6 }}>Partial</div>
-          <div style={{ fontSize: 26, fontWeight: 800, color: "#ffd166" }}>
-            {summary.partial}
+          <div style={{ fontSize: 12, opacity: 0.6 }}>
+            Average Compliance Score
+          </div>
+          <div style={{ fontSize: 26, fontWeight: 800 }}>
+            {averageScore}%
           </div>
         </div>
 
         <div className="card">
-          <div style={{ fontSize: 12, opacity: 0.6 }}>Non-Compliant</div>
-          <div style={{ fontSize: 26, fontWeight: 800, color: "#ff4d4d" }}>
-            {summary.non}
+          <div style={{ fontSize: 12, opacity: 0.6 }}>
+            Audit Readiness
+          </div>
+          <div style={{ fontSize: 26, fontWeight: 800 }}>
+            {averageScore >= 80 ? "Ready" : "Needs Attention"}
           </div>
         </div>
       </div>
 
-      {/* ================= MAIN GRID ================= */}
+      {/* MAIN GRID */}
       <div
         style={{
           display: "grid",
           gridTemplateColumns: "2fr 1fr",
-          gap: 24,
+          gap: 24
         }}
       >
 
-        {/* ================= LEFT: FRAMEWORK LIST ================= */}
-        <div className="card" style={{ padding: 0, overflow: "hidden" }}>
-          <div style={{ maxHeight: 520, overflowY: "auto" }}>
+        {/* ================= FRAMEWORK LIST ================= */}
+        <div className="card">
+          <h3>Framework Coverage</h3>
 
-            {loading ? (
-              <div style={{ padding: 20 }}>Loading frameworks...</div>
-            ) : frameworks.length === 0 ? (
-              <div style={{ padding: 20 }}>No compliance data available.</div>
-            ) : (
-              safeArray(frameworks).map((f, idx) => (
-                <div
-                  key={f?.id || idx}
-                  onClick={() => setSelected(f)}
-                  style={{
-                    padding: 18,
-                    borderBottom: "1px solid rgba(255,255,255,0.08)",
-                    cursor: "pointer",
-                    background:
-                      selected?.id === f?.id
-                        ? "rgba(94,198,255,0.08)"
-                        : "transparent",
-                  }}
-                >
-                  <div style={{ display: "flex", justifyContent: "space-between" }}>
-                    <strong>{f?.name || "Framework"}</strong>
+          {loading ? (
+            <div>Loading compliance data...</div>
+          ) : frameworks.length === 0 ? (
+            <div style={{ opacity: 0.6 }}>
+              No compliance frameworks configured.
+            </div>
+          ) : (
+            <div style={{ marginTop: 20, display: "flex", flexDirection: "column", gap: 18 }}>
+              {frameworks.map((f, index) => {
+                const score = pct(scoreFrom(f));
 
-                    <span
+                return (
+                  <div
+                    key={f?.id || index}
+                    style={{
+                      padding: 16,
+                      borderRadius: 14,
+                      background: "rgba(255,255,255,.04)",
+                      border: "1px solid rgba(255,255,255,.08)"
+                    }}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between" }}>
+                      <strong>{f?.name || "Framework"}</strong>
+                      <span>{score}%</span>
+                    </div>
+
+                    <div
                       style={{
-                        fontSize: 12,
-                        fontWeight: 700,
-                        color: statusColor(f?.status),
+                        marginTop: 10,
+                        height: 8,
+                        background: "rgba(255,255,255,.08)",
+                        borderRadius: 999,
+                        overflow: "hidden"
                       }}
                     >
-                      {String(f?.status || "unknown").toUpperCase()}
-                    </span>
+                      <div
+                        style={{
+                          width: `${score}%`,
+                          height: "100%",
+                          background:
+                            score >= 80
+                              ? "linear-gradient(90deg,#2bd576,#5EC6FF)"
+                              : "linear-gradient(90deg,#ff5a5f,#ffd166)"
+                        }}
+                      />
+                    </div>
+
+                    <div style={{ marginTop: 10, fontSize: 13, opacity: 0.7 }}>
+                      {f?.compliantControls || 0} /{" "}
+                      {f?.totalControls || 0} controls compliant
+                    </div>
                   </div>
-
-                  <div style={{ fontSize: 13, opacity: 0.6, marginTop: 4 }}>
-                    Controls: {f?.controls || 0} • Score: {pct(f?.score)}%
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-
-        {/* ================= RIGHT: DETAIL ================= */}
-        <div className="card">
-          {selected ? (
-            <>
-              <h3>{selected?.name}</h3>
-
-              <div style={{ marginBottom: 10 }}>
-                <strong>Status: </strong>
-                <span
-                  style={{
-                    color: statusColor(selected?.status),
-                    fontWeight: 700,
-                  }}
-                >
-                  {String(selected?.status || "unknown").toUpperCase()}
-                </span>
-              </div>
-
-              <div style={{ marginBottom: 10 }}>
-                <strong>Overall Score:</strong> {pct(selected?.score)}%
-              </div>
-
-              <div
-                style={{
-                  height: 8,
-                  background: "rgba(255,255,255,0.08)",
-                  borderRadius: 999,
-                  overflow: "hidden",
-                  marginBottom: 18,
-                }}
-              >
-                <div
-                  style={{
-                    width: `${pct(selected?.score)}%`,
-                    height: "100%",
-                    background:
-                      "linear-gradient(90deg,#5EC6FF,#7aa2ff)",
-                  }}
-                />
-              </div>
-
-              <div style={{ fontSize: 14, opacity: 0.7 }}>
-                {selected?.description ||
-                  "Detailed control mapping and audit readiness analysis."}
-              </div>
-
-              <button className="btn" style={{ marginTop: 16 }}>
-                Export Compliance Report
-              </button>
-            </>
-          ) : (
-            <div style={{ opacity: 0.6 }}>
-              Select a framework to review compliance posture.
+                );
+              })}
             </div>
           )}
         </div>
+
+        {/* ================= ACTION PANEL ================= */}
+        <div className="card">
+          <h3>Audit Actions</h3>
+
+          <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 14 }}>
+
+            <div>
+              <strong>Control Gap Review</strong>
+              <div style={{ fontSize: 13, opacity: 0.7 }}>
+                Identify missing controls before audit cycle.
+              </div>
+            </div>
+
+            <div>
+              <strong>Policy Mapping</strong>
+              <div style={{ fontSize: 13, opacity: 0.7 }}>
+                Map policies to regulatory frameworks automatically.
+              </div>
+            </div>
+
+            <div>
+              <strong>Certification Preparation</strong>
+              <div style={{ fontSize: 13, opacity: 0.7 }}>
+                Generate audit evidence documentation.
+              </div>
+            </div>
+
+            <button className="btn" onClick={load}>
+              Refresh Compliance Data
+            </button>
+
+          </div>
+        </div>
+
       </div>
     </div>
   );
