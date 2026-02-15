@@ -20,7 +20,7 @@ function riskColor(level) {
     case "medium":
       return "#ffd166";
     case "low":
-      return "#2bd576";
+      return "#5EC6FF";
     default:
       return "#999";
   }
@@ -30,10 +30,8 @@ function riskColor(level) {
 
 export default function Assets() {
   const [assets, setAssets] = useState([]);
+  const [selected, setSelected] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [sortKey, setSortKey] = useState("risk");
-  const [sortDir, setSortDir] = useState("desc");
 
   async function load() {
     setLoading(true);
@@ -51,42 +49,15 @@ export default function Assets() {
     load();
   }, []);
 
-  /* ================= FILTER + SORT ================= */
-
-  const filtered = useMemo(() => {
-    let list = safeArray(assets);
-
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      list = list.filter((a) =>
-        JSON.stringify(a).toLowerCase().includes(q)
-      );
-    }
-
-    list = [...list].sort((a, b) => {
-      const aVal = a?.[sortKey];
-      const bVal = b?.[sortKey];
-
-      if (aVal === bVal) return 0;
-
-      if (sortDir === "asc") {
-        return aVal > bVal ? 1 : -1;
-      } else {
-        return aVal < bVal ? 1 : -1;
-      }
-    });
-
-    return list;
-  }, [assets, search, sortKey, sortDir]);
-
-  function changeSort(key) {
-    if (key === sortKey) {
-      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
-    } else {
-      setSortKey(key);
-      setSortDir("desc");
-    }
-  }
+  const summary = useMemo(() => {
+    const list = safeArray(assets);
+    return {
+      total: list.length,
+      critical: list.filter(a => a?.risk === "critical").length,
+      high: list.filter(a => a?.risk === "high").length,
+      internetFacing: list.filter(a => a?.internetFacing).length,
+    };
+  }, [assets]);
 
   /* ================= UI ================= */
 
@@ -94,39 +65,14 @@ export default function Assets() {
     <div style={{ padding: 32, display: "flex", flexDirection: "column", gap: 28 }}>
 
       {/* ================= HEADER ================= */}
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          flexWrap: "wrap",
-          gap: 16,
-        }}
-      >
-        <div>
-          <h2 style={{ margin: 0 }}>Asset Intelligence</h2>
-          <div style={{ fontSize: 13, opacity: 0.6 }}>
-            Enterprise-wide monitored assets
-          </div>
+      <div>
+        <h2 style={{ margin: 0 }}>Asset Command Center</h2>
+        <div style={{ fontSize: 13, opacity: 0.6 }}>
+          Enterprise asset visibility and exposure
         </div>
-
-        <input
-          type="text"
-          placeholder="Search assets..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          style={{
-            width: 260,
-            padding: 10,
-            borderRadius: 10,
-            background: "rgba(255,255,255,0.05)",
-            border: "1px solid rgba(255,255,255,0.1)",
-            color: "#fff",
-          }}
-        />
       </div>
 
-      {/* ================= SUMMARY STRIP ================= */}
+      {/* ================= SUMMARY ================= */}
       <div
         style={{
           display: "grid",
@@ -136,124 +82,130 @@ export default function Assets() {
       >
         <div className="card">
           <div style={{ fontSize: 12, opacity: 0.6 }}>Total Assets</div>
-          <div style={{ fontSize: 26, fontWeight: 800 }}>
-            {assets.length}
-          </div>
+          <div style={{ fontSize: 26, fontWeight: 800 }}>{summary.total}</div>
         </div>
 
         <div className="card">
-          <div style={{ fontSize: 12, opacity: 0.6 }}>Critical</div>
+          <div style={{ fontSize: 12, opacity: 0.6 }}>Critical Risk</div>
           <div style={{ fontSize: 26, fontWeight: 800, color: "#ff4d4d" }}>
-            {assets.filter((a) => a?.risk === "critical").length}
+            {summary.critical}
           </div>
         </div>
 
         <div className="card">
           <div style={{ fontSize: 12, opacity: 0.6 }}>High Risk</div>
           <div style={{ fontSize: 26, fontWeight: 800, color: "#ff884d" }}>
-            {assets.filter((a) => a?.risk === "high").length}
+            {summary.high}
+          </div>
+        </div>
+
+        <div className="card">
+          <div style={{ fontSize: 12, opacity: 0.6 }}>Internet Facing</div>
+          <div style={{ fontSize: 26, fontWeight: 800, color: "#5EC6FF" }}>
+            {summary.internetFacing}
           </div>
         </div>
       </div>
 
-      {/* ================= TABLE ================= */}
+      {/* ================= MAIN GRID ================= */}
       <div
-        className="card"
         style={{
-          padding: 0,
-          overflow: "hidden",
+          display: "grid",
+          gridTemplateColumns: "2fr 1fr",
+          gap: 24,
         }}
       >
-        <div
-          style={{
-            overflowX: "auto",
-          }}
-        >
-          <table
-            style={{
-              width: "100%",
-              borderCollapse: "collapse",
-              minWidth: 800,
-            }}
-          >
-            <thead>
-              <tr style={{ background: "rgba(255,255,255,0.04)" }}>
-                {["name", "type", "owner", "risk", "lastScan"].map((col) => (
-                  <th
-                    key={col}
-                    onClick={() => changeSort(col)}
-                    style={{
-                      textAlign: "left",
-                      padding: "14px 18px",
-                      fontSize: 13,
-                      cursor: "pointer",
-                      opacity: 0.8,
-                    }}
-                  >
-                    {col.toUpperCase()}
-                  </th>
-                ))}
-              </tr>
-            </thead>
 
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan="5" style={{ padding: 20 }}>
-                    Loading assets...
-                  </td>
-                </tr>
-              ) : filtered.length === 0 ? (
-                <tr>
-                  <td colSpan="5" style={{ padding: 20 }}>
-                    No assets found.
-                  </td>
-                </tr>
-              ) : (
-                filtered.map((a, i) => (
-                  <tr
-                    key={a?.id || i}
-                    style={{
-                      borderTop:
-                        "1px solid rgba(255,255,255,0.08)",
-                    }}
-                  >
-                    <td style={{ padding: "14px 18px" }}>
-                      {safeStr(a?.name)}
-                    </td>
+        {/* ================= LEFT PANEL ================= */}
+        <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+          <div style={{ maxHeight: 500, overflowY: "auto" }}>
 
-                    <td style={{ padding: "14px 18px" }}>
-                      {safeStr(a?.type)}
-                    </td>
+            {loading ? (
+              <div style={{ padding: 20 }}>Loading assets...</div>
+            ) : assets.length === 0 ? (
+              <div style={{ padding: 20 }}>No assets discovered.</div>
+            ) : (
+              safeArray(assets).map((asset, i) => (
+                <div
+                  key={asset?.id || i}
+                  onClick={() => setSelected(asset)}
+                  style={{
+                    padding: 18,
+                    borderBottom: "1px solid rgba(255,255,255,0.08)",
+                    cursor: "pointer",
+                    background:
+                      selected?.id === asset?.id
+                        ? "rgba(94,198,255,0.08)"
+                        : "transparent",
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <strong>{safeStr(asset?.name, "Unnamed Asset")}</strong>
 
-                    <td style={{ padding: "14px 18px" }}>
-                      {safeStr(a?.owner)}
-                    </td>
+                    <span
+                      style={{
+                        fontSize: 12,
+                        fontWeight: 700,
+                        color: riskColor(asset?.risk),
+                      }}
+                    >
+                      {safeStr(asset?.risk).toUpperCase()}
+                    </span>
+                  </div>
 
-                    <td style={{ padding: "14px 18px" }}>
-                      <span
-                        style={{
-                          padding: "4px 10px",
-                          borderRadius: 999,
-                          fontSize: 12,
-                          fontWeight: 700,
-                          background:
-                            "rgba(255,255,255,0.05)",
-                          color: riskColor(a?.risk),
-                        }}
-                      >
-                        {safeStr(a?.risk, "unknown").toUpperCase()}
-                      </span>
-                    </td>
+                  <div style={{ fontSize: 13, opacity: 0.6, marginTop: 4 }}>
+                    Type: {safeStr(asset?.type)} • Owner: {safeStr(asset?.owner)}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
 
-                    <td style={{ padding: "14px 18px", opacity: 0.7 }}>
-                      {safeStr(a?.lastScan)}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+        {/* ================= RIGHT PANEL ================= */}
+        <div className="card">
+          {selected ? (
+            <>
+              <h3>{safeStr(selected?.name)}</h3>
+
+              <div style={{ marginBottom: 10 }}>
+                <strong>Risk Level: </strong>
+                <span
+                  style={{
+                    color: riskColor(selected?.risk),
+                    fontWeight: 700,
+                  }}
+                >
+                  {safeStr(selected?.risk).toUpperCase()}
+                </span>
+              </div>
+
+              <div style={{ marginBottom: 10 }}>
+                <strong>Type:</strong> {safeStr(selected?.type)}
+              </div>
+
+              <div style={{ marginBottom: 10 }}>
+                <strong>Owner:</strong> {safeStr(selected?.owner)}
+              </div>
+
+              <div style={{ marginBottom: 10 }}>
+                <strong>Internet Facing:</strong>{" "}
+                {selected?.internetFacing ? "Yes" : "No"}
+              </div>
+
+              <div style={{ fontSize: 13, opacity: 0.6 }}>
+                Last Scan: {safeStr(selected?.lastScan)}
+              </div>
+
+              <button className="btn" style={{ marginTop: 20 }}>
+                Initiate Deep Scan
+              </button>
+            </>
+          ) : (
+            <div style={{ opacity: 0.6 }}>
+              Select an asset to view details.
+            </div>
+          )}
         </div>
       </div>
     </div>
