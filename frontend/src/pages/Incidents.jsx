@@ -11,16 +11,16 @@ function safeStr(v, fallback = "—") {
   return typeof v === "string" && v.trim() ? v : fallback;
 }
 
-function statusColor(status) {
-  switch (String(status).toLowerCase()) {
-    case "open":
+function severityColor(level) {
+  switch (String(level).toLowerCase()) {
+    case "critical":
       return "#ff4d4d";
-    case "investigating":
+    case "high":
+      return "#ff884d";
+    case "medium":
       return "#ffd166";
-    case "contained":
+    case "low":
       return "#5EC6FF";
-    case "resolved":
-      return "#2bd576";
     default:
       return "#999";
   }
@@ -53,8 +53,8 @@ export default function Incidents() {
     const list = safeArray(incidents);
     return {
       total: list.length,
-      open: list.filter(i => i?.status === "open").length,
-      investigating: list.filter(i => i?.status === "investigating").length,
+      critical: list.filter(i => i?.severity === "critical").length,
+      active: list.filter(i => i?.status === "active").length,
       resolved: list.filter(i => i?.status === "resolved").length,
     };
   }, [incidents]);
@@ -68,7 +68,7 @@ export default function Incidents() {
       <div>
         <h2 style={{ margin: 0 }}>Incident Response War Room</h2>
         <div style={{ fontSize: 13, opacity: 0.6 }}>
-          Active investigations and containment status
+          Live security event containment and response coordination
         </div>
       </div>
 
@@ -86,22 +86,22 @@ export default function Incidents() {
         </div>
 
         <div className="card">
-          <div style={{ fontSize: 12, opacity: 0.6 }}>Open</div>
+          <div style={{ fontSize: 12, opacity: 0.6 }}>Critical</div>
           <div style={{ fontSize: 26, fontWeight: 800, color: "#ff4d4d" }}>
-            {summary.open}
+            {summary.critical}
           </div>
         </div>
 
         <div className="card">
-          <div style={{ fontSize: 12, opacity: 0.6 }}>Investigating</div>
+          <div style={{ fontSize: 12, opacity: 0.6 }}>Active</div>
           <div style={{ fontSize: 26, fontWeight: 800, color: "#ffd166" }}>
-            {summary.investigating}
+            {summary.active}
           </div>
         </div>
 
         <div className="card">
           <div style={{ fontSize: 12, opacity: 0.6 }}>Resolved</div>
-          <div style={{ fontSize: 26, fontWeight: 800, color: "#2bd576" }}>
+          <div style={{ fontSize: 26, fontWeight: 800, color: "#5EC6FF" }}>
             {summary.resolved}
           </div>
         </div>
@@ -116,45 +116,45 @@ export default function Incidents() {
         }}
       >
 
-        {/* ================= LEFT PANEL ================= */}
+        {/* ================= LEFT: INCIDENT LIST ================= */}
         <div className="card" style={{ padding: 0, overflow: "hidden" }}>
-          <div style={{ maxHeight: 500, overflowY: "auto" }}>
+          <div style={{ maxHeight: 520, overflowY: "auto" }}>
 
             {loading ? (
               <div style={{ padding: 20 }}>Loading incidents...</div>
             ) : incidents.length === 0 ? (
-              <div style={{ padding: 20 }}>No incidents reported.</div>
+              <div style={{ padding: 20 }}>No incidents detected.</div>
             ) : (
-              safeArray(incidents).map((incident, i) => (
+              safeArray(incidents).map((i, idx) => (
                 <div
-                  key={incident?.id || i}
-                  onClick={() => setSelected(incident)}
+                  key={i?.id || idx}
+                  onClick={() => setSelected(i)}
                   style={{
                     padding: 18,
                     borderBottom: "1px solid rgba(255,255,255,0.08)",
                     cursor: "pointer",
                     background:
-                      selected?.id === incident?.id
-                        ? "rgba(94,198,255,0.08)"
+                      selected?.id === i?.id
+                        ? "rgba(255,77,77,0.08)"
                         : "transparent",
                   }}
                 >
                   <div style={{ display: "flex", justifyContent: "space-between" }}>
-                    <strong>{safeStr(incident?.title, "Security Incident")}</strong>
+                    <strong>{safeStr(i?.title, "Security Incident")}</strong>
 
                     <span
                       style={{
                         fontSize: 12,
                         fontWeight: 700,
-                        color: statusColor(incident?.status),
+                        color: severityColor(i?.severity),
                       }}
                     >
-                      {safeStr(incident?.status).toUpperCase()}
+                      {safeStr(i?.severity).toUpperCase()}
                     </span>
                   </div>
 
                   <div style={{ fontSize: 13, opacity: 0.6, marginTop: 4 }}>
-                    Affected Asset: {safeStr(incident?.asset)}
+                    Asset: {safeStr(i?.asset)} • Status: {safeStr(i?.status)}
                   </div>
                 </div>
               ))
@@ -162,46 +162,46 @@ export default function Incidents() {
           </div>
         </div>
 
-        {/* ================= RIGHT PANEL ================= */}
+        {/* ================= RIGHT: INCIDENT DETAIL ================= */}
         <div className="card">
           {selected ? (
             <>
               <h3>{safeStr(selected?.title)}</h3>
 
-              <div style={{ marginBottom: 12 }}>
-                <strong>Status: </strong>
+              <div style={{ marginBottom: 10 }}>
+                <strong>Severity: </strong>
                 <span
                   style={{
-                    color: statusColor(selected?.status),
+                    color: severityColor(selected?.severity),
                     fontWeight: 700,
                   }}
                 >
-                  {safeStr(selected?.status).toUpperCase()}
+                  {safeStr(selected?.severity).toUpperCase()}
                 </span>
               </div>
 
+              <div style={{ marginBottom: 10 }}>
+                <strong>Status:</strong> {safeStr(selected?.status)}
+              </div>
+
+              <div style={{ marginBottom: 10 }}>
+                <strong>Asset:</strong> {safeStr(selected?.asset)}
+              </div>
+
               <div style={{ marginBottom: 14 }}>
-                {safeStr(selected?.description, "No description available.")}
+                <strong>Description:</strong>
+                <div style={{ fontSize: 14, opacity: 0.7 }}>
+                  {safeStr(selected?.description, "No details available")}
+                </div>
               </div>
 
-              <div style={{ fontSize: 13, opacity: 0.6 }}>
-                Detected: {safeStr(selected?.detectedAt)}
-              </div>
-
-              <div style={{ fontSize: 13, opacity: 0.6 }}>
-                Owner: {safeStr(selected?.owner)}
-              </div>
-
-              <button
-                className="btn"
-                style={{ marginTop: 20 }}
-              >
-                Escalate
+              <button className="btn" style={{ marginTop: 10 }}>
+                Mark as Resolved
               </button>
             </>
           ) : (
             <div style={{ opacity: 0.6 }}>
-              Select an incident to view details.
+              Select an incident to review.
             </div>
           )}
         </div>
