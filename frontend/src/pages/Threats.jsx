@@ -7,26 +7,25 @@ function safeArray(v) {
   return Array.isArray(v) ? v : [];
 }
 
-function countBySeverity(threats = []) {
-  return {
-    critical: threats.filter(t => t?.severity === "critical").length,
-    high: threats.filter(t => t?.severity === "high").length,
-    medium: threats.filter(t => t?.severity === "medium").length,
-    low: threats.filter(t => t?.severity === "low").length,
-  };
+function pct(n) {
+  const x = Number(n);
+  if (!Number.isFinite(x)) return 0;
+  return Math.max(0, Math.min(100, Math.round(x)));
 }
 
 /* ================= PAGE ================= */
 
 export default function Threats() {
-  const [threats, setThreats] = useState([]);
+  const [feed, setFeed] = useState([]);
+  const [globalLevel, setGlobalLevel] = useState(0);
   const [loading, setLoading] = useState(true);
 
   async function load() {
     setLoading(true);
     try {
-      const data = await api.threats().catch(() => ({}));
-      setThreats(safeArray(data?.threats));
+      const res = await api.threatFeed().catch(() => ({}));
+      setFeed(safeArray(res?.threats));
+      setGlobalLevel(pct(res?.globalThreatLevel ?? 65));
     } finally {
       setLoading(false);
     }
@@ -36,10 +35,14 @@ export default function Threats() {
     load();
   }, []);
 
-  const severity = useMemo(
-    () => countBySeverity(threats),
-    [threats]
-  );
+  const attackVectors = useMemo(() => {
+    const map = {};
+    feed.forEach(t => {
+      const type = t?.type || "unknown";
+      map[type] = (map[type] || 0) + 1;
+    });
+    return Object.entries(map);
+  }, [feed]);
 
   /* ================= UI ================= */
 
@@ -48,93 +51,144 @@ export default function Threats() {
 
       {/* HEADER */}
       <div>
-        <h2 style={{ margin: 0 }}>Threat Intelligence Command</h2>
+        <h2 style={{ margin: 0 }}>Threat Intelligence Center</h2>
         <div style={{ fontSize: 13, opacity: 0.6 }}>
-          Real-time threat visibility and attack monitoring
+          Global & external cyber threat monitoring
         </div>
       </div>
 
-      {/* SEVERITY STRIP */}
-      <div style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))",
-        gap: 18
-      }}>
-        {Object.entries(severity).map(([level, count]) => (
-          <div key={level} className="card">
-            <div style={{ fontSize: 12, opacity: 0.6 }}>
-              {level.toUpperCase()}
-            </div>
-            <div style={{ fontSize: 26, fontWeight: 800 }}>
-              {count}
+      {/* GLOBAL THREAT LEVEL */}
+      <div className="card" style={{ padding: 28 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            <h3 style={{ margin: 0 }}>Global Threat Level</h3>
+            <div style={{ fontSize: 13, opacity: 0.6 }}>
+              Aggregated external intelligence signals
             </div>
           </div>
-        ))}
+
+          <div
+            style={{
+              width: 120,
+              height: 120,
+              borderRadius: "50%",
+              background: `conic-gradient(#ff5a5f ${globalLevel * 3.6}deg, rgba(255,255,255,0.08) 0deg)`,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 22,
+              fontWeight: 800,
+            }}
+          >
+            {globalLevel}%
+          </div>
+        </div>
+
+        <div
+          style={{
+            marginTop: 20,
+            height: 8,
+            background: "rgba(255,255,255,.08)",
+            borderRadius: 999,
+            overflow: "hidden"
+          }}
+        >
+          <div
+            style={{
+              width: `${globalLevel}%`,
+              height: "100%",
+              background: "linear-gradient(90deg,#ff5a5f,#ffd166)"
+            }}
+          />
+        </div>
       </div>
 
-      {/* THREAT LIST */}
-      <div className="card">
-        <h3>Live Threat Feed</h3>
+      {/* MAIN GRID */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "2fr 1fr",
+          gap: 24
+        }}
+      >
 
-        {loading ? (
-          <div>Loading threats...</div>
-        ) : threats.length === 0 ? (
-          <div style={{ opacity: 0.6 }}>
-            No active threats detected.
-          </div>
-        ) : (
-          <div style={{
-            marginTop: 20,
-            display: "flex",
-            flexDirection: "column",
-            gap: 14
-          }}>
-            {threats.slice(0, 15).map((threat, i) => (
-              <div
-                key={threat?.id || i}
-                style={{
-                  padding: 16,
-                  borderRadius: 12,
-                  background: "rgba(255,255,255,0.05)",
-                  border: "1px solid rgba(255,255,255,0.08)",
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center"
-                }}
-              >
-                <div>
-                  <strong>{threat?.title || "Threat Event"}</strong>
+        {/* ================= ACTIVE THREATS ================= */}
+        <div className="card" style={{ padding: 24 }}>
+          <h3>Active Threat Feed</h3>
+
+          <div style={{ marginTop: 18, display: "flex", flexDirection: "column", gap: 14 }}>
+
+            {safeArray(feed)
+              .slice(0, 8)
+              .map((t, i) => (
+                <div
+                  key={t?.id || i}
+                  style={{
+                    padding: 14,
+                    borderRadius: 12,
+                    background: "rgba(255,255,255,.04)",
+                    border: "1px solid rgba(255,255,255,.08)"
+                  }}
+                >
+                  <strong>{t?.title || "Emerging Threat"}</strong>
                   <div style={{ fontSize: 13, opacity: 0.7 }}>
-                    {threat?.description || "No description available"}
+                    {t?.description || "Threat intelligence summary unavailable"}
                   </div>
                 </div>
+              ))}
 
-                <div style={{
-                  padding: "6px 12px",
-                  borderRadius: 999,
-                  fontSize: 12,
-                  background:
-                    threat?.severity === "critical"
-                      ? "rgba(255,0,0,.25)"
-                      : threat?.severity === "high"
-                      ? "rgba(255,90,95,.25)"
-                      : "rgba(122,167,255,.18)"
-                }}>
-                  {threat?.severity || "unknown"}
+            {feed.length === 0 && (
+              <div style={{ opacity: 0.6 }}>
+                No active intelligence feed data
+              </div>
+            )}
+
+          </div>
+        </div>
+
+        {/* ================= ATTACK VECTORS ================= */}
+        <div className="card" style={{ padding: 24 }}>
+          <h3>Attack Vectors</h3>
+
+          <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 14 }}>
+            {attackVectors.map(([type, count]) => (
+              <div key={type}>
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span>{type.toUpperCase()}</span>
+                  <strong>{count}</strong>
+                </div>
+
+                <div
+                  style={{
+                    marginTop: 6,
+                    height: 6,
+                    background: "rgba(255,255,255,.08)",
+                    borderRadius: 999,
+                    overflow: "hidden"
+                  }}
+                >
+                  <div
+                    style={{
+                      width: `${pct((count / (feed.length || 1)) * 100)}%`,
+                      height: "100%",
+                      background: "linear-gradient(90deg,#5EC6FF,#7aa2ff)"
+                    }}
+                  />
                 </div>
               </div>
             ))}
           </div>
-        )}
-      </div>
 
-      {/* ANALYST INSIGHT */}
-      <div className="card">
-        <h3>AI Threat Assessment</h3>
-        <p style={{ opacity: 0.8 }}>
-          Based on current activity patterns, highest risk area is
-          identity-based intrusion attempts and credential harvesting.
-        </p>
+          <button
+            className="btn"
+            onClick={load}
+            disabled={loading}
+            style={{ marginTop: 22 }}
+          >
+            {loading ? "Refreshing…" : "Refresh Intelligence"}
+          </button>
+        </div>
+
       </div>
 
     </div>
