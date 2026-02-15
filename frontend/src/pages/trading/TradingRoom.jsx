@@ -1,173 +1,173 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
-import { executeEngine } from "./engines/ExecutionEngine";
-import {
-  allocateCapital,
-  rebalanceCapital,
-  calculateTotalCapital,
-  rotateCapitalByPerformance,
-} from "./engines/CapitalAllocator";
-import {
-  evaluateGlobalRisk,
-  setManualLock,
-} from "./engines/GlobalRiskGovernor";
-import {
-  updatePerformance,
-  getPerformanceStats,
-  getAllPerformanceStats,
-  evaluatePerformance,
-} from "./engines/PerformanceEngine";
+import React, { useEffect, useState } from "react";
 
-export default function TradingRoom({
-  mode: parentMode = "paper",
-  dailyLimit = 5,
-}) {
+const API_BASE = "/api";
 
-  const [mode, setMode] = useState(parentMode.toUpperCase());
-  const [engineType] = useState("scalp");
+export default function TradingRoom() {
+  const [paper, setPaper] = useState(null);
+  const [live, setLive] = useState(null);
+  const [risk, setRisk] = useState(null);
+  const [prices, setPrices] = useState({});
+  const [wsStatus, setWsStatus] = useState("disconnected");
 
-  const [baseRisk] = useState(1);
-  const [leverage] = useState(1);
-  const [humanMultiplier] = useState(1);
+  /* =======================================================
+     LOAD SNAPSHOTS
+  ======================================================= */
 
-  const [dailyPnL, setDailyPnL] = useState(0);
-  const [tradesUsed, setTradesUsed] = useState(0);
-  const [log, setLog] = useState([]);
-  const [lastConfidence, setLastConfidence] = useState(null);
-  const [systemLocked, setSystemLocked] = useState(false);
+  async function loadSnapshots() {
+    try {
+      const [paperRes, liveRes, riskRes] = await Promise.all([
+        fetch(`${API_BASE}/trading/paper/snapshot`).then(r => r.json()),
+        fetch(`${API_BASE}/trading/live/snapshot`).then(r => r.json()),
+        fetch(`${API_BASE}/trading/risk/snapshot`).then(r => r.json()),
+      ]);
 
-  const initialCapital = 1000;
-
-  const initialDistribution = useMemo(() => {
-    return allocateCapital({ totalCapital: initialCapital });
-  }, []);
-
-  const [reserve, setReserve] = useState(initialDistribution.reserve);
-  const [allocation, setAllocation] = useState(initialDistribution.allocation);
-
-  const peakCapital = useRef(initialCapital);
-
-  const totalCapital = useMemo(() => {
-    return calculateTotalCapital(allocation, reserve);
-  }, [allocation, reserve]);
-
-  useEffect(() => {
-    setMode(parentMode.toUpperCase());
-  }, [parentMode]);
-
-  useEffect(() => {
-    if (totalCapital > peakCapital.current) {
-      peakCapital.current = totalCapital;
+      if (paperRes.ok) setPaper(paperRes.snapshot);
+      if (liveRes.ok) setLive(liveRes.snapshot);
+      if (riskRes.ok) setRisk(riskRes.risk);
+    } catch (err) {
+      console.error("Snapshot load failed:", err);
     }
-  }, [totalCapital]);
-
-  const globalRisk = useMemo(() => {
-    return evaluateGlobalRisk({
-      totalCapital,
-      peakCapital: peakCapital.current,
-      dailyPnL,
-    });
-  }, [totalCapital, dailyPnL]);
-
-  const pushLog = useCallback((message, confidence) => {
-    setLog((prev) => {
-      const next = [
-        {
-          t: new Date().toLocaleTimeString(),
-          m: message,
-          confidence,
-        },
-        ...prev,
-      ];
-      return next.slice(0, 200);
-    });
-  }, []);
-
-  function handleLock() {
-    setManualLock(true);
-    setSystemLocked(true);
-    pushLog("🚨 Manual system lock activated.");
   }
 
-  function handleUnlock() {
-    setManualLock(false);
-    setSystemLocked(false);
-    pushLog("✅ Manual system lock released.");
-  }
+  useEffect(() => {
+    loadSnapshots();
+    const interval = setInterval(loadSnapshots, 5000);
+    return () => clearInterval(interval);
+  }, []);
 
-  function executeTrade() {
+  /* =======================================================
+     MARKET WEBSOCKET
+  ======================================================= */
 
-    if (systemLocked) return pushLog("System locked.");
-    if (!globalRisk.allowed) return pushLog(`Blocked: ${globalRisk.reason}`);
-    if (tradesUsed >= dailyLimit) return pushLog("Daily trade count limit reached.");
+  useEffect(() => {
+    const protocol =
+      window.location.protocol === "https:" ? "wss:" : "ws:";
 
-    const exchange = "coinbase";
-    const engineCapital = allocation?.[engineType]?.[exchange] ?? 0;
+    const ws = new WebSocket(
+      `${protocol}//${window.location.host}/ws/market`
+    );
 
-    if (!engineCapital) return pushLog("No capital allocated to engine.");
+    ws.onopen = () => setWsStatus("connected");
+    ws.onclose = () => setWsStatus("disconnected");
+    ws.onerror = () => setWsStatus("error");
 
-    const performanceStats = getPerformanceStats(engineType);
-
-    const result = executeEngine({
-      engineType,
-      balance: engineCapital,
-      riskPct: baseRisk,
-      leverage,
-      humanMultiplier,
-      recentPerformance: performanceStats,
-    });
-
-    if (!result || result.blocked) {
-      return pushLog(`Blocked: ${result?.reason || "Engine error"}`, result?.confidenceScore);
-    }
-
-    updatePerformance(engineType, result.pnl, result.isWin);
-
-    const updatedAllocation = {
-      ...allocation,
-      [engineType]: {
-        ...allocation[engineType],
-        [exchange]: result.newBalance,
-      },
+    ws.onmessage = (msg) => {
+      try {
+        const data = JSON.parse(msg.data);
+        if (data.type === "tick") {
+          setPrices((prev) => ({
+            ...prev,
+            [data.symbol]: data.price,
+          }));
+        }
+      } catch {}
     };
 
-    const rebalanced = rebalanceCapital({
-      allocation: updatedAllocation,
-      reserve,
-    });
+    return () => ws.close();
+  }, []);
 
-    const rotated = rotateCapitalByPerformance({
-      allocation: rebalanced.allocation,
-      performanceStats: getAllPerformanceStats(),
-    });
-
-    setAllocation(rotated);
-    setReserve(rebalanced.reserve);
-    setTradesUsed((v) => v + 1);
-    setDailyPnL((v) => v + result.pnl);
-    setLastConfidence(result.confidenceScore);
-
-    pushLog(
-      `${engineType.toUpperCase()} | ${exchange} | PnL: ${result.pnl.toFixed(2)}`,
-      result.confidenceScore
-    );
-  }
-
-  const allStats = useMemo(() => {
-    const allTrades = Object.values(getAllPerformanceStats())
-      .flatMap((e) => e.trades || []);
-    return evaluatePerformance(allTrades);
-  }, [tradesUsed]);
-
-  function confidenceColor(score) {
-    if (score == null) return "";
-    if (score < 50) return "#ff4d4d";
-    if (score < 75) return "#f5b942";
-    return "#5EC6FF";
-  }
+  /* =======================================================
+     UI
+  ======================================================= */
 
   return (
-    <div className="postureWrap">
-      {/* UI remains unchanged */}
+    <div className="postureWrap" style={{ padding: 20 }}>
+      <h2>Trading Oversight</h2>
+
+      <div style={{ marginBottom: 20 }}>
+        <strong>WebSocket:</strong>{" "}
+        <span
+          style={{
+            color:
+              wsStatus === "connected"
+                ? "#5EC6FF"
+                : wsStatus === "error"
+                ? "#ff4d4d"
+                : "#aaa",
+          }}
+        >
+          {wsStatus}
+        </span>
+      </div>
+
+      {/* ================= PAPER ================= */}
+
+      <section style={{ marginBottom: 30 }}>
+        <h3>Paper Engine</h3>
+        {paper ? (
+          <div>
+            <div>Equity: ${paper.equity?.toFixed(2)}</div>
+            <div>Peak: ${paper.peakEquity?.toFixed(2)}</div>
+            <div>
+              Position:{" "}
+              {paper.position
+                ? `${paper.position.qty} @ ${paper.position.entry}`
+                : "None"}
+            </div>
+            <div>Trades: {paper.trades?.length}</div>
+          </div>
+        ) : (
+          <div>Loading...</div>
+        )}
+      </section>
+
+      {/* ================= LIVE ================= */}
+
+      <section style={{ marginBottom: 30 }}>
+        <h3>Live Engine</h3>
+        {live ? (
+          <div>
+            <div>Mode: {live.mode}</div>
+            <div>Equity: ${live.equity?.toFixed(2)}</div>
+            <div>Margin Used: ${live.marginUsed?.toFixed(2)}</div>
+            <div>
+              Maintenance Required: $
+              {live.maintenanceRequired?.toFixed(2)}
+            </div>
+            <div>
+              Liquidation Flag:{" "}
+              {live.liquidation ? "YES ⚠️" : "No"}
+            </div>
+          </div>
+        ) : (
+          <div>Loading...</div>
+        )}
+      </section>
+
+      {/* ================= RISK ================= */}
+
+      <section style={{ marginBottom: 30 }}>
+        <h3>Risk Status</h3>
+        {risk ? (
+          <div>
+            <div>Halted: {risk.halted ? "YES" : "No"}</div>
+            <div>Reason: {risk.haltReason || "None"}</div>
+            <div>
+              Risk Multiplier: {risk.riskMultiplier?.toFixed(2)}
+            </div>
+            <div>
+              Drawdown: {(risk.drawdown * 100)?.toFixed(2)}%
+            </div>
+          </div>
+        ) : (
+          <div>Loading...</div>
+        )}
+      </section>
+
+      {/* ================= MARKET PRICES ================= */}
+
+      <section>
+        <h3>Live Market</h3>
+        {Object.keys(prices).length === 0 ? (
+          <div>No ticks yet...</div>
+        ) : (
+          Object.entries(prices).map(([symbol, price]) => (
+            <div key={symbol}>
+              {symbol}: {price}
+            </div>
+          ))
+        )}
+      </section>
     </div>
   );
 }
