@@ -1,5 +1,9 @@
 // frontend/src/layouts/CompanyLayout.jsx
-// Company Layout — SOC Command Architecture (PHASE 2)
+// Company Layout — Institutional Visibility SOC (HARDENED)
+// Standard / Focus / Command modes
+// Structural parity with Admin & Manager
+// Trading-aware
+// Scroll-safe
 
 import React, { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
@@ -14,9 +18,11 @@ export default function CompanyLayout() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [advisorOpen, setAdvisorOpen] = useState(false);
 
-  // 🧠 NEW: layout modes
   const [layoutMode, setLayoutMode] = useState("standard");
   // standard | focus | command
+
+  const isCommand = layoutMode === "command";
+  const isFocus = layoutMode === "focus";
 
   function logout() {
     clearToken();
@@ -32,12 +38,11 @@ export default function CompanyLayout() {
     });
   }
 
-  const isCommand = layoutMode === "command";
-  const isFocus = layoutMode === "focus";
-
   return (
     <div
-      className={`layout-root ${menuOpen ? "sidebar-open" : ""} layout-${layoutMode}`}
+      className={`layout-root ${
+        menuOpen ? "sidebar-open" : ""
+      } layout-${layoutMode}`}
     >
       {/* ================= MOBILE OVERLAY ================= */}
       {menuOpen && !isCommand && (
@@ -49,23 +54,48 @@ export default function CompanyLayout() {
 
       {/* ================= SIDEBAR ================= */}
       {!isCommand && (
-        <aside className={`layout-sidebar company ${isFocus ? "collapsed" : ""}`}>
+        <aside
+          className={`layout-sidebar company ${
+            isFocus ? "collapsed" : ""
+          }`}
+        >
           <div className="layout-brand">
             <Logo size="md" />
             <span className="muted" style={{ fontSize: 12 }}>
-              Company Visibility
+              Company SOC
             </span>
           </div>
 
           <nav className="layout-nav">
-            <NavLink to="/company" end>
+            <NavLink to="/company" end onClick={() => setMenuOpen(false)}>
               Security Overview
             </NavLink>
-            <NavLink to="/company/assets">Assets</NavLink>
-            <NavLink to="/company/threats">Threats</NavLink>
-            <NavLink to="/company/incidents">Incidents</NavLink>
-            <NavLink to="/company/reports">Reports</NavLink>
-            <NavLink to="/company/notifications">
+
+            <NavLink to="/company/assets" onClick={() => setMenuOpen(false)}>
+              Assets
+            </NavLink>
+
+            <NavLink to="/company/threats" onClick={() => setMenuOpen(false)}>
+              Threats
+            </NavLink>
+
+            <NavLink to="/company/incidents" onClick={() => setMenuOpen(false)}>
+              Incidents
+            </NavLink>
+
+            <NavLink to="/company/reports" onClick={() => setMenuOpen(false)}>
+              Reports
+            </NavLink>
+
+            {/* 🔥 Trading visibility (view-only) */}
+            <NavLink to="/admin/trading" onClick={() => setMenuOpen(false)}>
+              Trading Oversight
+            </NavLink>
+
+            <NavLink
+              to="/company/notifications"
+              onClick={() => setMenuOpen(false)}
+            >
               Notifications
             </NavLink>
           </nav>
@@ -77,8 +107,11 @@ export default function CompanyLayout() {
       )}
 
       {/* ================= MAIN ================= */}
-      <main className={`layout-main ${isCommand ? "command-main" : ""}`}>
-        
+      <main
+        className={`layout-main ${
+          isCommand ? "command-main" : ""
+        }`}
+      >
         {/* ===== MODE SWITCHER ===== */}
         <div className="layout-mode-toggle">
           <button className="btn small" onClick={cycleLayoutMode}>
@@ -100,7 +133,9 @@ export default function CompanyLayout() {
         {/* ================= ADVISOR ================= */}
         {!isCommand && (
           <section
-            className={`ai-drawer ${advisorOpen ? "open" : ""}`}
+            className={`ai-drawer ${
+              advisorOpen ? "open" : ""
+            }`}
           >
             <div className="ai-drawer-handle">
               <button
@@ -113,15 +148,12 @@ export default function CompanyLayout() {
               </button>
             </div>
 
-            <div
-              className="ai-drawer-body"
-              style={{ overflow: "auto" }}
-            >
+            <div className="ai-drawer-body">
               <AuthoDevPanel
-                title="Security Advisor"
+                title="Company Security Advisor"
                 getContext={() => ({
                   role: "company",
-                  mode: "advisory",
+                  mode: layoutMode,
                   location: window.location.pathname,
                 })}
               />
