@@ -1,95 +1,199 @@
-// frontend/src/pages/AttackSurface.jsx
-// Attack Surface & Exposure — FINAL BASELINE
-// External visibility, attacker-first view
+import React, { useEffect, useMemo, useState } from "react";
+import { api } from "../lib/api.js";
 
-import React from "react";
+/* ================= HELPERS ================= */
+
+function safeArray(v) {
+  return Array.isArray(v) ? v : [];
+}
+
+function riskColor(level) {
+  switch (level) {
+    case "critical":
+      return "#ff4d4d";
+    case "high":
+      return "#ff8a4d";
+    case "medium":
+      return "#ffd166";
+    case "low":
+      return "#5EC6FF";
+    default:
+      return "#999";
+  }
+}
+
+/* ================= PAGE ================= */
 
 export default function AttackSurface() {
+  const [assets, setAssets] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  async function load() {
+    setLoading(true);
+    try {
+      const res = await api.attackSurfaceOverview().catch(() => ({}));
+      setAssets(safeArray(res?.assets));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  const stats = useMemo(() => {
+    return {
+      total: assets.length,
+      critical: assets.filter(a => a.risk === "critical").length,
+      exposed: assets.filter(a => a.exposed === true).length,
+      sslIssues: assets.filter(a => a.sslValid === false).length,
+    };
+  }, [assets]);
+
   return (
-    <div className="postureWrap">
-      {/* ================= LEFT: EXPOSURE ================= */}
-      <section className="postureCard">
-        <div className="postureTop">
-          <div>
-            <h2>Attack Surface</h2>
-            <small>What attackers can see and reach</small>
+    <div style={{ padding: 32, display: "flex", flexDirection: "column", gap: 28 }}>
+
+      {/* HEADER */}
+      <div>
+        <h2 style={{ margin: 0 }}>External Attack Surface</h2>
+        <div style={{ fontSize: 13, opacity: 0.6 }}>
+          Internet-facing assets and exposure monitoring
+        </div>
+      </div>
+
+      {/* STAT CARDS */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))",
+          gap: 20
+        }}
+      >
+        <div className="card">
+          <div style={{ fontSize: 12, opacity: 0.6 }}>Total Assets</div>
+          <div style={{ fontSize: 26, fontWeight: 800 }}>{stats.total}</div>
+        </div>
+
+        <div className="card">
+          <div style={{ fontSize: 12, opacity: 0.6 }}>Critical Risk</div>
+          <div style={{ fontSize: 26, fontWeight: 800, color: "#ff4d4d" }}>
+            {stats.critical}
           </div>
         </div>
 
-        <ul className="list" style={{ marginTop: 20 }}>
-          <li>
-            <span className="dot bad" />
-            <div>
-              <b>Internet-Facing Server</b>
-              <small>Production system exposed to the web</small>
+        <div className="card">
+          <div style={{ fontSize: 12, opacity: 0.6 }}>Exposed Services</div>
+          <div style={{ fontSize: 26, fontWeight: 800, color: "#ff8a4d" }}>
+            {stats.exposed}
+          </div>
+        </div>
+
+        <div className="card">
+          <div style={{ fontSize: 12, opacity: 0.6 }}>SSL Issues</div>
+          <div style={{ fontSize: 26, fontWeight: 800, color: "#ffd166" }}>
+            {stats.sslIssues}
+          </div>
+        </div>
+      </div>
+
+      {/* ASSET TABLE */}
+      <div className="card" style={{ padding: 24 }}>
+        <h3>Internet-Facing Assets</h3>
+
+        <div style={{ marginTop: 18, display: "flex", flexDirection: "column", gap: 14 }}>
+          {safeArray(assets).slice(0, 20).map((a, i) => (
+            <div
+              key={a?.id || i}
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                padding: 14,
+                borderRadius: 12,
+                background: "rgba(255,255,255,.04)",
+                border: "1px solid rgba(255,255,255,.08)"
+              }}
+            >
+              <div>
+                <strong>{a?.hostname || a?.ip || "Unknown Asset"}</strong>
+                <div style={{ fontSize: 12, opacity: 0.6 }}>
+                  Ports: {safeArray(a?.ports).join(", ") || "—"}
+                </div>
+              </div>
+
+              <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+
+                <span
+                  style={{
+                    fontSize: 12,
+                    padding: "6px 10px",
+                    borderRadius: 999,
+                    background: "rgba(255,255,255,.08)"
+                  }}
+                >
+                  {a?.type || "service"}
+                </span>
+
+                <span
+                  style={{
+                    fontSize: 12,
+                    padding: "6px 10px",
+                    borderRadius: 999,
+                    background: `${riskColor(a?.risk)}22`,
+                    color: riskColor(a?.risk)
+                  }}
+                >
+                  {(a?.risk || "unknown").toUpperCase()}
+                </span>
+
+                {!a?.sslValid && (
+                  <span
+                    style={{
+                      fontSize: 12,
+                      padding: "6px 10px",
+                      borderRadius: 999,
+                      background: "rgba(255,209,102,.15)"
+                    }}
+                  >
+                    SSL ISSUE
+                  </span>
+                )}
+
+                {a?.exposed && (
+                  <span
+                    style={{
+                      fontSize: 12,
+                      padding: "6px 10px",
+                      borderRadius: 999,
+                      background: "rgba(255,77,77,.15)"
+                    }}
+                  >
+                    EXPOSED
+                  </span>
+                )}
+
+              </div>
             </div>
-          </li>
+          ))}
 
-          <li>
-            <span className="dot warn" />
-            <div>
-              <b>Cloud Storage Exposure</b>
-              <small>Public permissions detected</small>
+          {assets.length === 0 && (
+            <div style={{ opacity: 0.6 }}>
+              No external assets detected
             </div>
-          </li>
+          )}
+        </div>
 
-          <li>
-            <span className="dot warn" />
-            <div>
-              <b>Email Domain Reputation</b>
-              <small>Potential spoofing risk</small>
-            </div>
-          </li>
+        <button
+          className="btn"
+          onClick={load}
+          disabled={loading}
+          style={{ marginTop: 22 }}
+        >
+          {loading ? "Scanning…" : "Run New Scan"}
+        </button>
+      </div>
 
-          <li>
-            <span className="dot ok" />
-            <div>
-              <b>Dark Web Monitoring</b>
-              <small>No leaked credentials found</small>
-            </div>
-          </li>
-        </ul>
-      </section>
-
-      {/* ================= RIGHT: GUIDANCE ================= */}
-      <aside className="postureCard">
-        <h3>Exposure Guidance</h3>
-        <p className="muted">
-          Reduce externally reachable assets first.
-        </p>
-
-        <ul className="list">
-          <li>
-            <span className="dot bad" />
-            <div>
-              <b>High Priority</b>
-              <small>Secure internet-facing systems</small>
-            </div>
-          </li>
-
-          <li>
-            <span className="dot warn" />
-            <div>
-              <b>Medium Priority</b>
-              <small>Harden cloud permissions</small>
-            </div>
-          </li>
-
-          <li>
-            <span className="dot ok" />
-            <div>
-              <b>Monitoring Active</b>
-              <small>Continuous external scanning enabled</small>
-            </div>
-          </li>
-        </ul>
-
-        <p className="muted" style={{ marginTop: 14 }}>
-          Ask the assistant:
-          <br />• “What can attackers reach?”
-          <br />• “Which exposure is most dangerous?”
-        </p>
-      </aside>
     </div>
   );
 }
