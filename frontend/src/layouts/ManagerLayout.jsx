@@ -1,11 +1,9 @@
 // frontend/src/layouts/ManagerLayout.jsx
-// Manager Layout — Operational SOC (PHASE 1 CLEAN)
-//
-// SAFE:
-// - No topbar (global header only)
-// - Scroll-safe
-// - Advisory-only assistant
-// - Structural parity with Admin / Company
+// Manager Layout — Institutional Operational SOC (HARDENED)
+// Structural parity with Admin
+// Trading-aware
+// Scroll-safe
+// Advisor locked
 
 import React, { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
@@ -39,7 +37,7 @@ export default function ManagerLayout() {
       <aside className="layout-sidebar manager">
         <div className="layout-brand">
           <Logo size="md" />
-          <span style={{ fontSize: 12, opacity: 0.75 }}>
+          <span className="muted" style={{ fontSize: 12 }}>
             Manager SOC
           </span>
         </div>
@@ -72,7 +70,15 @@ export default function ManagerLayout() {
             Reports
           </NavLink>
 
-          <NavLink to="/manager/notifications" onClick={() => setMenuOpen(false)}>
+          {/* 🔥 Trading Access (Manager View) */}
+          <NavLink to="/admin/trading" onClick={() => setMenuOpen(false)}>
+            Trading Oversight
+          </NavLink>
+
+          <NavLink
+            to="/manager/notifications"
+            onClick={() => setMenuOpen(false)}
+          >
             Notifications
           </NavLink>
         </nav>
@@ -89,7 +95,7 @@ export default function ManagerLayout() {
           <Outlet />
         </section>
 
-        {/* ================= ADVISOR ================= */}
+        {/* ================= ADVISOR DRAWER ================= */}
         <section
           className={`ai-drawer ${assistantOpen ? "open" : ""}`}
           aria-hidden={!assistantOpen}
@@ -97,16 +103,13 @@ export default function ManagerLayout() {
           <div className="ai-drawer-handle">
             <button
               className="ai-toggle"
-              onClick={() => setAssistantOpen(v => !v)}
+              onClick={() => setAssistantOpen((v) => !v)}
             >
               {assistantOpen ? "▼ Hide Advisor" : "▲ Show Advisor"}
             </button>
           </div>
 
-          <div
-            className="ai-drawer-body"
-            style={{ overflow: "auto" }} // 🔑 FIX
-          >
+          <div className="ai-drawer-body">
             <AuthoDevPanel
               title="Manager Security Advisor"
               getContext={() => ({
