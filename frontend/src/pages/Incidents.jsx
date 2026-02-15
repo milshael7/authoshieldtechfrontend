@@ -8,27 +8,47 @@ function safeArray(v) {
 }
 
 function statusColor(status) {
-  if (status === "open") return "#ff4d4d";
-  if (status === "investigating") return "#ffd166";
-  if (status === "contained") return "#5EC6FF";
-  if (status === "resolved") return "#2bd576";
-  return "#999";
+  switch (status?.toLowerCase()) {
+    case "critical":
+      return "rgba(255,0,0,.25)";
+    case "active":
+      return "rgba(255,90,0,.25)";
+    case "investigating":
+      return "rgba(255,200,0,.25)";
+    case "resolved":
+      return "rgba(43,213,118,.18)";
+    default:
+      return "rgba(255,255,255,.08)";
+  }
+}
+
+function groupByStatus(incidents = []) {
+  const map = {
+    critical: 0,
+    active: 0,
+    investigating: 0,
+    resolved: 0,
+  };
+
+  incidents.forEach(i => {
+    const s = i?.status?.toLowerCase();
+    if (map[s] !== undefined) map[s]++;
+  });
+
+  return map;
 }
 
 /* ================= PAGE ================= */
 
 export default function Incidents() {
   const [incidents, setIncidents] = useState([]);
-  const [selected, setSelected] = useState(null);
   const [loading, setLoading] = useState(true);
 
   async function load() {
     setLoading(true);
     try {
-      const res = await api.incidents().catch(() => ({}));
-      setIncidents(safeArray(res?.incidents));
-    } catch {
-      setIncidents([]);
+      const data = await api.incidents().catch(() => ({}));
+      setIncidents(safeArray(data?.incidents));
     } finally {
       setLoading(false);
     }
@@ -38,139 +58,146 @@ export default function Incidents() {
     load();
   }, []);
 
-  const summary = useMemo(() => {
-    return {
-      total: incidents.length,
-      open: incidents.filter(i => i?.status === "open").length,
-      investigating: incidents.filter(i => i?.status === "investigating").length,
-      contained: incidents.filter(i => i?.status === "contained").length,
-      resolved: incidents.filter(i => i?.status === "resolved").length,
-    };
-  }, [incidents]);
+  const stats = useMemo(
+    () => groupByStatus(incidents),
+    [incidents]
+  );
+
+  const total = incidents.length;
 
   /* ================= UI ================= */
 
   return (
     <div style={{ padding: 32, display: "flex", flexDirection: "column", gap: 28 }}>
 
-      {/* ================= HEADER ================= */}
+      {/* HEADER */}
       <div>
-        <h2 style={{ margin: 0 }}>Incident Response War Room</h2>
+        <h2 style={{ margin: 0 }}>Incident Response Command Center</h2>
         <div style={{ fontSize: 13, opacity: 0.6 }}>
-          Active security events & containment operations
+          Detection, containment & remediation lifecycle
         </div>
       </div>
 
-      {/* ================= SUMMARY STRIP ================= */}
+      {/* SUMMARY STRIP */}
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit,minmax(140px,1fr))",
-          gap: 18,
+          gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))",
+          gap: 18
         }}
       >
-        {Object.entries(summary).map(([k, v]) => (
-          <div key={k} className="card">
+        <div className="card">
+          <div style={{ fontSize: 12, opacity: 0.6 }}>Total Incidents</div>
+          <div style={{ fontSize: 26, fontWeight: 800 }}>{total}</div>
+        </div>
+
+        {Object.entries(stats).map(([level, count]) => (
+          <div key={level} className="card">
             <div style={{ fontSize: 12, opacity: 0.6 }}>
-              {k.toUpperCase()}
+              {level.toUpperCase()}
             </div>
-            <div style={{ fontSize: 24, fontWeight: 800 }}>
-              {v}
-            </div>
+            <div style={{ fontSize: 22, fontWeight: 800 }}>{count}</div>
           </div>
         ))}
       </div>
 
-      {/* ================= MAIN GRID ================= */}
+      {/* MAIN GRID */}
       <div
         style={{
           display: "grid",
           gridTemplateColumns: "2fr 1fr",
-          gap: 24,
+          gap: 24
         }}
       >
 
-        {/* ================= INCIDENT LIST ================= */}
-        <div className="card" style={{ padding: 0, overflow: "hidden" }}>
-          <div style={{ maxHeight: 520, overflowY: "auto" }}>
-            {loading ? (
-              <div style={{ padding: 20 }}>Loading incidents...</div>
-            ) : incidents.length === 0 ? (
-              <div style={{ padding: 20 }}>No active incidents.</div>
-            ) : (
-              safeArray(incidents).map((i, idx) => (
-                <div
-                  key={i?.id || idx}
-                  onClick={() => setSelected(i)}
-                  style={{
-                    padding: 18,
-                    borderBottom: "1px solid rgba(255,255,255,0.08)",
-                    cursor: "pointer",
-                    background:
-                      selected?.id === i?.id
-                        ? "rgba(94,198,255,0.08)"
-                        : "transparent",
-                  }}
-                >
-                  <div style={{ display: "flex", justifyContent: "space-between" }}>
-                    <strong>{i?.title || "Unknown Incident"}</strong>
+        {/* ================= INCIDENT TABLE ================= */}
+        <div className="card">
+          <h3>Active Incident Stream</h3>
 
-                    <span
+          {loading ? (
+            <div>Loading incident stream...</div>
+          ) : total === 0 ? (
+            <div style={{ opacity: 0.6 }}>
+              No active incidents detected.
+            </div>
+          ) : (
+            <div style={{ marginTop: 20, overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr style={{ textAlign: "left", opacity: 0.6 }}>
+                    <th>Title</th>
+                    <th>Asset</th>
+                    <th>Status</th>
+                    <th>Severity</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {incidents.map((i, index) => (
+                    <tr
+                      key={i?.id || index}
                       style={{
-                        fontSize: 12,
-                        fontWeight: 700,
-                        color: statusColor(i?.status),
+                        borderTop: "1px solid rgba(255,255,255,.08)"
                       }}
                     >
-                      {String(i?.status || "unknown").toUpperCase()}
-                    </span>
-                  </div>
-
-                  <div style={{ fontSize: 13, opacity: 0.6, marginTop: 4 }}>
-                    Affected Asset: {i?.asset || "—"}
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-
-        {/* ================= INCIDENT DETAIL ================= */}
-        <div className="card">
-          {selected ? (
-            <>
-              <h3>{selected?.title}</h3>
-
-              <div style={{ marginBottom: 8 }}>
-                Status:{" "}
-                <span style={{ color: statusColor(selected?.status) }}>
-                  {selected?.status}
-                </span>
-              </div>
-
-              <div style={{ marginBottom: 8 }}>
-                Affected Asset: {selected?.asset || "Unknown"}
-              </div>
-
-              <div style={{ marginBottom: 14 }}>
-                Description:
-                <div style={{ fontSize: 14, opacity: 0.8, marginTop: 6 }}>
-                  {selected?.description || "No additional details."}
-                </div>
-              </div>
-
-              <div style={{ display: "flex", gap: 10 }}>
-                <button className="btn">Start Investigation</button>
-                <button className="btn">Contain</button>
-                <button className="btn">Mark Resolved</button>
-              </div>
-            </>
-          ) : (
-            <div style={{ opacity: 0.6 }}>
-              Select an incident to view operational details.
+                      <td style={{ padding: "10px 0" }}>
+                        {i?.title || "—"}
+                      </td>
+                      <td>{i?.asset || "—"}</td>
+                      <td>
+                        <span
+                          style={{
+                            padding: "4px 10px",
+                            borderRadius: 999,
+                            fontSize: 12,
+                            background: statusColor(i?.status)
+                          }}
+                        >
+                          {i?.status || "open"}
+                        </span>
+                      </td>
+                      <td>{i?.severity || "unknown"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </div>
+
+        {/* ================= RESPONSE PANEL ================= */}
+        <div className="card">
+          <h3>Response Playbook</h3>
+
+          <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 14 }}>
+
+            <div>
+              <strong>Containment</strong>
+              <div style={{ fontSize: 13, opacity: 0.7 }}>
+                Isolate affected endpoints and revoke compromised credentials.
+              </div>
+            </div>
+
+            <div>
+              <strong>Eradication</strong>
+              <div style={{ fontSize: 13, opacity: 0.7 }}>
+                Patch vulnerabilities and remove malicious artifacts.
+              </div>
+            </div>
+
+            <div>
+              <strong>Recovery</strong>
+              <div style={{ fontSize: 13, opacity: 0.7 }}>
+                Restore services and validate system integrity.
+              </div>
+            </div>
+
+            <button className="btn" onClick={load}>
+              Refresh Incident Stream
+            </button>
+
+          </div>
+        </div>
+
       </div>
     </div>
   );
