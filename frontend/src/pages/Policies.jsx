@@ -7,10 +7,8 @@ function safeArray(v) {
   return Array.isArray(v) ? v : [];
 }
 
-function pct(n) {
-  const x = Number(n);
-  if (!Number.isFinite(x)) return 0;
-  return Math.max(0, Math.min(100, Math.round(x)));
+function safeStr(v, fallback = "—") {
+  return typeof v === "string" && v.trim() ? v : fallback;
 }
 
 /* ================= PAGE ================= */
@@ -22,8 +20,8 @@ export default function Policies() {
   async function load() {
     setLoading(true);
     try {
-      const data = await api.policies().catch(() => ({}));
-      setPolicies(safeArray(data?.policies));
+      const res = await api.policiesOverview().catch(() => ({}));
+      setPolicies(safeArray(res?.policies));
     } finally {
       setLoading(false);
     }
@@ -33,24 +31,13 @@ export default function Policies() {
     load();
   }, []);
 
-  const totalPolicies = policies.length;
-
-  const acknowledgedRate = useMemo(() => {
-    if (!policies.length) return 0;
-
-    const totalUsers = policies.reduce(
-      (acc, p) => acc + (p?.totalUsers || 0),
-      0
-    );
-
-    const acknowledgedUsers = policies.reduce(
-      (acc, p) => acc + (p?.acknowledgedUsers || 0),
-      0
-    );
-
-    if (!totalUsers) return 0;
-
-    return Math.round((acknowledgedUsers / totalUsers) * 100);
+  const stats = useMemo(() => {
+    return {
+      total: policies.length,
+      approved: policies.filter(p => p.status === "approved").length,
+      draft: policies.filter(p => p.status === "draft").length,
+      expired: policies.filter(p => p.status === "expired").length,
+    };
   }, [policies]);
 
   /* ================= UI ================= */
@@ -60,44 +47,43 @@ export default function Policies() {
 
       {/* HEADER */}
       <div>
-        <h2 style={{ margin: 0 }}>Policies Governance Center</h2>
+        <h2 style={{ margin: 0 }}>Policies & Governance</h2>
         <div style={{ fontSize: 13, opacity: 0.6 }}>
-          Internal security controls & compliance governance
+          Policy lifecycle management and enforcement oversight
         </div>
       </div>
 
-      {/* SUMMARY STRIP */}
+      {/* POLICY STATS */}
       <div
         style={{
           display: "grid",
           gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))",
-          gap: 18
+          gap: 20
         }}
       >
         <div className="card">
-          <div style={{ fontSize: 12, opacity: 0.6 }}>
-            Total Policies
-          </div>
-          <div style={{ fontSize: 26, fontWeight: 800 }}>
-            {totalPolicies}
+          <div style={{ fontSize: 12, opacity: 0.6 }}>Total Policies</div>
+          <div style={{ fontSize: 26, fontWeight: 800 }}>{stats.total}</div>
+        </div>
+
+        <div className="card">
+          <div style={{ fontSize: 12, opacity: 0.6 }}>Approved</div>
+          <div style={{ fontSize: 26, fontWeight: 800, color: "#5EC6FF" }}>
+            {stats.approved}
           </div>
         </div>
 
         <div className="card">
-          <div style={{ fontSize: 12, opacity: 0.6 }}>
-            Acknowledgement Rate
-          </div>
-          <div style={{ fontSize: 26, fontWeight: 800 }}>
-            {acknowledgedRate}%
+          <div style={{ fontSize: 12, opacity: 0.6 }}>Draft</div>
+          <div style={{ fontSize: 26, fontWeight: 800, color: "#ffd166" }}>
+            {stats.draft}
           </div>
         </div>
 
         <div className="card">
-          <div style={{ fontSize: 12, opacity: 0.6 }}>
-            Governance Status
-          </div>
-          <div style={{ fontSize: 26, fontWeight: 800 }}>
-            {acknowledgedRate >= 85 ? "Healthy" : "Review Needed"}
+          <div style={{ fontSize: 12, opacity: 0.6 }}>Expired</div>
+          <div style={{ fontSize: 26, fontWeight: 800, color: "#ff5a5f" }}>
+            {stats.expired}
           </div>
         </div>
       </div>
@@ -111,111 +97,115 @@ export default function Policies() {
         }}
       >
 
-        {/* ================= POLICY LIST ================= */}
-        <div className="card">
-          <h3>Policy Library</h3>
+        {/* POLICY LIST */}
+        <div className="card" style={{ padding: 24 }}>
+          <h3>Policy Registry</h3>
 
-          {loading ? (
-            <div>Loading policies...</div>
-          ) : policies.length === 0 ? (
-            <div style={{ opacity: 0.6 }}>
-              No policies configured.
-            </div>
-          ) : (
-            <div style={{ marginTop: 20, display: "flex", flexDirection: "column", gap: 18 }}>
-              {policies.map((p, index) => {
-                const rate = pct(
-                  (p?.acknowledgedUsers || 0) /
-                  (p?.totalUsers || 1) *
-                  100
-                );
-
-                return (
-                  <div
-                    key={p?.id || index}
-                    style={{
-                      padding: 16,
-                      borderRadius: 14,
-                      background: "rgba(255,255,255,.04)",
-                      border: "1px solid rgba(255,255,255,.08)"
-                    }}
-                  >
-                    <div style={{ display: "flex", justifyContent: "space-between" }}>
-                      <strong>{p?.title || "Policy"}</strong>
-                      <span>v{p?.version || "1.0"}</span>
-                    </div>
-
-                    <div style={{ fontSize: 13, opacity: 0.7, marginTop: 6 }}>
-                      {p?.description || "No description available"}
-                    </div>
-
-                    <div
-                      style={{
-                        marginTop: 12,
-                        height: 8,
-                        background: "rgba(255,255,255,.08)",
-                        borderRadius: 999,
-                        overflow: "hidden"
-                      }}
-                    >
-                      <div
-                        style={{
-                          width: `${rate}%`,
-                          height: "100%",
-                          background:
-                            rate >= 85
-                              ? "linear-gradient(90deg,#2bd576,#5EC6FF)"
-                              : "linear-gradient(90deg,#ff5a5f,#ffd166)"
-                        }}
-                      />
-                    </div>
-
-                    <div style={{ marginTop: 8, fontSize: 12, opacity: 0.6 }}>
-                      {p?.acknowledgedUsers || 0} /{" "}
-                      {p?.totalUsers || 0} acknowledged
+          <div style={{ marginTop: 18, display: "flex", flexDirection: "column", gap: 14 }}>
+            {safeArray(policies)
+              .slice(0, 12)
+              .map((p, i) => (
+                <div
+                  key={p?.id || i}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    padding: 14,
+                    borderRadius: 12,
+                    background: "rgba(255,255,255,.04)",
+                    border: "1px solid rgba(255,255,255,.08)"
+                  }}
+                >
+                  <div>
+                    <strong>{safeStr(p?.title, "Policy Document")}</strong>
+                    <div style={{ fontSize: 12, opacity: 0.6 }}>
+                      Owner: {safeStr(p?.owner, "Unassigned")}
                     </div>
                   </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
 
-        {/* ================= ACTION PANEL ================= */}
-        <div className="card">
-          <h3>Governance Actions</h3>
+                  <span
+                    style={{
+                      fontSize: 12,
+                      padding: "6px 10px",
+                      borderRadius: 999,
+                      background:
+                        p?.status === "approved"
+                          ? "rgba(94,198,255,.15)"
+                          : p?.status === "expired"
+                          ? "rgba(255,90,95,.15)"
+                          : "rgba(255,209,102,.15)"
+                    }}
+                  >
+                    {safeStr(p?.status, "draft").toUpperCase()}
+                  </span>
+                </div>
+              ))}
 
-          <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 14 }}>
-
-            <div>
-              <strong>Issue New Policy</strong>
-              <div style={{ fontSize: 13, opacity: 0.7 }}>
-                Publish updated internal security policies.
+            {policies.length === 0 && (
+              <div style={{ opacity: 0.6 }}>
+                No policies registered
               </div>
-            </div>
-
-            <div>
-              <strong>Track Acknowledgements</strong>
-              <div style={{ fontSize: 13, opacity: 0.7 }}>
-                Monitor which users have not signed.
-              </div>
-            </div>
-
-            <div>
-              <strong>Version Control</strong>
-              <div style={{ fontSize: 13, opacity: 0.7 }}>
-                Maintain historical policy revisions.
-              </div>
-            </div>
-
-            <button className="btn" onClick={load}>
-              Refresh Policies
-            </button>
-
+            )}
           </div>
         </div>
 
+        {/* WORKFLOW PANEL */}
+        <div className="card" style={{ padding: 24 }}>
+          <h3>Approval Workflow</h3>
+
+          <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 14 }}>
+            <div
+              style={{
+                padding: 14,
+                borderRadius: 12,
+                background: "rgba(255,255,255,.05)"
+              }}
+            >
+              <strong>Draft → Review</strong>
+              <div style={{ fontSize: 12, opacity: 0.6 }}>
+                Awaiting stakeholder review
+              </div>
+            </div>
+
+            <div
+              style={{
+                padding: 14,
+                borderRadius: 12,
+                background: "rgba(255,255,255,.05)"
+              }}
+            >
+              <strong>Review → Approval</strong>
+              <div style={{ fontSize: 12, opacity: 0.6 }}>
+                Executive sign-off required
+              </div>
+            </div>
+
+            <div
+              style={{
+                padding: 14,
+                borderRadius: 12,
+                background: "rgba(255,255,255,.05)"
+              }}
+            >
+              <strong>Approval → Enforcement</strong>
+              <div style={{ fontSize: 12, opacity: 0.6 }}>
+                Policy distributed across systems
+              </div>
+            </div>
+          </div>
+
+          <button
+            className="btn"
+            onClick={load}
+            disabled={loading}
+            style={{ marginTop: 22 }}
+          >
+            {loading ? "Refreshing…" : "Reload Policies"}
+          </button>
+        </div>
+
       </div>
+
     </div>
   );
 }
