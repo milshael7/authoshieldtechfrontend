@@ -37,6 +37,10 @@ import Reports from "./pages/Reports.jsx";
 import Notifications from "./pages/Notifications.jsx";
 import NotFound from "./pages/NotFound.jsx";
 
+/* ================= NEW: TRADING ================= */
+
+import TradingRoom from "./pages/TradingRoom.jsx";
+
 /* ========================================================= */
 
 function normalizeRole(role) {
@@ -90,7 +94,7 @@ function AppRoutes({ user }) {
   return (
     <Routes>
 
-      {/* PUBLIC */}
+      {/* ================= PUBLIC ================= */}
       <Route path="/" element={<Landing />} />
       <Route path="/pricing" element={<Pricing />} />
       <Route path="/signup" element={<Signup />} />
@@ -113,6 +117,10 @@ function AppRoutes({ user }) {
         <Route path="compliance" element={<Compliance />} />
         <Route path="policies" element={<Policies />} />
         <Route path="reports" element={<Reports />} />
+
+        {/* 🔥 FIXED: TRADING ROUTE */}
+        <Route path="trading" element={<TradingRoom />} />
+
         <Route path="notifications" element={<Notifications />} />
       </Route>
 
