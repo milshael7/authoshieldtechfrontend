@@ -1,180 +1,166 @@
-// frontend/src/pages/Response.jsx
-// SOC Response Actions & Playbooks — Phase 1
-// Containment, automation, operator visibility
+import React, { useEffect, useMemo, useState } from "react";
+import { api } from "../lib/api.js";
 
-import React, { useEffect, useState } from "react";
+/* ================= HELPERS ================= */
+
+function pct(n) {
+  const x = Number(n);
+  if (!Number.isFinite(x)) return 0;
+  return Math.max(0, Math.min(100, Math.round(x)));
+}
+
+function money(v) {
+  if (!Number.isFinite(Number(v))) return "—";
+  return `$${Number(v).toFixed(2)}`;
+}
+
+function safeArray(v) {
+  return Array.isArray(v) ? v : [];
+}
 
 /* ================= PAGE ================= */
 
-export default function Response() {
-  const [playbooks, setPlaybooks] = useState([]);
+export default function Reports() {
+  const [summary, setSummary] = useState({});
+  const [checks, setChecks] = useState([]);
+  const [trading, setTrading] = useState({});
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    // Placeholder until backend wiring
-    setTimeout(() => {
-      setPlaybooks([
-        {
-          id: "PB-001",
-          name: "Account Compromise",
-          description: "Lock account, reset credentials, review logs",
-          automation: "Partial",
-          status: "Available",
-        },
-        {
-          id: "PB-002",
-          name: "Malware Containment",
-          description: "Isolate endpoint, block hash, scan environment",
-          automation: "Full",
-          status: "Active",
-        },
-        {
-          id: "PB-003",
-          name: "Phishing Response",
-          description: "Quarantine email, notify users, purge mailboxes",
-          automation: "Full",
-          status: "Available",
-        },
-        {
-          id: "PB-004",
-          name: "Data Exfiltration",
-          description: "Disable access, snapshot systems, alert SOC",
-          automation: "Manual",
-          status: "Available",
-        },
+  async function load() {
+    setLoading(true);
+    try {
+      const [s, c, t] = await Promise.all([
+        api.postureSummary().catch(() => ({})),
+        api.postureChecks().catch(() => ({})),
+        fetch("/api/trading/paper/snapshot")
+          .then(r => r.json())
+          .catch(() => ({})),
       ]);
+
+      setSummary(s || {});
+      setChecks(safeArray(c?.checks));
+      setTrading(t?.snapshot || {});
+    } catch {
+      setSummary({});
+      setChecks([]);
+      setTrading({});
+    } finally {
       setLoading(false);
-    }, 500);
+    }
+  }
+
+  useEffect(() => {
+    load();
   }, []);
+
+  const securityScore = useMemo(() => {
+    if (!checks.length) return 0;
+    const val = checks.reduce((s, c) => {
+      if (c?.status === "ok") return s + 1;
+      if (c?.status === "warn") return s + 0.5;
+      return s;
+    }, 0);
+    return Math.round((val / checks.length) * 100);
+  }, [checks]);
+
+  const highRisk = checks.filter(c => c?.status !== "ok").length;
 
   /* ================= UI ================= */
 
   return (
-    <div className="postureWrap">
-      {/* ================= LEFT: PLAYBOOKS ================= */}
-      <section className="postureCard">
-        <div className="postureTop">
-          <div>
-            <h2>Response Playbooks</h2>
-            <small>Predefined actions for rapid containment</small>
+    <div style={{ padding: 32, display: "flex", flexDirection: "column", gap: 28 }}>
+
+      {/* ================= HEADER ================= */}
+      <div>
+        <h2 style={{ margin: 0 }}>Executive Intelligence Overview</h2>
+        <div style={{ fontSize: 13, opacity: 0.6 }}>
+          High-level security & trading performance summary
+        </div>
+      </div>
+
+      {/* ================= SCORE STRIP ================= */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))",
+          gap: 20,
+        }}
+      >
+        <div className="card">
+          <div style={{ fontSize: 12, opacity: 0.6 }}>Security Score</div>
+          <div style={{ fontSize: 30, fontWeight: 800 }}>
+            {pct(securityScore)}%
           </div>
         </div>
 
-        {loading && <p className="muted">Loading playbooks…</p>}
-
-        {!loading && (
-          <div className="list" style={{ marginTop: 18 }}>
-            {playbooks.map((p) => (
-              <div key={p.id} className="card" style={{ padding: 16 }}>
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "1fr auto",
-                    gap: 14,
-                  }}
-                >
-                  <div>
-                    <b>{p.name}</b>
-                    <small
-                      style={{
-                        display: "block",
-                        marginTop: 6,
-                        color: "var(--p-muted)",
-                      }}
-                    >
-                      {p.description}
-                    </small>
-
-                    <small
-                      style={{
-                        display: "block",
-                        marginTop: 6,
-                        fontSize: 12,
-                      }}
-                    >
-                      Automation:{" "}
-                      <b>{p.automation}</b>
-                    </small>
-                  </div>
-
-                  <div style={{ textAlign: "right" }}>
-                    <small
-                      style={{
-                        display: "block",
-                        fontSize: 12,
-                        marginBottom: 6,
-                      }}
-                    >
-                      {p.id}
-                    </small>
-
-                    <span
-                      className={`badge ${
-                        p.status === "Active"
-                          ? "warn"
-                          : "ok"
-                      }`}
-                    >
-                      {p.status}
-                    </span>
-                  </div>
-                </div>
-
-                <div
-                  style={{
-                    display: "flex",
-                    gap: 10,
-                    marginTop: 14,
-                  }}
-                >
-                  <button>Run Playbook</button>
-                  <button>View Steps</button>
-                </div>
-              </div>
-            ))}
+        <div className="card">
+          <div style={{ fontSize: 12, opacity: 0.6 }}>High-Risk Controls</div>
+          <div style={{ fontSize: 30, fontWeight: 800 }}>
+            {highRisk}
           </div>
+        </div>
+
+        <div className="card">
+          <div style={{ fontSize: 12, opacity: 0.6 }}>Trading Equity</div>
+          <div style={{ fontSize: 30, fontWeight: 800 }}>
+            {money(trading?.equity)}
+          </div>
+        </div>
+
+        <div className="card">
+          <div style={{ fontSize: 12, opacity: 0.6 }}>Active Positions</div>
+          <div style={{ fontSize: 30, fontWeight: 800 }}>
+            {trading?.position ? 1 : 0}
+          </div>
+        </div>
+      </div>
+
+      {/* ================= STRATEGIC SUMMARY ================= */}
+      <div className="card">
+        <h3>Strategic Risk Summary</h3>
+
+        {loading ? (
+          <div>Analyzing...</div>
+        ) : (
+          <>
+            <p style={{ opacity: 0.85 }}>
+              Overall security posture is currently operating at{" "}
+              <strong>{pct(securityScore)}%</strong>.
+              {securityScore >= 85
+                ? " Risk exposure is controlled."
+                : securityScore >= 65
+                ? " Moderate exposure detected."
+                : " Elevated exposure requires executive attention."}
+            </p>
+
+            <p style={{ opacity: 0.85 }}>
+              {highRisk > 0
+                ? `${highRisk} security controls require review.`
+                : "All critical security controls are stable."}
+            </p>
+
+            <p style={{ opacity: 0.85 }}>
+              Trading equity currently stands at{" "}
+              <strong>{money(trading?.equity)}</strong>.
+              {trading?.equity > 0
+                ? " Portfolio is operational."
+                : " Trading engine inactive or initializing."}
+            </p>
+          </>
         )}
-      </section>
+      </div>
 
-      {/* ================= RIGHT: RESPONSE STATE ================= */}
-      <aside className="postureCard">
-        <h3>Response Status</h3>
-        <p className="muted">
-          Current containment and remediation state.
-        </p>
+      {/* ================= ACTION PANEL ================= */}
+      <div className="card">
+        <h3>Executive Actions</h3>
 
-        <ul className="list">
-          <li>
-            <span className="dot bad" />
-            <div>
-              <b>Immediate Actions Required</b>
-              <small>Critical incidents detected</small>
-            </div>
-          </li>
-
-          <li>
-            <span className="dot warn" />
-            <div>
-              <b>Automations Running</b>
-              <small>Playbooks executing</small>
-            </div>
-          </li>
-
-          <li>
-            <span className="dot ok" />
-            <div>
-              <b>Systems Stabilized</b>
-              <small>No uncontrolled spread</small>
-            </div>
-          </li>
-        </ul>
-
-        <p className="muted" style={{ marginTop: 14 }}>
-          Ask the assistant:
-          <br />• “Which playbook should I run?”
-          <br />• “What was auto-contained?”
-        </p>
-      </aside>
+        <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
+          <button className="btn">Generate PDF Report</button>
+          <button className="btn">Export Security Metrics</button>
+          <button className="btn">Export Trading Metrics</button>
+          <button className="btn">Schedule Board Summary</button>
+        </div>
+      </div>
     </div>
   );
 }
