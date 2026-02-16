@@ -1,8 +1,7 @@
 // frontend/src/layouts/AdminLayout.jsx
-// Admin Layout — Enterprise SOC Architecture (POLISHED)
-// Professional collapsible AUTHOSHIELD Advisory dock
-// Stable scroll / fixed input
-// Production ready
+// Admin Layout — Enterprise SOC Architecture (FINAL STABLE)
+// Collapsible Right AuthoShield Advisor Dock
+// Production Ready
 
 import React, { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
@@ -13,9 +12,6 @@ import "../styles/layout.css";
 
 export default function AdminLayout() {
   const navigate = useNavigate();
-  const [menuOpen, setMenuOpen] = useState(false);
-
-  // AI Dock State
   const [advisorOpen, setAdvisorOpen] = useState(true);
 
   function logout() {
@@ -24,14 +20,9 @@ export default function AdminLayout() {
     navigate("/login");
   }
 
-  function closeMenu() {
-    setMenuOpen(false);
-  }
-
   return (
-    <div className={`layout-root enterprise ${menuOpen ? "sidebar-open" : ""}`}>
-      {menuOpen && <div className="sidebar-overlay" onClick={closeMenu} />}
-
+    <div className="layout-root enterprise">
+      
       {/* ================= SIDEBAR ================= */}
       <aside className="layout-sidebar admin">
         <div className="layout-brand">
@@ -42,22 +33,22 @@ export default function AdminLayout() {
         </div>
 
         <nav className="layout-nav">
-          <NavLink to="." end onClick={closeMenu}>Security Posture</NavLink>
-          <NavLink to="assets" onClick={closeMenu}>Assets</NavLink>
-          <NavLink to="threats" onClick={closeMenu}>Threats</NavLink>
-          <NavLink to="incidents" onClick={closeMenu}>Incidents</NavLink>
-          <NavLink to="vulnerabilities" onClick={closeMenu}>Vulnerabilities</NavLink>
-          <NavLink to="vulnerability-center" onClick={closeMenu}>Vulnerability Center</NavLink>
-          <NavLink to="compliance" onClick={closeMenu}>Compliance</NavLink>
-          <NavLink to="policies" onClick={closeMenu}>Policies</NavLink>
-          <NavLink to="reports" onClick={closeMenu}>Reports</NavLink>
-          <NavLink to="trading" onClick={closeMenu}>Trading Command</NavLink>
-          <NavLink to="notifications" onClick={closeMenu}>Notifications</NavLink>
+          <NavLink to="." end>Security Posture</NavLink>
+          <NavLink to="assets">Assets</NavLink>
+          <NavLink to="threats">Threats</NavLink>
+          <NavLink to="incidents">Incidents</NavLink>
+          <NavLink to="vulnerabilities">Vulnerabilities</NavLink>
+          <NavLink to="vulnerability-center">Vulnerability Center</NavLink>
+          <NavLink to="compliance">Compliance</NavLink>
+          <NavLink to="policies">Policies</NavLink>
+          <NavLink to="reports">Reports</NavLink>
+          <NavLink to="trading">Trading Command</NavLink>
+          <NavLink to="notifications">Notifications</NavLink>
 
           <hr style={{ opacity: 0.18 }} />
 
-          <NavLink to="/manager" onClick={closeMenu}>Manager Global View</NavLink>
-          <NavLink to="/company" onClick={closeMenu}>Company Global View</NavLink>
+          <NavLink to="/manager">Manager Global View</NavLink>
+          <NavLink to="/company">Company Global View</NavLink>
         </nav>
 
         <button className="btn logout-btn" onClick={logout}>
@@ -65,7 +56,7 @@ export default function AdminLayout() {
         </button>
       </aside>
 
-      {/* ================= MAIN + ADVISOR ================= */}
+      {/* ================= MAIN + AI ================= */}
       <div className="enterprise-main">
 
         {/* CENTER CONTENT */}
@@ -75,39 +66,35 @@ export default function AdminLayout() {
           </section>
         </main>
 
-        {/* RIGHT ADVISOR DOCK */}
-        <aside className={`enterprise-ai-panel ${advisorOpen ? "open" : "collapsed"}`}>
-
-          {/* TOP HEADER — CLICK TO OPEN/CLOSE */}
-          <div
-            className="enterprise-ai-header"
-            onClick={() => setAdvisorOpen(v => !v)}
-            title={advisorOpen ? "Collapse Advisory Panel" : "Open Advisory Panel"}
+        {/* RIGHT AI DOCK */}
+        <aside
+          className={`enterprise-ai-panel ${
+            advisorOpen ? "open" : "collapsed"
+          }`}
+        >
+          {/* Toggle Button */}
+          <button
+            className="advisor-tab"
+            onClick={() => setAdvisorOpen((v) => !v)}
+            title={advisorOpen ? "Collapse Advisor" : "Open AuthoShield Advisor"}
           >
-            <span className="enterprise-ai-title">
-              AUTHOSHIELD Advisory
-            </span>
+            {advisorOpen ? "‹" : "AuthoShield Advisor"}
+          </button>
 
-            <span className="enterprise-ai-toggle">
-              {advisorOpen ? "›" : "‹"}
-            </span>
+          <div className="enterprise-ai-inner">
+            <AuthoDevPanel
+              title=""
+              getContext={() => ({
+                role: "admin",
+                location: window.location.pathname,
+                access: "full-control",
+                scope: "global-visibility",
+              })}
+            />
           </div>
-
-          {/* PANEL BODY */}
-          {advisorOpen && (
-            <div className="enterprise-ai-inner">
-              <AuthoDevPanel
-                title=""
-                getContext={() => ({
-                  role: "admin",
-                  location: window.location.pathname,
-                  access: "full-control",
-                  scope: "global-visibility",
-                })}
-              />
-            </div>
-          )}
         </aside>
+
       </div>
     </div>
   );
+}
