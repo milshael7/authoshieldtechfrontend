@@ -45,7 +45,8 @@ function normalizeRole(role) {
   return String(role || "").toLowerCase();
 }
 
-function RoleGuard({ user, allow, children }) {
+function RoleGuard({ user, ready, allow, children }) {
+  if (!ready) return null; // ⛔ block render until hydration finishes
   if (!user) return <Navigate to="/login" replace />;
 
   const role = normalizeRole(user.role);
@@ -58,15 +59,8 @@ function RoleGuard({ user, allow, children }) {
   return children;
 }
 
-function AppRoutes() {
+function AppRoutes({ user, ready }) {
   const location = useLocation();
-  const [user, setUser] = useState(null);
-
-  /* 🔥 FIX: Re-read user whenever route changes */
-  useEffect(() => {
-    const u = getSavedUser();
-    setUser(u || null);
-  }, [location.pathname]);
 
   const isPublicPath = useMemo(() => {
     return (
@@ -108,7 +102,7 @@ function AppRoutes() {
       <Route
         path="/admin"
         element={
-          <RoleGuard user={user} allow={["admin"]}>
+          <RoleGuard user={user} ready={ready} allow={["admin"]}>
             <AdminLayout />
           </RoleGuard>
         }
@@ -146,9 +140,23 @@ function AppRoutes() {
 }
 
 export default function App() {
+  const [user, setUser] = useState(null);
+  const [ready, setReady] = useState(false);
+
+  // 🔥 Hydrate ONCE on initial mount
+  useEffect(() => {
+    const u = getSavedUser();
+    setUser(u || null);
+    setReady(true);
+  }, []);
+
+  if (!ready) {
+    return <div style={{ padding: 40 }}>Loading...</div>;
+  }
+
   return (
     <BrowserRouter>
-      <AppRoutes />
+      <AppRoutes user={user} ready={ready} />
     </BrowserRouter>
   );
 }
