@@ -1,5 +1,6 @@
 /* =========================================================
-   AUTOSHIELD FRONTEND API LAYER — CLEAN PRODUCTION VERSION
+   AUTOSHIELD FRONTEND API LAYER — RENDER SAFE VERSION
+   Cold-start protected + warmup + stable refresh
    ========================================================= */
 
 const API_BASE = import.meta.env.VITE_API_BASE?.trim();
@@ -10,7 +11,9 @@ if (!API_BASE) {
 
 const TOKEN_KEY = "as_token";
 const USER_KEY = "as_user";
-const REQUEST_TIMEOUT = 15000;
+
+/* 🔥 Render cold start safe timeout */
+const REQUEST_TIMEOUT = 45000;
 
 /* =============================
    STORAGE HELPERS
@@ -58,14 +61,26 @@ function joinUrl(base, path) {
 }
 
 /* =============================
-   TIMEOUT WRAPPER
+   FETCH WITH REAL ABORT TIMEOUT
    ============================= */
 
-function withTimeout(promise, ms = REQUEST_TIMEOUT) {
-  const timeout = new Promise((_, reject) =>
-    setTimeout(() => reject(new Error("Request timeout")), ms)
-  );
-  return Promise.race([promise, timeout]);
+async function fetchWithTimeout(url, options = {}, ms = REQUEST_TIMEOUT) {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), ms);
+
+  try {
+    return await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+  } catch (err) {
+    if (err?.name === "AbortError") {
+      throw new Error("Request timeout");
+    }
+    throw err;
+  } finally {
+    clearTimeout(id);
+  }
 }
 
 /* =============================
@@ -92,14 +107,12 @@ async function req(
   }
 
   try {
-    const res = await withTimeout(
-      fetch(joinUrl(API_BASE, path), {
-        method,
-        headers,
-        credentials: "include",
-        body: body !== undefined ? JSON.stringify(body) : undefined,
-      })
-    );
+    const res = await fetchWithTimeout(joinUrl(API_BASE, path), {
+      method,
+      headers,
+      credentials: "include",
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    });
 
     let data = {};
     try {
@@ -111,15 +124,16 @@ async function req(
     /* ---------- TOKEN REFRESH ---------- */
     if (res.status === 401 && auth && retry) {
       try {
-        const refreshRes = await withTimeout(
-          fetch(joinUrl(API_BASE, "/api/auth/refresh"), {
+        const refreshRes = await fetchWithTimeout(
+          joinUrl(API_BASE, "/api/auth/refresh"),
+          {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
               Authorization: `Bearer ${getToken()}`,
             },
             credentials: "include",
-          })
+          }
         );
 
         const refreshData = await refreshRes.json().catch(() => ({}));
@@ -146,8 +160,8 @@ async function req(
     if (!res.ok) {
       throw new Error(
         data?.error ||
-        data?.message ||
-        `Request failed (${res.status})`
+          data?.message ||
+          `Request failed (${res.status})`
       );
     }
 
@@ -210,4 +224,11 @@ export const api = {
       method: "POST",
       body: { message, context },
     }),
+
+  /* 🔥 RENDER WARMUP */
+  warmup: () =>
+    fetch(joinUrl(API_BASE, "/api/health"), {
+      method: "GET",
+      credentials: "include",
+    }).catch(() => null),
 };
