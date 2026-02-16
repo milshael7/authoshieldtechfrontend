@@ -3,37 +3,40 @@
   <head>
     <meta charset="UTF-8" />
 
-    <!-- Viewport: mobile + notch safe -->
     <meta
       name="viewport"
       content="width=device-width, initial-scale=1, viewport-fit=cover"
     />
 
-    <!-- App identity -->
     <title>AutoShield Tech</title>
     <meta name="theme-color" content="#0b1220" />
     <meta name="color-scheme" content="dark" />
 
-    <!-- Favicon -->
     <link rel="icon" type="image/png" href="/autoshield-logo.png" />
 
-    <!-- 🔒 HARD BACKGROUND GUARD (pre-React paint) -->
     <style>
       html,
       body {
         margin: 0;
         padding: 0;
         min-height: 100%;
-        background: #0b1220; /* SOC dark base */
+        background: #0b1220;
         color-scheme: dark;
 
-        /* ✅ FIX: allow vertical scrolling */
+        /* ✅ ENABLE FULL SCROLL */
+        overflow-x: auto;
         overflow-y: auto;
       }
 
-      /* Root mount guard */
+      /* Prevent accidental 100vw overflow bugs */
+      * {
+        box-sizing: border-box;
+      }
+
       #root {
         min-height: 100vh;
+        width: 100%;
+
         background: radial-gradient(
             1200px 600px at 20% -10%,
             rgba(122,167,255,0.12),
@@ -54,10 +57,7 @@
   </head>
 
   <body>
-    <!-- React Mount -->
     <div id="root"></div>
-
-    <!-- App Entry -->
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
