@@ -1,90 +1,3 @@
-/* =========================================================
-   AUTOSHIELD FRONTEND API LAYER — FULL STABLE VERSION
-   Cold-start protected + token refresh + timeout safe
-   ========================================================= */
-
-const API_BASE = import.meta.env.VITE_API_BASE?.trim();
-
-if (!API_BASE) {
-  console.error("❌ VITE_API_BASE is missing");
-}
-
-const TOKEN_KEY = "as_token";
-const USER_KEY = "as_user";
-const REQUEST_TIMEOUT = 45000;
-
-/* =============================
-   STORAGE HELPERS
-   ============================= */
-
-export function getToken() {
-  return localStorage.getItem(TOKEN_KEY);
-}
-
-export function setToken(token) {
-  if (token) localStorage.setItem(TOKEN_KEY, token);
-}
-
-export function clearToken() {
-  localStorage.removeItem(TOKEN_KEY);
-}
-
-export function getSavedUser() {
-  try {
-    return JSON.parse(localStorage.getItem(USER_KEY) || "null");
-  } catch {
-    return null;
-  }
-}
-
-export function saveUser(user) {
-  if (user) localStorage.setItem(USER_KEY, JSON.stringify(user));
-}
-
-export function clearUser() {
-  localStorage.removeItem(USER_KEY);
-}
-
-/* =============================
-   URL HELPER
-   ============================= */
-
-function joinUrl(base, path) {
-  const cleanBase = String(base || "").replace(/\/+$/, "");
-  const cleanPath = String(path || "").startsWith("/")
-    ? path
-    : `/${path}`;
-
-  return `${cleanBase}${cleanPath}`;
-}
-
-/* =============================
-   FETCH WITH TIMEOUT
-   ============================= */
-
-async function fetchWithTimeout(url, options = {}, ms = REQUEST_TIMEOUT) {
-  const controller = new AbortController();
-  const id = setTimeout(() => controller.abort(), ms);
-
-  try {
-    return await fetch(url, {
-      ...options,
-      signal: controller.signal,
-    });
-  } catch (err) {
-    if (err?.name === "AbortError") {
-      throw new Error("Request timeout");
-    }
-    throw err;
-  } finally {
-    clearTimeout(id);
-  }
-}
-
-/* =============================
-   CORE REQUEST WRAPPER
-   ============================= */
-
 async function req(
   path,
   { method = "GET", body, auth = true, headers: extraHeaders = {} } = {},
@@ -119,8 +32,8 @@ async function req(
       data = {};
     }
 
-    /* ---------- TOKEN REFRESH ---------- */
-    if (res.status === 401 && auth && retry) {
+    /* ---------- TOKEN REFRESH (SAFE VERSION) ---------- */
+    if (res.status === 401 && auth && retry && getToken()) {
       try {
         const refreshRes = await fetchWithTimeout(
           joinUrl(API_BASE, "/api/auth/refresh"),
@@ -147,26 +60,23 @@ async function req(
           );
         }
       } catch {
-        // refresh failed
+        // ignore refresh failure
       }
 
-      clearToken();
-      clearUser();
-      throw new Error("Session expired");
+      // 🔥 DO NOT auto clear token here
+      throw new Error("Unauthorized");
     }
 
     if (!res.ok) {
       throw new Error(
         data?.error ||
-          data?.message ||
-          `Request failed (${res.status})`
+        data?.message ||
+        `Request failed (${res.status})`
       );
     }
 
     return data;
   } catch (err) {
-    if (err.message === "Session expired") throw err;
-
     if (err.message === "Request timeout") {
       throw new Error("Network timeout. Please try again.");
     }
@@ -176,74 +86,3 @@ async function req(
     );
   }
 }
-
-/* =============================
-   API SURFACE
-   ============================= */
-
-export const api = {
-  /* ---------- AUTH ---------- */
-  login: (email, password) =>
-    req("/api/auth/login", {
-      method: "POST",
-      body: { email, password },
-      auth: false,
-    }),
-
-  resetPassword: (email, newPassword) =>
-    req("/api/auth/reset-password", {
-      method: "POST",
-      body: { email, newPassword },
-      auth: false,
-    }),
-
-  /* ---------- USER ---------- */
-  meNotifications: () => req("/api/me/notifications"),
-  markMyNotificationRead: (id) =>
-    req(`/api/me/notifications/${id}/read`, { method: "POST" }),
-
-  /* ---------- ADMIN ---------- */
-  adminUsers: () => req("/api/admin/users"),
-  adminCompanies: () => req("/api/admin/companies"),
-  adminNotifications: () => req("/api/admin/notifications"),
-
-  /* ---------- MANAGER ---------- */
-  managerOverview: () => req("/api/manager/overview"),
-  managerUsers: () => req("/api/manager/users"),
-  managerCompanies: () => req("/api/manager/companies"),
-  managerAudit: (limit = 200) =>
-    req(`/api/manager/audit?limit=${encodeURIComponent(limit)}`),
-
-  /* ---------- COMPANY ---------- */
-  companyMe: () => req("/api/company/me"),
-  companyNotifications: () => req("/api/company/notifications"),
-  companyMarkRead: (id) =>
-    req(`/api/company/notifications/${id}/read`, {
-      method: "POST",
-    }),
-
-  /* ---------- AI ---------- */
-  aiChat: (message, context) =>
-    req("/api/ai/chat", {
-      method: "POST",
-      body: { message, context },
-    }),
-
-  /* ---------- THREAT INTELLIGENCE ---------- */
-  threatFeed: () => req("/api/threat-feed"),
-
-  /* ---------- INCIDENTS ---------- */
-  incidents: () => req("/api/incidents"),
-  createIncident: (payload) =>
-    req("/api/incidents", {
-      method: "POST",
-      body: payload,
-    }),
-
-  /* ---------- HEALTH WARMUP ---------- */
-  warmup: () =>
-    fetch(joinUrl(API_BASE, "/api/health"), {
-      method: "GET",
-      credentials: "include",
-    }).catch(() => null),
-};
