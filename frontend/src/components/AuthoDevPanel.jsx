@@ -32,7 +32,7 @@ function getStorageKey() {
 /* ================= COMPONENT ================= */
 
 export default function AuthoDevPanel({
-  title = "Security Advisor",
+  title = "Security Advisory",
   endpoint = "/api/ai/chat",
   getContext
 }) {
@@ -69,12 +69,15 @@ export default function AuthoDevPanel({
   /* ================= VOICE INPUT ================= */
 
   function startListening() {
-    if (!("webkitSpeechRecognition" in window)) {
-      alert("Voice not supported in this browser.");
+    const SpeechRecognition =
+      window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      alert("Voice input not supported in this browser.");
       return;
     }
 
-    const recognition = new window.webkitSpeechRecognition();
+    const recognition = new SpeechRecognition();
     recognition.lang = "en-US";
     recognition.interimResults = false;
 
@@ -154,7 +157,7 @@ export default function AuthoDevPanel({
     }
   }
 
-  /* ================= MESSAGE ACTIONS ================= */
+  /* ================= ACTIONS ================= */
 
   function copyText(text) {
     navigator.clipboard.writeText(text);
@@ -165,7 +168,6 @@ export default function AuthoDevPanel({
       navigator.share({ text });
     } else {
       copyText(text);
-      alert("Copied (sharing not supported).");
     }
   }
 
@@ -180,40 +182,56 @@ export default function AuthoDevPanel({
   /* ================= UI ================= */
 
   return (
-    <div className="advisor-container">
+    <div className="advisor-wrapper">
 
+      {/* HEADER */}
       <div className="advisor-header">
-        <strong>{title}</strong>
+        <div className="advisor-title">{title}</div>
       </div>
 
-      <div className="advisor-messages">
+      {/* MESSAGES */}
+      <div className="advisor-body">
         {messages.map((m, i) => (
-          <div key={i} className={`advisor-bubble ${m.role}`}>
+          <div key={i} className={`advisor-message ${m.role}`}>
 
-            <div className="advisor-text">{m.text}</div>
+            <div className="advisor-bubble">
+              {m.text}
+            </div>
 
             {m.role === "ai" && (
-              <div className="advisor-actions">
+              <div className="advisor-controls">
 
-                <button onClick={() => readAloud(m.speakText)}>🔊</button>
-                <button onClick={() => copyText(m.text)}>📋</button>
-                <button onClick={() => shareText(m.text)}>📤</button>
+                <button onClick={() => readAloud(m.speakText)} title="Read aloud">
+                  🔊
+                </button>
+
+                <button onClick={() => copyText(m.text)} title="Copy">
+                  ⧉
+                </button>
+
+                <button onClick={() => shareText(m.text)} title="Share">
+                  ⇪
+                </button>
 
                 <button
                   className={m.reaction === "up" ? "active" : ""}
                   onClick={() => setReaction(i, "up")}
+                  title="Helpful"
                 >
-                  👍
+                  ↑
                 </button>
 
                 <button
                   className={m.reaction === "down" ? "active" : ""}
                   onClick={() => setReaction(i, "down")}
+                  title="Not helpful"
                 >
-                  👎
+                  ↓
                 </button>
 
-                <button onClick={() => sendMessage(m.text)}>↻</button>
+                <button onClick={() => sendMessage(m.text)} title="Regenerate">
+                  ↻
+                </button>
 
               </div>
             )}
@@ -226,10 +244,11 @@ export default function AuthoDevPanel({
         <div ref={bottomRef} />
       </div>
 
-      <div className="advisor-input">
+      {/* INPUT */}
+      <div className="advisor-input-area">
 
         <textarea
-          placeholder="Type your message..."
+          placeholder="Ask about risks, posture, compliance..."
           value={input}
           onChange={e => setInput(e.target.value)}
           rows={2}
@@ -241,15 +260,23 @@ export default function AuthoDevPanel({
           }}
         />
 
-        <div className="advisor-input-actions">
+        <div className="advisor-input-controls">
 
           {!listening ? (
-            <button onClick={startListening}>🎙</button>
+            <button onClick={startListening} title="Voice input">
+              🎙
+            </button>
           ) : (
-            <button onClick={stopListening}>⏹</button>
+            <button onClick={stopListening} title="Stop listening">
+              ■
+            </button>
           )}
 
-          <button onClick={() => sendMessage()}>
+          <button
+            onClick={() => sendMessage()}
+            disabled={loading}
+            title="Send"
+          >
             ➤
           </button>
 
