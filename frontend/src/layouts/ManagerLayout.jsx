@@ -1,9 +1,9 @@
 // frontend/src/layouts/ManagerLayout.jsx
-// Manager Layout — Institutional Operational SOC (STABILIZED)
-// Clean relative routing
-// No cross-role leakage
-// Scroll-safe
-// Production hardened
+// Manager Layout — GLOBAL OPERATIONAL OVERSIGHT
+// Structured hierarchy
+// Trading oversight included
+// Admin-compatible visibility
+// Phase 2 Architecture Lock
 
 import React, { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
@@ -30,12 +30,8 @@ export default function ManagerLayout() {
   return (
     <div className={`layout-root ${menuOpen ? "sidebar-open" : ""}`}>
 
-      {/* ================= MOBILE OVERLAY ================= */}
       {menuOpen && (
-        <div
-          className="sidebar-overlay"
-          onClick={closeMenu}
-        />
+        <div className="sidebar-overlay" onClick={closeMenu} />
       )}
 
       {/* ================= SIDEBAR ================= */}
@@ -44,38 +40,53 @@ export default function ManagerLayout() {
         <div className="layout-brand">
           <Logo size="md" />
           <span className="muted" style={{ fontSize: 12 }}>
-            Manager SOC
+            Global Manager SOC
           </span>
         </div>
 
         <nav className="layout-nav">
 
+          {/* GLOBAL SECURITY */}
           <NavLink to="." end onClick={closeMenu}>
-            Security Overview
+            Global Posture
           </NavLink>
 
           <NavLink to="assets" onClick={closeMenu}>
-            Assets
+            Global Assets
           </NavLink>
 
           <NavLink to="threats" onClick={closeMenu}>
-            Threats
+            Global Threats
           </NavLink>
 
           <NavLink to="incidents" onClick={closeMenu}>
-            Incidents
+            Global Incidents
           </NavLink>
 
           <NavLink to="vulnerabilities" onClick={closeMenu}>
-            Vulnerabilities
+            Global Vulnerabilities
+          </NavLink>
+
+          <NavLink to="compliance" onClick={closeMenu}>
+            Compliance Oversight
           </NavLink>
 
           <NavLink to="reports" onClick={closeMenu}>
-            Reports
+            Operational Reports
           </NavLink>
 
+          <hr style={{ opacity: 0.18 }} />
+
+          {/* TRADING (READ-ONLY OVERSIGHT) */}
+          <NavLink to="trading" onClick={closeMenu}>
+            Trading Oversight
+          </NavLink>
+
+          <hr style={{ opacity: 0.18 }} />
+
+          {/* NOTIFICATIONS */}
           <NavLink to="notifications" onClick={closeMenu}>
-            Notifications
+            System Notifications
           </NavLink>
 
         </nav>
@@ -88,16 +99,13 @@ export default function ManagerLayout() {
       {/* ================= MAIN ================= */}
       <main className="layout-main">
 
-        {/* ================= CONTENT ================= */}
         <section className="layout-content">
           <Outlet />
         </section>
 
-        {/* ================= ADVISOR DRAWER ================= */}
-        <section
-          className={`ai-drawer ${assistantOpen ? "open" : ""}`}
-          aria-hidden={!assistantOpen}
-        >
+        {/* ================= AI DRAWER ================= */}
+        <section className={`ai-drawer ${assistantOpen ? "open" : ""}`}>
+
           <div className="ai-drawer-handle">
             <button
               className="ai-toggle"
@@ -112,10 +120,12 @@ export default function ManagerLayout() {
               title="Manager Security Advisor"
               getContext={() => ({
                 role: "manager",
+                scope: "global-oversight",
                 location: window.location.pathname,
               })}
             />
           </div>
+
         </section>
 
       </main>
