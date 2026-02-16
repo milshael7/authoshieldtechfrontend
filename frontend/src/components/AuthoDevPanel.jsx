@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { readAloud } from "./ReadAloud";
 
-/* ================= SAFE HELPERS ================= */
+/* ================= SAFE STORAGE ================= */
 
 function safeLocalGet(key) {
   try {
@@ -38,28 +38,10 @@ function getStorageKey() {
   return `authodev.panel.${tenantId}.${roomId}`;
 }
 
-function buildSystemContext(user, pageContext = {}) {
-  const role = String(user?.role || "user").toLowerCase();
-  const page = pageContext?.page || getRoomId();
-
-  const toneMap = {
-    admin: "SOC advisor. Concise and technical.",
-    manager: "Risk-focused advisor.",
-    company: "Clear security guidance.",
-    user: "Simple practical assistance.",
-  };
-
-  return {
-    role,
-    page,
-    tone: toneMap[role] || toneMap.user,
-  };
-}
-
 /* ================= COMPONENT ================= */
 
 export default function AuthoDevPanel({
-  title = "AuthoDev 6.5",
+  title = "Security Advisor",
   endpoint = "/api/ai/chat",
   getContext,
 }) {
@@ -69,23 +51,59 @@ export default function AuthoDevPanel({
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [listening, setListening] = useState(false);
+
   const bottomRef = useRef(null);
+  const recognitionRef = useRef(null);
+
+  /* ================= LOAD STORED MESSAGES ================= */
 
   useEffect(() => {
-    try {
-      const raw = safeLocalGet(storageKey);
-      if (raw) {
+    const raw = safeLocalGet(storageKey);
+    if (raw) {
+      try {
         const parsed = JSON.parse(raw);
         setMessages(Array.isArray(parsed?.messages) ? parsed.messages : []);
+      } catch {
+        setMessages([]);
       }
-    } catch {
-      setMessages([]);
     }
   }, [storageKey]);
 
   useEffect(() => {
     safeLocalSet(storageKey, JSON.stringify({ messages }));
   }, [messages, storageKey]);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  /* ================= VOICE INPUT ================= */
+
+  function startListening() {
+    if (!("webkitSpeechRecognition" in window)) {
+      alert("Voice input not supported in this browser.");
+      return;
+    }
+
+    const recognition = new window.webkitSpeechRecognition();
+    recognition.lang = "en-US";
+    recognition.interimResults = false;
+    recognition.continuous = false;
+
+    recognition.onstart = () => setListening(true);
+    recognition.onend = () => setListening(false);
+
+    recognition.onresult = (event) => {
+      const transcript = event.results[0][0].transcript;
+      setInput(transcript);
+    };
+
+    recognition.start();
+    recognitionRef.current = recognition;
+  }
+
+  /* ================= SEND MESSAGE ================= */
 
   async function sendMessage() {
     if (!input.trim() || loading) return;
@@ -104,29 +122,22 @@ export default function AuthoDevPanel({
       const pageContext =
         typeof getContext === "function" ? getContext() : {};
 
-      const systemContext = buildSystemContext(user, pageContext);
-
       const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
           message: userMsg.text,
-          context: {
-            ...pageContext,
-            system: systemContext,
-          },
+          context: pageContext,
         }),
       });
 
       const data = await res.json().catch(() => ({}));
 
-      const aiText = data?.reply || "No response available.";
-
       const aiMsg = {
         role: "ai",
-        text: aiText,
-        speakText: data?.speakText || aiText,
+        text: data?.reply || "No response available.",
+        speakText: data?.speakText || data?.reply,
         ts: new Date().toLocaleTimeString(),
       };
 
@@ -143,46 +154,52 @@ export default function AuthoDevPanel({
       ]);
     } finally {
       setLoading(false);
-      setTimeout(
-        () => bottomRef.current?.scrollIntoView({ behavior: "smooth" }),
-        50
-      );
     }
   }
 
-  return (
-    <div className="authodev-panel">
-      <header className="ad-header">
-        <div className="ad-title">
-          <span className="ad-badge">AI</span>
-          <h3>{title}</h3>
-        </div>
-        <span className="ad-sub">Advisory assistant</span>
-      </header>
+  /* ================= UI ================= */
 
-      <div className="ad-messages">
+  return (
+    <div className="advisor-dock">
+
+      {/* HEADER */}
+      <div className="advisor-header">
+        <div>
+          <strong>{title}</strong>
+          <div className="advisor-sub">Enterprise AI Assistant</div>
+        </div>
+      </div>
+
+      {/* MESSAGES */}
+      <div className="advisor-messages">
         {messages.map((m, i) => (
-          <div key={i} className={`ad-msg ${m.role}`}>
-            <div className="ad-text">{m.text}</div>
+          <div key={i} className={`advisor-bubble ${m.role}`}>
+            <div className="advisor-text">{m.text}</div>
 
             {m.role === "ai" && (
-              <div className="ad-actions">
-                <button onClick={() => readAloud(m.speakText)}>🔊</button>
+              <div className="advisor-controls">
+                <button
+                  className="icon-btn"
+                  onClick={() => readAloud(m.speakText)}
+                >
+                  🔊
+                </button>
               </div>
             )}
 
-            <div className="ad-time">{m.ts}</div>
+            <div className="advisor-time">{m.ts}</div>
           </div>
         ))}
         <div ref={bottomRef} />
       </div>
 
-      <div className="ad-input">
+      {/* INPUT */}
+      <div className="advisor-input">
         <textarea
-          placeholder="Ask about risks, posture, or actions…"
+          placeholder="Type or use voice…"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          rows={3}
+          rows={2}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
@@ -191,10 +208,20 @@ export default function AuthoDevPanel({
           }}
         />
 
-        <button onClick={sendMessage} disabled={loading}>
-          {loading ? "Analyzing…" : "Send"}
-        </button>
+        <div className="advisor-actions">
+          <button
+            className={`icon-btn ${listening ? "active" : ""}`}
+            onClick={startListening}
+          >
+            🎙
+          </button>
+
+          <button onClick={sendMessage} disabled={loading}>
+            {loading ? "..." : "Send"}
+          </button>
+        </div>
       </div>
+
     </div>
   );
 }
