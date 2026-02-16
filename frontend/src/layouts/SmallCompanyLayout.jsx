@@ -1,9 +1,9 @@
 // frontend/src/layouts/SmallCompanyLayout.jsx
-// Small Company Layout — Institutional Baseline (STABILIZED)
-// Clean relative routing
-// Role-contained
-// Scroll-safe
+// Small Company Layout — LIMITED ORGANIZATION CONTROL
+// Scoped to small-company permissions
+// No global visibility
 // Upgrade path preserved
+// Phase 2 architecture lock
 
 import React, { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
@@ -15,7 +15,7 @@ import "../styles/layout.css";
 export default function SmallCompanyLayout() {
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
-  const [insightsOpen, setInsightsOpen] = useState(false);
+  const [advisorOpen, setAdvisorOpen] = useState(false);
 
   function logout() {
     clearToken();
@@ -30,20 +30,17 @@ export default function SmallCompanyLayout() {
   return (
     <div className={`layout-root ${menuOpen ? "sidebar-open" : ""}`}>
 
-      {/* ================= MOBILE OVERLAY ================= */}
       {menuOpen && (
-        <div
-          className="sidebar-overlay"
-          onClick={closeMenu}
-        />
+        <div className="sidebar-overlay" onClick={closeMenu} />
       )}
 
       {/* ================= SIDEBAR ================= */}
       <aside className="layout-sidebar small-company">
+
         <div className="layout-brand">
           <Logo size="md" />
           <span className="muted" style={{ fontSize: 12 }}>
-            Small Company SOC
+            Small Company Security
           </span>
         </div>
 
@@ -54,19 +51,19 @@ export default function SmallCompanyLayout() {
           </NavLink>
 
           <NavLink to="assets" onClick={closeMenu}>
-            Assets
+            Asset Inventory
           </NavLink>
 
           <NavLink to="threats" onClick={closeMenu}>
-            Threats
+            Threat Monitoring
           </NavLink>
 
           <NavLink to="incidents" onClick={closeMenu}>
-            Incidents
+            Incident Tracking
           </NavLink>
 
           <NavLink to="reports" onClick={closeMenu}>
-            Reports
+            Basic Reports
           </NavLink>
 
           <hr style={{ opacity: 0.2 }} />
@@ -76,34 +73,33 @@ export default function SmallCompanyLayout() {
             className="upgrade-link"
             onClick={closeMenu}
           >
-            Upgrade to Company
+            Upgrade to Full Company
           </NavLink>
+
         </nav>
 
         <button className="btn logout-btn" onClick={logout}>
           Log out
         </button>
+
       </aside>
 
       {/* ================= MAIN ================= */}
       <main className="layout-main">
 
-        {/* ================= CONTENT ================= */}
         <section className="layout-content">
           <Outlet />
         </section>
 
-        {/* ================= INSIGHTS DRAWER ================= */}
-        <section
-          className={`ai-drawer ${insightsOpen ? "open" : ""}`}
-          aria-hidden={!insightsOpen}
-        >
+        {/* ================= SECURITY ADVISOR ================= */}
+        <section className={`ai-drawer ${advisorOpen ? "open" : ""}`}>
+
           <div className="ai-drawer-handle">
             <button
               className="ai-toggle"
-              onClick={() => setInsightsOpen(v => !v)}
+              onClick={() => setAdvisorOpen(v => !v)}
             >
-              {insightsOpen
+              {advisorOpen
                 ? "▼ Hide Security Insights"
                 : "▲ Show Security Insights"}
             </button>
@@ -111,16 +107,16 @@ export default function SmallCompanyLayout() {
 
           <div className="ai-drawer-body">
             <AuthoDevPanel
-              title="Security Insights"
+              title="Small Company Security Insights"
               getContext={() => ({
                 role: "small_company",
-                scope: "limited-soc",
-                permissions: "visibility-only",
-                upgradeAvailable: true,
+                scope: "organization-only",
+                tier: "limited",
                 location: window.location.pathname,
               })}
             />
           </div>
+
         </section>
 
       </main>
