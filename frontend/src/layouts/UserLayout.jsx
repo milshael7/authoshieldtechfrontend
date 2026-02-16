@@ -1,11 +1,9 @@
 // frontend/src/layouts/UserLayout.jsx
-// User Layout — SOC Baseline (PHASE 1 CLEAN)
-//
-// RULES:
-// - No layout-level topbar
-// - Scroll-safe content
-// - Advisory-only assistant
-// - Structural parity with Admin / Manager / Company
+// Individual User Layout — Personal Security Workspace
+// Scoped to single user only
+// No organizational controls
+// Advisory assistant only
+// Architecture aligned
 
 import React, { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
@@ -25,55 +23,62 @@ export default function UserLayout() {
     navigate("/login");
   }
 
+  function closeMenu() {
+    setMenuOpen(false);
+  }
+
   return (
     <div className={`layout-root ${menuOpen ? "sidebar-open" : ""}`}>
-      {/* ================= MOBILE OVERLAY ================= */}
+
       {menuOpen && (
         <div
           className="sidebar-overlay"
-          onClick={() => setMenuOpen(false)}
+          onClick={closeMenu}
         />
       )}
 
       {/* ================= SIDEBAR ================= */}
       <aside className="layout-sidebar user">
+
         <div className="layout-brand">
           <Logo size="sm" />
           <span style={{ fontSize: 12, opacity: 0.75 }}>
-            User Portal
+            Personal Security
           </span>
         </div>
 
         <nav className="layout-nav">
-          <NavLink to="/user" end onClick={() => setMenuOpen(false)}>
-            Overview
+
+          <NavLink to="." end onClick={closeMenu}>
+            Security Overview
           </NavLink>
 
-          <NavLink
-            to="/user/notifications"
-            onClick={() => setMenuOpen(false)}
-          >
+          <NavLink to="notifications" onClick={closeMenu}>
             Notifications
           </NavLink>
+
+          <NavLink to="reports" onClick={closeMenu}>
+            My Reports
+          </NavLink>
+
         </nav>
 
         <button className="btn logout-btn" onClick={logout}>
           Log out
         </button>
+
       </aside>
 
       {/* ================= MAIN ================= */}
       <main className="layout-main">
-        {/* ================= CONTENT ================= */}
+
         <section className="layout-content">
           <Outlet />
         </section>
 
         {/* ================= ASSISTANT ================= */}
-        <section
-          className={`ai-drawer ${assistantOpen ? "open" : ""}`}
-          aria-hidden={!assistantOpen}
-        >
+        <section className={`ai-drawer ${assistantOpen ? "open" : ""}`}>
+
           <div className="ai-drawer-handle">
             <button
               className="ai-toggle"
@@ -83,21 +88,20 @@ export default function UserLayout() {
             </button>
           </div>
 
-          <div
-            className="ai-drawer-body"
-            style={{ overflow: "auto" }}  // 🔑 SCROLL FIX
-          >
+          <div className="ai-drawer-body" style={{ overflow: "auto" }}>
             <AuthoDevPanel
-              title="Security Assistant"
+              title="Personal Security Assistant"
               getContext={() => ({
                 role: "user",
-                scope: "individual",
-                permissions: "advisory-only",
+                scope: "individual-only",
+                access: "no-global-visibility",
                 location: window.location.pathname,
               })}
             />
           </div>
+
         </section>
+
       </main>
     </div>
   );
