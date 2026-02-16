@@ -1,5 +1,6 @@
 /* =========================================================
-   AUTOSHIELD CORE LAYOUT — GLOBAL SCROLL ENABLED
+   AUTOSHIELD CORE LAYOUT — CONTROLLED SCROLL VERSION
+   GitHub-style horizontal + vertical scroll inside content
    ========================================================= */
 
 /* =========================================================
@@ -11,8 +12,6 @@
   min-height:100vh;
   width:100%;
   position:relative;
-
-  /* 🔥 IMPORTANT: allow full page scroll */
   overflow:visible;
 }
 
@@ -70,12 +69,22 @@
   flex:1;
   display:flex;
   flex-direction:column;
-  min-width:0;
+  min-width:0; /* 🔥 prevent flex overflow clipping */
 }
 
-/* 🔥 allow natural scrolling */
+/* =========================================================
+   CONTENT (SCROLL ENABLED HERE)
+   ========================================================= */
+
 .layout-content{
   padding:28px;
+
+  /* 🔥 THIS IS THE FIX */
+  overflow-x:auto;
+  overflow-y:auto;
+
+  min-width:0;
+  max-width:100%;
 }
 
 /* =========================================================
