@@ -1,6 +1,6 @@
 /* =========================================================
-   AUTOSHIELD FRONTEND API LAYER — STABLE VERSION
-   Cold-start protected + warmup + stable refresh
+   AUTOSHIELD FRONTEND API LAYER — FULL STABLE VERSION
+   Cold-start protected + token refresh + timeout safe
    ========================================================= */
 
 const API_BASE = import.meta.env.VITE_API_BASE?.trim();
@@ -11,8 +11,6 @@ if (!API_BASE) {
 
 const TOKEN_KEY = "as_token";
 const USER_KEY = "as_user";
-
-/* 🔥 Render cold start safe timeout */
 const REQUEST_TIMEOUT = 45000;
 
 /* =============================
@@ -61,7 +59,7 @@ function joinUrl(base, path) {
 }
 
 /* =============================
-   FETCH WITH REAL ABORT TIMEOUT
+   FETCH WITH TIMEOUT
    ============================= */
 
 async function fetchWithTimeout(url, options = {}, ms = REQUEST_TIMEOUT) {
@@ -231,8 +229,16 @@ export const api = {
       body: { message, context },
     }),
 
-  /* ---------- THREAT INTELLIGENCE (FIXED) ---------- */
+  /* ---------- THREAT INTELLIGENCE ---------- */
   threatFeed: () => req("/api/threat-feed"),
+
+  /* ---------- INCIDENTS ---------- */
+  incidents: () => req("/api/incidents"),
+  createIncident: (payload) =>
+    req("/api/incidents", {
+      method: "POST",
+      body: payload,
+    }),
 
   /* ---------- HEALTH WARMUP ---------- */
   warmup: () =>
