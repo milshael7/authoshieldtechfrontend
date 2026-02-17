@@ -167,6 +167,22 @@ export const api = {
   adminCompanies: () => req("/api/admin/companies"),
   adminNotifications: () => req("/api/admin/notifications"),
 
+  /* ---------- ADMIN TOOL GOVERNANCE ---------- */
+  adminCompanyTools: (companyId) =>
+    req(`/api/admin/companies/${encodeURIComponent(companyId)}/tools`),
+
+  adminBlockTool: (companyId, toolId) =>
+    req(
+      `/api/admin/companies/${encodeURIComponent(companyId)}/tools/${encodeURIComponent(toolId)}/block`,
+      { method: "POST" }
+    ),
+
+  adminUnblockTool: (companyId, toolId) =>
+    req(
+      `/api/admin/companies/${encodeURIComponent(companyId)}/tools/${encodeURIComponent(toolId)}/unblock`,
+      { method: "POST" }
+    ),
+
   /* ---------- MANAGER ---------- */
   managerOverview: () => req("/api/manager/overview"),
   managerUsers: () => req("/api/manager/users"),
