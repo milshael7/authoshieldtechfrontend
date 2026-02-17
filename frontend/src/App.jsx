@@ -1,6 +1,5 @@
 // frontend/src/App.jsx
-// FULL ROLE-STRUCTURED ROUTING — HARDENED + ADMIN GLOBAL READY
-// Phase 3 Architecture Lock
+// FULL ROLE-STRUCTURED ROUTING — GLOBAL CONTROL ADDED
 
 import React, { useEffect, useState } from "react";
 import {
@@ -41,6 +40,10 @@ import TradingRoom from "./pages/TradingRoom.jsx";
 import VulnerabilityCenter from "./pages/VulnerabilityCenter.jsx";
 import NotFound from "./pages/NotFound.jsx";
 
+/* ================= ADMIN GLOBAL ================= */
+
+import GlobalControl from "./pages/admin/GlobalControl.jsx";
+
 /* ========================================================= */
 
 function normalizeRole(role) {
@@ -49,10 +52,7 @@ function normalizeRole(role) {
 
 function RoleGuard({ user, ready, allow, children }) {
   if (!ready) return null;
-
-  if (!user) {
-    return <Navigate to="/login" replace />;
-  }
+  if (!user) return <Navigate to="/login" replace />;
 
   const role = normalizeRole(user.role);
   const allowed = allow.map(normalizeRole);
@@ -93,23 +93,19 @@ export default function App() {
     }
   }
 
-  if (!ready) {
-    return <div style={{ padding: 40 }}>Loading...</div>;
-  }
+  if (!ready) return <div style={{ padding: 40 }}>Loading...</div>;
 
   return (
     <BrowserRouter>
       <Routes>
 
-        {/* ================= PUBLIC ================= */}
-
+        {/* PUBLIC */}
         <Route path="/" element={<Landing />} />
         <Route path="/pricing" element={<Pricing />} />
         <Route path="/signup" element={<Signup />} />
         <Route path="/login" element={<Login />} />
 
-        {/* ================= ADMIN ================= */}
-
+        {/* ADMIN */}
         <Route
           path="/admin/*"
           element={
@@ -127,20 +123,14 @@ export default function App() {
           <Route path="compliance" element={<Compliance />} />
           <Route path="policies" element={<Policies />} />
           <Route path="reports" element={<Reports />} />
-          <Route path="notifications" element={<Notifications />} />
           <Route path="trading" element={<TradingRoom />} />
+          <Route path="notifications" element={<Notifications />} />
 
-          {/* 🔒 Admin Global Routes (Reserved – Next Step) */}
-          {/* Example:
-              <Route path="global/companies" element={<GlobalCompanies />} />
-              <Route path="global/small-companies" element={<GlobalSmallCompanies />} />
-              <Route path="global/users" element={<GlobalUsers />} />
-          */}
+          {/* NEW */}
+          <Route path="global" element={<GlobalControl />} />
         </Route>
 
-        {/* ================= MANAGER ================= */}
-        {/* Admin allowed to enter Manager room */}
-
+        {/* MANAGER */}
         <Route
           path="/manager/*"
           element={
@@ -156,13 +146,11 @@ export default function App() {
           <Route path="vulnerabilities" element={<Vulnerabilities />} />
           <Route path="compliance" element={<Compliance />} />
           <Route path="reports" element={<Reports />} />
-          <Route path="notifications" element={<Notifications />} />
           <Route path="trading" element={<TradingRoom />} />
+          <Route path="notifications" element={<Notifications />} />
         </Route>
 
-        {/* ================= COMPANY ================= */}
-        {/* Manager + Admin visibility */}
-
+        {/* COMPANY */}
         <Route
           path="/company/*"
           element={
@@ -177,8 +165,7 @@ export default function App() {
           <Route path="notifications" element={<Notifications />} />
         </Route>
 
-        {/* ================= SMALL COMPANY ================= */}
-
+        {/* SMALL COMPANY */}
         <Route
           path="/small-company/*"
           element={
@@ -193,8 +180,7 @@ export default function App() {
           <Route path="notifications" element={<Notifications />} />
         </Route>
 
-        {/* ================= INDIVIDUAL ================= */}
-
+        {/* USER */}
         <Route
           path="/user/*"
           element={
@@ -206,8 +192,6 @@ export default function App() {
           <Route index element={<Posture />} />
           <Route path="notifications" element={<Notifications />} />
         </Route>
-
-        {/* ================= FALLBACK ================= */}
 
         <Route path="/404" element={<NotFound />} />
         <Route path="*" element={<Navigate to={defaultRedirect()} replace />} />
