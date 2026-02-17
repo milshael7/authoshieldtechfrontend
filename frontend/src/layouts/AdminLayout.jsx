@@ -1,5 +1,5 @@
 // frontend/src/layouts/AdminLayout.jsx
-// Admin Layout — Enterprise SOC Architecture (LOCKED PANEL VERSION)
+// Admin Layout — Enterprise Locked Dock Version (FINAL FIX)
 
 import React, { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
@@ -19,8 +19,8 @@ export default function AdminLayout() {
   }
 
   return (
-    <div className="layout-root enterprise">
-
+    <div className={`layout-root ${advisorOpen ? "advisor-open" : "advisor-closed"}`}>
+      
       {/* ================= SIDEBAR ================= */}
       <aside className="layout-sidebar admin">
         <div className="layout-brand">
@@ -42,11 +42,6 @@ export default function AdminLayout() {
           <NavLink to="reports">Reports</NavLink>
           <NavLink to="trading">Trading Command</NavLink>
           <NavLink to="notifications">Notifications</NavLink>
-
-          <hr style={{ opacity: 0.18 }} />
-
-          <NavLink to="/manager">Manager Global View</NavLink>
-          <NavLink to="/company">Company Global View</NavLink>
         </nav>
 
         <button className="btn logout-btn" onClick={logout}>
@@ -54,48 +49,51 @@ export default function AdminLayout() {
         </button>
       </aside>
 
-      {/* ================= MAIN + AI ================= */}
-      <div className="enterprise-main">
+      {/* ================= MAIN ================= */}
+      <main className="layout-main">
+        <section className="layout-content">
+          <Outlet />
+        </section>
+      </main>
 
-        {/* CENTER CONTENT */}
-        <main className="layout-main">
-          <section className="layout-content">
-            <Outlet />
-          </section>
-        </main>
-
-        {/* RIGHT AI PANEL */}
-        <aside
-          className={`enterprise-ai-panel ${
-            advisorOpen ? "open" : "collapsed"
-          }`}
+      {/* ================= OPEN BUTTON (ONLY WHEN CLOSED) ================= */}
+      {!advisorOpen && (
+        <button
+          className="advisor-open-button"
+          onClick={() => setAdvisorOpen(true)}
         >
-          {/* TOP FIXED TOGGLE */}
-          <div className="advisor-top-toggle">
+          AuthoShield Advisor
+        </button>
+      )}
+
+      {/* ================= FIXED ADVISOR PANEL ================= */}
+      {advisorOpen && (
+        <aside className="enterprise-ai-panel">
+          
+          <div className="advisor-topbar">
             <button
-              onClick={() => setAdvisorOpen(v => !v)}
-              title={advisorOpen ? "Collapse Advisor" : "Open AuthoShield Advisor"}
+              className="advisor-close-button"
+              onClick={() => setAdvisorOpen(false)}
             >
-              {advisorOpen ? "‹" : "AuthoShield"}
+              ✕
             </button>
           </div>
 
-          {advisorOpen && (
-            <div className="enterprise-ai-inner">
-              <AuthoDevPanel
-                title=""
-                getContext={() => ({
-                  role: "admin",
-                  location: window.location.pathname,
-                  access: "full-control",
-                  scope: "global-visibility",
-                })}
-              />
-            </div>
-          )}
-        </aside>
+          <div className="enterprise-ai-inner">
+            <AuthoDevPanel
+              title=""
+              getContext={() => ({
+                role: "admin",
+                location: window.location.pathname,
+                access: "full-control",
+                scope: "global-visibility",
+              })}
+            />
+          </div>
 
-      </div>
+        </aside>
+      )}
+
     </div>
   );
 }
