@@ -1,12 +1,10 @@
 /* =========================================================
-   AUTOSHIELD ENTERPRISE — TRUE FIXED ADVISOR DOCK
-   Panel stays locked.
-   Main content scrolls independently.
+   AUTOSHIELD ENTERPRISE — TRUE EXPAND / COLLAPSE VERSION
    ========================================================= */
 
 :root{
   --bg-main:#0b0f1a;
-  --bg-panel:#111827;
+  --panel-bg:#111827;
   --border-soft:rgba(255,255,255,.08);
   --accent:#5EC6FF;
   --text-main:#eaf1ff;
@@ -59,16 +57,8 @@
   margin-top:auto;
 }
 
-/* ================= MAIN CONTENT ================= */
+/* ================= MAIN ================= */
 
-.enterprise-main{
-  flex:1;
-  display:flex;
-  position:relative;
-  overflow:hidden;
-}
-
-/* Main scroll area */
 .layout-main{
   flex:1;
   overflow:hidden;
@@ -78,14 +68,20 @@
   height:100%;
   overflow:auto;
   padding:28px;
+  transition: margin-right .25s ease;
+}
 
-  /* IMPORTANT: leave space for fixed panel */
+/* WHEN PANEL OPEN — shrink content */
+.advisor-open .layout-content{
   margin-right:420px;
 }
 
-/* =========================================================
-   FIXED RIGHT ADVISOR PANEL
-   ========================================================= */
+/* WHEN PANEL CLOSED — full width */
+.advisor-closed .layout-content{
+  margin-right:0;
+}
+
+/* ================= FIXED PANEL ================= */
 
 .enterprise-ai-panel{
   position:fixed;
@@ -93,138 +89,54 @@
   top:0;
   height:100vh;
   width:420px;
-  display:flex;
-  flex-direction:column;
-  background:linear-gradient(180deg, rgba(255,255,255,.03), rgba(0,0,0,.55));
+  background:linear-gradient(180deg, rgba(255,255,255,.03), rgba(0,0,0,.6));
   border-left:1px solid var(--border-soft);
-  z-index:50;
-  transition:transform .25s ease;
-}
-
-/* COLLAPSED STATE */
-.enterprise-ai-panel.collapsed{
-  transform:translateX(100%);
-}
-
-/* When collapsed remove margin space */
-.enterprise-ai-panel.collapsed ~ .layout-main .layout-content{
-  margin-right:0;
-}
-
-/* =========================================================
-   ADVISOR INTERNAL STRUCTURE
-   ========================================================= */
-
-.enterprise-ai-inner{
-  flex:1;
   display:flex;
   flex-direction:column;
-  height:100%;
+  z-index:100;
 }
 
-/* HEADER */
-.advisor-header{
-  padding:14px 16px;
+/* TOP BAR */
+.advisor-topbar{
+  display:flex;
+  justify-content:flex-end;
+  padding:10px 14px;
   border-bottom:1px solid var(--border-soft);
-  font-weight:700;
-  background:rgba(0,0,0,.3);
-  flex-shrink:0;
+  background:rgba(0,0,0,.4);
 }
 
-/* MESSAGE AREA (ONLY THIS SCROLLS) */
-.advisor-body{
-  flex:1;
-  overflow-y:auto;
-  padding:18px;
-  display:flex;
-  flex-direction:column;
-  gap:18px;
-}
-
-/* INPUT STAYS FIXED INSIDE PANEL */
-.advisor-input-area{
-  border-top:1px solid var(--border-soft);
-  padding:12px;
-  display:flex;
-  gap:10px;
-  align-items:flex-end;
-  background:rgba(0,0,0,.35);
-  flex-shrink:0;
-}
-
-/* BUBBLES */
-.advisor-message{
-  display:flex;
-  flex-direction:column;
-  gap:6px;
-}
-
-.advisor-message.user{
-  align-items:flex-end;
-}
-
-.advisor-message.ai{
-  align-items:flex-start;
-}
-
-.advisor-bubble{
-  max-width:85%;
-  padding:12px 14px;
-  border-radius:14px;
-  font-size:14px;
-  line-height:1.5;
-  white-space:pre-wrap;
-}
-
-.advisor-message.user .advisor-bubble{
-  background:linear-gradient(180deg, var(--accent), #4ea3ff);
-  color:#fff;
-}
-
-.advisor-message.ai .advisor-bubble{
-  background:rgba(255,255,255,.05);
-  border:1px solid var(--border-soft);
-}
-
-.advisor-controls{
-  display:flex;
-  gap:6px;
-}
-
-.advisor-controls button{
+.advisor-close-button{
   background:transparent;
   border:1px solid var(--border-soft);
-  color:#94a3b8;
-  padding:4px 6px;
+  color:#fff;
+  padding:6px 10px;
   border-radius:6px;
   cursor:pointer;
 }
 
-.advisor-time{
-  font-size:10px;
-  opacity:.4;
-}
-
-/* TEXTAREA */
-.advisor-input-area textarea{
-  flex:1;
-  min-height:44px;
-  max-height:160px;
-  resize:none;
-  border-radius:10px;
+/* OPEN BUTTON */
+.advisor-open-button{
+  position:fixed;
+  top:20px;
+  right:20px;
+  background:var(--panel-bg);
   border:1px solid var(--border-soft);
-  background:var(--bg-panel);
   color:#fff;
-  padding:12px;
-  outline:none;
-}
-
-.advisor-input-area button{
-  width:44px;
-  height:44px;
-  border-radius:10px;
-  border:1px solid var(--border-soft);
-  background:var(--bg-panel);
-  color:#fff;
+  padding:10px 16px;
+  border-radius:8px;
   cursor:pointer;
+  z-index:120;
+  font-weight:600;
+}
+
+.advisor-open-button:hover{
+  background:rgba(94,198,255,.2);
+}
+
+/* INNER PANEL */
+.enterprise-ai-inner{
+  flex:1;
+  min-height:0;
+  display:flex;
+  flex-direction:column;
 }
