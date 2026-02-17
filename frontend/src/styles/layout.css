@@ -1,17 +1,27 @@
 /* =========================================================
-   AUTOSHIELD ENTERPRISE LAYOUT — FINAL STABLE VERSION
-   + TRUE collapsible advisor dock
-   + Pinned dock (header + input fixed)
-   + Feed-only scroll
-   + Full space recovery when collapsed
+   AUTOSHIELD ENTERPRISE LAYOUT — HARD LOCK VERSION
+   + Advisor truly fixed to viewport
+   + Zero movement on scroll
+   + Only content scrolls
+   + Clean collapse behavior
    ========================================================= */
+
+html, body {
+  margin:0;
+  padding:0;
+  height:100%;
+  overflow:hidden; /* 🔒 prevent whole page scroll */
+  background:#0b0f1a;
+  color:#eaf1ff;
+}
+
+/* ================= ROOT ================= */
 
 .layout-root{
   display:flex;
-  min-height:100vh;
+  height:100vh;
   width:100%;
-  background:#0b0f1a;
-  color:#eaf1ff;
+  overflow:hidden; /* 🔒 no layout shift */
 }
 
 /* ================= SIDEBAR ================= */
@@ -26,64 +36,34 @@
   gap:18px;
   flex-shrink:0;
   backdrop-filter:blur(10px);
+  overflow-y:auto; /* sidebar scroll only if needed */
 }
 
-.layout-brand{
-  display:flex;
-  flex-direction:column;
-  gap:8px;
-}
-
-.layout-nav{
-  display:flex;
-  flex-direction:column;
-  gap:10px;
-}
-
-.layout-nav a{
-  display:block;
-  padding:10px 14px;
-  border-radius:8px;
-  text-decoration:none;
-  font-weight:500;
-  color:#cfd8ff;
-  transition:.2s ease;
-}
-
-.layout-nav a:hover{
-  background:rgba(120,160,255,.12);
-}
-
-.layout-nav a.active{
-  background:rgba(120,160,255,.22);
-  color:#fff;
-  font-weight:600;
-}
-
-.logout-btn{
-  margin-top:auto;
-}
-
-/* ================= MAIN AREA ================= */
+/* ================= MAIN WRAPPER ================= */
 
 .enterprise-main{
   display:flex;
   flex:1;
-  min-width:0;
+  height:100%;
+  overflow:hidden;
+  position:relative;
 }
+
+/* ================= MAIN CONTENT ================= */
 
 .layout-main{
   flex:1;
   display:flex;
   flex-direction:column;
   min-width:0;
+  height:100%;
 }
 
-/* App scroll lives here */
 .layout-content{
   flex:1;
   padding:28px;
-  overflow:auto;
+  overflow-y:auto; /* ✅ ONLY THIS SCROLLS */
+  overflow-x:hidden;
   min-width:0;
 }
 
@@ -121,14 +101,15 @@
 }
 
 /* =========================================================
-   RIGHT ADVISOR DOCK
-   - pinned
-   - does NOT move when content scrolls
+   🔒 RIGHT ADVISOR — TRUE FIXED DOCK
    ========================================================= */
 
 .enterprise-ai-panel{
   width:380px;
   flex-shrink:0;
+
+  position:relative;
+  height:100%;
   display:flex;
   flex-direction:column;
 
@@ -136,17 +117,14 @@
   background:linear-gradient(180deg, rgba(255,255,255,.04), rgba(0,0,0,.45));
   backdrop-filter:blur(10px);
 
-  height:100vh;
-  position:relative;
-
+  overflow:hidden;
   transition:width .25s ease;
 }
 
-/* FULL collapse — zero width, space restored */
+/* FULL collapse */
 .enterprise-ai-panel.collapsed{
   width:0;
   border-left:none;
-  overflow:hidden;
 }
 
 .enterprise-ai-panel.collapsed .enterprise-ai-inner{
@@ -154,45 +132,10 @@
 }
 
 .enterprise-ai-inner{
-  flex:1;
-  min-height:0;
   display:flex;
   flex-direction:column;
-}
-
-/* =========================================================
-   FLOATING OPEN BUTTON (only when collapsed)
-   ========================================================= */
-
-.advisor-fab{
-  position:fixed;
-  right:16px;
-  top:16px;
-  z-index:9999;
-
-  border:1px solid rgba(255,255,255,.14);
-  background:rgba(0,0,0,.6);
-  color:#eaf1ff;
-
-  padding:10px 14px;
-  border-radius:14px;
-
-  font-weight:800;
-  font-size:12px;
-
-  cursor:pointer;
-  backdrop-filter:blur(10px);
-  transition:.2s ease;
-}
-
-.advisor-fab:hover{
-  background:rgba(120,160,255,.15);
-  border-color:rgba(120,160,255,.35);
-}
-
-/* Hide FAB when open */
-.enterprise-ai-panel.open ~ .advisor-fab{
-  display:none;
+  height:100%;
+  min-height:0;
 }
 
 /* =========================================================
@@ -200,44 +143,44 @@
    ========================================================= */
 
 .advisor-wrap{
-  height:100%;
   display:flex;
   flex-direction:column;
+  height:100%;
   min-height:0;
 }
 
-/* HEADER (never scrolls) */
+/* HEADER LOCKED */
 .advisor-miniTitle{
+  flex:0 0 auto;
   padding:14px 16px;
   border-bottom:1px solid rgba(255,255,255,.06);
   font-weight:800;
   font-size:12px;
   opacity:.9;
-  flex:0 0 auto;
 }
 
-/* MESSAGE FEED (ONLY THIS SCROLLS) */
+/* FEED — ONLY THIS SCROLLS */
 .advisor-feed{
   flex:1;
-  overflow:auto;
+  overflow-y:auto;
   padding:16px;
   display:flex;
   flex-direction:column;
   gap:16px;
 }
 
-/* INPUT (never scrolls) */
+/* INPUT LOCKED */
 .advisor-inputBar{
+  flex:0 0 auto;
   border-top:1px solid rgba(255,255,255,.06);
   padding:12px;
   display:flex;
   gap:10px;
   align-items:flex-end;
   background:rgba(0,0,0,.2);
-  flex:0 0 auto;
 }
 
-/* ================= MESSAGE STYLING ================= */
+/* ================= MESSAGE ================= */
 
 .advisor-row{
   display:flex;
@@ -270,75 +213,18 @@
   border-top-left-radius:6px;
 }
 
-.advisor-actions{
-  display:flex;
-  gap:8px;
-  flex-wrap:wrap;
-}
-
-.advisor-actions button{
-  background:transparent;
-  border:1px solid rgba(255,255,255,.10);
-  color:#cfd8ff;
-  padding:6px 8px;
-  border-radius:8px;
-  cursor:pointer;
-  transition:.15s ease;
-  font-size:12px;
-}
-
-.advisor-actions button:hover{
-  background:rgba(120,160,255,.14);
-  border-color:rgba(120,160,255,.35);
-}
-
-.advisor-actions button.active{
-  background:rgba(120,160,255,.22);
-  border-color:rgba(120,160,255,.55);
-}
-
-.advisor-ts{
-  font-size:10px;
-  opacity:.45;
-}
-
 /* ================= INPUT ================= */
-
-.advisor-micBtn,
-.advisor-sendBtn{
-  width:44px;
-  height:44px;
-  border-radius:12px;
-  border:1px solid rgba(255,255,255,.10);
-  background:rgba(0,0,0,.35);
-  color:#eaf1ff;
-  cursor:pointer;
-  transition:.15s ease;
-  font-weight:900;
-}
-
-.advisor-micBtn:hover,
-.advisor-sendBtn:hover{
-  background:rgba(120,160,255,.12);
-  border-color:rgba(120,160,255,.35);
-}
-
-.advisor-sendBtn:disabled{
-  opacity:.4;
-  cursor:not-allowed;
-}
 
 .advisor-inputCenter{
   flex:1;
   position:relative;
   display:flex;
-  align-items:center;
 }
 
 .advisor-textarea{
   width:100%;
   min-height:44px;
-  max-height:140px;
+  max-height:200px; /* expanded more */
   resize:none;
   border-radius:12px;
   border:1px solid rgba(255,255,255,.10);
@@ -347,46 +233,37 @@
   padding:12px;
   padding-right:70px;
   outline:none;
+  overflow-y:auto;
 }
 
 .advisor-textarea:focus{
   border-color:rgba(120,160,255,.45);
 }
 
-/* Voice animation bars */
-.advisor-bars{
-  position:absolute;
+/* ================= FAB ================= */
+
+.advisor-fab{
+  position:fixed;
   right:16px;
-  display:flex;
-  gap:4px;
-  align-items:flex-end;
-  height:16px;
+  top:16px;
+  z-index:9999;
+
+  border:1px solid rgba(255,255,255,.14);
+  background:rgba(0,0,0,.6);
+  color:#eaf1ff;
+
+  padding:10px 14px;
+  border-radius:14px;
+
+  font-weight:800;
+  font-size:12px;
+
+  cursor:pointer;
+  backdrop-filter:blur(10px);
+  transition:.2s ease;
 }
 
-.advisor-bars span{
-  width:3px;
-  border-radius:999px;
-  background:#5EC6FF;
-  animation:advWave .9s infinite ease-in-out;
-}
-
-@keyframes advWave{
-  0%,100%{ height:4px; }
-  50%{ height:16px; }
-}
-
-/* =========================================================
-   TRADING
-   ========================================================= */
-
-.trading-room{
-  display:flex;
-  flex-direction:column;
-  gap:28px;
-}
-
-.trading-grid{
-  display:grid;
-  grid-template-columns:repeat(auto-fit,minmax(280px,1fr));
-  gap:20px;
+.advisor-fab:hover{
+  background:rgba(120,160,255,.15);
+  border-color:rgba(120,160,255,.35);
 }
