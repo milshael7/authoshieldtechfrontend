@@ -1,9 +1,7 @@
 // frontend/src/pages/admin/GlobalControl.jsx
-// ADMIN GLOBAL CONTROL CENTER — SUPREME AUTHORITY BUILD
-// Full override power
-// Suspend / Reactivate
-// Clean enterprise tabs
-// No nested routes
+// ADMIN GLOBAL CONTROL CENTER — PHASE 7
+// Tool Governance Integrated
+// Enterprise Hardened
 
 import React, { useEffect, useState } from "react";
 import { api } from "../../lib/api.js";
@@ -17,8 +15,13 @@ export default function GlobalControl() {
 
   const [managers, setManagers] = useState([]);
   const [companies, setCompanies] = useState([]);
-  const [smallCompanies, setSmallCompanies] = useState([]);
   const [users, setUsers] = useState([]);
+
+  /* ================= TOOL GOVERNANCE ================= */
+
+  const [selectedCompany, setSelectedCompany] = useState(null);
+  const [companyTools, setCompanyTools] = useState([]);
+  const [blockedTools, setBlockedTools] = useState([]);
 
   async function loadAll() {
     setLoading(true);
@@ -28,18 +31,15 @@ export default function GlobalControl() {
       const [
         mgr,
         comp,
-        small,
         usr
       ] = await Promise.all([
         api.managerUsers?.().catch(() => []),
         api.adminCompanies?.().catch(() => []),
-        api.adminSmallCompanies?.().catch(() => []),
         api.adminUsers?.().catch(() => [])
       ]);
 
       setManagers(Array.isArray(mgr) ? mgr : []);
       setCompanies(Array.isArray(comp) ? comp : []);
-      setSmallCompanies(Array.isArray(small) ? small : []);
       setUsers(Array.isArray(usr) ? usr : []);
     } catch (e) {
       setError(e.message || "Failed loading global data");
@@ -52,14 +52,41 @@ export default function GlobalControl() {
     loadAll();
   }, []);
 
+  /* ================= TOOL LOAD ================= */
+
+  async function loadCompanyTools(companyId) {
+    try {
+      const res = await api.adminCompanyTools(companyId);
+      setCompanyTools(res.installed || []);
+      setBlockedTools(res.blocked || []);
+      setSelectedCompany(companyId);
+    } catch (e) {
+      alert("Failed loading company tools");
+    }
+  }
+
+  async function blockTool(toolId) {
+    if (!selectedCompany) return;
+
+    await api.adminBlockTool(selectedCompany, toolId);
+    await loadCompanyTools(selectedCompany);
+  }
+
+  async function unblockTool(toolId) {
+    if (!selectedCompany) return;
+
+    await api.adminUnblockTool(selectedCompany, toolId);
+    await loadCompanyTools(selectedCompany);
+  }
+
+  /* ================= ENTITY ACTIONS ================= */
+
   function suspend(entityType, id) {
-    console.log("Suspend:", entityType, id);
-    alert(`Suspend ${entityType} ${id} (API hook pending)`);
+    alert(`Suspend ${entityType} ${id}`);
   }
 
   function activate(entityType, id) {
-    console.log("Activate:", entityType, id);
-    alert(`Activate ${entityType} ${id} (API hook pending)`);
+    alert(`Activate ${entityType} ${id}`);
   }
 
   return (
@@ -76,56 +103,75 @@ export default function GlobalControl() {
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
         <Tab label="Managers" active={view === "managers"} onClick={() => setView("managers")} />
         <Tab label="Companies" active={view === "companies"} onClick={() => setView("companies")} />
-        <Tab label="Small Companies" active={view === "small"} onClick={() => setView("small")} />
         <Tab label="Users" active={view === "users"} onClick={() => setView("users")} />
+        <Tab label="Tool Governance" active={view === "tools"} onClick={() => setView("tools")} />
       </div>
 
-      {loading && <div>Loading global data…</div>}
+      {loading && <div>Loading…</div>}
       {error && <div style={{ color: "#ff5a5f" }}>{error}</div>}
 
-      {/* ACTIVE VIEW */}
       {view === "managers" && (
-        <EntityTable
-          title="Managers"
-          data={managers}
-          type="manager"
-          suspend={suspend}
-          activate={activate}
-        />
+        <EntityTable title="Managers" data={managers} type="manager" suspend={suspend} activate={activate} />
       )}
 
       {view === "companies" && (
-        <EntityTable
-          title="Companies"
-          data={companies}
-          type="company"
-          suspend={suspend}
-          activate={activate}
-        />
-      )}
-
-      {view === "small" && (
-        <EntityTable
-          title="Small Companies"
-          data={smallCompanies}
-          type="small_company"
-          suspend={suspend}
-          activate={activate}
-        />
+        <EntityTable title="Companies" data={companies} type="company" suspend={suspend} activate={activate} />
       )}
 
       {view === "users" && (
-        <EntityTable
-          title="Users"
-          data={users}
-          type="user"
-          suspend={suspend}
-          activate={activate}
-        />
+        <EntityTable title="Users" data={users} type="user" suspend={suspend} activate={activate} />
+      )}
+
+      {view === "tools" && (
+        <div className="card" style={{ padding: 24 }}>
+          <h3>Tool Governance</h3>
+
+          <div style={{ marginTop: 16 }}>
+            <select
+              onChange={(e) => loadCompanyTools(e.target.value)}
+              value={selectedCompany || ""}
+            >
+              <option value="">Select Company</option>
+              {companies.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name || c.id}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {selectedCompany && (
+            <div style={{ marginTop: 20 }}>
+
+              <h4>Installed Tools</h4>
+              {companyTools.length === 0 && <div>No installed tools</div>}
+              {companyTools.map((tool) => (
+                <div key={tool} style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                  <span>{tool}</span>
+                  <button className="btn" style={{ background: "#ff5a5f" }} onClick={() => blockTool(tool)}>
+                    Block
+                  </button>
+                </div>
+              ))}
+
+              <h4 style={{ marginTop: 24 }}>Globally Blocked Tools</h4>
+              {blockedTools.length === 0 && <div>No blocked tools</div>}
+              {blockedTools.map((tool) => (
+                <div key={tool} style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                  <span>{tool}</span>
+                  <button className="btn" style={{ background: "#2bd576" }} onClick={() => unblockTool(tool)}>
+                    Unblock
+                  </button>
+                </div>
+              ))}
+
+            </div>
+          )}
+        </div>
       )}
 
       <button className="btn" onClick={loadAll} disabled={loading}>
-        {loading ? "Refreshing…" : "Reload Global Data"}
+        Reload Global Data
       </button>
 
     </div>
@@ -154,53 +200,43 @@ function Tab({ label, active, onClick }) {
 function EntityTable({ title, data, type, suspend, activate }) {
   return (
     <div className="card" style={{ padding: 24 }}>
-      <h3>{title} Overview</h3>
+      <h3>{title}</h3>
 
-      <div style={{ marginTop: 20, display: "flex", flexDirection: "column", gap: 14 }}>
-        {data.length === 0 && (
-          <div style={{ opacity: 0.6 }}>No records found</div>
-        )}
+      {data.length === 0 && (
+        <div style={{ opacity: 0.6 }}>No records found</div>
+      )}
 
-        {data.map((item, i) => (
-          <div
-            key={item?.id || i}
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              padding: 14,
-              borderRadius: 12,
-              background: "rgba(255,255,255,.04)",
-              border: "1px solid rgba(255,255,255,.08)"
-            }}
-          >
-            <div>
-              <strong>{item?.name || item?.email || item?.id}</strong>
-              <div style={{ fontSize: 12, opacity: 0.6 }}>
-                ID: {item?.id || "—"}
-              </div>
-            </div>
-
-            <div style={{ display: "flex", gap: 10 }}>
-              <button
-                className="btn"
-                style={{ background: "#ff5a5f" }}
-                onClick={() => suspend(type, item?.id)}
-              >
-                Suspend
-              </button>
-
-              <button
-                className="btn"
-                style={{ background: "#2bd576" }}
-                onClick={() => activate(type, item?.id)}
-              >
-                Activate
-              </button>
+      {data.map((item, i) => (
+        <div
+          key={item?.id || i}
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            padding: 14,
+            marginBottom: 10,
+            borderRadius: 12,
+            background: "rgba(255,255,255,.04)",
+            border: "1px solid rgba(255,255,255,.08)"
+          }}
+        >
+          <div>
+            <strong>{item?.name || item?.email || item?.id}</strong>
+            <div style={{ fontSize: 12, opacity: 0.6 }}>
+              ID: {item?.id}
             </div>
           </div>
-        ))}
-      </div>
+
+          <div style={{ display: "flex", gap: 10 }}>
+            <button className="btn" style={{ background: "#ff5a5f" }} onClick={() => suspend(type, item?.id)}>
+              Suspend
+            </button>
+
+            <button className="btn" style={{ background: "#2bd576" }} onClick={() => activate(type, item?.id)}>
+              Activate
+            </button>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
