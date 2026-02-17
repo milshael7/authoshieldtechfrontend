@@ -38,13 +38,14 @@ export default function Posture() {
   async function load() {
     setLoading(true);
     setErr("");
+
     try {
       const [s, c] = await Promise.all([
         api.postureSummary().catch(() => ({})),
         api.postureChecks().catch(() => ({})),
       ]);
 
-      setSummary(s && typeof s === "object" ? s : {});
+      setSummary(s || {});
       setChecks(safeArray(c?.checks));
     } catch {
       setErr("Failed to load security posture");
@@ -60,8 +61,6 @@ export default function Posture() {
   }, []);
 
   const score = useMemo(() => scoreFrom(checks), [checks]);
-
-  /* ================= DERIVED ================= */
 
   const degradedControls = checks.filter(
     (c) => c?.status && c.status !== "ok"
@@ -82,37 +81,39 @@ export default function Posture() {
   return (
     <div style={{ padding: 32, display: "flex", flexDirection: "column", gap: 32 }}>
 
-      {/* ================= KPI STRIP ================= */}
+      {/* ================= GLOBAL ADMIN STRIP ================= */}
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit,minmax(170px,1fr))",
+          gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))",
           gap: 20,
         }}
       >
         <div className="card">
-          <div style={{ fontSize: 12, opacity: 0.6 }}>Security Score</div>
-          <div style={{ fontSize: 30, fontWeight: 800 }}>{pct(score)}%</div>
-        </div>
-
-        <div className="card">
-          <div style={{ fontSize: 12, opacity: 0.6 }}>Total Assets</div>
-          <div style={{ fontSize: 30, fontWeight: 800 }}>
-            {summary.assets ?? 0}
+          <div style={{ fontSize: 12, opacity: 0.6 }}>Global Companies</div>
+          <div style={{ fontSize: 28, fontWeight: 800 }}>
+            {summary.totalCompanies ?? 0}
           </div>
         </div>
 
         <div className="card">
-          <div style={{ fontSize: 12, opacity: 0.6 }}>High Risk Assets</div>
-          <div style={{ fontSize: 30, fontWeight: 800 }}>
-            {summary.highRiskAssets ?? 0}
+          <div style={{ fontSize: 12, opacity: 0.6 }}>Small Companies</div>
+          <div style={{ fontSize: 28, fontWeight: 800 }}>
+            {summary.totalSmallCompanies ?? 0}
           </div>
         </div>
 
         <div className="card">
-          <div style={{ fontSize: 12, opacity: 0.6 }}>Active Threats</div>
-          <div style={{ fontSize: 30, fontWeight: 800 }}>
-            {degradedControls.length}
+          <div style={{ fontSize: 12, opacity: 0.6 }}>Global Users</div>
+          <div style={{ fontSize: 28, fontWeight: 800 }}>
+            {summary.totalUsers ?? 0}
+          </div>
+        </div>
+
+        <div className="card">
+          <div style={{ fontSize: 12, opacity: 0.6 }}>System Health</div>
+          <div style={{ fontSize: 28, fontWeight: 800 }}>
+            {pct(score)}%
           </div>
         </div>
       </div>
@@ -125,12 +126,12 @@ export default function Posture() {
           gap: 28,
         }}
       >
-        {/* ================= LEFT PANEL ================= */}
+
+        {/* LEFT PANEL */}
         <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
 
-          {/* SECURITY SCORE PANEL */}
           <div className="card" style={{ padding: 28 }}>
-            <h2 style={{ margin: 0 }}>Security Posture Overview</h2>
+            <h2 style={{ margin: 0 }}>Enterprise Security Overview</h2>
 
             <div
               style={{
@@ -152,11 +153,10 @@ export default function Posture() {
             </div>
 
             <div style={{ marginTop: 14, opacity: 0.7 }}>
-              Enterprise operational readiness
+              Global infrastructure operational readiness
             </div>
           </div>
 
-          {/* THREAT SEVERITY */}
           <div className="card" style={{ padding: 28 }}>
             <h3>Threat Severity Distribution</h3>
 
@@ -196,118 +196,63 @@ export default function Posture() {
               </div>
             ))}
           </div>
-
-          {/* CONTROL MATRIX */}
-          <div className="card" style={{ padding: 28 }}>
-            <h3>Control Health Matrix</h3>
-
-            <div
-              style={{
-                marginTop: 20,
-                display: "grid",
-                gridTemplateColumns:
-                  "repeat(auto-fit,minmax(160px,1fr))",
-                gap: 14,
-              }}
-            >
-              {safeArray(checks)
-                .slice(0, 8)
-                .map((c, i) => (
-                  <div
-                    key={i}
-                    style={{
-                      padding: 14,
-                      borderRadius: 14,
-                      background: "rgba(255,255,255,0.04)",
-                      border:
-                        "1px solid rgba(255,255,255,0.08)",
-                    }}
-                  >
-                    <div style={{ fontSize: 12, opacity: 0.7 }}>
-                      {safeStr(c?.title)}
-                    </div>
-
-                    <div
-                      style={{
-                        marginTop: 6,
-                        fontWeight: 700,
-                        color:
-                          c?.status === "ok"
-                            ? "#2bd576"
-                            : "#ff4d4d",
-                      }}
-                    >
-                      {safeStr(c?.status, "unknown").toUpperCase()}
-                    </div>
-                  </div>
-                ))}
-            </div>
-          </div>
         </div>
 
-        {/* ================= RIGHT PANEL ================= */}
+        {/* RIGHT PANEL */}
         <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
 
           <div className="card" style={{ padding: 28 }}>
-            <h3>Asset Exposure</h3>
+            <h3>Admin Control Panel</h3>
 
-            <div style={{ marginTop: 16, lineHeight: 1.9 }}>
-              <div>Users: {summary.users ?? 0}</div>
-              <div>Devices: {summary.devices ?? 0}</div>
-              <div>Mailboxes: {summary.mailboxes ?? 0}</div>
-              <div>Cloud Drives: {summary.drives ?? 0}</div>
-            </div>
-          </div>
-
-          <div className="card" style={{ padding: 28 }}>
-            <h3>Analyst Feed</h3>
-
-            <div style={{ marginTop: 18 }}>
-              {safeArray(checks)
-                .slice(0, 5)
-                .map((c, i) => (
-                  <div
-                    key={i}
-                    style={{
-                      paddingBottom: 14,
-                      marginBottom: 14,
-                      borderBottom:
-                        "1px solid rgba(255,255,255,0.08)",
-                    }}
-                  >
-                    <strong>{safeStr(c?.title)}</strong>
-                    <div
-                      style={{
-                        fontSize: 13,
-                        opacity: 0.7,
-                        marginTop: 4,
-                      }}
-                    >
-                      {safeStr(c?.message)}
-                    </div>
-                  </div>
-                ))}
+            <div style={{ marginTop: 16, lineHeight: 2 }}>
+              <div>Suspended Companies: {summary.suspendedCompanies ?? 0}</div>
+              <div>Suspended Users: {summary.suspendedUsers ?? 0}</div>
+              <div>Pending Escalations: {summary.pendingEscalations ?? 0}</div>
             </div>
 
             <button
               onClick={load}
               disabled={loading}
               className="btn"
-              style={{ marginTop: 12 }}
+              style={{ marginTop: 18 }}
             >
-              {loading ? "Refreshing…" : "Run New Scan"}
+              {loading ? "Refreshing…" : "Refresh Global State"}
             </button>
 
             {err && (
-              <div
-                style={{
-                  marginTop: 14,
-                  color: "#ff4d4d",
-                }}
-              >
+              <div style={{ marginTop: 14, color: "#ff4d4d" }}>
                 {err}
               </div>
             )}
+          </div>
+
+          <div className="card" style={{ padding: 28 }}>
+            <h3>Escalation Feed</h3>
+
+            {safeArray(checks)
+              .slice(0, 5)
+              .map((c, i) => (
+                <div
+                  key={i}
+                  style={{
+                    paddingBottom: 14,
+                    marginBottom: 14,
+                    borderBottom:
+                      "1px solid rgba(255,255,255,0.08)",
+                  }}
+                >
+                  <strong>{safeStr(c?.title)}</strong>
+                  <div
+                    style={{
+                      fontSize: 13,
+                      opacity: 0.7,
+                      marginTop: 4,
+                    }}
+                  >
+                    {safeStr(c?.message)}
+                  </div>
+                </div>
+              ))}
           </div>
         </div>
       </div>
