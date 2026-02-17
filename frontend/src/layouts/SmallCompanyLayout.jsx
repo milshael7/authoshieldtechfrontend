@@ -1,21 +1,40 @@
 // frontend/src/layouts/SmallCompanyLayout.jsx
-// Small Company Layout — LIMITED ORGANIZATION CONTROL
-// Scoped to small-company permissions
-// No global visibility
-// Upgrade path preserved
-// Phase 2 architecture lock
+// Small Company Layout — ENTERPRISE-STYLE DOCKED ADVISOR
+// Sticky right advisor
+// True collapse (content expands)
+// Floating top-right toggle
+// Phase 3 Unified Architecture
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import { clearToken, clearUser } from "../lib/api";
-import AuthoDevPanel from "../components/AuthoDevPanel";
+import { clearToken, clearUser } from "../lib/api.js";
+import AuthoDevPanel from "../components/AuthoDevPanel.jsx";
 import Logo from "../components/Logo.jsx";
 import "../styles/layout.css";
 
 export default function SmallCompanyLayout() {
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
-  const [advisorOpen, setAdvisorOpen] = useState(false);
+
+  // Advisor dock state (persisted)
+  const [advisorOpen, setAdvisorOpen] = useState(true);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("as_advisor_open_small_company");
+      if (raw === "0") setAdvisorOpen(false);
+    } catch {}
+  }, []);
+
+  function setAdvisor(next) {
+    setAdvisorOpen(next);
+    try {
+      localStorage.setItem(
+        "as_advisor_open_small_company",
+        next ? "1" : "0"
+      );
+    } catch {}
+  }
 
   function logout() {
     clearToken();
@@ -28,15 +47,13 @@ export default function SmallCompanyLayout() {
   }
 
   return (
-    <div className={`layout-root ${menuOpen ? "sidebar-open" : ""}`}>
-
+    <div className={`layout-root enterprise ${menuOpen ? "sidebar-open" : ""}`}>
       {menuOpen && (
         <div className="sidebar-overlay" onClick={closeMenu} />
       )}
 
       {/* ================= SIDEBAR ================= */}
       <aside className="layout-sidebar small-company">
-
         <div className="layout-brand">
           <Logo size="md" />
           <span className="muted" style={{ fontSize: 12 }}>
@@ -81,33 +98,21 @@ export default function SmallCompanyLayout() {
         <button className="btn logout-btn" onClick={logout}>
           Log out
         </button>
-
       </aside>
 
-      {/* ================= MAIN ================= */}
-      <main className="layout-main">
+      {/* ================= MAIN + ADVISOR ================= */}
+      <div className="enterprise-main">
+        <main className="layout-main">
+          <section className="layout-content">
+            <Outlet />
+          </section>
+        </main>
 
-        <section className="layout-content">
-          <Outlet />
-        </section>
-
-        {/* ================= SECURITY ADVISOR ================= */}
-        <section className={`ai-drawer ${advisorOpen ? "open" : ""}`}>
-
-          <div className="ai-drawer-handle">
-            <button
-              className="ai-toggle"
-              onClick={() => setAdvisorOpen(v => !v)}
-            >
-              {advisorOpen
-                ? "▼ Hide Security Insights"
-                : "▲ Show Security Insights"}
-            </button>
-          </div>
-
-          <div className="ai-drawer-body">
+        {/* RIGHT ADVISOR DOCK */}
+        <aside className={`enterprise-ai-panel ${advisorOpen ? "open" : "collapsed"}`}>
+          <div className="enterprise-ai-inner">
             <AuthoDevPanel
-              title="Small Company Security Insights"
+              title=""
               getContext={() => ({
                 role: "small_company",
                 scope: "organization-only",
@@ -116,10 +121,17 @@ export default function SmallCompanyLayout() {
               })}
             />
           </div>
+        </aside>
+      </div>
 
-        </section>
-
-      </main>
+      {/* FLOATING TOGGLE */}
+      <button
+        className="advisor-fab"
+        onClick={() => setAdvisor(!advisorOpen)}
+        title={advisorOpen ? "Close Advisor" : "Open Advisor"}
+      >
+        {advisorOpen ? "›" : "AuthoShield Advisor"}
+      </button>
     </div>
   );
 }
