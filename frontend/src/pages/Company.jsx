@@ -8,13 +8,16 @@ import React, { useEffect, useState, useMemo } from "react";
 import { api } from "../lib/api.js";
 import NotificationList from "../components/NotificationList.jsx";
 import PosturePanel from "../components/PosturePanel.jsx";
+import { useCompany } from "../context/CompanyContext";
 
 function safeArray(v) {
   return Array.isArray(v) ? v : [];
 }
 
 export default function Company() {
-  const [company, setCompany] = useState(null);
+  const { setCompany } = useCompany();
+
+  const [company, setCompanyData] = useState(null);
   const [notes, setNotes] = useState([]);
   const [memberId, setMemberId] = useState("");
   const [memberDetails, setMemberDetails] = useState([]);
@@ -34,9 +37,18 @@ export default function Company() {
         api.companyMembers?.() || Promise.resolve({ users: [] }),
       ]);
 
-      setCompany(c || null);
+      setCompanyData(c || null);
       setNotes(safeArray(n));
       setMemberDetails(safeArray(members?.users));
+
+      // 🔥 LOCK CONTEXT TO THIS COMPANY
+      if (c?.id) {
+        setCompany({
+          id: c.id,
+          name: c.name,
+        });
+      }
+
     } catch (e) {
       setErr(e?.message || "Failed to load company workspace");
     } finally {
@@ -51,7 +63,6 @@ export default function Company() {
   useEffect(() => {
     loadRoom();
     refreshPosture();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const stats = useMemo(() => {
