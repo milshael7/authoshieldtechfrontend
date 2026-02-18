@@ -1,9 +1,8 @@
 // frontend/src/layouts/ManagerLayout.jsx
-// Manager Layout — GLOBAL OPERATIONAL OVERSIGHT
-// Admin > Manager hierarchy respected
-// Sticky Advisor Dock
+// Manager Layout — MULTI-COMPANY OPERATIONAL CONSOLE
+// Enforcement visibility layer
+// Admin supersedes Manager
 // No override authority
-// Clean enterprise structure
 
 import React, { useEffect, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
@@ -16,8 +15,10 @@ export default function ManagerLayout() {
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
   const [advisorOpen, setAdvisorOpen] = useState(true);
+  const [oversightOpen, setOversightOpen] = useState(true);
 
-  // Persist advisor state
+  /* ================= ADVISOR STATE ================= */
+
   useEffect(() => {
     try {
       const raw = localStorage.getItem("as_manager_advisor_open");
@@ -32,6 +33,8 @@ export default function ManagerLayout() {
     } catch {}
   }
 
+  /* ================= LOGOUT ================= */
+
   function logout() {
     clearToken();
     clearUser();
@@ -42,6 +45,8 @@ export default function ManagerLayout() {
     setMenuOpen(false);
   }
 
+  /* ================= UI ================= */
+
   return (
     <div className={`layout-root enterprise ${menuOpen ? "sidebar-open" : ""}`}>
       {menuOpen && <div className="sidebar-overlay" onClick={closeMenu} />}
@@ -51,13 +56,17 @@ export default function ManagerLayout() {
         <div className="layout-brand">
           <Logo size="md" />
           <span className="muted" style={{ fontSize: 12 }}>
-            Manager Operational Oversight
+            Operational Oversight Console
           </span>
         </div>
 
         <nav className="layout-nav">
 
           {/* ===== GLOBAL MONITORING ===== */}
+          <div className="nav-section-label">
+            Global Monitoring
+          </div>
+
           <NavLink to="." end onClick={closeMenu}>
             Global Posture
           </NavLink>
@@ -67,19 +76,19 @@ export default function ManagerLayout() {
           </NavLink>
 
           <NavLink to="threats" onClick={closeMenu}>
-            Global Threats
+            Threat Intelligence
           </NavLink>
 
           <NavLink to="incidents" onClick={closeMenu}>
-            Global Incidents
+            Incident Oversight
           </NavLink>
 
           <NavLink to="vulnerabilities" onClick={closeMenu}>
-            Global Vulnerabilities
+            Vulnerabilities
           </NavLink>
 
           <NavLink to="compliance" onClick={closeMenu}>
-            Compliance Oversight
+            Compliance View
           </NavLink>
 
           <NavLink to="reports" onClick={closeMenu}>
@@ -88,9 +97,43 @@ export default function ManagerLayout() {
 
           <hr style={{ opacity: 0.18 }} />
 
-          {/* ===== TRADING (Oversight Only) ===== */}
-          <NavLink to="trading" onClick={closeMenu}>
+          {/* ===== ENTITY OVERSIGHT ===== */}
+          <div
+            className="nav-section-label clickable"
+            onClick={() => setOversightOpen(v => !v)}
+          >
+            Entity Oversight {oversightOpen ? "▾" : "▸"}
+          </div>
+
+          {oversightOpen && (
+            <>
+              <NavLink to="/company" onClick={closeMenu}>
+                All Companies
+              </NavLink>
+
+              <NavLink to="/small-company" onClick={closeMenu}>
+                Small Companies
+              </NavLink>
+
+              <NavLink to="/user" onClick={closeMenu}>
+                Individuals
+              </NavLink>
+
+              <NavLink to="/admin/global" onClick={closeMenu}>
+                Approval Queue (Admin Review)
+              </NavLink>
+            </>
+          )}
+
+          <hr style={{ opacity: 0.18 }} />
+
+          {/* ===== TRADING ===== */}
+          <div className="nav-section-label">
             Trading Oversight
+          </div>
+
+          <NavLink to="trading" onClick={closeMenu}>
+            Market Activity
           </NavLink>
 
           <hr style={{ opacity: 0.18 }} />
@@ -115,23 +158,27 @@ export default function ManagerLayout() {
           </section>
         </main>
 
-        {/* Sticky Advisor Dock */}
-        <aside className={`enterprise-ai-panel ${advisorOpen ? "open" : "collapsed"}`}>
+        {/* ===== ADVISOR PANEL ===== */}
+        <aside
+          className={`enterprise-ai-panel ${
+            advisorOpen ? "open" : "collapsed"
+          }`}
+        >
           <div className="enterprise-ai-inner">
             <AuthoDevPanel
               title=""
               getContext={() => ({
                 role: "manager",
                 location: window.location.pathname,
-                scope: "global-oversight",
-                authority: "no-override",
+                scope: "multi-company-oversight",
+                authority: "approval-visible-no-override",
               })}
             />
           </div>
         </aside>
       </div>
 
-      {/* Floating Toggle */}
+      {/* ===== FLOATING TOGGLE ===== */}
       <button
         className="advisor-fab"
         onClick={() => setAdvisor(!advisorOpen)}
