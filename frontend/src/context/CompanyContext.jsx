@@ -36,4 +36,3 @@ export function useCompany() {
     throw new Error("useCompany must be used inside CompanyProvider");
   }
   return context;
-}
