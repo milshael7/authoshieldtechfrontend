@@ -1,5 +1,5 @@
 /* =========================================================
-   AUTOSHIELD FRONTEND API LAYER — MULTI-TENANT SECURE BUILD
+   AUTOSHIELD FRONTEND API LAYER — MULTI-TENANT + APPROVAL SYSTEM
    X-Company-Id enforced automatically
    ========================================================= */
 
@@ -101,7 +101,6 @@ async function req(
     if (token) headers.Authorization = `Bearer ${token}`;
   }
 
-  /* 🔥 MULTI-TENANT HEADER */
   const activeCompanyId = getActiveCompanyId();
   if (activeCompanyId) {
     headers["X-Company-Id"] = activeCompanyId;
@@ -119,7 +118,6 @@ async function req(
     data = await res.json();
   } catch {}
 
-  /* ---------- TOKEN REFRESH ---------- */
   if (res.status === 401 && auth && retry && getToken()) {
     try {
       const refreshRes = await fetchWithTimeout(
@@ -164,11 +162,19 @@ async function req(
 
 export const api = {
 
-  /* ---------- AUTH ---------- */
+  /* ================= AUTH ================= */
+
   login: (email, password) =>
     req("/api/auth/login", {
       method: "POST",
       body: { email, password },
+      auth: false,
+    }),
+
+  signup: (payload) =>
+    req("/api/auth/signup", {
+      method: "POST",
+      body: payload,
       auth: false,
     }),
 
@@ -179,24 +185,55 @@ export const api = {
       auth: false,
     }),
 
-  /* ---------- USER ---------- */
+  /* ================= APPROVAL SYSTEM ================= */
+
+  /* --- Admin --- */
+
+  adminPendingUsers: () =>
+    req("/api/admin/pending-users"),
+
+  adminApproveUser: (id) =>
+    req(`/api/admin/users/${encodeURIComponent(id)}/approve`, {
+      method: "POST",
+    }),
+
+  adminDenyUser: (id) =>
+    req(`/api/admin/users/${encodeURIComponent(id)}/deny`, {
+      method: "POST",
+    }),
+
+  /* --- Manager --- */
+
+  managerPendingUsers: () =>
+    req("/api/manager/pending-users"),
+
+  managerApproveUser: (id) =>
+    req(`/api/manager/users/${encodeURIComponent(id)}/approve`, {
+      method: "POST",
+    }),
+
+  /* ================= USER ================= */
+
   meNotifications: () => req("/api/me/notifications"),
   markMyNotificationRead: (id) =>
     req(`/api/me/notifications/${id}/read`, { method: "POST" }),
 
-  /* ---------- ADMIN ---------- */
+  /* ================= ADMIN ================= */
+
   adminUsers: () => req("/api/admin/users"),
   adminCompanies: () => req("/api/admin/companies"),
   adminNotifications: () => req("/api/admin/notifications"),
 
-  /* ---------- MANAGER ---------- */
+  /* ================= MANAGER ================= */
+
   managerOverview: () => req("/api/manager/overview"),
   managerUsers: () => req("/api/manager/users"),
   managerCompanies: () => req("/api/manager/companies"),
   managerAudit: (limit = 200) =>
     req(`/api/manager/audit?limit=${encodeURIComponent(limit)}`),
 
-  /* ---------- SECURITY ---------- */
+  /* ================= SECURITY ================= */
+
   postureSummary: () => req("/api/security/posture-summary"),
   postureChecks: () => req("/api/security/posture-checks"),
 
@@ -204,22 +241,24 @@ export const api = {
   compliance: () => req("/api/security/compliance"),
   policies: () => req("/api/security/policies"),
   reports: () => req("/api/security/reports"),
-
   assets: () => req("/api/security/assets"),
 
-  /* ---------- INCIDENTS ---------- */
+  /* ================= INCIDENTS ================= */
+
   incidents: () => req("/api/incidents"),
   createIncident: (payload) =>
     req("/api/incidents", { method: "POST", body: payload }),
 
-  /* ---------- AI ---------- */
+  /* ================= AI ================= */
+
   aiChat: (message, context) =>
     req("/api/ai/chat", {
       method: "POST",
       body: { message, context },
     }),
 
-  /* ---------- HEALTH ---------- */
+  /* ================= HEALTH ================= */
+
   warmup: () =>
     fetch(joinUrl(API_BASE, "/api/health"), {
       method: "GET",
