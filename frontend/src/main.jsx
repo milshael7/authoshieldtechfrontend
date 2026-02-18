@@ -5,6 +5,9 @@ import ReactDOM from "react-dom/client";
 import App from "./App.jsx";
 import AppShell from "./shell/AppShell.jsx";
 
+// 🔥 NEW: Company Context Provider
+import { CompanyProvider } from "./context/CompanyContext";
+
 // Global styles
 import "./styles/main.css";
 import "./styles/layout.css";
@@ -61,8 +64,6 @@ class RootErrorBoundary extends React.Component {
 
   componentDidCatch(error, info) {
     console.error("🔥 Runtime Crash:", error, info);
-
-    // Force mobile to show stack
     alert("RUNTIME STACK:\n\n" + (error?.stack || error));
   }
 
@@ -130,9 +131,12 @@ const root = ReactDOM.createRoot(rootEl);
 root.render(
   <React.StrictMode>
     <RootErrorBoundary>
-      <AppShell>
-        <App />
-      </AppShell>
+      {/* 🔥 GLOBAL MULTI-COMPANY LAYER */}
+      <CompanyProvider>
+        <AppShell>
+          <App />
+        </AppShell>
+      </CompanyProvider>
     </RootErrorBoundary>
   </React.StrictMode>
 );
