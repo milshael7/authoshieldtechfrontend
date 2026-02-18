@@ -1,6 +1,6 @@
 /* =========================================================
-   AUTOSHIELD FRONTEND API LAYER — MULTI-TENANT + APPROVAL SYSTEM
-   X-Company-Id enforced automatically
+   AUTOSHIELD FRONTEND API LAYER — STABLE BUILD
+   FIXED: No Infinite Refresh Loop
    ========================================================= */
 
 const API_BASE = import.meta.env.VITE_API_BASE?.trim();
@@ -11,7 +11,7 @@ if (!API_BASE) {
 
 const TOKEN_KEY = "as_token";
 const USER_KEY = "as_user";
-const REQUEST_TIMEOUT = 45000;
+const REQUEST_TIMEOUT = 20000;
 
 /* ================= STORAGE ================= */
 
@@ -81,13 +81,12 @@ async function fetchWithTimeout(url, options = {}, ms = REQUEST_TIMEOUT) {
 }
 
 /* =========================================================
-   CORE REQUEST
+   CORE REQUEST (NO AUTO REFRESH LOOP)
 ========================================================= */
 
 async function req(
   path,
-  { method = "GET", body, auth = true, headers: extraHeaders = {} } = {},
-  retry = true
+  { method = "GET", body, auth = true, headers: extraHeaders = {} } = {}
 ) {
   if (!API_BASE) throw new Error("API base URL not configured");
 
@@ -118,31 +117,11 @@ async function req(
     data = await res.json();
   } catch {}
 
-  if (res.status === 401 && auth && retry && getToken()) {
-    try {
-      const refreshRes = await fetchWithTimeout(
-        joinUrl(API_BASE, "/api/auth/refresh"),
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${getToken()}`,
-          },
-          credentials: "include",
-        }
-      );
-
-      const refreshData = await refreshRes.json().catch(() => ({}));
-
-      if (refreshRes.ok && refreshData.token) {
-        setToken(refreshData.token);
-        if (refreshData.user) saveUser(refreshData.user);
-
-        return req(path, { method, body, auth, headers: extraHeaders }, false);
-      }
-    } catch {}
-
-    throw new Error("Unauthorized");
+  /* 🔥 IMPORTANT CHANGE */
+  if (res.status === 401 && auth) {
+    clearToken();
+    clearUser();
+    throw new Error("Session expired");
   }
 
   if (!res.ok) {
@@ -185,33 +164,6 @@ export const api = {
       auth: false,
     }),
 
-  /* ================= APPROVAL SYSTEM ================= */
-
-  /* --- Admin --- */
-
-  adminPendingUsers: () =>
-    req("/api/admin/pending-users"),
-
-  adminApproveUser: (id) =>
-    req(`/api/admin/users/${encodeURIComponent(id)}/approve`, {
-      method: "POST",
-    }),
-
-  adminDenyUser: (id) =>
-    req(`/api/admin/users/${encodeURIComponent(id)}/deny`, {
-      method: "POST",
-    }),
-
-  /* --- Manager --- */
-
-  managerPendingUsers: () =>
-    req("/api/manager/pending-users"),
-
-  managerApproveUser: (id) =>
-    req(`/api/manager/users/${encodeURIComponent(id)}/approve`, {
-      method: "POST",
-    }),
-
   /* ================= USER ================= */
 
   meNotifications: () => req("/api/me/notifications"),
@@ -236,7 +188,6 @@ export const api = {
 
   postureSummary: () => req("/api/security/posture-summary"),
   postureChecks: () => req("/api/security/posture-checks"),
-
   vulnerabilities: () => req("/api/security/vulnerabilities"),
   compliance: () => req("/api/security/compliance"),
   policies: () => req("/api/security/policies"),
