@@ -5,15 +5,16 @@ import ReactDOM from "react-dom/client";
 import App from "./App.jsx";
 import AppShell from "./shell/AppShell.jsx";
 
-// 🔥 NEW: Company Context Provider
+// 🔥 Company Context Provider
 import { CompanyProvider } from "./context/CompanyContext";
 
 // Global styles
 import "./styles/main.css";
 import "./styles/layout.css";
+import "./styles/enterprise.css"; // ✅ NEW ENTERPRISE FRAMEWORK
 
 /* =========================================================
-   🔥 FORCE GLOBAL ERROR CAPTURE (EARLIEST POSSIBLE)
+   GLOBAL ERROR CAPTURE
 ========================================================= */
 
 window.onerror = function (message, source, lineno, colno, error) {
@@ -64,7 +65,6 @@ class RootErrorBoundary extends React.Component {
 
   componentDidCatch(error, info) {
     console.error("🔥 Runtime Crash:", error, info);
-    alert("RUNTIME STACK:\n\n" + (error?.stack || error));
   }
 
   render() {
@@ -87,10 +87,6 @@ class RootErrorBoundary extends React.Component {
             <h1 style={{ marginBottom: 14 }}>
               🔥 AutoShield Runtime Crash
             </h1>
-
-            <p style={{ opacity: 0.8, marginBottom: 18 }}>
-              Full stack trace below:
-            </p>
 
             <pre
               style={{
@@ -131,7 +127,6 @@ const root = ReactDOM.createRoot(rootEl);
 root.render(
   <React.StrictMode>
     <RootErrorBoundary>
-      {/* 🔥 GLOBAL MULTI-COMPANY LAYER */}
       <CompanyProvider>
         <AppShell>
           <App />
