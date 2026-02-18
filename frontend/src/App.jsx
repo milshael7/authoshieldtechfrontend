@@ -1,5 +1,6 @@
 // frontend/src/App.jsx
 // FULL ROLE-STRUCTURED ROUTING — MULTI-TENANT HARDENED
+// FIXED: Safe Silent Refresh (No Login Loop)
 
 import React, { useEffect, useState } from "react";
 import {
@@ -80,7 +81,7 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [ready, setReady] = useState(false);
 
-  /* ================= AUTH BOOT ================= */
+  /* ================= SAFE AUTH BOOT ================= */
 
   useEffect(() => {
     async function bootAuth() {
@@ -88,14 +89,20 @@ export default function App() {
       const storedUser = getSavedUser();
 
       if (!token || !storedUser) {
-        clearToken();
-        clearUser();
         setUser(null);
         setReady(true);
         return;
       }
 
+      // 🔥 Trust existing session immediately
+      setUser(storedUser);
+      setReady(true);
+
+      // 🔥 Attempt silent refresh in background
       try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 8000);
+
         const res = await fetch(
           `${import.meta.env.VITE_API_BASE}/api/auth/refresh`,
           {
@@ -104,28 +111,32 @@ export default function App() {
               "Content-Type": "application/json",
               Authorization: `Bearer ${token}`,
             },
+            signal: controller.signal,
           }
         );
 
-        if (!res.ok) throw new Error("Session invalid");
+        clearTimeout(timeout);
+
+        if (!res.ok) {
+          if (res.status === 401) {
+            clearToken();
+            clearUser();
+            setUser(null);
+          }
+          return;
+        }
 
         const data = await res.json();
 
-        if (!data?.token || !data?.user) {
-          throw new Error("Invalid refresh response");
+        if (data?.token && data?.user) {
+          setToken(data.token);
+          saveUser(data.user);
+          setUser(data.user);
         }
 
-        setToken(data.token);
-        saveUser(data.user);
-        setUser(data.user);
-
       } catch (e) {
-        console.warn("Session expired. Clearing auth.");
-        clearToken();
-        clearUser();
-        setUser(null);
-      } finally {
-        setReady(true);
+        // 🚫 Do NOT clear auth on network failure
+        console.warn("Silent refresh failed. Keeping session.");
       }
     }
 
