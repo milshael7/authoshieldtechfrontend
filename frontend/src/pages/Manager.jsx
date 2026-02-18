@@ -1,11 +1,13 @@
 // frontend/src/pages/Manager.jsx
 // GLOBAL OPERATIONAL OVERSIGHT CENTER
 // Manager = enforcement visibility layer
-// Admin sees everything Manager sees + override power
+// Admin supersedes Manager
 
 import React, { useEffect, useMemo, useState } from "react";
 import { api } from "../lib/api.js";
 import PosturePanel from "../components/PosturePanel.jsx";
+import CompanySelector from "../components/CompanySelector.jsx";
+import { useCompany } from "../context/CompanyContext";
 
 /* ================= HELPERS ================= */
 
@@ -20,9 +22,13 @@ function safeStr(v, fallback = "—") {
 /* ================= PAGE ================= */
 
 export default function Manager() {
+  const { activeCompanyId, mode } = useCompany();
+
   const [overview, setOverview] = useState(null);
   const [audit, setAudit] = useState([]);
   const [notifications, setNotifications] = useState([]);
+  const [companies, setCompanies] = useState([]);
+
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
 
@@ -33,15 +39,17 @@ export default function Manager() {
     setErr("");
 
     try {
-      const [ov, au, no] = await Promise.all([
+      const [ov, au, no, co] = await Promise.all([
         api.managerOverview(),
         api.managerAudit(200),
         api.managerNotifications?.() || Promise.resolve([]),
+        api.adminCompanies?.() || Promise.resolve([]),
       ]);
 
       setOverview(ov || null);
       setAudit(safeArray(au));
       setNotifications(safeArray(no));
+      setCompanies(safeArray(co));
     } catch (e) {
       setErr(e?.message || "Failed to load manager oversight data");
     } finally {
@@ -56,20 +64,29 @@ export default function Manager() {
   useEffect(() => {
     loadRoom();
     refreshPosture();
-    // eslint-disable-next-line
   }, []);
 
-  /* ================= DERIVED ================= */
+  /* ================= COMPANY SCOPED FILTERING ================= */
+
+  const filteredAudit = useMemo(() => {
+    if (!activeCompanyId) return audit;
+    return audit.filter(ev => ev.companyId === activeCompanyId);
+  }, [audit, activeCompanyId]);
+
+  const filteredNotifications = useMemo(() => {
+    if (!activeCompanyId) return notifications;
+    return notifications.filter(n => n.companyId === activeCompanyId);
+  }, [notifications, activeCompanyId]);
 
   const severityStats = useMemo(() => {
     const base = { critical: 0, high: 0, medium: 0, low: 0 };
-    safeArray(notifications).forEach((n) => {
+    filteredNotifications.forEach((n) => {
       if (base[n?.severity] !== undefined) {
         base[n.severity]++;
       }
     });
     return base;
-  }, [notifications]);
+  }, [filteredNotifications]);
 
   /* ================= UI ================= */
 
@@ -78,9 +95,12 @@ export default function Manager() {
 
       {/* HEADER */}
       <div className="card">
-        <h2 style={{ margin: 0 }}>Global Operational Oversight</h2>
+        <h2 style={{ margin: 0 }}>
+          Operational Oversight — {mode === "global" ? "All Companies" : "Scoped Company"}
+        </h2>
+
         <div style={{ opacity: 0.65, fontSize: 13 }}>
-          Enforcement visibility • Read-only control layer • Admin supersedes Manager
+          Enforcement visibility • Read-only control layer
         </div>
 
         <div style={{ marginTop: 18, display: "flex", gap: 12, flexWrap: "wrap" }}>
@@ -100,11 +120,18 @@ export default function Manager() {
         )}
       </div>
 
+      {/* 🔥 COMPANY SELECTOR */}
+      <div className="card">
+        <CompanySelector companies={companies} />
+      </div>
+
       {/* POSTURE SNAPSHOT */}
       <PosturePanel
         key={postureKey}
-        title="Global Security Posture"
-        subtitle="Manager-level snapshot (Admin has full override authority)"
+        title="Security Posture Snapshot"
+        subtitle={mode === "global"
+          ? "All companies combined"
+          : "Scoped company only"}
       />
 
       {/* KPI STRIP */}
@@ -133,14 +160,14 @@ export default function Manager() {
           <div className="card">
             <div style={{ fontSize: 12, opacity: 0.6 }}>Audit Events</div>
             <div style={{ fontSize: 26, fontWeight: 800 }}>
-              {overview.auditEvents ?? 0}
+              {filteredAudit.length}
             </div>
           </div>
 
           <div className="card">
             <div style={{ fontSize: 12, opacity: 0.6 }}>Active Alerts</div>
             <div style={{ fontSize: 26, fontWeight: 800 }}>
-              {notifications.length}
+              {filteredNotifications.length}
             </div>
           </div>
         </div>
@@ -167,8 +194,8 @@ export default function Manager() {
             >
               <div
                 style={{
-                  width: `${notifications.length
-                    ? Math.round((count / notifications.length) * 100)
+                  width: `${filteredNotifications.length
+                    ? Math.round((count / filteredNotifications.length) * 100)
                     : 0}%`,
                   height: "100%",
                   borderRadius: 999,
@@ -184,13 +211,13 @@ export default function Manager() {
       <div className="card">
         <h3>Recent Alerts</h3>
 
-        {notifications.length === 0 && (
+        {filteredNotifications.length === 0 && (
           <div style={{ opacity: 0.6 }}>
             {loading ? "Loading…" : "No alerts detected."}
           </div>
         )}
 
-        {notifications.slice(0, 12).map((n) => (
+        {filteredNotifications.slice(0, 12).map((n) => (
           <div
             key={n.id}
             style={{
@@ -225,7 +252,7 @@ export default function Manager() {
               </tr>
             </thead>
             <tbody>
-              {audit.slice(0, 25).map((ev, i) => (
+              {filteredAudit.slice(0, 25).map((ev, i) => (
                 <tr key={ev.id || i}>
                   <td style={{ padding: "8px 0" }}>
                     {ev.at ? new Date(ev.at).toLocaleString() : ""}
@@ -243,7 +270,6 @@ export default function Manager() {
 
         <div style={{ marginTop: 12, opacity: 0.55, fontSize: 12 }}>
           Managers operate in read-only enforcement mode.
-          Administrative override requires Admin role.
         </div>
       </div>
 
