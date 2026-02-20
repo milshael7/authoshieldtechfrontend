@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { api, getSavedUser, saveUser } from "../lib/api.js";
+import { api, getSavedUser } from "../lib/api.js";
 
 /* ================= HELPERS ================= */
 
@@ -7,10 +7,6 @@ function pct(n) {
   const x = Number(n);
   if (!Number.isFinite(x)) return 0;
   return Math.max(0, Math.min(100, Math.round(x)));
-}
-
-function safeArray(v) {
-  return Array.isArray(v) ? v : [];
 }
 
 function scoreFrom(checks = []) {
@@ -36,17 +32,13 @@ export default function Posture() {
   const [err, setErr] = useState("");
 
   /* ===== AUTOPROTECT STATE ===== */
-  const [autoEnabled, setAutoEnabled] = useState(false);
-  const [autoLoading, setAutoLoading] = useState(false);
 
-  const AUTOPROTECT_LIMIT = 10;
+  const [autoStatus, setAutoStatus] = useState(null);
+  const [autoLoading, setAutoLoading] = useState(false);
 
   /* ================= LOAD SECURITY ================= */
 
   async function loadSecurity() {
-    setLoading(true);
-    setErr("");
-
     try {
       const [s, c] = await Promise.all([
         api.postureSummary().catch(() => ({})),
@@ -54,7 +46,7 @@ export default function Posture() {
       ]);
 
       setSummary(s || {});
-      setChecks(safeArray(c?.checks));
+      setChecks(c?.checks || []);
     } catch {
       setErr("Failed to load security posture");
       setSummary({});
@@ -64,16 +56,16 @@ export default function Posture() {
     }
   }
 
-  /* ================= LOAD AUTOPROTECT STATUS ================= */
+  /* ================= LOAD AUTOPROTECT ================= */
 
   async function loadAutoStatus() {
     if (!isIndividual) return;
 
     try {
-      const data = await api.autoprotecStatus();
-      setAutoEnabled(!!data?.enabled);
+      const data = await api.autoprotectStatus();
+      setAutoStatus(data);
     } catch {
-      // ignore silent fail
+      // silent
     }
   }
 
@@ -82,7 +74,7 @@ export default function Posture() {
     loadAutoStatus();
   }, []);
 
-  /* ================= ENABLE / DISABLE ================= */
+  /* ================= TOGGLE ================= */
 
   async function toggleAutoProtect() {
     if (!isIndividual) return;
@@ -90,21 +82,13 @@ export default function Posture() {
     setAutoLoading(true);
 
     try {
-      if (autoEnabled) {
-        await api.autoprotecDisable();
-        setAutoEnabled(false);
+      if (autoStatus?.status === "ACTIVE") {
+        await api.autoprotectDisable();
       } else {
-        await api.autoprotecEnable();
-        setAutoEnabled(true);
+        await api.autoprotectEnable();
       }
 
-      // update local storage user snapshot
-      const current = getSavedUser();
-      if (current) {
-        current.autoprotectEnabled = !autoEnabled;
-        saveUser(current);
-      }
-
+      await loadAutoStatus();
     } catch (e) {
       alert(e.message || "AutoProtect update failed");
     } finally {
@@ -116,42 +100,60 @@ export default function Posture() {
 
   const score = useMemo(() => scoreFrom(checks), [checks]);
 
-  const protectedJobs = isIndividual
-    ? Math.min(checks.length, AUTOPROTECT_LIMIT)
-    : checks.length;
-
-  const limitReached =
-    isIndividual && checks.length > AUTOPROTECT_LIMIT;
+  const activeJobs = autoStatus?.activeJobs || 0;
+  const activeLimit = autoStatus?.activeLimit || 10;
+  const limitReached = activeJobs >= activeLimit;
 
   /* ================= UI ================= */
 
   return (
     <div style={{ padding: 32, display: "flex", flexDirection: "column", gap: 32 }}>
 
-      {/* ================= AUTOPROTECT (INDIVIDUAL ONLY) ================= */}
-      {isIndividual && (
+      {/* ================= AUTOPROTECT ================= */}
+      {isIndividual && autoStatus && (
         <div className="card" style={{ padding: 28 }}>
-          <h2 style={{ margin: 0 }}>AutoProtect Control</h2>
+          <h2 style={{ margin: 0 }}>AutoProtect</h2>
 
-          <div style={{ marginTop: 14, opacity: 0.75 }}>
+          <div style={{ marginTop: 14 }}>
             Status:{" "}
-            <strong style={{ color: autoEnabled ? "#5EC6FF" : "#ff4d4d" }}>
-              {autoEnabled ? "Active" : "Disabled"}
+            <strong
+              style={{
+                color:
+                  autoStatus.status === "ACTIVE"
+                    ? "#5EC6FF"
+                    : "#ff4d4d",
+              }}
+            >
+              {autoStatus.status}
             </strong>
           </div>
 
           <div style={{ marginTop: 12 }}>
-            Protected Jobs:{" "}
+            Active Jobs:{" "}
             <strong>
-              {protectedJobs} / {AUTOPROTECT_LIMIT}
+              {activeJobs} / {activeLimit}
             </strong>
           </div>
 
           {limitReached && (
-            <div style={{ marginTop: 12, color: "#ffb347" }}>
-              Limit reached. Jobs above 10 require manual handling.
+            <div style={{ marginTop: 10, color: "#ffb347" }}>
+              Active job limit reached (10).
             </div>
           )}
+
+          <div style={{ marginTop: 12 }}>
+            Next Billing:{" "}
+            <strong>
+              {autoStatus.nextBillingDate
+                ? new Date(autoStatus.nextBillingDate).toLocaleDateString()
+                : "—"}
+            </strong>
+          </div>
+
+          <div style={{ marginTop: 12 }}>
+            Monthly Price:{" "}
+            <strong>${autoStatus.price || 550}</strong>
+          </div>
 
           <button
             className="btn"
@@ -161,19 +163,18 @@ export default function Posture() {
           >
             {autoLoading
               ? "Updating..."
-              : autoEnabled
+              : autoStatus.status === "ACTIVE"
               ? "Disable AutoProtect"
               : "Enable AutoProtect"}
           </button>
 
           <div style={{ marginTop: 14, fontSize: 12, opacity: 0.6 }}>
-            AutoProtect automatically handles up to 10 active jobs.
-            Additional jobs remain manual.
+            AutoProtect covers up to 10 active jobs at a time.
           </div>
         </div>
       )}
 
-      {/* ================= GLOBAL (ADMIN / MANAGER ONLY) ================= */}
+      {/* ================= GLOBAL ================= */}
       {!isIndividual && (
         <div
           style={{
@@ -226,10 +227,6 @@ export default function Posture() {
                 "linear-gradient(90deg,#5EC6FF,#7aa2ff)",
             }}
           />
-        </div>
-
-        <div style={{ marginTop: 14, opacity: 0.7 }}>
-          Infrastructure operational readiness
         </div>
       </div>
 
