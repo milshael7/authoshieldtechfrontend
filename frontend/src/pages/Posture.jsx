@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { api } from "../lib/api.js";
+import { api, getSavedUser } from "../lib/api.js";
 
 /* ================= HELPERS ================= */
 
@@ -30,10 +30,21 @@ function scoreFrom(checks = []) {
 /* ================= PAGE ================= */
 
 export default function Posture() {
+  const user = getSavedUser();
+  const role = String(user?.role || "").toLowerCase();
+  const isIndividual = role === "individual";
+
   const [summary, setSummary] = useState({});
   const [checks, setChecks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
+
+  /* ===== AUTOPROTECT STATE ===== */
+  const [autoEnabled, setAutoEnabled] = useState(
+    !!user?.autoprotectEnabled
+  );
+
+  const AUTOPROTECT_LIMIT = 10;
 
   async function load() {
     setLoading(true);
@@ -62,10 +73,6 @@ export default function Posture() {
 
   const score = useMemo(() => scoreFrom(checks), [checks]);
 
-  const degradedControls = checks.filter(
-    (c) => c?.status && c.status !== "ok"
-  );
-
   const severityCounts = useMemo(() => {
     const base = { critical: 0, high: 0, medium: 0, low: 0 };
     safeArray(checks).forEach((c) => {
@@ -76,186 +83,121 @@ export default function Posture() {
     return base;
   }, [checks]);
 
+  const protectedJobs = isIndividual
+    ? Math.min(checks.length, AUTOPROTECT_LIMIT)
+    : checks.length;
+
+  const limitReached =
+    isIndividual && checks.length > AUTOPROTECT_LIMIT;
+
   /* ================= UI ================= */
 
   return (
     <div style={{ padding: 32, display: "flex", flexDirection: "column", gap: 32 }}>
 
-      {/* ================= GLOBAL ADMIN STRIP ================= */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))",
-          gap: 20,
-        }}
-      >
-        <div className="card">
-          <div style={{ fontSize: 12, opacity: 0.6 }}>Global Companies</div>
-          <div style={{ fontSize: 28, fontWeight: 800 }}>
-            {summary.totalCompanies ?? 0}
+      {/* ================= AUTOPROTECT CARD (INDIVIDUAL ONLY) ================= */}
+      {isIndividual && (
+        <div className="card" style={{ padding: 28 }}>
+          <h2 style={{ margin: 0 }}>AutoProtect Control</h2>
+
+          <div style={{ marginTop: 14, opacity: 0.75 }}>
+            Status:{" "}
+            <strong style={{ color: autoEnabled ? "#5EC6FF" : "#ff4d4d" }}>
+              {autoEnabled ? "Active" : "Disabled"}
+            </strong>
+          </div>
+
+          <div style={{ marginTop: 12 }}>
+            Protected Jobs:{" "}
+            <strong>
+              {protectedJobs} / {AUTOPROTECT_LIMIT}
+            </strong>
+          </div>
+
+          {limitReached && (
+            <div style={{ marginTop: 12, color: "#ffb347" }}>
+              Limit reached. Jobs above 10 require manual handling.
+            </div>
+          )}
+
+          <button
+            className="btn"
+            style={{ marginTop: 18 }}
+            onClick={() => setAutoEnabled(!autoEnabled)}
+          >
+            {autoEnabled ? "Disable AutoProtect" : "Enable AutoProtect"}
+          </button>
+
+          <div style={{ marginTop: 14, fontSize: 12, opacity: 0.6 }}>
+            AutoProtect automatically handles up to 10 active jobs.
+            Additional jobs remain manual.
           </div>
         </div>
+      )}
 
-        <div className="card">
-          <div style={{ fontSize: 12, opacity: 0.6 }}>Small Companies</div>
-          <div style={{ fontSize: 28, fontWeight: 800 }}>
-            {summary.totalSmallCompanies ?? 0}
+      {/* ================= GLOBAL STRIP (ADMIN/MANAGER ONLY) ================= */}
+      {!isIndividual && (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))",
+            gap: 20,
+          }}
+        >
+          <div className="card">
+            <div style={{ fontSize: 12, opacity: 0.6 }}>Global Companies</div>
+            <div style={{ fontSize: 28, fontWeight: 800 }}>
+              {summary.totalCompanies ?? 0}
+            </div>
+          </div>
+
+          <div className="card">
+            <div style={{ fontSize: 12, opacity: 0.6 }}>Global Users</div>
+            <div style={{ fontSize: 28, fontWeight: 800 }}>
+              {summary.totalUsers ?? 0}
+            </div>
+          </div>
+
+          <div className="card">
+            <div style={{ fontSize: 12, opacity: 0.6 }}>System Health</div>
+            <div style={{ fontSize: 28, fontWeight: 800 }}>
+              {pct(score)}%
+            </div>
           </div>
         </div>
+      )}
 
-        <div className="card">
-          <div style={{ fontSize: 12, opacity: 0.6 }}>Global Users</div>
-          <div style={{ fontSize: 28, fontWeight: 800 }}>
-            {summary.totalUsers ?? 0}
-          </div>
+      {/* ================= SECURITY OVERVIEW ================= */}
+      <div className="card" style={{ padding: 28 }}>
+        <h2 style={{ margin: 0 }}>Security Overview</h2>
+
+        <div
+          style={{
+            marginTop: 20,
+            height: 10,
+            background: "rgba(255,255,255,0.08)",
+            borderRadius: 999,
+            overflow: "hidden",
+          }}
+        >
+          <div
+            style={{
+              width: `${pct(score)}%`,
+              height: "100%",
+              background:
+                "linear-gradient(90deg,#5EC6FF,#7aa2ff)",
+            }}
+          />
         </div>
 
-        <div className="card">
-          <div style={{ fontSize: 12, opacity: 0.6 }}>System Health</div>
-          <div style={{ fontSize: 28, fontWeight: 800 }}>
-            {pct(score)}%
-          </div>
+        <div style={{ marginTop: 14, opacity: 0.7 }}>
+          Infrastructure operational readiness
         </div>
       </div>
 
-      {/* ================= MAIN GRID ================= */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "3fr 1.2fr",
-          gap: 28,
-        }}
-      >
-
-        {/* LEFT PANEL */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
-
-          <div className="card" style={{ padding: 28 }}>
-            <h2 style={{ margin: 0 }}>Enterprise Security Overview</h2>
-
-            <div
-              style={{
-                marginTop: 20,
-                height: 10,
-                background: "rgba(255,255,255,0.08)",
-                borderRadius: 999,
-                overflow: "hidden",
-              }}
-            >
-              <div
-                style={{
-                  width: `${pct(score)}%`,
-                  height: "100%",
-                  background:
-                    "linear-gradient(90deg,#5EC6FF,#7aa2ff)",
-                }}
-              />
-            </div>
-
-            <div style={{ marginTop: 14, opacity: 0.7 }}>
-              Global infrastructure operational readiness
-            </div>
-          </div>
-
-          <div className="card" style={{ padding: 28 }}>
-            <h3>Threat Severity Distribution</h3>
-
-            {Object.entries(severityCounts).map(([level, count]) => (
-              <div key={level} style={{ marginTop: 16 }}>
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    fontSize: 13,
-                    opacity: 0.8,
-                  }}
-                >
-                  <span>{level.toUpperCase()}</span>
-                  <span>{count}</span>
-                </div>
-
-                <div
-                  style={{
-                    marginTop: 6,
-                    height: 6,
-                    background: "rgba(255,255,255,0.08)",
-                    borderRadius: 999,
-                  }}
-                >
-                  <div
-                    style={{
-                      width: `${pct(
-                        (count / (checks.length || 1)) * 100
-                      )}%`,
-                      height: "100%",
-                      borderRadius: 999,
-                      background: "#5EC6FF",
-                    }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* RIGHT PANEL */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
-
-          <div className="card" style={{ padding: 28 }}>
-            <h3>Admin Control Panel</h3>
-
-            <div style={{ marginTop: 16, lineHeight: 2 }}>
-              <div>Suspended Companies: {summary.suspendedCompanies ?? 0}</div>
-              <div>Suspended Users: {summary.suspendedUsers ?? 0}</div>
-              <div>Pending Escalations: {summary.pendingEscalations ?? 0}</div>
-            </div>
-
-            <button
-              onClick={load}
-              disabled={loading}
-              className="btn"
-              style={{ marginTop: 18 }}
-            >
-              {loading ? "Refreshing…" : "Refresh Global State"}
-            </button>
-
-            {err && (
-              <div style={{ marginTop: 14, color: "#ff4d4d" }}>
-                {err}
-              </div>
-            )}
-          </div>
-
-          <div className="card" style={{ padding: 28 }}>
-            <h3>Escalation Feed</h3>
-
-            {safeArray(checks)
-              .slice(0, 5)
-              .map((c, i) => (
-                <div
-                  key={i}
-                  style={{
-                    paddingBottom: 14,
-                    marginBottom: 14,
-                    borderBottom:
-                      "1px solid rgba(255,255,255,0.08)",
-                  }}
-                >
-                  <strong>{safeStr(c?.title)}</strong>
-                  <div
-                    style={{
-                      fontSize: 13,
-                      opacity: 0.7,
-                      marginTop: 4,
-                    }}
-                  >
-                    {safeStr(c?.message)}
-                  </div>
-                </div>
-              ))}
-          </div>
-        </div>
-      </div>
+      {err && (
+        <div style={{ color: "#ff4d4d" }}>{err}</div>
+      )}
     </div>
   );
 }
