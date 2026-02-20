@@ -1,10 +1,43 @@
 // frontend/src/pages/Dashboard.jsx
-// SOC Dashboard — Executive + Analyst Overview
-// FINAL BASELINE — builds only on platform.css
+// SOC Dashboard — Monetization Aware • Usage Integrated
 
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 
 export default function Dashboard() {
+  const [usage, setUsage] = useState(null);
+
+  /* ======================================================
+     LOAD USAGE FROM BACKEND
+  ====================================================== */
+
+  useEffect(() => {
+    async function loadUsage() {
+      try {
+        const token = localStorage.getItem("token");
+
+        const res = await fetch("/api/me/usage", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        const data = await res.json();
+
+        if (data.ok) {
+          setUsage(data.usage);
+        }
+      } catch (e) {
+        console.error("Failed to load usage", e);
+      }
+    }
+
+    loadUsage();
+  }, []);
+
+  /* ======================================================
+     STATIC KPI (UNCHANGED)
+  ====================================================== */
+
   const kpis = useMemo(
     () => [
       { label: "Users", value: 108, trend: "▲ 7%" },
@@ -24,8 +57,60 @@ export default function Dashboard() {
     { label: "Low", value: 11 },
   ];
 
+  /* ======================================================
+     CALCULATIONS
+  ====================================================== */
+
+  const percentUsed =
+    usage && usage.included !== Infinity
+      ? Math.min(
+          100,
+          Math.round((usage.used / usage.included) * 100)
+        )
+      : 0;
+
+  const showUpgrade =
+    usage &&
+    usage.included !== Infinity &&
+    usage.remaining <= 1;
+
   return (
     <div className="postureWrap">
+
+      {/* ================= PLAN + USAGE ================= */}
+      {usage && (
+        <div className="postureCard" style={{ marginBottom: 20 }}>
+          <h3>{usage.planLabel}</h3>
+
+          {usage.included === Infinity ? (
+            <p className="muted">Unlimited scans available</p>
+          ) : (
+            <>
+              <p className="muted">
+                {usage.remaining} of {usage.included} scans remaining
+              </p>
+
+              <div className="meter">
+                <div style={{ width: `${percentUsed}%` }} />
+              </div>
+            </>
+          )}
+
+          {showUpgrade && (
+            <button
+              style={{
+                marginTop: 14,
+                padding: "8px 14px",
+                cursor: "pointer",
+              }}
+              onClick={() => (window.location.href = "/billing")}
+            >
+              Upgrade Plan
+            </button>
+          )}
+        </div>
+      )}
+
       {/* ================= KPI STRIP ================= */}
       <div className="kpiGrid">
         {kpis.map((k) => (
@@ -39,7 +124,6 @@ export default function Dashboard() {
 
       {/* ================= MAIN GRID ================= */}
       <div className="postureGrid">
-        {/* ===== LEFT: SECURITY HEALTH ===== */}
         <section className="postureCard">
           <div className="postureTop">
             <div>
@@ -79,7 +163,6 @@ export default function Dashboard() {
           </ul>
         </section>
 
-        {/* ===== RIGHT: INSIGHTS ===== */}
         <aside className="postureCard">
           <h3>Executive Insights</h3>
           <p className="muted">
@@ -109,12 +192,6 @@ export default function Dashboard() {
               </div>
             </li>
           </ul>
-
-          <p className="muted" style={{ marginTop: 14 }}>
-            Use the assistant to ask:
-            <br />• “What should I focus on today?”
-            <br />• “Where is my biggest risk?”
-          </p>
         </aside>
       </div>
     </div>
