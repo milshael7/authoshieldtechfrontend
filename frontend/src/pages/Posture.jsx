@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { api, getSavedUser } from "../lib/api.js";
+import { api, getSavedUser, saveUser } from "../lib/api.js";
 
 /* ================= HELPERS ================= */
 
@@ -11,10 +11,6 @@ function pct(n) {
 
 function safeArray(v) {
   return Array.isArray(v) ? v : [];
-}
-
-function safeStr(v, fallback = "—") {
-  return typeof v === "string" && v.trim() ? v : fallback;
 }
 
 function scoreFrom(checks = []) {
@@ -40,13 +36,14 @@ export default function Posture() {
   const [err, setErr] = useState("");
 
   /* ===== AUTOPROTECT STATE ===== */
-  const [autoEnabled, setAutoEnabled] = useState(
-    !!user?.autoprotectEnabled
-  );
+  const [autoEnabled, setAutoEnabled] = useState(false);
+  const [autoLoading, setAutoLoading] = useState(false);
 
   const AUTOPROTECT_LIMIT = 10;
 
-  async function load() {
+  /* ================= LOAD SECURITY ================= */
+
+  async function loadSecurity() {
     setLoading(true);
     setErr("");
 
@@ -67,21 +64,57 @@ export default function Posture() {
     }
   }
 
+  /* ================= LOAD AUTOPROTECT STATUS ================= */
+
+  async function loadAutoStatus() {
+    if (!isIndividual) return;
+
+    try {
+      const data = await api.autoprotecStatus();
+      setAutoEnabled(!!data?.enabled);
+    } catch {
+      // ignore silent fail
+    }
+  }
+
   useEffect(() => {
-    load();
+    loadSecurity();
+    loadAutoStatus();
   }, []);
 
-  const score = useMemo(() => scoreFrom(checks), [checks]);
+  /* ================= ENABLE / DISABLE ================= */
 
-  const severityCounts = useMemo(() => {
-    const base = { critical: 0, high: 0, medium: 0, low: 0 };
-    safeArray(checks).forEach((c) => {
-      if (base[c?.severity] !== undefined) {
-        base[c.severity]++;
+  async function toggleAutoProtect() {
+    if (!isIndividual) return;
+
+    setAutoLoading(true);
+
+    try {
+      if (autoEnabled) {
+        await api.autoprotecDisable();
+        setAutoEnabled(false);
+      } else {
+        await api.autoprotecEnable();
+        setAutoEnabled(true);
       }
-    });
-    return base;
-  }, [checks]);
+
+      // update local storage user snapshot
+      const current = getSavedUser();
+      if (current) {
+        current.autoprotectEnabled = !autoEnabled;
+        saveUser(current);
+      }
+
+    } catch (e) {
+      alert(e.message || "AutoProtect update failed");
+    } finally {
+      setAutoLoading(false);
+    }
+  }
+
+  /* ================= COMPUTED ================= */
+
+  const score = useMemo(() => scoreFrom(checks), [checks]);
 
   const protectedJobs = isIndividual
     ? Math.min(checks.length, AUTOPROTECT_LIMIT)
@@ -95,7 +128,7 @@ export default function Posture() {
   return (
     <div style={{ padding: 32, display: "flex", flexDirection: "column", gap: 32 }}>
 
-      {/* ================= AUTOPROTECT CARD (INDIVIDUAL ONLY) ================= */}
+      {/* ================= AUTOPROTECT (INDIVIDUAL ONLY) ================= */}
       {isIndividual && (
         <div className="card" style={{ padding: 28 }}>
           <h2 style={{ margin: 0 }}>AutoProtect Control</h2>
@@ -123,9 +156,14 @@ export default function Posture() {
           <button
             className="btn"
             style={{ marginTop: 18 }}
-            onClick={() => setAutoEnabled(!autoEnabled)}
+            onClick={toggleAutoProtect}
+            disabled={autoLoading}
           >
-            {autoEnabled ? "Disable AutoProtect" : "Enable AutoProtect"}
+            {autoLoading
+              ? "Updating..."
+              : autoEnabled
+              ? "Disable AutoProtect"
+              : "Enable AutoProtect"}
           </button>
 
           <div style={{ marginTop: 14, fontSize: 12, opacity: 0.6 }}>
@@ -135,7 +173,7 @@ export default function Posture() {
         </div>
       )}
 
-      {/* ================= GLOBAL STRIP (ADMIN/MANAGER ONLY) ================= */}
+      {/* ================= GLOBAL (ADMIN / MANAGER ONLY) ================= */}
       {!isIndividual && (
         <div
           style={{
