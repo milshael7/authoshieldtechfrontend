@@ -2,6 +2,7 @@
 // FULL ROLE-STRUCTURED ROUTING — MULTI-TENANT HARDENED
 // Company Dashboard V2 Activated
 // Safe Silent Refresh (No Login Loop)
+// Scan + Billing Integrated
 
 import React, { useEffect, useState } from "react";
 import {
@@ -56,9 +57,15 @@ import NotFound from "./pages/NotFound.jsx";
 
 import GlobalControl from "./pages/admin/GlobalControl.jsx";
 
-/* ================= NEW DASHBOARD ================= */
+/* ================= COMPANY ================= */
 
 import CompanyDashboardV2 from "./pages/company/CompanyDashboardV2.jsx";
+
+/* ================= USER EXTENSIONS ================= */
+
+import Scans from "./pages/Scans.jsx";
+import RunScan from "./pages/RunScan.jsx";
+import Billing from "./pages/Billing.jsx";
 
 /* ========================================================= */
 
@@ -99,11 +106,9 @@ export default function App() {
         return;
       }
 
-      // Trust existing session immediately
       setUser(storedUser);
       setReady(true);
 
-      // Silent refresh in background
       try {
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 8000);
@@ -223,7 +228,7 @@ export default function App() {
             <Route path="notifications" element={<Notifications />} />
           </Route>
 
-          {/* COMPANY — V2 ACTIVE */}
+          {/* COMPANY */}
           <Route
             path="/company/*"
             element={
@@ -264,6 +269,9 @@ export default function App() {
           >
             <Route index element={<Posture />} />
             <Route path="notifications" element={<Notifications />} />
+            <Route path="scans" element={<Scans />} />
+            <Route path="run-scan" element={<RunScan />} />
+            <Route path="billing" element={<Billing />} />
           </Route>
 
           <Route path="/404" element={<NotFound />} />
