@@ -1,6 +1,6 @@
 // frontend/src/pages/admin/AdminOverview.jsx
-// Executive Command Center v2
-// SOC + Revenue + Compliance + Intelligence
+// Executive Command Center v3
+// SOC + Revenue + Compliance + Intelligence (Fully Polished)
 
 import React, { useEffect, useState } from "react";
 import { api } from "../../lib/api";
@@ -41,43 +41,65 @@ export default function AdminOverview() {
   }, []);
 
   if (loading) {
-    return <div className="dashboard-loading">Loading Executive Command Center…</div>;
+    return (
+      <div className="dashboard-loading">
+        Loading Executive Command Center…
+      </div>
+    );
   }
 
   if (!posture) {
-    return <div className="dashboard-error">Unable to load platform data.</div>;
+    return (
+      <div className="dashboard-error">
+        Unable to load platform data.
+      </div>
+    );
   }
 
   const totals = posture?.totals || {};
+  const revenueDrift =
+    compliance?.financialIntegrity?.revenueDrift || 0;
 
-  const revenueDrift = compliance?.financialIntegrity?.revenueDrift || 0;
   const auditOK = compliance?.auditIntegrity?.ok;
 
+  const driftClass =
+    revenueDrift === 0
+      ? "metric-positive"
+      : "metric-negative";
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 36 }}>
 
       {/* ======================================================
           EXECUTIVE KPI ROW
       ====================================================== */}
 
+      <div className="sectionTitle">
+        Executive Metrics
+      </div>
+
       <div className="kpiGrid">
 
-        <div className="kpiCard">
+        <div className="kpiCard executive executiveGlow">
           <small>Total Revenue</small>
-          <b>${metrics?.totalRevenue?.toFixed(2) || "0.00"}</b>
+          <b>
+            ${metrics?.totalRevenue?.toFixed(2) || "0.00"}
+          </b>
         </div>
 
-        <div className="kpiCard">
+        <div className="kpiCard executive">
           <small>Active Subscribers</small>
           <b>{metrics?.activeSubscribers || 0}</b>
         </div>
 
-        <div className="kpiCard">
+        <div className="kpiCard executive">
           <small>MRR</small>
-          <b>${metrics?.MRR?.toFixed(2) || "0.00"}</b>
+          <b>
+            ${metrics?.MRR?.toFixed(2) || "0.00"}
+          </b>
         </div>
 
-        <div className="kpiCard">
+        <div className="kpiCard executive">
           <small>Churn Rate</small>
           <b>{metrics?.churnRate || 0}</b>
         </div>
@@ -85,33 +107,48 @@ export default function AdminOverview() {
       </div>
 
       {/* ======================================================
-          COMPLIANCE + INTEGRITY STATUS
+          COMPLIANCE + INTEGRITY PANEL
       ====================================================== */}
 
-      <div className="postureCard" style={{ display: "flex", gap: 24 }}>
+      <div className="postureCard executivePanel executiveGlow">
 
-        <div style={{ flex: 1 }}>
+        <div className="executiveBlock">
           <h3>Compliance Integrity</h3>
+
+          <div className="executiveDivider" />
+
           <p>
             Revenue Drift:{" "}
-            <b style={{ color: revenueDrift === 0 ? "#16c784" : "#ff3b30" }}>
+            <b className={driftClass}>
               {revenueDrift}
             </b>
           </p>
-          <p>
+
+          <p style={{ marginTop: 10 }}>
             Audit Chain:{" "}
-            <b style={{ color: auditOK ? "#16c784" : "#ff3b30" }}>
+            <span
+              className={
+                auditOK
+                  ? "integrityBadge ok"
+                  : "integrityBadge fail"
+              }
+            >
               {auditOK ? "Verified" : "Integrity Failure"}
-            </b>
+            </span>
           </p>
         </div>
 
-        <div style={{ flex: 1 }}>
+        <div className="executiveBlock">
           <h3>Platform Totals</h3>
-          <p>Users: <b>{totals.users}</b></p>
-          <p>Companies: <b>{totals.companies}</b></p>
-          <p>Audit Events: <b>{totals.auditEvents}</b></p>
-          <p>Notifications: <b>{totals.notifications}</b></p>
+
+          <div className="executiveDivider" />
+
+          <div className="stats">
+            <div>Users <b>{totals.users}</b></div>
+            <div>Companies <b>{totals.companies}</b></div>
+            <div>Audit Events <b>{totals.auditEvents}</b></div>
+            <div>Notifications <b>{totals.notifications}</b></div>
+          </div>
         </div>
 
       </div>
@@ -119,6 +156,10 @@ export default function AdminOverview() {
       {/* ======================================================
           SOC COMMAND GRID
       ====================================================== */}
+
+      <div className="sectionTitle">
+        Security Operations Command
+      </div>
 
       <div className="postureWrap">
 
@@ -134,6 +175,7 @@ export default function AdminOverview() {
         </div>
 
       </div>
+
     </div>
   );
 }
