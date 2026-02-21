@@ -3,6 +3,7 @@
    Stable • No Infinite Refresh • Executive Intelligence Ready
    + Subscriber Growth Integrated
    + Refund / Dispute Timeline Integrated
+   + Executive Risk + Overlay + Predictive Churn Integrated
    ========================================================= */
 
 const API_BASE = import.meta.env.VITE_API_BASE?.trim();
@@ -73,9 +74,7 @@ async function fetchWithTimeout(url, options = {}, ms = REQUEST_TIMEOUT) {
   try {
     return await fetch(url, { ...options, signal: controller.signal });
   } catch (err) {
-    if (err?.name === "AbortError") {
-      throw new Error("Request timeout");
-    }
+    if (err?.name === "AbortError") throw new Error("Request timeout");
     throw err;
   } finally {
     clearTimeout(id);
@@ -103,9 +102,7 @@ async function req(
   }
 
   const activeCompanyId = getActiveCompanyId();
-  if (activeCompanyId) {
-    headers["X-Company-Id"] = activeCompanyId;
-  }
+  if (activeCompanyId) headers["X-Company-Id"] = activeCompanyId;
 
   const res = await fetchWithTimeout(joinUrl(API_BASE, path), {
     method,
@@ -127,9 +124,7 @@ async function req(
 
   if (!res.ok) {
     throw new Error(
-      data?.error ||
-      data?.message ||
-      `Request failed (${res.status})`
+      data?.error || data?.message || `Request failed (${res.status})`
     );
   }
 
@@ -141,7 +136,6 @@ async function req(
 ========================================================= */
 
 export const api = {
-
   /* ================= AUTH ================= */
 
   login: (email, password) =>
@@ -174,31 +168,29 @@ export const api = {
   /* ================= AUTOPROTECT ================= */
 
   autoprotecStatus: () => req("/api/autoprotect/status"),
-  autoprotecEnable: () =>
-    req("/api/autoprotect/enable", { method: "POST" }),
-  autoprotecDisable: () =>
-    req("/api/autoprotect/disable", { method: "POST" }),
+  autoprotecEnable: () => req("/api/autoprotect/enable", { method: "POST" }),
+  autoprotecDisable: () => req("/api/autoprotect/disable", { method: "POST" }),
   autoprotecCreateProject: (payload) =>
-    req("/api/autoprotect/project", {
-      method: "POST",
-      body: payload,
-    }),
+    req("/api/autoprotect/project", { method: "POST", body: payload }),
 
   /* ================= ADMIN EXECUTIVE ================= */
 
   adminMetrics: () => req("/api/admin/metrics"),
 
-  adminComplianceReport: () =>
-    req("/api/admin/compliance/report"),
+  adminComplianceReport: () => req("/api/admin/compliance/report"),
 
   adminComplianceHistory: (limit = 20) =>
     req(`/api/admin/compliance/history?limit=${encodeURIComponent(limit)}`),
 
-  adminSubscriberGrowth: () =>
-    req("/api/admin/subscriber-growth"),
+  adminSubscriberGrowth: () => req("/api/admin/subscriber-growth"),
 
-  adminRefundDisputeTimeline: () =>
-    req("/api/admin/refund-dispute-timeline"),
+  adminRefundDisputeTimeline: () => req("/api/admin/refund-dispute-timeline"),
+
+  // ✅ NEW (3 layers)
+  adminExecutiveRisk: () => req("/api/admin/executive-risk"),
+  adminRevenueRefundOverlay: (days = 90) =>
+    req(`/api/admin/revenue-refund-overlay?days=${encodeURIComponent(days)}`),
+  adminPredictiveChurn: () => req("/api/admin/predictive-churn"),
 
   adminUsers: () => req("/api/admin/users"),
   adminCompanies: () => req("/api/admin/companies"),
@@ -231,10 +223,7 @@ export const api = {
   /* ================= AI ================= */
 
   aiChat: (message, context) =>
-    req("/api/ai/chat", {
-      method: "POST",
-      body: { message, context },
-    }),
+    req("/api/ai/chat", { method: "POST", body: { message, context } }),
 
   /* ================= HEALTH ================= */
 
