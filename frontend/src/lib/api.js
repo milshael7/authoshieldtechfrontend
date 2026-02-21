@@ -1,6 +1,7 @@
 /* =========================================================
    AUTOSHIELD FRONTEND API LAYER — EXECUTIVE BUILD
    Stable • No Infinite Refresh • Executive Intelligence Ready
+   + Subscriber Growth Integrated
    ========================================================= */
 
 const API_BASE = import.meta.env.VITE_API_BASE?.trim();
@@ -192,6 +193,9 @@ export const api = {
 
   adminComplianceHistory: (limit = 20) =>
     req(`/api/admin/compliance/history?limit=${encodeURIComponent(limit)}`),
+
+  adminSubscriberGrowth: () =>
+    req("/api/admin/subscriber-growth"),
 
   adminUsers: () => req("/api/admin/users"),
   adminCompanies: () => req("/api/admin/companies"),
