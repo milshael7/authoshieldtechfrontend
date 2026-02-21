@@ -1,6 +1,6 @@
 // frontend/src/pages/admin/AdminOverview.jsx
-// Executive Command Center v6.1 (Layout Fixed)
-// Revenue → Subscriber Growth → Refund Risk → Compliance → SOC
+// Executive Command Center v7 (Enterprise Intelligence Upgrade)
+// Revenue → Subscriber Growth → Refund Risk → Executive Intelligence → Compliance → SOC
 
 import React, { useEffect, useMemo, useState } from "react";
 import { api } from "../../lib/api";
@@ -8,6 +8,7 @@ import { api } from "../../lib/api";
 import RevenueTrendChart from "../../components/RevenueTrendChart";
 import SubscriberGrowthChart from "../../components/SubscriberGrowthChart";
 import RefundDisputeChart from "../../components/RefundDisputeChart";
+import RevenueRefundOverlayChart from "../../components/RevenueRefundOverlayChart";
 
 import SecurityPostureDashboard from "../../components/SecurityPostureDashboard";
 import SecurityFeedPanel from "../../components/SecurityFeedPanel";
@@ -23,10 +24,24 @@ function fmtMoney(n) {
   return x.toFixed(2);
 }
 
+function riskLevelBadge(level) {
+  const L = String(level || "").toUpperCase();
+  if (L === "LOW") return { cls: "ok", label: "LOW" };
+  if (L === "MODERATE") return { cls: "warn", label: "MODERATE" };
+  if (L === "ELEVATED") return { cls: "warn", label: "ELEVATED" };
+  if (L === "CRITICAL") return { cls: "warn", label: "CRITICAL" };
+  return { cls: "", label: L || "UNKNOWN" };
+}
+
 export default function AdminOverview() {
   const [posture, setPosture] = useState(null);
   const [metrics, setMetrics] = useState(null);
   const [compliance, setCompliance] = useState(null);
+
+  // ✅ NEW ENTERPRISE INTELLIGENCE
+  const [execRisk, setExecRisk] = useState(null);
+  const [predictiveChurn, setPredictiveChurn] = useState(null);
+
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -34,10 +49,18 @@ export default function AdminOverview() {
 
     async function load() {
       try {
-        const [summary, metricData, complianceReport] = await Promise.all([
+        const [
+          summary,
+          metricData,
+          complianceReport,
+          riskRes,
+          churnRes,
+        ] = await Promise.all([
           api.postureSummary(),
           api.adminMetrics(),
           api.adminComplianceReport(),
+          api.adminExecutiveRisk(),
+          api.adminPredictiveChurn(),
         ]);
 
         if (!alive) return;
@@ -45,6 +68,9 @@ export default function AdminOverview() {
         setPosture(summary || null);
         setMetrics(metricData?.metrics || null);
         setCompliance(complianceReport?.complianceReport || null);
+
+        setExecRisk(riskRes?.executiveRisk || null);
+        setPredictiveChurn(churnRes?.predictiveChurn || null);
       } catch (e) {
         console.error(e);
       } finally {
@@ -59,12 +85,23 @@ export default function AdminOverview() {
   }, []);
 
   const totals = posture?.totals || {};
-  const revenueDrift = Number(compliance?.financialIntegrity?.revenueDrift || 0);
+
+  const revenueDrift = Number(
+    compliance?.financialIntegrity?.revenueDrift || 0
+  );
   const auditOK = !!compliance?.auditIntegrity?.ok;
 
   const driftClass = useMemo(() => {
     return revenueDrift === 0 ? "metric-positive" : "metric-negative";
   }, [revenueDrift]);
+
+  const riskIndex = Number(execRisk?.riskIndex ?? 0);
+  const riskLevel = execRisk?.level || "UNKNOWN";
+  const riskBadge = riskLevelBadge(riskLevel);
+
+  const churnScore = Number(predictiveChurn?.score ?? 0);
+  const churnLevel = predictiveChurn?.level || "UNKNOWN";
+  const churnBadge = riskLevelBadge(churnLevel);
 
   if (loading) {
     return (
@@ -114,21 +151,68 @@ export default function AdminOverview() {
 
       {/* ======================================================
           REVENUE INTELLIGENCE
-          (Component renders its own card)
       ====================================================== */}
       <RevenueTrendChart />
 
       {/* ======================================================
           SUBSCRIBER GROWTH
-          (Component renders its own card)
       ====================================================== */}
       <SubscriberGrowthChart />
 
       {/* ======================================================
           FINANCIAL RISK TIMELINE
-          (Component renders its own card)
       ====================================================== */}
       <RefundDisputeChart />
+
+      {/* ======================================================
+          ✅ NEW: EXECUTIVE INTELLIGENCE (3 layers)
+      ====================================================== */}
+
+      <div className="sectionTitle">Executive Intelligence</div>
+
+      {/* Layer 1 + Layer 3 */}
+      <div className="postureCard executivePanel executiveGlow">
+        <div className="executiveBlock">
+          <h3>Executive Risk Index</h3>
+          <div className="executiveDivider" />
+
+          <p>
+            Risk Index: <b>{Number.isFinite(riskIndex) ? riskIndex.toFixed(2) : "0.00"}</b>{" "}
+            <span className={`badge ${riskBadge.cls}`} style={{ marginLeft: 10 }}>
+              {riskBadge.label}
+            </span>
+          </p>
+
+          <div style={{ marginTop: 12 }} className="stats">
+            <div>Drift <b>{Number(execRisk?.signals?.revenueDrift ?? 0).toFixed(2)}</b></div>
+            <div>Audit <b>{execRisk?.signals?.auditOK ? "OK" : "FAIL"}</b></div>
+            <div>Refunds <b>${fmtMoney(execRisk?.signals?.refundedAmount)}</b></div>
+            <div>Disputes <b>${fmtMoney(execRisk?.signals?.disputedAmount)}</b></div>
+          </div>
+        </div>
+
+        <div className="executiveBlock">
+          <h3>Predictive Churn</h3>
+          <div className="executiveDivider" />
+
+          <p>
+            Churn Score: <b>{Number.isFinite(churnScore) ? churnScore.toFixed(2) : "0.00"}</b>{" "}
+            <span className={`badge ${churnBadge.cls}`} style={{ marginLeft: 10 }}>
+              {churnBadge.label}
+            </span>
+          </p>
+
+          <div style={{ marginTop: 12 }} className="stats">
+            <div>Recent Payers (60d) <b>{predictiveChurn?.drivers?.recentPayers60d ?? 0}</b></div>
+            <div>Locked Ratio <b>{predictiveChurn?.drivers?.users?.lockedRatio ?? 0}</b></div>
+            <div>Refunds <b>{predictiveChurn?.drivers?.refunds?.count ?? 0}</b></div>
+            <div>Disputes <b>{predictiveChurn?.drivers?.disputes?.count ?? 0}</b></div>
+          </div>
+        </div>
+      </div>
+
+      {/* Layer 2 */}
+      <RevenueRefundOverlayChart days={90} />
 
       {/* ======================================================
           COMPLIANCE & INTEGRITY
@@ -143,7 +227,9 @@ export default function AdminOverview() {
 
           <p>
             Revenue Drift:{" "}
-            <b className={driftClass}>{Number.isFinite(revenueDrift) ? revenueDrift : 0}</b>
+            <b className={driftClass}>
+              {Number.isFinite(revenueDrift) ? revenueDrift : 0}
+            </b>
           </p>
 
           <p style={{ marginTop: 12 }}>
@@ -169,8 +255,6 @@ export default function AdminOverview() {
 
       {/* ======================================================
           SECURITY OPERATIONS COMMAND
-          NOTE: SecurityPostureDashboard already uses `.postureWrap`
-          so we keep it FULL-WIDTH to avoid nested grid collisions.
       ====================================================== */}
 
       <div className="sectionTitle">Security Operations Command</div>
