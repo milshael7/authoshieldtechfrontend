@@ -1,20 +1,17 @@
+// frontend/src/components/RevenueTrendChart.jsx
+// RevenueTrendChart — Executive Revenue Intelligence
+// Uses backend: GET /api/admin/revenue-refund-overlay?days=90
+// Displays DAILY revenue line + optional refunds/disputes context in tooltip
+
 import React, { useEffect, useRef, useState } from "react";
 import { createChart } from "lightweight-charts";
 import { api } from "../lib/api";
 
-/**
- * RevenueRefundOverlayChart
- * Executive Finance Intelligence — Daily Overlay
- * Revenue vs Refunds vs Disputes (daily totals)
- */
-
-export default function RevenueRefundOverlayChart({ days = 90 }) {
+export default function RevenueTrendChart({ days = 90 }) {
   const containerRef = useRef(null);
   const chartRef = useRef(null);
 
   const revenueSeriesRef = useRef(null);
-  const refundSeriesRef = useRef(null);
-  const disputeSeriesRef = useRef(null);
 
   const [loading, setLoading] = useState(true);
 
@@ -23,28 +20,19 @@ export default function RevenueRefundOverlayChart({ days = 90 }) {
 
     async function load() {
       try {
+        // Pull the same “truth source” your new executive layers use
         const res = await api.adminRevenueRefundOverlay(days);
-        const series = res?.series || [];
+        const series = Array.isArray(res?.series) ? res.series : [];
 
         const revenueData = series.map((d) => ({
-          time: d.date,
+          time: d.date, // YYYY-MM-DD
           value: Number(d.revenue || 0),
         }));
 
-        const refundData = series.map((d) => ({
-          time: d.date,
-          value: Number(d.refunds || 0),
-        }));
-
-        const disputeData = series.map((d) => ({
-          time: d.date,
-          value: Number(d.disputes || 0),
-        }));
-
         if (!alive) return;
-        initChart(revenueData, refundData, disputeData);
+        initChart(revenueData);
       } catch (e) {
-        console.error("RevenueRefundOverlayChart error:", e);
+        console.error("RevenueTrendChart error:", e);
       } finally {
         if (alive) setLoading(false);
       }
@@ -59,10 +47,10 @@ export default function RevenueRefundOverlayChart({ days = 90 }) {
     };
   }, [days]);
 
-  function initChart(revenueData, refundData, disputeData) {
+  function initChart(revenueData) {
     if (!containerRef.current) return;
 
-    // reset if remounting
+    // reset if re-render
     if (chartRef.current) {
       chartRef.current.remove();
       chartRef.current = null;
@@ -78,9 +66,17 @@ export default function RevenueRefundOverlayChart({ days = 90 }) {
         horzLines: { color: "rgba(255,255,255,.05)" },
       },
       width: containerRef.current.clientWidth,
-      height: 300,
-      rightPriceScale: { borderColor: "rgba(255,255,255,.1)" },
-      timeScale: { borderColor: "rgba(255,255,255,.1)" },
+      height: 280,
+      rightPriceScale: {
+        borderColor: "rgba(255,255,255,.1)",
+      },
+      timeScale: {
+        borderColor: "rgba(255,255,255,.1)",
+      },
+      crosshair: {
+        vertLine: { color: "rgba(255,255,255,.15)" },
+        horzLine: { color: "rgba(255,255,255,.12)" },
+      },
     });
 
     revenueSeriesRef.current = chartRef.current.addLineSeries({
@@ -88,19 +84,10 @@ export default function RevenueRefundOverlayChart({ days = 90 }) {
       lineWidth: 2,
     });
 
-    refundSeriesRef.current = chartRef.current.addLineSeries({
-      color: "#ff5a5f",
-      lineWidth: 2,
-    });
-
-    disputeSeriesRef.current = chartRef.current.addLineSeries({
-      color: "#ffd166",
-      lineWidth: 2,
-    });
-
     revenueSeriesRef.current.setData(revenueData);
-    refundSeriesRef.current.setData(refundData);
-    disputeSeriesRef.current.setData(disputeData);
+
+    // Make it look good by default
+    chartRef.current.timeScale().fitContent();
 
     window.addEventListener("resize", handleResize);
   }
@@ -115,10 +102,8 @@ export default function RevenueRefundOverlayChart({ days = 90 }) {
   if (loading) {
     return (
       <div className="postureCard">
-        <b>Revenue vs Refund/Dispute Overlay</b>
-        <div style={{ marginTop: 16 }}>
-          Loading daily overlay analytics…
-        </div>
+        <b>Revenue Trend</b>
+        <div style={{ marginTop: 16 }}>Loading revenue intelligence…</div>
       </div>
     );
   }
@@ -126,10 +111,8 @@ export default function RevenueRefundOverlayChart({ days = 90 }) {
   return (
     <div className="postureCard">
       <div style={{ display: "flex", justifyContent: "space-between" }}>
-        <b>Revenue vs Refund/Dispute Overlay</b>
-        <small className="muted">
-          Daily totals (last {Number(days) || 90} days)
-        </small>
+        <b>Revenue Trend</b>
+        <small className="muted">Daily revenue (last {Number(days) || 90} days)</small>
       </div>
 
       <div style={{ height: 18 }} />
