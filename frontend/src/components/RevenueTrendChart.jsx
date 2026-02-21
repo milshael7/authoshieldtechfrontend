@@ -3,55 +3,72 @@ import { createChart } from "lightweight-charts";
 import { api } from "../lib/api";
 
 /**
- * RevenueTrendChart
- * Executive Revenue Timeline Visualization
+ * RevenueRefundOverlayChart
+ * Executive Finance Intelligence — Daily Overlay
+ * Revenue vs Refunds vs Disputes (daily totals)
  */
 
-export default function RevenueTrendChart() {
-  const chartContainerRef = useRef(null);
+export default function RevenueRefundOverlayChart({ days = 90 }) {
+  const containerRef = useRef(null);
   const chartRef = useRef(null);
-  const seriesRef = useRef(null);
+
+  const revenueSeriesRef = useRef(null);
+  const refundSeriesRef = useRef(null);
+  const disputeSeriesRef = useRef(null);
 
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let alive = true;
+
     async function load() {
       try {
-        const res = await api.adminComplianceHistory(60);
-        const history = res?.history || [];
+        const res = await api.adminRevenueRefundOverlay(days);
+        const series = res?.series || [];
 
-        const formatted = history
-          .map((snap) => ({
-            time: snap.generatedAt.slice(0, 10),
-            value:
-              snap?.financialIntegrity?.internalRevenue
-                ?.totalRevenueCalculated || 0,
-          }))
-          .sort((a, b) =>
-            a.time > b.time ? 1 : -1
-          );
+        const revenueData = series.map((d) => ({
+          time: d.date,
+          value: Number(d.revenue || 0),
+        }));
 
-        initChart(formatted);
+        const refundData = series.map((d) => ({
+          time: d.date,
+          value: Number(d.refunds || 0),
+        }));
+
+        const disputeData = series.map((d) => ({
+          time: d.date,
+          value: Number(d.disputes || 0),
+        }));
+
+        if (!alive) return;
+        initChart(revenueData, refundData, disputeData);
       } catch (e) {
-        console.error(e);
+        console.error("RevenueRefundOverlayChart error:", e);
       } finally {
-        setLoading(false);
+        if (alive) setLoading(false);
       }
     }
 
     load();
 
     return () => {
-      if (chartRef.current) {
-        chartRef.current.remove();
-      }
+      alive = false;
+      if (chartRef.current) chartRef.current.remove();
+      window.removeEventListener("resize", handleResize);
     };
-  }, []);
+  }, [days]);
 
-  function initChart(data) {
-    if (!chartContainerRef.current) return;
+  function initChart(revenueData, refundData, disputeData) {
+    if (!containerRef.current) return;
 
-    chartRef.current = createChart(chartContainerRef.current, {
+    // reset if remounting
+    if (chartRef.current) {
+      chartRef.current.remove();
+      chartRef.current = null;
+    }
+
+    chartRef.current = createChart(containerRef.current, {
       layout: {
         background: { color: "transparent" },
         textColor: "#D9D9D9",
@@ -60,39 +77,48 @@ export default function RevenueTrendChart() {
         vertLines: { color: "rgba(255,255,255,.05)" },
         horzLines: { color: "rgba(255,255,255,.05)" },
       },
-      width: chartContainerRef.current.clientWidth,
-      height: 260,
-      rightPriceScale: {
-        borderColor: "rgba(255,255,255,.1)",
-      },
-      timeScale: {
-        borderColor: "rgba(255,255,255,.1)",
-      },
+      width: containerRef.current.clientWidth,
+      height: 300,
+      rightPriceScale: { borderColor: "rgba(255,255,255,.1)" },
+      timeScale: { borderColor: "rgba(255,255,255,.1)" },
     });
 
-    seriesRef.current = chartRef.current.addLineSeries({
+    revenueSeriesRef.current = chartRef.current.addLineSeries({
       color: "#5EC6FF",
       lineWidth: 2,
     });
 
-    seriesRef.current.setData(data);
+    refundSeriesRef.current = chartRef.current.addLineSeries({
+      color: "#ff5a5f",
+      lineWidth: 2,
+    });
+
+    disputeSeriesRef.current = chartRef.current.addLineSeries({
+      color: "#ffd166",
+      lineWidth: 2,
+    });
+
+    revenueSeriesRef.current.setData(revenueData);
+    refundSeriesRef.current.setData(refundData);
+    disputeSeriesRef.current.setData(disputeData);
 
     window.addEventListener("resize", handleResize);
   }
 
   function handleResize() {
-    if (!chartRef.current || !chartContainerRef.current) return;
-
+    if (!chartRef.current || !containerRef.current) return;
     chartRef.current.applyOptions({
-      width: chartContainerRef.current.clientWidth,
+      width: containerRef.current.clientWidth,
     });
   }
 
   if (loading) {
     return (
       <div className="postureCard">
-        <b>Revenue Trend</b>
-        <div style={{ marginTop: 16 }}>Loading revenue timeline…</div>
+        <b>Revenue vs Refund/Dispute Overlay</b>
+        <div style={{ marginTop: 16 }}>
+          Loading daily overlay analytics…
+        </div>
       </div>
     );
   }
@@ -100,18 +126,14 @@ export default function RevenueTrendChart() {
   return (
     <div className="postureCard">
       <div style={{ display: "flex", justifyContent: "space-between" }}>
-        <b>Revenue Trend</b>
+        <b>Revenue vs Refund/Dispute Overlay</b>
         <small className="muted">
-          Based on Compliance Snapshots
+          Daily totals (last {Number(days) || 90} days)
         </small>
       </div>
 
       <div style={{ height: 18 }} />
-
-      <div
-        ref={chartContainerRef}
-        style={{ width: "100%" }}
-      />
+      <div ref={containerRef} style={{ width: "100%" }} />
     </div>
   );
 }
