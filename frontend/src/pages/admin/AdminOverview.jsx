@@ -1,8 +1,8 @@
 // frontend/src/pages/admin/AdminOverview.jsx
-// Executive Command Center v6
+// Executive Command Center v6.1 (Layout Fixed)
 // Revenue → Subscriber Growth → Refund Risk → Compliance → SOC
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { api } from "../../lib/api";
 
 import RevenueTrendChart from "../../components/RevenueTrendChart";
@@ -17,6 +17,12 @@ import IncidentBoard from "../../components/IncidentBoard";
 
 import "../../styles/platform.css";
 
+function fmtMoney(n) {
+  const x = Number(n);
+  if (!Number.isFinite(x)) return "0.00";
+  return x.toFixed(2);
+}
+
 export default function AdminOverview() {
   const [posture, setPosture] = useState(null);
   const [metrics, setMetrics] = useState(null);
@@ -24,6 +30,8 @@ export default function AdminOverview() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let alive = true;
+
     async function load() {
       try {
         const [summary, metricData, complianceReport] = await Promise.all([
@@ -32,18 +40,31 @@ export default function AdminOverview() {
           api.adminComplianceReport(),
         ]);
 
-        setPosture(summary);
+        if (!alive) return;
+
+        setPosture(summary || null);
         setMetrics(metricData?.metrics || null);
         setCompliance(complianceReport?.complianceReport || null);
       } catch (e) {
         console.error(e);
       } finally {
-        setLoading(false);
+        if (alive) setLoading(false);
       }
     }
 
     load();
+    return () => {
+      alive = false;
+    };
   }, []);
+
+  const totals = posture?.totals || {};
+  const revenueDrift = Number(compliance?.financialIntegrity?.revenueDrift || 0);
+  const auditOK = !!compliance?.auditIntegrity?.ok;
+
+  const driftClass = useMemo(() => {
+    return revenueDrift === 0 ? "metric-positive" : "metric-negative";
+  }, [revenueDrift]);
 
   if (loading) {
     return (
@@ -61,20 +82,8 @@ export default function AdminOverview() {
     );
   }
 
-  const totals = posture?.totals || {};
-  const revenueDrift =
-    compliance?.financialIntegrity?.revenueDrift || 0;
-
-  const auditOK = compliance?.auditIntegrity?.ok;
-
-  const driftClass =
-    revenueDrift === 0
-      ? "metric-positive"
-      : "metric-negative";
-
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 40 }}>
-
       {/* ======================================================
           EXECUTIVE METRICS
       ====================================================== */}
@@ -82,12 +91,9 @@ export default function AdminOverview() {
       <div className="sectionTitle">Executive Metrics</div>
 
       <div className="kpiGrid">
-
         <div className="kpiCard executive executiveGlow">
           <small>Total Revenue</small>
-          <b>
-            ${metrics?.totalRevenue?.toFixed(2) || "0.00"}
-          </b>
+          <b>${fmtMoney(metrics?.totalRevenue)}</b>
         </div>
 
         <div className="kpiCard executive">
@@ -97,34 +103,31 @@ export default function AdminOverview() {
 
         <div className="kpiCard executive">
           <small>MRR</small>
-          <b>
-            ${metrics?.MRR?.toFixed(2) || "0.00"}
-          </b>
+          <b>${fmtMoney(metrics?.MRR)}</b>
         </div>
 
         <div className="kpiCard executive">
           <small>Churn Rate</small>
-          <b>{metrics?.churnRate || 0}</b>
+          <b>{metrics?.churnRate ?? 0}</b>
         </div>
-
       </div>
 
       {/* ======================================================
           REVENUE INTELLIGENCE
+          (Component renders its own card)
       ====================================================== */}
-
       <RevenueTrendChart />
 
       {/* ======================================================
           SUBSCRIBER GROWTH
+          (Component renders its own card)
       ====================================================== */}
-
       <SubscriberGrowthChart />
 
       {/* ======================================================
           FINANCIAL RISK TIMELINE
+          (Component renders its own card)
       ====================================================== */}
-
       <RefundDisputeChart />
 
       {/* ======================================================
@@ -134,27 +137,18 @@ export default function AdminOverview() {
       <div className="sectionTitle">Compliance & Integrity</div>
 
       <div className="postureCard executivePanel executiveGlow">
-
         <div className="executiveBlock">
           <h3>Financial Integrity</h3>
           <div className="executiveDivider" />
 
           <p>
             Revenue Drift:{" "}
-            <b className={driftClass}>
-              {revenueDrift}
-            </b>
+            <b className={driftClass}>{Number.isFinite(revenueDrift) ? revenueDrift : 0}</b>
           </p>
 
           <p style={{ marginTop: 12 }}>
             Audit Chain:{" "}
-            <span
-              className={
-                auditOK
-                  ? "integrityBadge ok"
-                  : "integrityBadge fail"
-              }
-            >
+            <span className={auditOK ? "integrityBadge ok" : "integrityBadge fail"}>
               {auditOK ? "Verified" : "Integrity Failure"}
             </span>
           </p>
@@ -171,19 +165,22 @@ export default function AdminOverview() {
             <div>Notifications <b>{totals.notifications}</b></div>
           </div>
         </div>
-
       </div>
 
       {/* ======================================================
           SECURITY OPERATIONS COMMAND
+          NOTE: SecurityPostureDashboard already uses `.postureWrap`
+          so we keep it FULL-WIDTH to avoid nested grid collisions.
       ====================================================== */}
 
       <div className="sectionTitle">Security Operations Command</div>
 
-      <div className="postureWrap">
+      {/* Full-width posture overview (prevents nested grid issues) */}
+      <SecurityPostureDashboard />
 
+      {/* Two-column SOC grid */}
+      <div className="postureWrap">
         <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-          <SecurityPostureDashboard />
           <SecurityPipeline />
           <SecurityRadar />
           <IncidentBoard />
@@ -192,9 +189,7 @@ export default function AdminOverview() {
         <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
           <SecurityFeedPanel />
         </div>
-
       </div>
-
     </div>
   );
 }
