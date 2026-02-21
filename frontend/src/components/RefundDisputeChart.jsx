@@ -3,55 +3,57 @@ import { createChart } from "lightweight-charts";
 import { api } from "../lib/api";
 
 /**
- * RefundDisputeChart
- * Executive Financial Risk Timeline
- * Cumulative Refunds vs Disputes
+ * RevenueRefundOverlayChart
+ * Layer 2 — Revenue vs Refund vs Dispute
+ * Executive Financial Erosion Visibility
  */
 
 export default function RefundDisputeChart() {
   const containerRef = useRef(null);
   const chartRef = useRef(null);
-  const refundSeriesRef = useRef(null);
-  const disputeSeriesRef = useRef(null);
 
   const [loading, setLoading] = useState(true);
+  const [days, setDays] = useState(90);
 
   useEffect(() => {
-    async function load() {
-      try {
-        const res = await api.adminRefundDisputeTimeline();
-        const timeline = res?.timeline || [];
-
-        const refundData = timeline.map((d) => ({
-          time: d.date,
-          value: Number(d.cumulativeRefund || 0),
-        }));
-
-        const disputeData = timeline.map((d) => ({
-          time: d.date,
-          value: Number(d.cumulativeDispute || 0),
-        }));
-
-        initChart(refundData, disputeData);
-      } catch (e) {
-        console.error("RefundDisputeChart error:", e);
-      } finally {
-        setLoading(false);
-      }
-    }
-
     load();
+    return cleanup;
+  }, [days]);
 
-    return () => {
-      if (chartRef.current) {
-        chartRef.current.remove();
-      }
-      window.removeEventListener("resize", handleResize);
-    };
-  }, []);
+  async function load() {
+    try {
+      setLoading(true);
 
-  function initChart(refundData, disputeData) {
+      const res = await api.adminRevenueRefundOverlay(days);
+      const series = res?.series || [];
+
+      const revenueData = series.map((d) => ({
+        time: d.date,
+        value: Number(d.revenue || 0),
+      }));
+
+      const refundData = series.map((d) => ({
+        time: d.date,
+        value: Number(d.refunds || 0),
+      }));
+
+      const disputeData = series.map((d) => ({
+        time: d.date,
+        value: Number(d.disputes || 0),
+      }));
+
+      initChart(revenueData, refundData, disputeData);
+    } catch (e) {
+      console.error("RevenueRefundOverlay error:", e);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function initChart(revenueData, refundData, disputeData) {
     if (!containerRef.current) return;
+
+    cleanup();
 
     chartRef.current = createChart(containerRef.current, {
       layout: {
@@ -63,7 +65,7 @@ export default function RefundDisputeChart() {
         horzLines: { color: "rgba(255,255,255,.05)" },
       },
       width: containerRef.current.clientWidth,
-      height: 280,
+      height: 300,
       rightPriceScale: {
         borderColor: "rgba(255,255,255,.1)",
       },
@@ -72,18 +74,24 @@ export default function RefundDisputeChart() {
       },
     });
 
-    refundSeriesRef.current = chartRef.current.addLineSeries({
+    const revenueSeries = chartRef.current.addLineSeries({
+      color: "#5EC6FF",
+      lineWidth: 2,
+    });
+
+    const refundSeries = chartRef.current.addLineSeries({
       color: "#ff5a5f",
       lineWidth: 2,
     });
 
-    disputeSeriesRef.current = chartRef.current.addLineSeries({
+    const disputeSeries = chartRef.current.addLineSeries({
       color: "#ffd166",
       lineWidth: 2,
     });
 
-    refundSeriesRef.current.setData(refundData);
-    disputeSeriesRef.current.setData(disputeData);
+    revenueSeries.setData(revenueData);
+    refundSeries.setData(refundData);
+    disputeSeries.setData(disputeData);
 
     window.addEventListener("resize", handleResize);
   }
@@ -96,12 +104,20 @@ export default function RefundDisputeChart() {
     });
   }
 
+  function cleanup() {
+    if (chartRef.current) {
+      chartRef.current.remove();
+      chartRef.current = null;
+    }
+    window.removeEventListener("resize", handleResize);
+  }
+
   if (loading) {
     return (
       <div className="postureCard">
-        <b>Refund & Dispute Timeline</b>
+        <b>Revenue vs Refund Exposure</b>
         <div style={{ marginTop: 16 }}>
-          Loading financial risk analytics…
+          Loading financial erosion analytics…
         </div>
       </div>
     );
@@ -109,15 +125,34 @@ export default function RefundDisputeChart() {
 
   return (
     <div className="postureCard">
-      <div style={{ display: "flex", justifyContent: "space-between" }}>
-        <b>Refund & Dispute Timeline</b>
-        <small className="muted">
-          Cumulative Financial Risk Exposure
-        </small>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+        }}
+      >
+        <div>
+          <b>Revenue vs Refund / Dispute Overlay</b>
+          <div className="muted" style={{ fontSize: 12 }}>
+            Margin erosion visibility
+          </div>
+        </div>
+
+        <div style={{ display: "flex", gap: 8 }}>
+          {[30, 90, 180].map((d) => (
+            <button
+              key={d}
+              className={`btn ${days === d ? "primary" : ""}`}
+              onClick={() => setDays(d)}
+            >
+              {d}d
+            </button>
+          ))}
+        </div>
       </div>
 
-      <div style={{ height: 18 }} />
-
+      <div style={{ height: 20 }} />
       <div ref={containerRef} style={{ width: "100%" }} />
     </div>
   );
