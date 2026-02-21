@@ -1,6 +1,6 @@
 // frontend/src/layouts/AdminLayout.jsx
-// Admin Layout — SUPREME CONTROL ARCHITECTURE
-// Now includes Multi-Company Scope Selector
+// Enterprise Admin Layout — Command Architecture v1
+// System Intelligence + Scope + Advisor
 
 import React, { useEffect, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
@@ -18,6 +18,23 @@ export default function AdminLayout() {
   const [advisorOpen, setAdvisorOpen] = useState(true);
   const [globalOpen, setGlobalOpen] = useState(true);
   const [companies, setCompanies] = useState([]);
+  const [systemState, setSystemState] = useState(null);
+
+  /* ================= LOAD SYSTEM HEALTH ================= */
+
+  useEffect(() => {
+    async function loadHealth() {
+      try {
+        const res = await fetch("/health");
+        const data = await res.json();
+        setSystemState(data.systemState);
+      } catch {}
+    }
+
+    loadHealth();
+    const interval = setInterval(loadHealth, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   /* ================= LOAD COMPANIES ================= */
 
@@ -31,22 +48,6 @@ export default function AdminLayout() {
     loadCompanies();
   }, []);
 
-  /* ================= ADVISOR STATE ================= */
-
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem("as_advisor_open");
-      if (raw === "0") setAdvisorOpen(false);
-    } catch {}
-  }, []);
-
-  function setAdvisor(next) {
-    setAdvisorOpen(next);
-    try {
-      localStorage.setItem("as_advisor_open", next ? "1" : "0");
-    } catch {}
-  }
-
   /* ================= LOGOUT ================= */
 
   function logout() {
@@ -55,94 +56,50 @@ export default function AdminLayout() {
     navigate("/login");
   }
 
-  function closeMenu() {
-    setMenuOpen(false);
-  }
-
   function handleCompanySelect(e) {
     const id = e.target.value;
-
-    if (!id) {
-      clearScope();
-      return;
-    }
+    if (!id) return clearScope();
 
     const company = companies.find(c => String(c.id) === String(id));
-    if (company) {
-      setCompany(company);
-    }
+    if (company) setCompany(company);
   }
 
-  /* ================= UI ================= */
+  function getStatusColor() {
+    if (!systemState) return "#999";
+    if (systemState.securityStatus === "NORMAL") return "#16c784";
+    if (systemState.securityStatus === "WARNING") return "#f5b400";
+    if (systemState.securityStatus === "LOCKDOWN") return "#ff3b30";
+    return "#999";
+  }
 
   return (
     <div className={`layout-root enterprise ${menuOpen ? "sidebar-open" : ""}`}>
-      {menuOpen && <div className="sidebar-overlay" onClick={closeMenu} />}
 
       {/* ================= SIDEBAR ================= */}
       <aside className="layout-sidebar admin">
         <div className="layout-brand">
           <Logo size="md" />
           <span className="muted" style={{ fontSize: 12 }}>
-            Supreme Admin
+            Enterprise Admin
           </span>
         </div>
 
         <nav className="layout-nav">
+          <NavLink to="." end>Dashboard</NavLink>
+          <NavLink to="assets">Assets</NavLink>
+          <NavLink to="threats">Threats</NavLink>
+          <NavLink to="incidents">Incidents</NavLink>
+          <NavLink to="vulnerabilities">Vulnerabilities</NavLink>
+          <NavLink to="compliance">Compliance</NavLink>
+          <NavLink to="reports">Reports</NavLink>
+          <NavLink to="notifications">Notifications</NavLink>
 
-          <NavLink to="." end onClick={closeMenu}>
-            Security Posture
-          </NavLink>
+          <hr />
 
-          <NavLink to="assets" onClick={closeMenu}>Assets</NavLink>
-          <NavLink to="threats" onClick={closeMenu}>Threats</NavLink>
-          <NavLink to="incidents" onClick={closeMenu}>Incidents</NavLink>
-          <NavLink to="vulnerabilities" onClick={closeMenu}>Vulnerabilities</NavLink>
-          <NavLink to="vulnerability-center" onClick={closeMenu}>
-            Vulnerability Center
-          </NavLink>
-          <NavLink to="compliance" onClick={closeMenu}>Compliance</NavLink>
-          <NavLink to="policies" onClick={closeMenu}>Policies</NavLink>
-          <NavLink to="reports" onClick={closeMenu}>Reports</NavLink>
-          <NavLink to="notifications" onClick={closeMenu}>Notifications</NavLink>
-
-          <hr style={{ opacity: 0.18 }} />
-
-          <div className="nav-section-label">
-            Operational Oversight
-          </div>
-
-          <NavLink to="/manager" onClick={closeMenu}>
-            Manager Control Room
-          </NavLink>
-
-          <NavLink to="trading" onClick={closeMenu}>
-            Trading Room
-          </NavLink>
-
-          <hr style={{ opacity: 0.18 }} />
-
-          <div
-            className="nav-section-label clickable"
-            onClick={() => setGlobalOpen(v => !v)}
-          >
-            Global Oversight {globalOpen ? "▾" : "▸"}
-          </div>
-
-          {globalOpen && (
-            <>
-              <NavLink to="/company" onClick={closeMenu}>
-                Global Companies
-              </NavLink>
-              <NavLink to="/small-company" onClick={closeMenu}>
-                Global Small Companies
-              </NavLink>
-              <NavLink to="/user" onClick={closeMenu}>
-                Global Users
-              </NavLink>
-            </>
-          )}
-
+          <div className="nav-section-label">Oversight</div>
+          <NavLink to="/manager">Manager Control</NavLink>
+          <NavLink to="/company">Companies</NavLink>
+          <NavLink to="/user">Users</NavLink>
         </nav>
 
         <button className="btn logout-btn" onClick={logout}>
@@ -150,18 +107,43 @@ export default function AdminLayout() {
         </button>
       </aside>
 
-      {/* ================= MAIN + ADVISOR ================= */}
+      {/* ================= MAIN AREA ================= */}
       <div className="enterprise-main">
 
-        {/* 🔥 SCOPE BAR */}
+        {/* 🔥 TOP INTELLIGENCE BAR */}
         <div
           style={{
-            padding: "12px 24px",
+            padding: "10px 24px",
             borderBottom: "1px solid rgba(255,255,255,.08)",
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
             background: "rgba(255,255,255,0.02)"
+          }}
+        >
+          <div>
+            <strong>System Status:</strong>{" "}
+            <span style={{ color: getStatusColor(), fontWeight: 600 }}>
+              {systemState?.securityStatus || "Loading..."}
+            </span>
+          </div>
+
+          <div style={{ fontSize: 13, opacity: 0.7 }}>
+            Last Check:{" "}
+            {systemState?.lastComplianceCheck
+              ? new Date(systemState.lastComplianceCheck).toLocaleString()
+              : "-"}
+          </div>
+        </div>
+
+        {/* 🔥 SCOPE BAR */}
+        <div
+          style={{
+            padding: "12px 24px",
+            borderBottom: "1px solid rgba(255,255,255,.06)",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center"
           }}
         >
           <div>
@@ -182,40 +164,32 @@ export default function AdminLayout() {
           </select>
         </div>
 
+        {/* MAIN CONTENT */}
         <main className="layout-main">
           <section className="layout-content">
             <Outlet />
           </section>
         </main>
 
-        {/* ===== ADVISOR ===== */}
-        <aside
-          className={`enterprise-ai-panel ${
-            advisorOpen ? "open" : "collapsed"
-          }`}
-        >
+        {/* ADVISOR */}
+        <aside className={`enterprise-ai-panel ${advisorOpen ? "open" : "collapsed"}`}>
           <div className="enterprise-ai-inner">
             <AuthoDevPanel
-              title=""
               getContext={() => ({
                 role: "admin",
-                location: window.location.pathname,
                 scope: activeCompanyId ? "company" : "global",
-                access: "full-override",
-                authority: "supreme",
+                systemStatus: systemState?.securityStatus,
               })}
             />
           </div>
         </aside>
-
       </div>
 
       <button
         className="advisor-fab"
-        onClick={() => setAdvisor(!advisorOpen)}
-        title={advisorOpen ? "Close Advisor" : "Open Advisor"}
+        onClick={() => setAdvisorOpen(v => !v)}
       >
-        {advisorOpen ? "›" : "AuthoShield Advisor"}
+        {advisorOpen ? "›" : "Advisor"}
       </button>
     </div>
   );
