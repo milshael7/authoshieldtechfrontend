@@ -1,10 +1,11 @@
 // frontend/src/pages/admin/AdminOverview.jsx
-// Executive Command Center v3
-// SOC + Revenue + Compliance + Intelligence (Fully Polished)
+// Executive Command Center v4
+// Revenue Intelligence → Compliance Integrity → SOC Operations
 
 import React, { useEffect, useState } from "react";
 import { api } from "../../lib/api";
 
+import RevenueTrendChart from "../../components/RevenueTrendChart";
 import SecurityPostureDashboard from "../../components/SecurityPostureDashboard";
 import SecurityFeedPanel from "../../components/SecurityFeedPanel";
 import SecurityPipeline from "../../components/SecurityPipeline";
@@ -25,7 +26,7 @@ export default function AdminOverview() {
         const [summary, metricData, complianceReport] = await Promise.all([
           api.postureSummary(),
           api.adminMetrics(),
-          api.adminComplianceReport()
+          api.adminComplianceReport(),
         ]);
 
         setPosture(summary);
@@ -37,6 +38,7 @@ export default function AdminOverview() {
         setLoading(false);
       }
     }
+
     load();
   }, []);
 
@@ -68,15 +70,13 @@ export default function AdminOverview() {
       : "metric-negative";
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 36 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 40 }}>
 
       {/* ======================================================
-          EXECUTIVE KPI ROW
+          EXECUTIVE METRICS
       ====================================================== */}
 
-      <div className="sectionTitle">
-        Executive Metrics
-      </div>
+      <div className="sectionTitle">Executive Metrics</div>
 
       <div className="kpiGrid">
 
@@ -107,14 +107,21 @@ export default function AdminOverview() {
       </div>
 
       {/* ======================================================
-          COMPLIANCE + INTEGRITY PANEL
+          REVENUE INTELLIGENCE CHART
       ====================================================== */}
+
+      <RevenueTrendChart />
+
+      {/* ======================================================
+          COMPLIANCE & INTEGRITY
+      ====================================================== */}
+
+      <div className="sectionTitle">Compliance & Integrity</div>
 
       <div className="postureCard executivePanel executiveGlow">
 
         <div className="executiveBlock">
-          <h3>Compliance Integrity</h3>
-
+          <h3>Financial Integrity</h3>
           <div className="executiveDivider" />
 
           <p>
@@ -124,7 +131,7 @@ export default function AdminOverview() {
             </b>
           </p>
 
-          <p style={{ marginTop: 10 }}>
+          <p style={{ marginTop: 12 }}>
             Audit Chain:{" "}
             <span
               className={
@@ -140,7 +147,6 @@ export default function AdminOverview() {
 
         <div className="executiveBlock">
           <h3>Platform Totals</h3>
-
           <div className="executiveDivider" />
 
           <div className="stats">
@@ -154,12 +160,10 @@ export default function AdminOverview() {
       </div>
 
       {/* ======================================================
-          SOC COMMAND GRID
+          SECURITY OPERATIONS COMMAND
       ====================================================== */}
 
-      <div className="sectionTitle">
-        Security Operations Command
-      </div>
+      <div className="sectionTitle">Security Operations Command</div>
 
       <div className="postureWrap">
 
