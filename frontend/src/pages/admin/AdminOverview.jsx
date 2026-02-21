@@ -1,5 +1,6 @@
 // frontend/src/pages/admin/AdminOverview.jsx
-// Executive SOC Command Center Layout
+// Executive Command Center v2
+// SOC + Revenue + Compliance + Intelligence
 
 import React, { useEffect, useState } from "react";
 import { api } from "../../lib/api";
@@ -13,14 +14,23 @@ import IncidentBoard from "../../components/IncidentBoard";
 import "../../styles/platform.css";
 
 export default function AdminOverview() {
-  const [data, setData] = useState(null);
+  const [posture, setPosture] = useState(null);
+  const [metrics, setMetrics] = useState(null);
+  const [compliance, setCompliance] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function load() {
       try {
-        const summary = await api.postureSummary();
-        setData(summary);
+        const [summary, metricData, complianceReport] = await Promise.all([
+          api.postureSummary(),
+          api.adminMetrics(),
+          api.adminComplianceReport()
+        ]);
+
+        setPosture(summary);
+        setMetrics(metricData?.metrics || null);
+        setCompliance(complianceReport?.complianceReport || null);
       } catch (e) {
         console.error(e);
       } finally {
@@ -31,61 +41,97 @@ export default function AdminOverview() {
   }, []);
 
   if (loading) {
-    return <div className="dashboard-loading">Loading SOC Command Center…</div>;
+    return <div className="dashboard-loading">Loading Executive Command Center…</div>;
   }
 
-  if (!data) {
+  if (!posture) {
     return <div className="dashboard-error">Unable to load platform data.</div>;
   }
 
-  const { totals } = data;
+  const totals = posture?.totals || {};
+
+  const revenueDrift = compliance?.financialIntegrity?.revenueDrift || 0;
+  const auditOK = compliance?.auditIntegrity?.ok;
 
   return (
-    <div className="postureWrap">
+    <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
 
-      {/* LEFT COLUMN — CORE COMMAND */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+      {/* ======================================================
+          EXECUTIVE KPI ROW
+      ====================================================== */}
 
-        <SecurityPostureDashboard />
+      <div className="kpiGrid">
 
-        <SecurityPipeline />
+        <div className="kpiCard">
+          <small>Total Revenue</small>
+          <b>${metrics?.totalRevenue?.toFixed(2) || "0.00"}</b>
+        </div>
 
-        <SecurityRadar />
+        <div className="kpiCard">
+          <small>Active Subscribers</small>
+          <b>{metrics?.activeSubscribers || 0}</b>
+        </div>
 
-        <IncidentBoard />
+        <div className="kpiCard">
+          <small>MRR</small>
+          <b>${metrics?.MRR?.toFixed(2) || "0.00"}</b>
+        </div>
+
+        <div className="kpiCard">
+          <small>Churn Rate</small>
+          <b>{metrics?.churnRate || 0}</b>
+        </div>
 
       </div>
 
-      {/* RIGHT COLUMN — LIVE INTEL + KPIs */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+      {/* ======================================================
+          COMPLIANCE + INTEGRITY STATUS
+      ====================================================== */}
 
-        <div className="postureCard">
-          <h3>Platform Totals</h3>
+      <div className="postureCard" style={{ display: "flex", gap: 24 }}>
 
-          <div className="kpiGrid">
-            <div className="kpiCard">
-              <small>Users</small>
-              <b>{totals.users}</b>
-            </div>
-
-            <div className="kpiCard">
-              <small>Companies</small>
-              <b>{totals.companies}</b>
-            </div>
-
-            <div className="kpiCard">
-              <small>Audit Events</small>
-              <b>{totals.auditEvents}</b>
-            </div>
-
-            <div className="kpiCard">
-              <small>Notifications</small>
-              <b>{totals.notifications}</b>
-            </div>
-          </div>
+        <div style={{ flex: 1 }}>
+          <h3>Compliance Integrity</h3>
+          <p>
+            Revenue Drift:{" "}
+            <b style={{ color: revenueDrift === 0 ? "#16c784" : "#ff3b30" }}>
+              {revenueDrift}
+            </b>
+          </p>
+          <p>
+            Audit Chain:{" "}
+            <b style={{ color: auditOK ? "#16c784" : "#ff3b30" }}>
+              {auditOK ? "Verified" : "Integrity Failure"}
+            </b>
+          </p>
         </div>
 
-        <SecurityFeedPanel />
+        <div style={{ flex: 1 }}>
+          <h3>Platform Totals</h3>
+          <p>Users: <b>{totals.users}</b></p>
+          <p>Companies: <b>{totals.companies}</b></p>
+          <p>Audit Events: <b>{totals.auditEvents}</b></p>
+          <p>Notifications: <b>{totals.notifications}</b></p>
+        </div>
+
+      </div>
+
+      {/* ======================================================
+          SOC COMMAND GRID
+      ====================================================== */}
+
+      <div className="postureWrap">
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+          <SecurityPostureDashboard />
+          <SecurityPipeline />
+          <SecurityRadar />
+          <IncidentBoard />
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+          <SecurityFeedPanel />
+        </div>
 
       </div>
     </div>
