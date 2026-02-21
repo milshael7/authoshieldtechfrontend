@@ -2,6 +2,7 @@
    AUTOSHIELD FRONTEND API LAYER — EXECUTIVE BUILD
    Stable • No Infinite Refresh • Executive Intelligence Ready
    + Subscriber Growth Integrated
+   + Refund / Dispute Timeline Integrated
    ========================================================= */
 
 const API_BASE = import.meta.env.VITE_API_BASE?.trim();
@@ -185,8 +186,7 @@ export const api = {
 
   /* ================= ADMIN EXECUTIVE ================= */
 
-  adminMetrics: () =>
-    req("/api/admin/metrics"),
+  adminMetrics: () => req("/api/admin/metrics"),
 
   adminComplianceReport: () =>
     req("/api/admin/compliance/report"),
@@ -196,6 +196,9 @@ export const api = {
 
   adminSubscriberGrowth: () =>
     req("/api/admin/subscriber-growth"),
+
+  adminRefundDisputeTimeline: () =>
+    req("/api/admin/refund-dispute-timeline"),
 
   adminUsers: () => req("/api/admin/users"),
   adminCompanies: () => req("/api/admin/companies"),
