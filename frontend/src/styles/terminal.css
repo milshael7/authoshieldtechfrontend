@@ -1,302 +1,268 @@
 /* =========================================================
-   AUTOSHIELD TECH — TRADING TERMINAL (HARDENED)
-   SOC-GOVERNED • DARK-SAFE • BACKGROUND-AWARE
+   AUTOSHIELD TECH — TRADING TERMINAL
+   INSTITUTIONAL COLOR STRUCTURE — HIERARCHY FIXED
    ========================================================= */
 
 /* ===================== ROOT ===================== */
 .terminalRoot{
-  --bg-main: rgba(15,18,28,.92);
-  --bg-soft: rgba(22,26,40,.96);
-  --bg-panel: rgba(28,34,52,.98);
 
-  --border-main: rgba(122,167,255,.28);
-  --accent: rgba(122,167,255,.55);
-  --accent-soft: rgba(122,167,255,.18);
+  /* DARK FRAME */
+  --bg-frame: #0f131d;
 
-  --warn: #ff5a5f;
-  --warn-soft: rgba(255,90,95,.18);
+  /* INNER CANVAS (lighter than frame) */
+  --bg-canvas: #171c28;
+
+  /* PANEL LAYER */
+  --bg-panel: #1e2536;
+
+  /* RAIL (darkest accent) */
+  --bg-rail: #0c1018;
+
+  /* BORDERS */
+  --border-main: rgba(122,167,255,.22);
+  --border-soft: rgba(255,255,255,.06);
+
+  /* ACCENT */
+  --accent: #5ea7ff;
+  --accent-soft: rgba(94,167,255,.18);
+
   --ok: #2bd576;
+  --warn: #ff5a5f;
 
-  --text-main: rgba(255,255,255,.96);
-  --text-soft: rgba(255,255,255,.65);
+  --text-main: rgba(255,255,255,.95);
+  --text-soft: rgba(255,255,255,.60);
 
   width:100%;
   height:100%;
   position:relative;
   color:var(--text-main);
-  background:transparent;
+  background:var(--bg-frame);
   overflow:hidden;
 }
 
-/* ===================== LIVE MODE VISUAL ===================== */
-.terminalRoot.liveMode{
-  box-shadow:
-    inset 0 0 0 1px rgba(255,90,95,.25),
-    inset 0 0 120px rgba(255,90,95,.06);
-}
-
-/* ===================== TERMINAL BRAND MARK ===================== */
-.terminalBrandMark{
-  position:absolute;
-  inset:0;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  pointer-events:none;
-  user-select:none;
-  z-index:0;
-
-  font-size:clamp(64px, 14vw, 180px);
-  font-weight:900;
-  letter-spacing:.12em;
-  text-transform:uppercase;
-
-  color:rgba(122,167,255,.08);
-  filter:blur(.4px);
-}
-
-/* ===================== GOVERNANCE BANNER ===================== */
-.marketBanner{
-  position:relative;
-  z-index:2;
-  display:flex;
-  align-items:center;
-  gap:8px;
-  padding:9px 14px;
-  font-size:13px;
-  font-weight:800;
-  background:rgba(15,18,28,.85);
-  border-bottom:1px solid var(--border-main);
-  backdrop-filter: blur(6px);
-}
-
-.marketBanner.warn{
-  background:var(--warn-soft);
-  color:var(--warn);
-}
-
-.warnText{
-  color:var(--warn);
-  font-weight:900;
-}
-
 /* ===================== TOP BAR ===================== */
-.tvTopBar{
-  position:relative;
-  z-index:2;
+.terminalTopbar{
   display:flex;
-  gap:12px;
-  align-items:center;
   justify-content:space-between;
-  padding:12px 14px;
-  background:
-    linear-gradient(
-      180deg,
-      rgba(22,26,40,.98),
-      rgba(18,22,34,.98)
-    );
-  border-bottom:1px solid var(--border-main);
-  backdrop-filter: blur(6px);
+  align-items:center;
+  padding:12px 18px;
+
+  background:var(--bg-rail);
+  border-bottom:1px solid var(--border-soft);
 }
 
-.tvTopLeft{
+.terminalSymbol{
+  font-weight:900;
+  letter-spacing:.05em;
+}
+
+.terminalActions{
   display:flex;
   gap:10px;
-  align-items:center;
-  flex-wrap:wrap;
 }
 
-.tvSelect{
-  padding:7px 12px;
-  border-radius:10px;
+/* BUY / SELL */
+.terminalBuy,
+.terminalSell{
+  padding:8px 16px;
+  border-radius:12px;
   border:1px solid var(--border-main);
-  background:rgba(0,0,0,.35);
-  color:var(--text-main);
-}
-
-/* ===================== TIMEFRAME ===================== */
-.tvTfRow{
-  display:flex;
-  gap:6px;
-}
-
-.tvPill{
-  padding:6px 11px;
-  border-radius:999px;
-  border:1px solid var(--border-main);
-  background:var(--accent-soft);
-  font-weight:800;
-  color:var(--text-main);
-}
-
-.tvPill.active{
-  background:var(--accent);
-}
-
-/* ===================== PRIMARY BUTTON ===================== */
-.tvPrimary{
-  padding:9px 16px;
-  border-radius:14px;
-  border:1px solid var(--border-main);
-  background:var(--accent);
   font-weight:900;
   cursor:pointer;
-  color:#0b0e14;
+  background:var(--bg-panel);
+  color:var(--text-main);
+  transition:.2s ease;
 }
 
-.tvPrimary.full{
-  width:100%;
+.terminalBuy:hover{
+  background:rgba(43,213,118,.15);
+  border-color:var(--ok);
 }
 
-.tvPrimary.warn{
-  background:var(--warn);
+.terminalSell:hover{
+  background:rgba(255,90,95,.15);
   border-color:var(--warn);
-  color:#fff;
-}
-
-.tvPrimary:disabled{
-  opacity:.45;
-  cursor:not-allowed;
 }
 
 /* ===================== BODY ===================== */
-.tvBody{
-  position:relative;
-  z-index:1;
+.terminalBody{
   display:flex;
-  height:calc(100svh - 150px);
+  height:calc(100vh - 52px);
+  background:var(--bg-canvas);
 }
 
-/* ===================== CHART ===================== */
-.tvChartArea{
+/* ===================== LEFT RAIL ===================== */
+.terminalRail{
+  width:54px;
+  background:var(--bg-rail);
+  border-right:1px solid var(--border-soft);
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  padding-top:12px;
+  gap:12px;
+}
+
+.terminalRailItem{
+  width:36px;
+  height:36px;
+  border-radius:10px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:var(--bg-panel);
+  cursor:pointer;
+  transition:.2s ease;
+}
+
+.terminalRailItem:hover{
+  background:var(--accent-soft);
+}
+
+/* ===================== CHART AREA ===================== */
+.terminalChartArea{
   flex:1;
   position:relative;
-  z-index:1;
+  background:var(--bg-canvas);
+  transition:.3s ease;
 }
 
-.tvIframe{
+.terminalChartSurface{
   width:100%;
   height:100%;
-  border:none;
 }
 
-/* ===================== DOCKED TRADE PANEL ===================== */
-.dockPanel{
-  width:300px;
-  background:
-    linear-gradient(
-      180deg,
-      rgba(28,34,52,.98),
-      rgba(22,26,40,.98)
-    );
-  border-left:1px solid var(--border-main);
-  backdrop-filter: blur(6px);
-  z-index:2;
+/* ===================== DOCKED PANEL ===================== */
+.terminalPanel{
+  background:var(--bg-panel);
+  border-left:1px solid var(--border-soft);
+  height:100%;
+  display:flex;
+  flex-direction:column;
+  position:relative;
+  z-index:5;
 }
 
-/* ===================== FLOATING TRADE PANEL ===================== */
-.floatingPanel{
+/* ===================== FLOATING PANEL ===================== */
+.terminalPanel.floating{
   position:fixed;
-  width:280px;
-  background:
-    linear-gradient(
-      180deg,
-      rgba(28,34,52,.98),
-      rgba(22,26,40,.98)
-    );
-  border-radius:16px;
+  background:var(--bg-panel);
   border:1px solid var(--border-main);
-  box-shadow:0 18px 40px rgba(0,0,0,.45);
-  backdrop-filter: blur(6px);
-  z-index:60;
+  border-radius:16px;
+  box-shadow:0 25px 60px rgba(0,0,0,.55);
+  z-index:100;
 }
 
-/* ===================== TRADE PANEL ===================== */
-.tradePanel{
+/* ===================== PANEL HEADER ===================== */
+.terminalPanelHeader{
+  padding:14px 16px;
+  font-weight:900;
+  border-bottom:1px solid var(--border-soft);
+  cursor:grab;
+  background:var(--bg-rail);
+}
+
+/* ===================== PANEL BODY ===================== */
+.terminalPanelBody{
   padding:16px;
   display:flex;
   flex-direction:column;
   gap:14px;
 }
 
-.tpHeader{
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  font-weight:900;
-  cursor:grab;
-}
-
-.tpClose{
-  background:none;
-  border:none;
-  font-size:18px;
-  cursor:pointer;
-  color:var(--text-soft);
-}
-
-/* ===================== ORDER SIDE ===================== */
-.orderSide{
-  display:flex;
-  gap:10px;
-}
-
-.orderBtn{
-  flex:1;
-  padding:11px;
-  border-radius:14px;
-  border:1px solid var(--border-main);
-  font-weight:900;
-  background:rgba(0,0,0,.35);
+/* INPUTS */
+.terminalPanelBody input,
+.terminalPanelBody select{
+  padding:10px;
+  border-radius:10px;
+  border:1px solid var(--border-soft);
+  background:#121826;
   color:var(--text-main);
 }
 
-.orderBtn.buy.active{
+/* ===================== CONFIRM BUTTON ===================== */
+.terminalConfirm{
+  padding:12px;
+  border-radius:12px;
+  border:none;
+  font-weight:900;
+  cursor:pointer;
+  transition:.2s ease;
+}
+
+.terminalConfirm.buy{
   background:var(--ok);
   color:#0b0e14;
 }
 
-.orderBtn.sell.active{
+.terminalConfirm.sell{
   background:var(--warn);
   color:#fff;
 }
 
-/* ===================== INPUTS ===================== */
-.tradeInput{
-  padding:11px;
-  border-radius:12px;
-  border:1px solid var(--border-main);
-  background:rgba(0,0,0,.35);
-  color:var(--text-main);
+.terminalConfirm:hover{
+  transform:translateY(-1px);
 }
 
-/* ===================== FOOTNOTE ===================== */
-.tradePanel small{
-  font-size:12px;
+/* ===================== RESIZE HANDLE ===================== */
+.terminalResize{
+  position:absolute;
+  left:-5px;
+  top:0;
+  width:10px;
+  height:100%;
+  cursor:ew-resize;
+}
+
+/* ===================== AI METRICS ===================== */
+.terminalAIMetrics{
+  font-size:13px;
   color:var(--text-soft);
-  line-height:1.45;
+  line-height:1.6;
 }
 
-/* =========================================================
-   MOBILE MODE — HARD OVERRIDE
-   ========================================================= */
+/* ===================== SIGNAL FEED ===================== */
+.terminalSignalFeed{
+  position:absolute;
+  bottom:16px;
+  left:70px;
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+  z-index:10;
+}
+
+.terminalSignal{
+  padding:6px 12px;
+  border-radius:999px;
+  font-size:12px;
+  font-weight:900;
+  backdrop-filter:blur(6px);
+  border:1px solid var(--border-soft);
+}
+
+.terminalSignal.buy{
+  background:rgba(43,213,118,.15);
+  color:var(--ok);
+}
+
+.terminalSignal.sell{
+  background:rgba(255,90,95,.15);
+  color:var(--warn);
+}
+
+/* ===================== MOBILE ===================== */
 @media (max-width:768px){
 
-  .tvBody{
-    flex-direction:column;
-    height:auto;
-  }
-
-  .dockPanel{
+  .terminalRail{
     display:none;
   }
 
-  .tvChartArea{
-    min-height:55svh;
+  .terminalPanel{
+    width:100% !important;
   }
 
-  .floatingPanel{
-    width:90vw;
-    left:5vw !important;
+  .terminalSignalFeed{
+    left:20px;
   }
 }
