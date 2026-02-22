@@ -1,7 +1,8 @@
 // frontend/src/components/SecurityFeedPanel.jsx
-// SOC Live Threat Intelligence Stream — Enterprise Grade
+// SOC Live Threat Intelligence Stream — Hardened Enterprise Version
 
 import React, { useEffect, useState } from "react";
+import { api } from "../lib/api";
 
 /* ================= HELPERS ================= */
 
@@ -19,7 +20,10 @@ function copy(text) {
 }
 
 function formatTime(iso) {
-  return new Date(iso).toLocaleString();
+  if (!iso) return "Unknown time";
+  const d = new Date(iso);
+  if (!Number.isFinite(d.getTime())) return "Invalid date";
+  return d.toLocaleString();
 }
 
 /* ================= COMPONENT ================= */
@@ -27,14 +31,23 @@ function formatTime(iso) {
 export default function SecurityFeedPanel() {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [status, setStatus] = useState("Loading…");
 
   async function load() {
     try {
-      const res = await fetch("/api/security/events?limit=50");
-      const data = await res.json();
-      setEvents(data.events || []);
-    } catch {
+      const res = await api.req
+        ? await api.req("/api/security/events?limit=50")
+        : await fetch("/api/security/events?limit=50");
+
+      // If using api layer
+      const data = res?.events ? res : await res.json?.();
+
+      setEvents(data?.events || []);
+      setStatus("LIVE");
+    } catch (e) {
+      console.error("SecurityFeedPanel error:", e);
       setEvents([]);
+      setStatus("ERROR");
     } finally {
       setLoading(false);
     }
@@ -47,16 +60,39 @@ export default function SecurityFeedPanel() {
   }, []);
 
   return (
-    <div className="platformCard" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h3 style={{ margin: 0 }}>Live Security Operations Feed</h3>
-        <small style={{ opacity: 0.6 }}>Real-time threat intelligence</small>
+    <div
+      className="platformCard"
+      style={{ display: "flex", flexDirection: "column", gap: 16 }}
+    >
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+        }}
+      >
+        <div>
+          <h3 style={{ margin: 0 }}>Live Security Operations Feed</h3>
+          <small style={{ opacity: 0.6 }}>
+            Real-time threat intelligence
+          </small>
+        </div>
+
+        <span className={`badge ${status === "LIVE" ? "ok" : ""}`}>
+          {status}
+        </span>
       </div>
 
-      {loading && <div style={{ opacity: 0.6 }}>Loading security events…</div>}
+      {loading && (
+        <div style={{ opacity: 0.6 }}>
+          Loading security events…
+        </div>
+      )}
 
       {!loading && events.length === 0 && (
-        <div style={{ opacity: 0.6 }}>No active threats detected.</div>
+        <div style={{ opacity: 0.6 }}>
+          No active threats detected.
+        </div>
       )}
 
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -66,7 +102,7 @@ export default function SecurityFeedPanel() {
 
           return (
             <div
-              key={e.id}
+              key={e.id || e.iso}
               style={{
                 display: "flex",
                 border: "1px solid rgba(255,255,255,.12)",
@@ -75,16 +111,21 @@ export default function SecurityFeedPanel() {
                 background: "rgba(0,0,0,.35)",
               }}
             >
-              {/* Severity Bar */}
               <div style={severityBar(severity)} />
 
               <div style={{ flex: 1, padding: 16 }}>
-                {/* Header */}
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    marginBottom: 8,
+                  }}
+                >
                   <div>
-                    <b>{e.type}</b>
+                    <b>{e.type || "Unknown Event"}</b>
                     <div style={{ fontSize: 12, opacity: 0.6 }}>
-                      {formatTime(e.iso)} • {e.source || "Unknown Source"}
+                      {formatTime(e.iso)} •{" "}
+                      {e.source || "Unknown Source"}
                     </div>
                   </div>
 
@@ -93,28 +134,43 @@ export default function SecurityFeedPanel() {
                   </div>
                 </div>
 
-                {/* Structured Body */}
                 <div style={{ fontSize: 14, lineHeight: 1.6 }}>
-                  <div><b>Description:</b> {e.description}</div>
-                  <div><b>Target:</b> {e.target || "Not specified"}</div>
-                  <div><b>Assessment:</b> {assessmentText(severity)}</div>
+                  <div>
+                    <b>Description:</b>{" "}
+                    {e.description || "No description"}
+                  </div>
+                  <div>
+                    <b>Target:</b>{" "}
+                    {e.target || "Not specified"}
+                  </div>
+                  <div>
+                    <b>Assessment:</b>{" "}
+                    {assessmentText(severity)}
+                  </div>
                 </div>
 
-                {/* Action Bar */}
                 <div
                   style={{
                     display: "flex",
                     gap: 14,
                     marginTop: 14,
-                    borderTop: "1px solid rgba(255,255,255,.08)",
+                    borderTop:
+                      "1px solid rgba(255,255,255,.08)",
                     paddingTop: 10,
                     fontSize: 13,
                   }}
                 >
-                  <button style={actionBtn} onClick={() => copy(explanation)}>
+                  <button
+                    style={actionBtn}
+                    onClick={() => copy(explanation)}
+                  >
                     Copy Report
                   </button>
-                  <button style={actionBtn} onClick={() => speak(explanation)}>
+
+                  <button
+                    style={actionBtn}
+                    onClick={() => speak(explanation)}
+                  >
                     Read Aloud
                   </button>
                 </div>
@@ -131,25 +187,34 @@ export default function SecurityFeedPanel() {
 
 function buildExplanation(e) {
   return `
-Security Event: ${e.type}
-Severity: ${e.severity}
-Time: ${new Date(e.iso).toLocaleString()}
+Security Event: ${e.type || "Unknown"}
+Severity: ${e.severity || "Low"}
+Time: ${formatSafe(e.iso)}
 Source: ${e.source || "Unknown"}
 Target: ${e.target || "Not specified"}
 
 Description:
-${e.description}
+${e.description || "No description"}
 
 Assessment:
 ${assessmentText(e.severity)}
 `.trim();
 }
 
+function formatSafe(iso) {
+  const d = new Date(iso);
+  if (!Number.isFinite(d.getTime())) return "Unknown";
+  return d.toLocaleString();
+}
+
 function assessmentText(severity) {
   const s = (severity || "").toLowerCase();
-  if (s === "critical") return "Immediate containment and investigation required.";
-  if (s === "high") return "High priority threat. Rapid review recommended.";
-  if (s === "medium") return "Monitor and validate activity.";
+  if (s === "critical")
+    return "Immediate containment and investigation required.";
+  if (s === "high")
+    return "High priority threat. Rapid review recommended.";
+  if (s === "medium")
+    return "Monitor and validate activity.";
   return "Low risk. Logged for awareness.";
 }
 
