@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { createChart } from "lightweight-charts";
-import "../../styles/terminal.css";
+import "../styles/terminal.css"; // ✅ FIXED PATH
 
 const API_BASE = "/api/trading";
 const WS_URL =
@@ -16,7 +16,6 @@ export default function TradingRoom() {
   const chartRef = useRef(null);
   const seriesRef = useRef(null);
   const candleDataRef = useRef([]);
-
   const wsRef = useRef(null);
 
   const [snapshot, setSnapshot] = useState(null);
@@ -71,12 +70,15 @@ export default function TradingRoom() {
 
     seriesRef.current = chartRef.current.addCandlestickSeries();
 
-    window.addEventListener("resize", () => {
+    const handleResize = () => {
       chartRef.current.applyOptions({
         width: chartContainerRef.current.clientWidth,
         height: chartContainerRef.current.clientHeight,
       });
-    });
+    };
+
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
 
   }, []);
 
@@ -106,14 +108,14 @@ export default function TradingRoom() {
       }
     };
 
-    return () => {
-      ws.close();
-    };
+    return () => ws.close();
   }, []);
 
   /* ================= CANDLE LOGIC ================= */
 
   function updateCandle(price, ts) {
+    if (!seriesRef.current) return;
+
     const time = Math.floor(ts / 1000);
     const lastCandle = candleDataRef.current[candleDataRef.current.length - 1];
 
@@ -221,7 +223,12 @@ export default function TradingRoom() {
 
         {panelOpen && panelDocked && (
           <div className="terminalPanel" style={{ width: panelWidth }}>
-            <TradePanel side={side} snapshot={snapshot} onDragStart={startDrag} setWidth={setPanelWidth} />
+            <TradePanel
+              side={side}
+              snapshot={snapshot}
+              onDragStart={startDrag}
+              setWidth={setPanelWidth}
+            />
           </div>
         )}
 
@@ -234,13 +241,16 @@ export default function TradingRoom() {
               top: floatPos.y,
             }}
           >
-            <TradePanel side={side} snapshot={snapshot} onDragStart={startDrag} setWidth={setPanelWidth} />
+            <TradePanel
+              side={side}
+              snapshot={snapshot}
+              onDragStart={startDrag}
+              setWidth={setPanelWidth}
+            />
           </div>
         )}
 
       </div>
-
-      {/* ================= AI SIGNAL FEED ================= */}
 
       <div className="terminalSignalFeed">
         {signals.map((s, i) => (
@@ -258,10 +268,6 @@ export default function TradingRoom() {
     </div>
   );
 }
-
-/* =========================================================
-   PANEL COMPONENT
-========================================================= */
 
 function TradePanel({ side, snapshot, onDragStart, setWidth }) {
 
@@ -305,29 +311,6 @@ function TradePanel({ side, snapshot, onDragStart, setWidth }) {
         </button>
 
       </div>
-
-      <div
-        className="terminalResize"
-        onMouseDown={(e) => {
-          e.preventDefault();
-          const startX = e.clientX;
-          const startWidth =
-            document.querySelector(".terminalPanel").offsetWidth;
-
-          function onMove(ev) {
-            const newWidth = startWidth - (ev.clientX - startX);
-            setWidth(Math.max(320, Math.min(newWidth, 640)));
-          }
-
-          function onUp() {
-            window.removeEventListener("mousemove", onMove);
-            window.removeEventListener("mouseup", onUp);
-          }
-
-          window.addEventListener("mousemove", onMove);
-          window.addEventListener("mouseup", onUp);
-        }}
-      />
     </>
   );
 }
