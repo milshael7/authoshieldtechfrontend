@@ -1,15 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { api } from "../lib/api";
 
 function clamp(n, a, b) {
   return Math.max(a, Math.min(b, n));
-}
-
-function apiBase() {
-  return (
-    (import.meta.env.VITE_API_BASE ||
-      import.meta.env.VITE_BACKEND_URL ||
-      "").trim()
-  );
 }
 
 function fmtPct(n) {
@@ -38,13 +31,10 @@ function riskTier(score) {
   return { level: "CRITICAL", desc: "Immediate action required", color: "#ff5a5f" };
 }
 
-/* ================= RECOMMENDATION ENGINE ================= */
-
 function buildRecommendations(domains) {
   if (!domains.length) return [];
 
   const sorted = [...domains].sort((a, b) => a.coverage - b.coverage);
-
   const weak = sorted.filter((d) => d.coverage < 75);
 
   return weak.slice(0, 3).map((d) => ({
@@ -65,27 +55,20 @@ export default function SecurityRadar() {
   const [posture, setPosture] = useState(null);
   const canvasRef = useRef(null);
 
-  const base = apiBase();
-
   async function load() {
-    if (!base) return;
-
     try {
-      const res = await fetch(`${base}/api/security/posture`, {
-        credentials: "include",
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error();
-      setPosture(data.posture);
+      const data = await api.postureSummary();
+      setPosture(data);
       setStatus("LIVE");
-    } catch {
+    } catch (e) {
+      console.error("SecurityRadar error:", e);
       setStatus("ERROR");
     }
   }
 
   useEffect(() => {
     load();
-    const t = setInterval(load, 8000);
+    const t = setInterval(load, 10000);
     return () => clearInterval(t);
   }, []);
 
@@ -100,11 +83,6 @@ export default function SecurityRadar() {
   const gradeInfo = gradeFromScore(score);
   const tier = riskTier(score);
   const recommendations = buildRecommendations(domains);
-
-  const maxIssues = useMemo(
-    () => Math.max(1, ...domains.map((d) => Number(d.issues) || 0)),
-    [domains]
-  );
 
   /* ================= RADAR DRAW ================= */
 
@@ -171,13 +149,12 @@ export default function SecurityRadar() {
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
-  }, [domains, maxIssues]);
+  }, [domains]);
 
   /* ================= UI ================= */
 
   return (
     <div className="card">
-      {/* SCORE */}
       <div style={{ display: "flex", justifyContent: "space-between" }}>
         <div>
           <div style={{ fontSize: 14, opacity: 0.7 }}>
@@ -220,7 +197,6 @@ export default function SecurityRadar() {
         </span>
       </div>
 
-      {/* RADAR */}
       <div style={{ marginTop: 20, height: 380 }}>
         <canvas
           ref={canvasRef}
@@ -233,7 +209,6 @@ export default function SecurityRadar() {
         />
       </div>
 
-      {/* EXECUTIVE RECOMMENDATIONS */}
       {recommendations.length > 0 && (
         <div style={{ marginTop: 30 }}>
           <h4 style={{ marginBottom: 12 }}>
