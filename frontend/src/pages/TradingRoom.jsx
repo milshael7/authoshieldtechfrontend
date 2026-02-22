@@ -5,12 +5,19 @@ import { createChart } from "lightweight-charts";
 import "../../styles/terminal.css";
 
 const API_BASE = "/api/trading";
+const WS_URL =
+  (window.location.protocol === "https:" ? "wss://" : "ws://") +
+  window.location.host +
+  "/ws/market";
 
 export default function TradingRoom() {
 
   const chartContainerRef = useRef(null);
   const chartRef = useRef(null);
   const seriesRef = useRef(null);
+  const candleDataRef = useRef([]);
+
+  const wsRef = useRef(null);
 
   const [snapshot, setSnapshot] = useState(null);
 
@@ -22,7 +29,9 @@ export default function TradingRoom() {
   const [dragging, setDragging] = useState(false);
   const [floatPos, setFloatPos] = useState({ x: 300, y: 120 });
 
-  /* ================= LOAD SNAPSHOT ================= */
+  const [signals, setSignals] = useState([]);
+
+  /* ================= SNAPSHOT ================= */
 
   async function loadSnapshot() {
     try {
@@ -36,7 +45,7 @@ export default function TradingRoom() {
 
   useEffect(() => {
     loadSnapshot();
-    const i = setInterval(loadSnapshot, 4000);
+    const i = setInterval(loadSnapshot, 5000);
     return () => clearInterval(i);
   }, []);
 
@@ -71,6 +80,61 @@ export default function TradingRoom() {
 
   }, []);
 
+  /* ================= WEBSOCKET ================= */
+
+  useEffect(() => {
+    const ws = new WebSocket(WS_URL);
+    wsRef.current = ws;
+
+    ws.onmessage = (event) => {
+      const msg = JSON.parse(event.data);
+
+      if (msg.type === "tick") {
+        updateCandle(msg.price, msg.ts);
+      }
+
+      if (msg.type === "ai_signal") {
+        setSignals((prev) => [
+          {
+            action: msg.action,
+            confidence: msg.confidence,
+            edge: msg.edge,
+            ts: msg.ts,
+          },
+          ...prev.slice(0, 20),
+        ]);
+      }
+    };
+
+    return () => {
+      ws.close();
+    };
+  }, []);
+
+  /* ================= CANDLE LOGIC ================= */
+
+  function updateCandle(price, ts) {
+    const time = Math.floor(ts / 1000);
+    const lastCandle = candleDataRef.current[candleDataRef.current.length - 1];
+
+    if (!lastCandle || time > lastCandle.time) {
+      const newCandle = {
+        time,
+        open: price,
+        high: price,
+        low: price,
+        close: price,
+      };
+      candleDataRef.current.push(newCandle);
+      seriesRef.current.update(newCandle);
+    } else {
+      lastCandle.high = Math.max(lastCandle.high, price);
+      lastCandle.low = Math.min(lastCandle.low, price);
+      lastCandle.close = price;
+      seriesRef.current.update(lastCandle);
+    }
+  }
+
   /* ================= PANEL LOGIC ================= */
 
   function togglePanel(type) {
@@ -87,8 +151,6 @@ export default function TradingRoom() {
       }
     }
   }
-
-  /* ================= DRAG LOGIC ================= */
 
   function startDrag() {
     setDragging(true);
@@ -123,45 +185,32 @@ export default function TradingRoom() {
   return (
     <div className="terminalRoot">
 
-      {/* ================= TOP BAR ================= */}
-
       <div className="terminalTopbar">
         <div className="terminalSymbol">BTCUSDT</div>
 
         <div className="terminalActions">
-          <button
-            className="terminalBuy"
-            onClick={() => togglePanel("BUY")}
-          >
+          <button className="terminalBuy" onClick={() => togglePanel("BUY")}>
             BUY
           </button>
 
-          <button
-            className="terminalSell"
-            onClick={() => togglePanel("SELL")}
-          >
+          <button className="terminalSell" onClick={() => togglePanel("SELL")}>
             SELL
           </button>
         </div>
       </div>
 
-      {/* ================= BODY ================= */}
-
       <div className="terminalBody">
 
-        {/* LEFT TOOL RAIL */}
         <div className="terminalRail">
           <div className="terminalRailItem">✏</div>
           <div className="terminalRailItem">📐</div>
           <div className="terminalRailItem">📊</div>
         </div>
 
-        {/* CHART AREA */}
         <div
           className="terminalChartArea"
           style={{
-            marginRight:
-              panelOpen && panelDocked ? panelWidth : 0,
+            marginRight: panelOpen && panelDocked ? panelWidth : 0,
           }}
         >
           <div
@@ -170,22 +219,12 @@ export default function TradingRoom() {
           />
         </div>
 
-        {/* DOCKED PANEL */}
         {panelOpen && panelDocked && (
-          <div
-            className="terminalPanel"
-            style={{ width: panelWidth }}
-          >
-            <TradePanel
-              side={side}
-              snapshot={snapshot}
-              onDragStart={startDrag}
-              setWidth={setPanelWidth}
-            />
+          <div className="terminalPanel" style={{ width: panelWidth }}>
+            <TradePanel side={side} snapshot={snapshot} onDragStart={startDrag} setWidth={setPanelWidth} />
           </div>
         )}
 
-        {/* FLOATING PANEL */}
         {panelOpen && !panelDocked && (
           <div
             className="terminalPanel floating"
@@ -195,16 +234,27 @@ export default function TradingRoom() {
               top: floatPos.y,
             }}
           >
-            <TradePanel
-              side={side}
-              snapshot={snapshot}
-              onDragStart={startDrag}
-              setWidth={setPanelWidth}
-            />
+            <TradePanel side={side} snapshot={snapshot} onDragStart={startDrag} setWidth={setPanelWidth} />
           </div>
         )}
 
       </div>
+
+      {/* ================= AI SIGNAL FEED ================= */}
+
+      <div className="terminalSignalFeed">
+        {signals.map((s, i) => (
+          <div
+            key={i}
+            className={`terminalSignal ${
+              s.action === "BUY" ? "buy" : "sell"
+            }`}
+          >
+            {s.action} • {(s.confidence * 100).toFixed(1)}%
+          </div>
+        ))}
+      </div>
+
     </div>
   );
 }
@@ -217,10 +267,7 @@ function TradePanel({ side, snapshot, onDragStart, setWidth }) {
 
   return (
     <>
-      <div
-        className="terminalPanelHeader"
-        onMouseDown={onDragStart}
-      >
+      <div className="terminalPanelHeader" onMouseDown={onDragStart}>
         {side} ORDER
       </div>
 
@@ -241,47 +288,35 @@ function TradePanel({ side, snapshot, onDragStart, setWidth }) {
 
         <div className="terminalAIMetrics">
           <div>
-            AI Win Rate:
-            {" "}
+            AI Win Rate:{" "}
             {snapshot?.ai?.stats?.winRate
               ? (snapshot.ai.stats.winRate * 100).toFixed(1) + "%"
               : "—"}
           </div>
 
           <div>
-            Risk Multiplier:
-            {" "}
+            Risk Multiplier:{" "}
             {snapshot?.risk?.riskMultiplier?.toFixed?.(2) || "—"}
           </div>
         </div>
 
-        <button
-          className={`terminalConfirm ${
-            side === "BUY" ? "buy" : "sell"
-          }`}
-        >
+        <button className={`terminalConfirm ${side === "BUY" ? "buy" : "sell"}`}>
           Confirm {side}
         </button>
 
       </div>
 
-      {/* RESIZE HANDLE */}
       <div
         className="terminalResize"
         onMouseDown={(e) => {
           e.preventDefault();
           const startX = e.clientX;
           const startWidth =
-            document.querySelector(".terminalPanel")
-              .offsetWidth;
+            document.querySelector(".terminalPanel").offsetWidth;
 
           function onMove(ev) {
-            const newWidth =
-              startWidth - (ev.clientX - startX);
-
-            setWidth(
-              Math.max(320, Math.min(newWidth, 640))
-            );
+            const newWidth = startWidth - (ev.clientX - startX);
+            setWidth(Math.max(320, Math.min(newWidth, 640)));
           }
 
           function onUp() {
