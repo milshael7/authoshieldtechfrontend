@@ -4,6 +4,7 @@
    + Zero movement on scroll
    + Only content scrolls
    + Clean collapse behavior
+   + Executive Critical State Support
    ========================================================= */
 
 html, body {
@@ -13,15 +14,39 @@ html, body {
   overflow:hidden; /* 🔒 prevent whole page scroll */
   background:#0b0f1a;
   color:#eaf1ff;
+  position:relative;
 }
 
-/* ================= ROOT ================= */
+/* =========================================================
+   🔥 EXECUTIVE CRITICAL OVERLAY (NON-BLOCKING)
+   ========================================================= */
+
+body.executive-critical::before{
+  content:"";
+  position:fixed;
+  inset:0;
+  background:rgba(255,90,95,.06);
+  pointer-events:none; /* 🔒 never block interaction */
+  z-index:1; /* below UI but above base background */
+  animation: executiveCriticalFade 2s ease-in-out infinite alternate;
+}
+
+@keyframes executiveCriticalFade{
+  from{ opacity:.4; }
+  to{ opacity:.75; }
+}
+
+/* =========================================================
+   ROOT
+   ========================================================= */
 
 .layout-root{
   display:flex;
   height:100vh;
   width:100%;
-  overflow:hidden; /* 🔒 no layout shift */
+  overflow:hidden;
+  position:relative;
+  z-index:2; /* above critical overlay */
 }
 
 /* ================= SIDEBAR ================= */
@@ -36,7 +61,7 @@ html, body {
   gap:18px;
   flex-shrink:0;
   backdrop-filter:blur(10px);
-  overflow-y:auto; /* sidebar scroll only if needed */
+  overflow-y:auto;
 }
 
 /* ================= MAIN WRAPPER ================= */
@@ -62,7 +87,7 @@ html, body {
 .layout-content{
   flex:1;
   padding:28px;
-  overflow-y:auto; /* ✅ ONLY THIS SCROLLS */
+  overflow-y:auto;
   overflow-x:hidden;
   min-width:0;
 }
@@ -107,21 +132,17 @@ html, body {
 .enterprise-ai-panel{
   width:380px;
   flex-shrink:0;
-
   position:relative;
   height:100%;
   display:flex;
   flex-direction:column;
-
   border-left:1px solid rgba(255,255,255,.08);
   background:linear-gradient(180deg, rgba(255,255,255,.04), rgba(0,0,0,.45));
   backdrop-filter:blur(10px);
-
   overflow:hidden;
   transition:width .25s ease;
 }
 
-/* FULL collapse */
 .enterprise-ai-panel.collapsed{
   width:0;
   border-left:none;
@@ -149,7 +170,6 @@ html, body {
   min-height:0;
 }
 
-/* HEADER LOCKED */
 .advisor-miniTitle{
   flex:0 0 auto;
   padding:14px 16px;
@@ -159,7 +179,6 @@ html, body {
   opacity:.9;
 }
 
-/* FEED — ONLY THIS SCROLLS */
 .advisor-feed{
   flex:1;
   overflow-y:auto;
@@ -169,7 +188,6 @@ html, body {
   gap:16px;
 }
 
-/* INPUT LOCKED */
 .advisor-inputBar{
   flex:0 0 auto;
   border-top:1px solid rgba(255,255,255,.06);
@@ -224,7 +242,7 @@ html, body {
 .advisor-textarea{
   width:100%;
   min-height:44px;
-  max-height:200px; /* expanded more */
+  max-height:200px;
   resize:none;
   border-radius:12px;
   border:1px solid rgba(255,255,255,.10);
@@ -247,17 +265,13 @@ html, body {
   right:16px;
   top:16px;
   z-index:9999;
-
   border:1px solid rgba(255,255,255,.14);
   background:rgba(0,0,0,.6);
   color:#eaf1ff;
-
   padding:10px 14px;
   border-radius:14px;
-
   font-weight:800;
   font-size:12px;
-
   cursor:pointer;
   backdrop-filter:blur(10px);
   transition:.2s ease;
@@ -266,4 +280,30 @@ html, body {
 .advisor-fab:hover{
   background:rgba(120,160,255,.15);
   border-color:rgba(120,160,255,.35);
+}
+
+/* =========================================================
+   EXECUTIVE BANNER PULSE (SAFE)
+   ========================================================= */
+
+.pulse{
+  animation:pulseGlow 1.8s ease-in-out infinite;
+}
+
+@keyframes pulseGlow{
+  0%{
+    box-shadow:
+      0 0 0 1px rgba(255,90,95,.35),
+      0 0 18px rgba(255,90,95,.25);
+  }
+  50%{
+    box-shadow:
+      0 0 0 1px rgba(255,90,95,.55),
+      0 0 28px rgba(255,90,95,.35);
+  }
+  100%{
+    box-shadow:
+      0 0 0 1px rgba(255,90,95,.35),
+      0 0 18px rgba(255,90,95,.25);
+  }
 }
