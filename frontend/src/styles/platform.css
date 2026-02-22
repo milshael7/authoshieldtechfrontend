@@ -189,6 +189,10 @@
   color: var(--p-bad);
 }
 
+.metric-warning {
+  color: var(--p-warn);
+}
+
 .metric-neutral {
   color: var(--p-muted);
 }
@@ -252,4 +256,67 @@
   font-weight: 900;
   letter-spacing: .6px;
   margin-bottom: 16px;
+}
+
+/* =============================
+   GLOBAL EXECUTIVE RISK BANNER
+   ============================= */
+
+.executiveBanner {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:28px;
+  padding:20px 28px;
+  border-radius:var(--p-radius);
+  margin-bottom:32px;
+  border:1px solid var(--p-border);
+  backdrop-filter: blur(10px);
+  transition:.3s ease;
+}
+
+.executiveBanner.loading{
+  opacity:.6;
+}
+
+.bannerBlock{
+  display:flex;
+  flex-direction:column;
+}
+
+.bannerBlock small{
+  font-size:12px;
+  color:var(--p-muted);
+  letter-spacing:.5px;
+}
+
+.bannerBlock b{
+  font-size:22px;
+  font-weight:900;
+}
+
+.bannerStatus{
+  font-weight:900;
+  letter-spacing:.08em;
+  font-size:13px;
+}
+
+/* STATES */
+
+.bannerStable{
+  background:rgba(43,213,118,.10);
+  border-color:rgba(43,213,118,.35);
+  color:var(--p-ok);
+}
+
+.bannerElevated{
+  background:rgba(255,209,102,.10);
+  border-color:rgba(255,209,102,.35);
+  color:var(--p-warn);
+}
+
+.bannerCritical{
+  background:rgba(255,90,95,.10);
+  border-color:rgba(255,90,95,.45);
+  color:var(--p-bad);
 }
