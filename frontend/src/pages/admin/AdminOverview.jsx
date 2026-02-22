@@ -1,9 +1,10 @@
 // frontend/src/pages/admin/AdminOverview.jsx
-// Executive Command Center v7 (Enterprise Intelligence Upgrade)
-// Revenue → Subscriber Growth → Refund Risk → Executive Intelligence → Compliance → SOC
+// Executive Command Center v8 (Global Banner Integrated)
 
 import React, { useEffect, useMemo, useState } from "react";
 import { api } from "../../lib/api";
+
+import ExecutiveRiskBanner from "../../components/ExecutiveRiskBanner";
 
 import RevenueTrendChart from "../../components/RevenueTrendChart";
 import SubscriberGrowthChart from "../../components/SubscriberGrowthChart";
@@ -37,11 +38,8 @@ export default function AdminOverview() {
   const [posture, setPosture] = useState(null);
   const [metrics, setMetrics] = useState(null);
   const [compliance, setCompliance] = useState(null);
-
-  // ✅ NEW ENTERPRISE INTELLIGENCE
   const [execRisk, setExecRisk] = useState(null);
   const [predictiveChurn, setPredictiveChurn] = useState(null);
-
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -68,7 +66,6 @@ export default function AdminOverview() {
         setPosture(summary || null);
         setMetrics(metricData?.metrics || null);
         setCompliance(complianceReport?.complianceReport || null);
-
         setExecRisk(riskRes?.executiveRisk || null);
         setPredictiveChurn(churnRes?.predictiveChurn || null);
       } catch (e) {
@@ -121,6 +118,13 @@ export default function AdminOverview() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 40 }}>
+
+      {/* ======================================================
+          🔥 GLOBAL EXECUTIVE RISK BANNER
+      ====================================================== */}
+
+      <ExecutiveRiskBanner />
+
       {/* ======================================================
           EXECUTIVE METRICS
       ====================================================== */}
@@ -149,46 +153,27 @@ export default function AdminOverview() {
         </div>
       </div>
 
-      {/* ======================================================
-          REVENUE INTELLIGENCE
-      ====================================================== */}
       <RevenueTrendChart />
-
-      {/* ======================================================
-          SUBSCRIBER GROWTH
-      ====================================================== */}
       <SubscriberGrowthChart />
-
-      {/* ======================================================
-          FINANCIAL RISK TIMELINE
-      ====================================================== */}
       <RefundDisputeChart />
 
       {/* ======================================================
-          ✅ NEW: EXECUTIVE INTELLIGENCE (3 layers)
+          EXECUTIVE INTELLIGENCE
       ====================================================== */}
 
       <div className="sectionTitle">Executive Intelligence</div>
 
-      {/* Layer 1 + Layer 3 */}
       <div className="postureCard executivePanel executiveGlow">
         <div className="executiveBlock">
           <h3>Executive Risk Index</h3>
           <div className="executiveDivider" />
 
           <p>
-            Risk Index: <b>{Number.isFinite(riskIndex) ? riskIndex.toFixed(2) : "0.00"}</b>{" "}
+            Risk Index: <b>{riskIndex.toFixed(2)}</b>{" "}
             <span className={`badge ${riskBadge.cls}`} style={{ marginLeft: 10 }}>
               {riskBadge.label}
             </span>
           </p>
-
-          <div style={{ marginTop: 12 }} className="stats">
-            <div>Drift <b>{Number(execRisk?.signals?.revenueDrift ?? 0).toFixed(2)}</b></div>
-            <div>Audit <b>{execRisk?.signals?.auditOK ? "OK" : "FAIL"}</b></div>
-            <div>Refunds <b>${fmtMoney(execRisk?.signals?.refundedAmount)}</b></div>
-            <div>Disputes <b>${fmtMoney(execRisk?.signals?.disputedAmount)}</b></div>
-          </div>
         </div>
 
         <div className="executiveBlock">
@@ -196,26 +181,18 @@ export default function AdminOverview() {
           <div className="executiveDivider" />
 
           <p>
-            Churn Score: <b>{Number.isFinite(churnScore) ? churnScore.toFixed(2) : "0.00"}</b>{" "}
+            Churn Score: <b>{churnScore.toFixed(2)}</b>{" "}
             <span className={`badge ${churnBadge.cls}`} style={{ marginLeft: 10 }}>
               {churnBadge.label}
             </span>
           </p>
-
-          <div style={{ marginTop: 12 }} className="stats">
-            <div>Recent Payers (60d) <b>{predictiveChurn?.drivers?.recentPayers60d ?? 0}</b></div>
-            <div>Locked Ratio <b>{predictiveChurn?.drivers?.users?.lockedRatio ?? 0}</b></div>
-            <div>Refunds <b>{predictiveChurn?.drivers?.refunds?.count ?? 0}</b></div>
-            <div>Disputes <b>{predictiveChurn?.drivers?.disputes?.count ?? 0}</b></div>
-          </div>
         </div>
       </div>
 
-      {/* Layer 2 */}
       <RevenueRefundOverlayChart days={90} />
 
       {/* ======================================================
-          COMPLIANCE & INTEGRITY
+          COMPLIANCE
       ====================================================== */}
 
       <div className="sectionTitle">Compliance & Integrity</div>
@@ -259,10 +236,8 @@ export default function AdminOverview() {
 
       <div className="sectionTitle">Security Operations Command</div>
 
-      {/* Full-width posture overview (prevents nested grid issues) */}
       <SecurityPostureDashboard />
 
-      {/* Two-column SOC grid */}
       <div className="postureWrap">
         <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
           <SecurityPipeline />
@@ -274,6 +249,7 @@ export default function AdminOverview() {
           <SecurityFeedPanel />
         </div>
       </div>
+
     </div>
   );
 }
