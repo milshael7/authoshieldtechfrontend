@@ -1,199 +1,140 @@
 // frontend/src/pages/Dashboard.jsx
-// SOC Dashboard — Monetization Aware • Usage Integrated
+// Enterprise Admin Dashboard — Clean SaaS Version
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
+import { api } from "../lib/api.js";
 
 export default function Dashboard() {
-  const [usage, setUsage] = useState(null);
-
-  /* ======================================================
-     LOAD USAGE FROM BACKEND
-  ====================================================== */
+  const [summary, setSummary] = useState(null);
+  const [incidents, setIncidents] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function loadUsage() {
+    async function load() {
       try {
-        const token = localStorage.getItem("token");
+        const [posture, incidentData] = await Promise.all([
+          api.postureSummary().catch(() => ({})),
+          api.incidents().catch(() => ({})),
+        ]);
 
-        const res = await fetch("/api/me/usage", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        const data = await res.json();
-
-        if (data.ok) {
-          setUsage(data.usage);
-        }
-      } catch (e) {
-        console.error("Failed to load usage", e);
+        setSummary(posture || {});
+        setIncidents(incidentData?.incidents || []);
+      } finally {
+        setLoading(false);
       }
     }
 
-    loadUsage();
+    load();
   }, []);
 
-  /* ======================================================
-     STATIC KPI (UNCHANGED)
-  ====================================================== */
-
-  const kpis = useMemo(
-    () => [
-      { label: "Users", value: 108, trend: "▲ 7%" },
-      { label: "Devices", value: 111, trend: "▲ 3%" },
-      { label: "Mailboxes", value: 124, trend: "▲ 2%" },
-      { label: "Cloud Drives", value: 62, trend: "▲ 1%" },
-      { label: "Internet Assets", value: 38, trend: "▲ 2%" },
-      { label: "Active Threats", value: 6, trend: "▲ 1" },
-    ],
-    []
-  );
-
-  const risks = [
-    { label: "Critical", value: 1 },
-    { label: "High", value: 3 },
-    { label: "Medium", value: 7 },
-    { label: "Low", value: 11 },
-  ];
-
-  /* ======================================================
-     CALCULATIONS
-  ====================================================== */
-
-  const percentUsed =
-    usage && usage.included !== Infinity
-      ? Math.min(
-          100,
-          Math.round((usage.used / usage.included) * 100)
-        )
-      : 0;
-
-  const showUpgrade =
-    usage &&
-    usage.included !== Infinity &&
-    usage.remaining <= 1;
+  const riskScore = Math.round(summary?.riskScore || 82);
+  const complianceScore = Math.round(summary?.complianceScore || 74);
 
   return (
-    <div className="postureWrap">
-
-      {/* ================= PLAN + USAGE ================= */}
-      {usage && (
-        <div className="postureCard" style={{ marginBottom: 20 }}>
-          <h3>{usage.planLabel}</h3>
-
-          {usage.included === Infinity ? (
-            <p className="muted">Unlimited scans available</p>
-          ) : (
-            <>
-              <p className="muted">
-                {usage.remaining} of {usage.included} scans remaining
-              </p>
-
-              <div className="meter">
-                <div style={{ width: `${percentUsed}%` }} />
-              </div>
-            </>
-          )}
-
-          {showUpgrade && (
-            <button
-              style={{
-                marginTop: 14,
-                padding: "8px 14px",
-                cursor: "pointer",
-              }}
-              onClick={() => (window.location.href = "/billing")}
-            >
-              Upgrade Plan
-            </button>
-          )}
-        </div>
-      )}
+    <div style={{ padding: 28, display: "flex", flexDirection: "column", gap: 28 }}>
 
       {/* ================= KPI STRIP ================= */}
-      <div className="kpiGrid">
-        {kpis.map((k) => (
-          <div key={k.label} className="kpiCard">
-            <small>{k.label}</small>
-            <b>{k.value}</b>
-            <span className="trend">{k.trend}</span>
-          </div>
-        ))}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))",
+          gap: 18,
+        }}
+      >
+        <Card title="Global Security Score" value={`${riskScore}%`} />
+        <Card title="Total Companies" value={summary?.totalCompanies ?? 14} />
+        <Card title="Active Users" value={summary?.totalUsers ?? 478} />
+        <Card title="Open Incidents" value={incidents.length} />
       </div>
 
       {/* ================= MAIN GRID ================= */}
-      <div className="postureGrid">
-        <section className="postureCard">
-          <div className="postureTop">
-            <div>
-              <h2>Security Health Overview</h2>
-              <small>Real-time snapshot of your environment</small>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "2fr 1fr",
+          gap: 24,
+        }}
+      >
+
+        {/* Threat Activity */}
+        <div className="card" style={{ padding: 24 }}>
+          <h3>Threat Activity (Last 30 Days)</h3>
+
+          <div style={{ marginTop: 20 }}>
+            <div className="meter">
+              <div style={{ width: `${riskScore}%` }} />
             </div>
+            <p style={{ marginTop: 10, opacity: 0.7 }}>
+              Overall threat exposure level across monitored entities.
+            </p>
           </div>
+        </div>
 
-          <div className="meter">
-            <div style={{ width: "70%" }} />
-          </div>
+        {/* Incident Overview */}
+        <div className="card" style={{ padding: 24 }}>
+          <h3>Incident Overview</h3>
 
-          <p className="muted">
-            Overall posture is stable, but some areas require attention.
-          </p>
+          <ul style={{ marginTop: 20, listStyle: "none", padding: 0 }}>
+            {incidents.length === 0 && (
+              <li style={{ opacity: 0.6 }}>No active incidents</li>
+            )}
 
-          <h3 style={{ marginTop: 20 }}>Issues by Risk Level</h3>
-
-          <ul className="list">
-            {risks.map((r) => (
-              <li key={r.label}>
-                <span
-                  className={`dot ${
-                    r.label === "Critical"
-                      ? "bad"
-                      : r.label === "High"
-                      ? "warn"
-                      : "ok"
-                  }`}
-                />
-                <div>
-                  <b>{r.label}</b>
-                  <small>{r.value} issues</small>
+            {incidents.slice(0, 5).map((i, idx) => (
+              <li key={idx} style={{ marginBottom: 10 }}>
+                <b>{i.title || "Security Incident"}</b>
+                <div style={{ fontSize: 12, opacity: 0.6 }}>
+                  Status: {i.status || "open"}
                 </div>
               </li>
             ))}
           </ul>
-        </section>
-
-        <aside className="postureCard">
-          <h3>Executive Insights</h3>
-          <p className="muted">
-            Key observations from your security controls.
-          </p>
-
-          <ul className="list">
-            <li>
-              <span className="dot warn" />
-              <div>
-                <b>Identity Risk Increasing</b>
-                <small>Multiple login anomalies detected</small>
-              </div>
-            </li>
-            <li>
-              <span className="dot bad" />
-              <div>
-                <b>Critical Endpoint Alert</b>
-                <small>Immediate investigation required</small>
-              </div>
-            </li>
-            <li>
-              <span className="dot ok" />
-              <div>
-                <b>Email Protection Healthy</b>
-                <small>No active phishing campaigns</small>
-              </div>
-            </li>
-          </ul>
-        </aside>
+        </div>
       </div>
+
+      {/* ================= LOWER GRID ================= */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          gap: 24,
+        }}
+      >
+        {/* Compliance */}
+        <div className="card" style={{ padding: 24 }}>
+          <h3>Compliance Overview</h3>
+
+          <div style={{ marginTop: 16 }}>
+            <div className="meter">
+              <div style={{ width: `${complianceScore}%` }} />
+            </div>
+            <p style={{ marginTop: 10, opacity: 0.7 }}>
+              Audit readiness score across regulatory frameworks.
+            </p>
+          </div>
+        </div>
+
+        {/* Vulnerability Snapshot */}
+        <div className="card" style={{ padding: 24 }}>
+          <h3>Vulnerability Snapshot</h3>
+
+          <ul style={{ marginTop: 16, listStyle: "none", padding: 0 }}>
+            <li>Critical: {summary?.critical ?? 1}</li>
+            <li>High: {summary?.high ?? 3}</li>
+            <li>Medium: {summary?.medium ?? 7}</li>
+            <li>Low: {summary?.low ?? 11}</li>
+          </ul>
+        </div>
+      </div>
+
+    </div>
+  );
+}
+
+function Card({ title, value }) {
+  return (
+    <div className="card" style={{ padding: 22 }}>
+      <div style={{ fontSize: 12, opacity: 0.6 }}>{title}</div>
+      <div style={{ fontSize: 28, fontWeight: 800 }}>{value}</div>
     </div>
   );
 }
