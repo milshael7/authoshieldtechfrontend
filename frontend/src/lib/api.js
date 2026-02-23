@@ -1,5 +1,5 @@
 /* =========================================================
-   AUTOSHIELD FRONTEND API LAYER — STABLE BUILD
+   AUTOSHIELD FRONTEND API LAYER — STABLE BUILD (FIXED)
 ========================================================= */
 
 const API_BASE = import.meta.env.VITE_API_BASE?.trim();
@@ -106,7 +106,7 @@ async function req(path, { method = "GET", body, auth = true } = {}) {
 }
 
 /* =========================================================
-   API OBJECT (IMPORTANT — THIS FIXES YOUR BUILD)
+   API OBJECT
 ========================================================= */
 
 const api = {
@@ -140,7 +140,12 @@ const api = {
 
   /* COMPLIANCE */
   complianceOverview: () => req("/api/security/compliance"),
+
+  /* 🔥 INCIDENTS — THIS WAS MISSING */
+  incidents: () => req("/api/incidents"),
+  createIncident: (payload) =>
+    req("/api/incidents", { method: "POST", body: payload }),
 };
 
-/* 🔥 THIS LINE IS WHAT YOUR BUILD WAS MISSING */
+/* EXPORT */
 export { api };
