@@ -1,5 +1,6 @@
 // frontend/src/layouts/AdminLayout.jsx
 // Enterprise Admin Layout — Clean Unified Command Architecture
+// Trading + Global Integrated Properly
 
 import React, { useEffect, useState } from "react";
 import { NavLink, Outlet, useNavigate, useLocation } from "react-router-dom";
@@ -17,10 +18,9 @@ export default function AdminLayout() {
 
   const [menuOpen, setMenuOpen] = useState(false);
 
-  // 🔐 persist advisor open state
   const [advisorOpen, setAdvisorOpen] = useState(() => {
     const saved = localStorage.getItem("admin.advisor.open");
-    return saved !== "false"; // default true
+    return saved !== "false";
   });
 
   const [companies, setCompanies] = useState([]);
@@ -113,6 +113,8 @@ export default function AdminLayout() {
         </div>
 
         <nav className="layout-nav" onClick={navClick}>
+
+          {/* Core Command */}
           <NavLink to="." end>Dashboard</NavLink>
           <NavLink to="assets">Assets</NavLink>
           <NavLink to="threats">Threat Intelligence</NavLink>
@@ -120,6 +122,11 @@ export default function AdminLayout() {
           <NavLink to="vulnerabilities">Vulnerability Oversight</NavLink>
           <NavLink to="compliance">Regulatory Compliance</NavLink>
           <NavLink to="reports">Executive Reporting</NavLink>
+
+          {/* 🔥 Newly Integrated */}
+          <NavLink to="trading">Trading Command</NavLink>
+          <NavLink to="global">Global Control</NavLink>
+
           <NavLink to="notifications">System Notifications</NavLink>
 
           <hr />
