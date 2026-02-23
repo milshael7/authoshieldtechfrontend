@@ -1,17 +1,60 @@
 // frontend/src/components/SecurityPostureDashboard.jsx
-// Enterprise SecurityPostureDashboard — Live Intelligence Version
+// Enterprise SecurityPostureDashboard — Live Intelligence Version (Hardened)
+// Fixes:
+// 1) Uses correct api import "../lib/api.js"
+// 2) Normalizes backend payload so UI doesn't break when fields differ
 
 import React, { useEffect, useMemo, useState } from "react";
-import { api } from "../lib/api";
+import { api } from "../lib/api.js";
 
 export default function SecurityPostureDashboard() {
   const [posture, setPosture] = useState(null);
   const [status, setStatus] = useState("Loading…");
 
+  function normalizePosture(data) {
+    // Works with different backend shapes:
+    // - { score, domains, incidents, criticalAlerts }
+    // - or { totals: {...}, checks: [...], time }
+    const totals = data?.totals || {};
+    const domains = Array.isArray(data?.domains) ? data.domains : [];
+
+    // Prefer explicit score, otherwise derive a simple score from checks if present
+    const checks = Array.isArray(data?.checks) ? data.checks : [];
+    const derivedScore = checks.length
+      ? clampNum(
+          100 -
+            checks.reduce((acc, c) => {
+              const st = String(c?.status || "").toLowerCase();
+              if (st === "warn") return acc + 10;
+              if (st === "danger") return acc + 25;
+              return acc;
+            }, 0),
+          0,
+          100
+        )
+      : 0;
+
+    const score = clampNum(
+      data?.score ?? totals?.score ?? derivedScore ?? 0,
+      0,
+      100
+    );
+
+    return {
+      score,
+      domains,
+      incidents: Number(data?.incidents ?? totals?.incidents ?? 0) || 0,
+      criticalAlerts:
+        Number(data?.criticalAlerts ?? totals?.criticalAlerts ?? 0) || 0,
+      time: data?.time || totals?.time || null,
+      raw: data || null,
+    };
+  }
+
   async function load() {
     try {
       const data = await api.postureSummary();
-      setPosture(data);
+      setPosture(normalizePosture(data));
       setStatus("LIVE");
     } catch (e) {
       console.error("SecurityPostureDashboard error:", e);
@@ -26,9 +69,11 @@ export default function SecurityPostureDashboard() {
   }, []);
 
   const score = clampNum(posture?.score ?? 0, 0, 100);
-  const domains = Array.isArray(posture?.domains)
-    ? posture.domains
-    : [];
+
+  const domains = useMemo(() => {
+    const d = posture?.domains;
+    return Array.isArray(d) ? d : [];
+  }, [posture]);
 
   const incidents = posture?.incidents ?? 0;
   const criticalAlerts = posture?.criticalAlerts ?? 0;
@@ -36,7 +81,7 @@ export default function SecurityPostureDashboard() {
   const avgCoverage = useMemo(() => {
     if (!domains.length) return 0;
     const total = domains.reduce(
-      (sum, d) => sum + clampNum(d.coverage ?? 0, 0, 100),
+      (sum, d) => sum + clampNum(d?.coverage ?? 0, 0, 100),
       0
     );
     return Math.round(total / domains.length);
@@ -55,12 +100,14 @@ export default function SecurityPostureDashboard() {
     <div className="postureWrap">
       {/* ================= LEFT PANEL ================= */}
       <div className="postureCard">
-
         <div className="postureTop">
           <div>
             <b>Security Posture</b>
             <small className="muted">
               Live Security Command Overview
+              {posture?.time ? (
+                <span> • Updated {new Date(posture.time).toLocaleString()}</span>
+              ) : null}
             </small>
           </div>
 
@@ -70,18 +117,15 @@ export default function SecurityPostureDashboard() {
               style={{ "--val": score }}
               title={`Overall Score: ${score}/100`}
             >
-              {score}
+              {status === "Loading…" ? "…" : score}
             </div>
 
             <div className="scoreMeta">
               <b>{grade.label}</b>
               <span>
-                {grade.level === "ok" &&
-                  "Systems operating within tolerance"}
-                {grade.level === "warn" &&
-                  "Some risk indicators detected"}
-                {grade.level === "bad" &&
-                  "Immediate remediation required"}
+                {grade.level === "ok" && "Systems operating within tolerance"}
+                {grade.level === "warn" && "Some risk indicators detected"}
+                {grade.level === "bad" && "Immediate remediation required"}
               </span>
             </div>
           </div>
@@ -99,13 +143,17 @@ export default function SecurityPostureDashboard() {
         </div>
 
         <div className="coverGrid" style={{ marginTop: 20 }}>
-          {domains.map((d) => (
-            <CoverageItem
-              key={d.key || d.label}
-              label={d.label || d.key}
-              value={d.coverage}
-            />
-          ))}
+          {domains.length ? (
+            domains.map((d) => (
+              <CoverageItem
+                key={d?.key || d?.label || Math.random()}
+                label={d?.label || d?.key || "Domain"}
+                value={d?.coverage ?? 0}
+              />
+            ))
+          ) : (
+            <small className="muted">No domain coverage returned yet.</small>
+          )}
         </div>
 
         <div style={{ marginTop: 14 }}>
@@ -119,9 +167,7 @@ export default function SecurityPostureDashboard() {
       <div className="postureCard">
         <div style={{ display: "flex", justifyContent: "space-between" }}>
           <b>Threat Surface Map</b>
-          <small className="muted">
-            Live Coverage Distribution
-          </small>
+          <small className="muted">Live Coverage Distribution</small>
         </div>
 
         <div style={{ height: 18 }} />
@@ -130,8 +176,8 @@ export default function SecurityPostureDashboard() {
 
         <div style={{ marginTop: 16 }}>
           <small className="muted">
-            Radar visualization reflects weighted detection surface
-            across active protection layers.
+            Radar visualization reflects weighted detection surface across active
+            protection layers.
           </small>
         </div>
       </div>
