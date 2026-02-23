@@ -1,9 +1,9 @@
 // frontend/src/layouts/AdminLayout.jsx
-// Advisor Door — Dual Visual Handle System (Top Open / Bottom Close)
+// Enterprise Admin Layout — Fixed Arrow Logic + Full Navigation Restored
 
-import React, { useEffect, useState } from "react";
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import { clearToken, clearUser } from "../lib/api.js";
+import React, { useEffect, useRef, useState } from "react";
+import { NavLink, Outlet, useNavigate, useLocation } from "react-router-dom";
+import { clearToken, clearUser, api } from "../lib/api.js";
 import { useCompany } from "../context/CompanyContext";
 import AuthoDevPanel from "../components/AuthoDevPanel.jsx";
 import Logo from "../components/Logo.jsx";
@@ -11,15 +11,23 @@ import "../styles/layout.css";
 
 export default function AdminLayout() {
   const navigate = useNavigate();
-  const { activeCompanyId } = useCompany();
+  const location = useLocation();
+  const { activeCompanyId, setCompany, clearScope } = useCompany();
 
   const [advisorOpen, setAdvisorOpen] = useState(() => {
     const saved = localStorage.getItem("admin.advisor.open");
     return saved !== "false";
   });
 
+  const [companies, setCompanies] = useState([]);
+  const [systemState, setSystemState] = useState(null);
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 900);
+  const [scopeOpen, setScopeOpen] = useState(false);
+  const scopeRef = useRef(null);
+
   const DRAWER_OPEN_W = 360;
-  const DRAWER_CLOSED_W = 34;
+  const DRAWER_CLOSED_W = 28;
+
   const drawerWidth = advisorOpen ? DRAWER_OPEN_W : DRAWER_CLOSED_W;
 
   useEffect(() => {
@@ -35,16 +43,33 @@ export default function AdminLayout() {
   return (
     <div className="layout-root enterprise">
 
-      {/* SIDEBAR */}
+      {/* ================= SIDEBAR (RESTORED FULL NAV) ================= */}
       <aside className="layout-sidebar admin">
         <div className="layout-brand">
           <Logo size="md" />
+          <span className="muted" style={{ fontSize: 12 }}>
+            Enterprise Administration
+          </span>
         </div>
 
         <nav className="layout-nav">
           <NavLink to="." end>Dashboard</NavLink>
-          <NavLink to="trading">Trading</NavLink>
+          <NavLink to="assets">Assets</NavLink>
+          <NavLink to="threats">Threat Intelligence</NavLink>
+          <NavLink to="incidents">Incident Management</NavLink>
+          <NavLink to="vulnerabilities">Vulnerability Oversight</NavLink>
+          <NavLink to="compliance">Regulatory Compliance</NavLink>
+          <NavLink to="reports">Executive Reporting</NavLink>
+          <NavLink to="trading">Trading Command</NavLink>
           <NavLink to="global">Global Control</NavLink>
+          <NavLink to="notifications">System Notifications</NavLink>
+
+          <hr />
+
+          <div className="nav-section-label">Operational Oversight</div>
+          <NavLink to="/manager">Manager Command</NavLink>
+          <NavLink to="/company">Corporate Entities</NavLink>
+          <NavLink to="/user">User Governance</NavLink>
         </nav>
 
         <button className="btn logout-btn" onClick={logout}>
@@ -52,11 +77,11 @@ export default function AdminLayout() {
         </button>
       </aside>
 
-      {/* MAIN CONTENT PUSH AREA */}
+      {/* ================= MAIN CONTENT ================= */}
       <div
         className="enterprise-main"
         style={{
-          marginRight: drawerWidth,
+          marginRight: isMobile ? 0 : drawerWidth,
           transition: "margin-right .22s ease",
         }}
       >
@@ -67,67 +92,48 @@ export default function AdminLayout() {
         </main>
       </div>
 
-      {/* ADVISOR DOOR */}
-      <div
-        style={{
-          position: "fixed",
-          top: 0,
-          right: 0,
-          height: "100vh",
-          width: drawerWidth,
-          transition: "width .22s ease",
-          display: "flex",
-          flexDirection: "row",
-          borderLeft: "1px solid rgba(255,255,255,0.10)",
-          background:
-            "linear-gradient(180deg, rgba(255,255,255,.04), rgba(0,0,0,.55))",
-          backdropFilter: "blur(10px)",
-          overflow: "hidden",
-          zIndex: 2000,
-        }}
-      >
-        {/* HANDLE COLUMN */}
+      {/* ================= ADVISOR DOOR ================= */}
+      {!isMobile && (
         <div
           style={{
-            width: DRAWER_CLOSED_W,
-            minWidth: DRAWER_CLOSED_W,
-            height: "100%",
-            background: "rgba(0,0,0,.25)",
+            position: "fixed",
+            top: 0,
+            right: 0,
+            height: "100vh",
+            width: drawerWidth,
+            transition: "width .22s ease",
             display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "space-between",
-            padding: "14px 0",
+            borderLeft: "1px solid rgba(255,255,255,0.10)",
+            background:
+              "linear-gradient(180deg, rgba(255,255,255,.04), rgba(0,0,0,.55))",
+            backdropFilter: "blur(10px)",
+            overflow: "hidden",
+            zIndex: 2000,
           }}
         >
-          {/* TOP OPEN INDICATOR (only when closed) */}
-          {!advisorOpen && (
-            <button
-              onClick={() => setAdvisorOpen(true)}
-              style={{
-                background: "none",
-                border: "none",
-                cursor: "pointer",
-                color: "#ffffff",
-                fontSize: 14,
-                opacity: .85,
-              }}
-              title="Open Advisor"
-            >
-              ▶
-            </button>
-          )}
-
-          {/* ROTATED TITLE */}
+          {/* HANDLE STRIP */}
           <button
             onClick={() => setAdvisorOpen(v => !v)}
             style={{
-              background: "none",
+              width: DRAWER_CLOSED_W,
+              minWidth: DRAWER_CLOSED_W,
+              height: "100%",
               border: "none",
-              cursor: "pointer",
+              background: "rgba(0,0,0,.22)",
               color: "#ffffff",
+              cursor: "pointer",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 8,
             }}
           >
+            {/* Arrow indicates direction panel will move */}
+            <div style={{ fontSize: 14 }}>
+              {advisorOpen ? "→" : "←"}
+            </div>
+
             <div
               style={{
                 transform: "rotate(-90deg)",
@@ -140,38 +146,20 @@ export default function AdminLayout() {
             </div>
           </button>
 
-          {/* BOTTOM CLOSE INDICATOR (only when open) */}
           {advisorOpen && (
-            <button
-              onClick={() => setAdvisorOpen(false)}
-              style={{
-                background: "none",
-                border: "none",
-                cursor: "pointer",
-                color: "#ffffff",
-                fontSize: 14,
-                opacity: .85,
-              }}
-              title="Close Advisor"
-            >
-              ◀
-            </button>
+            <div style={{ flex: 1 }}>
+              <AuthoDevPanel
+                title="Advisor"
+                getContext={() => ({
+                  role: "admin",
+                  scope: activeCompanyId ? "entity" : "global",
+                  systemStatus: systemState?.securityStatus,
+                })}
+              />
+            </div>
           )}
         </div>
-
-        {/* PANEL */}
-        {advisorOpen && (
-          <div style={{ flex: 1 }}>
-            <AuthoDevPanel
-              title="Advisor"
-              getContext={() => ({
-                role: "admin",
-                scope: activeCompanyId ? "entity" : "global",
-              })}
-            />
-          </div>
-        )}
-      </div>
+      )}
     </div>
   );
 }
