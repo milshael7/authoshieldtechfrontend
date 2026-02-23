@@ -1,14 +1,6 @@
 /* ================================================= */
 /* AI / VOICE / SLIDING PANEL SYSTEM                 */
 /* ================================================= */
-/*
-  Purpose:
-  - Vertical sliding panels (up/down)
-  - Independent from sidebar and layout.css
-  - Supports stacking multiple panels later
-  - Desktop + Mobile safe
-  - No behavior logic here (CSS-only)
-*/
 
 /* ---------- Panel Stack Container ---------- */
 .panel-stack {
@@ -18,30 +10,25 @@
   gap: 12px;
 }
 
-/* ---------- Base Panel ---------- */
 .panel {
   background: rgba(0, 0, 0, 0.35);
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 16px;
   overflow: hidden;
-
   transition:
     max-height 0.35s ease,
     transform 0.35s ease,
     opacity 0.25s ease;
 }
 
-/* ---------- Panel Header ---------- */
 .panel-header {
   padding: 14px 16px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-
   cursor: pointer;
   user-select: none;
-
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
@@ -55,17 +42,11 @@
   gap: 8px;
 }
 
-/* ---------- Panel Body ---------- */
 .panel-body {
   padding: 16px;
   overflow: auto;
 }
 
-/* ================================================= */
-/* PANEL STATES                                      */
-/* ================================================= */
-
-/* --- Collapsed (peek only) --- */
 .panel--collapsed {
   max-height: 56px;
 }
@@ -74,19 +55,13 @@
   display: none;
 }
 
-/* --- Half (default working state) --- */
 .panel--half {
   max-height: 45vh;
 }
 
-/* --- Expanded (focus mode) --- */
 .panel--expanded {
   max-height: 80vh;
 }
-
-/* ================================================= */
-/* MOBILE BEHAVIOR                                   */
-/* ================================================= */
 
 @media (max-width: 768px) {
   .panel--half {
@@ -101,10 +76,6 @@
     border-radius: 18px;
   }
 }
-
-/* ================================================= */
-/* OPTIONAL VISUAL CUES                              */
-/* ================================================= */
 
 .panel-header::after {
   content: "";
@@ -121,4 +92,155 @@
   .panel-header:hover {
     background: rgba(255, 255, 255, 0.04);
   }
+}
+
+/* ================================================= */
+/* ADVISOR UI STYLING                                */
+/* ================================================= */
+
+.advisor-wrap {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.advisor-miniTitle {
+  font-size: 13px;
+  opacity: 0.7;
+  padding: 10px 16px;
+  border-bottom: 1px solid rgba(255,255,255,.08);
+}
+
+/* FEED */
+
+.advisor-feed {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.advisor-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.advisor-bubble {
+  padding: 10px 14px;
+  border-radius: 14px;
+  max-width: 100%;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.advisor-row.user .advisor-bubble {
+  align-self: flex-end;
+  background: rgba(255,255,255,.08);
+}
+
+.advisor-row.ai .advisor-bubble {
+  align-self: flex-start;
+  background: rgba(255,255,255,.04);
+}
+
+.advisor-ts {
+  font-size: 11px;
+  opacity: 0.45;
+}
+
+/* ACTION ROW */
+
+.advisor-actions {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  opacity: 0.7;
+}
+
+.advisor-actions button {
+  background: none;
+  border: none;
+  font-size: 15px;
+  cursor: pointer;
+  padding: 0;
+  opacity: 0.7;
+}
+
+.advisor-actions button:hover {
+  opacity: 1;
+}
+
+/* INPUT BAR */
+
+.advisor-inputBar {
+  padding: 14px;
+  border-top: 1px solid rgba(255,255,255,.08);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.advisor-micBtn,
+.advisor-sendBtn {
+  background: none;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+  opacity: 0.8;
+}
+
+.advisor-micBtn:hover,
+.advisor-sendBtn:hover {
+  opacity: 1;
+}
+
+.advisor-inputCenter {
+  flex: 1;
+  position: relative;
+}
+
+.advisor-textarea {
+  width: 100%;
+  resize: none;
+  border: none;
+  outline: none;
+  background: rgba(255,255,255,.06);
+  border-radius: 999px;
+  padding: 8px 14px;
+  color: inherit;
+  font-size: 14px;
+}
+
+/* Voice Bars */
+
+.advisor-bars {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  pointer-events: none;
+}
+
+.advisor-bars span {
+  width: 3px;
+  height: 12px;
+  background: rgba(255,255,255,.7);
+  border-radius: 999px;
+  animation: wave 1s infinite ease-in-out;
+}
+
+@keyframes wave {
+  0%,100% { height: 8px; opacity: .4; }
+  50% { height: 22px; opacity: 1; }
+}
+
+.advisor-loading {
+  font-size: 12px;
+  opacity: 0.6;
+  padding: 8px 16px;
 }
