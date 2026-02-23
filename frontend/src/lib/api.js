@@ -1,6 +1,6 @@
 /* =========================================================
    AUTOSHIELD FRONTEND API LAYER — FULL PRODUCTION BUILD
-   Hardened + Backward Compatible + Compliance Safe
+   EXECUTIVE INTELLIGENCE ALIGNED
 ========================================================= */
 
 const API_BASE = import.meta.env.VITE_API_BASE?.trim();
@@ -129,56 +129,70 @@ const api = {
   refresh: () =>
     req("/api/auth/refresh", { method: "POST" }),
 
-  /* ================= ADMIN ================= */
+  /* ======================================================
+     🔥 ADMIN — EXECUTIVE COMMAND CENTER
+  ====================================================== */
 
-  adminCompanies: () => req("/api/admin/companies"),
+  adminMetrics: () =>
+    req("/api/admin/metrics"),
+
+  adminSubscriberGrowth: (days = 90) =>
+    req(`/api/admin/subscriber-growth?days=${days}`),
+
+  adminExecutiveRisk: () =>
+    req("/api/admin/executive-risk"),
+
+  adminRevenueRefundOverlay: (days = 90) =>
+    req(`/api/admin/revenue-refund-overlay?days=${days}`),
+
+  adminPredictiveChurn: () =>
+    req("/api/admin/predictive-churn"),
+
+  adminRefundDisputeTimeline: () =>
+    req("/api/admin/refund-dispute-timeline"),
+
+  adminComplianceReport: () =>
+    req("/api/admin/compliance/report"),
+
+  adminComplianceHistory: (limit = 20) =>
+    req(`/api/admin/compliance/history?limit=${limit}`),
+
+  adminUsers: () =>
+    req("/api/admin/users"),
+
+  adminNotifications: () =>
+    req("/api/admin/notifications"),
+
+  adminCompanies: () =>
+    req("/api/admin/companies"),
+
   adminCreateCompany: (payload) =>
     req("/api/admin/companies", { method: "POST", body: payload }),
 
-  adminUsers: () => req("/api/admin/users"),
-  adminNotifications: () => req("/api/admin/notifications"),
-
-  adminRotateUserId: (id) =>
-    req(`/api/admin/users/${id}/rotate-id`, { method: "POST" }),
-
-  adminUpdateSubscription: (id, payload) =>
-    req(`/api/admin/users/${id}/subscription`, {
-      method: "PATCH",
-      body: payload,
-    }),
-
-  adminForceCompleteScan: (scanId) =>
-    req(`/api/admin/scan/${scanId}/force-complete`, {
-      method: "POST",
-    }),
-
-  adminCancelScan: (scanId) =>
-    req(`/api/admin/scan/${scanId}/cancel`, {
-      method: "POST",
-    }),
-
-  adminOverrideScanRisk: (scanId, riskScore) =>
-    req(`/api/admin/scan/${scanId}/override-risk`, {
-      method: "POST",
-      body: { riskScore },
-    }),
-
-  /* 🔥 FIX: ADMIN COMPLIANCE REPORT */
-  adminComplianceReport: () =>
-    req("/api/admin/compliance-report"),
-
   /* ================= MANAGER ================= */
 
-  managerUsers: () => req("/api/manager/users"),
-  managerNotifications: () => req("/api/manager/notifications"),
-  managerOverview: () => req("/api/manager/overview"),
-  managerAudit: () => req("/api/manager/audit"),
+  managerUsers: () =>
+    req("/api/manager/users"),
+
+  managerNotifications: () =>
+    req("/api/manager/notifications"),
+
+  managerOverview: () =>
+    req("/api/manager/overview"),
+
+  managerAudit: () =>
+    req("/api/manager/audit"),
 
   /* ================= COMPANY ================= */
 
-  companyMe: () => req("/api/company/me"),
-  companyNotifications: () => req("/api/company/notifications"),
-  companyMembers: () => req("/api/company/members"),
+  companyMe: () =>
+    req("/api/company/me"),
+
+  companyNotifications: () =>
+    req("/api/company/notifications"),
+
+  companyMembers: () =>
+    req("/api/company/members"),
 
   companyAddMember: (userId) =>
     req("/api/company/members", {
@@ -198,25 +212,15 @@ const api = {
 
   /* ================= SECURITY ================= */
 
-  postureSummary: () => req("/api/security/posture-summary"),
-  postureChecks: () => req("/api/security/posture-checks"),
-  postureRecent: (limit = 20) =>
-    req(`/api/security/posture-recent?limit=${limit}`),
+  postureSummary: () =>
+    req("/api/security/posture-summary"),
 
-  vulnerabilities: () => req("/api/security/vulnerabilities"),
+  vulnerabilities: () =>
+    req("/api/security/vulnerabilities"),
 
   securityEvents: (limit = 50) =>
     req(`/api/security/events?limit=${limit}`),
 
-  /* Backward compatibility */
-  threatFeed: (limit = 50) =>
-    req(`/api/security/events?limit=${limit}`),
-
-  incidents: () => req("/api/incidents"),
-  createIncident: (payload) =>
-    req("/api/incidents", { method: "POST", body: payload }),
-
-  /* 🔥 FIX: SECURITY COMPLIANCE (non-admin roles) */
   compliance: () =>
     req("/api/security/compliance"),
 
@@ -230,19 +234,25 @@ const api = {
 
   /* ================= AUTOPROTECT ================= */
 
-  autoprotectStatus: () => req("/api/autoprotect/status"),
+  autoprotectStatus: () =>
+    req("/api/autoprotect/status"),
+
   autoprotectEnable: () =>
     req("/api/autoprotect/enable", { method: "POST" }),
+
   autoprotectDisable: () =>
     req("/api/autoprotect/disable", { method: "POST" }),
 
   /* ================= ASSETS ================= */
 
-  assets: () => req("/api/assets"),
+  assets: () =>
+    req("/api/assets"),
 
   /* ================= BILLING ================= */
 
-  billingStatus: () => req("/api/billing/status"),
+  billingStatus: () =>
+    req("/api/billing/status"),
+
   createCheckout: () =>
     req("/api/billing/checkout", { method: "POST" }),
 
