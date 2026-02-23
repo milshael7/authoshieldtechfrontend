@@ -43,23 +43,17 @@ html, body {
   z-index:5;
 }
 
-/* BRAND */
-
 .layout-brand{
   display:flex;
   flex-direction:column;
   gap:4px;
 }
 
-/* NAV */
-
 .layout-nav{
   display:flex;
   flex-direction:column;
   gap:6px;
 }
-
-/* 🔥 FIXED LINK STYLING */
 
 .layout-nav a{
   display:block;
@@ -82,8 +76,6 @@ html, body {
   color:#fff;
 }
 
-/* SECTION LABEL */
-
 .nav-section-label{
   font-size:12px;
   font-weight:800;
@@ -94,15 +86,11 @@ html, body {
   letter-spacing:.08em;
 }
 
-/* HR */
-
 .layout-nav hr{
   border:none;
   border-top:1px solid rgba(255,255,255,.08);
   margin:12px 0;
 }
-
-/* LOGOUT */
 
 .logout-btn{
   margin-top:auto;
@@ -164,6 +152,43 @@ html, body {
   display:flex;
   flex-direction:column;
   height:100%;
+}
+
+/* =========================================================
+   ADVISOR ACTION ICONS (CLEAN PROFESSIONAL STYLE)
+   ========================================================= */
+
+.advisor-actions{
+  display:flex;
+  align-items:center;
+  gap:14px;
+  margin-top:8px;
+}
+
+.icon-btn{
+  background:none;
+  border:none;
+  padding:0;
+  cursor:pointer;
+  color:rgba(255,255,255,0.75);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  transition:color .2s ease, opacity .2s ease;
+}
+
+.icon-btn svg{
+  width:18px;     /* slightly smaller as requested */
+  height:18px;
+  stroke:currentColor;
+}
+
+.icon-btn:hover{
+  color:#ffffff;
+}
+
+.icon-btn.active{
+  color:#ffffff;
 }
 
 /* =========================================================
