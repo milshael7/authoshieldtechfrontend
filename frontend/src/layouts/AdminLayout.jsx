@@ -3,7 +3,7 @@
 // Mobile-Aware • Institutional Grade • Structural Hardened
 
 import React, { useEffect, useState } from "react";
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { NavLink, Outlet, useNavigate, useLocation } from "react-router-dom";
 import { clearToken, clearUser, api } from "../lib/api.js";
 import { useCompany } from "../context/CompanyContext";
 import AuthoDevPanel from "../components/AuthoDevPanel.jsx";
@@ -11,25 +11,50 @@ import Logo from "../components/Logo.jsx";
 import "../styles/layout.css";
 
 export default function AdminLayout() {
-
   const navigate = useNavigate();
-  const { activeCompanyId, activeCompanyName, setCompany, clearScope } = useCompany();
+  const location = useLocation();
+
+  const { activeCompanyId, activeCompanyName, setCompany, clearScope } =
+    useCompany();
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [advisorOpen, setAdvisorOpen] = useState(true);
   const [companies, setCompanies] = useState([]);
   const [systemState, setSystemState] = useState(null);
 
-  const isMobile = window.innerWidth < 900;
+  // ✅ reactive mobile detection (fixes “it worked once then broke”)
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 900);
+
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 900);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  // ✅ auto-close menu when route changes (mobile UX)
+  useEffect(() => {
+    if (isMobile) setMenuOpen(false);
+  }, [location.pathname, isMobile]);
+
+  function closeMenu() {
+    setMenuOpen(false);
+  }
 
   /* ================= SYSTEM HEALTH ================= */
 
   useEffect(() => {
     async function loadHealth() {
       try {
-        const res = await fetch("/health");
+        // ✅ use backend base so Vercel doesn’t call itself
+        const base = import.meta.env.VITE_API_BASE?.trim();
+        if (!base) return;
+
+        const res = await fetch(`${base.replace(/\/+$/, "")}/health`, {
+          method: "GET",
+          credentials: "include",
+        });
         const data = await res.json();
-        setSystemState(data.systemState);
+        setSystemState(data.systemState || null);
       } catch {}
     }
 
@@ -62,7 +87,7 @@ export default function AdminLayout() {
     const id = e.target.value;
     if (!id) return clearScope();
 
-    const company = companies.find(c => String(c.id) === String(id));
+    const company = companies.find((c) => String(c.id) === String(id));
     if (company) setCompany(company);
   }
 
@@ -74,11 +99,24 @@ export default function AdminLayout() {
     return "#999";
   }
 
+  // ✅ helper so NavLink closes menu on mobile
+  const navClick = () => {
+    if (isMobile) closeMenu();
+  };
+
   return (
     <div className={`layout-root enterprise ${menuOpen ? "sidebar-open" : ""}`}>
+      {/* ✅ overlay to close (fixes “can’t get back / can’t scroll” on phone) */}
+      {isMobile && menuOpen && (
+        <div className="sidebar-overlay" onClick={closeMenu} />
+      )}
 
       {/* ================= SIDEBAR ================= */}
-      <aside className={`layout-sidebar admin ${isMobile && !menuOpen ? "collapsed" : ""}`}>
+      <aside
+        className={`layout-sidebar admin ${
+          isMobile && !menuOpen ? "collapsed" : ""
+        }`}
+      >
         <div className="layout-brand">
           <Logo size="md" />
           <span className="muted" style={{ fontSize: 12 }}>
@@ -86,8 +124,10 @@ export default function AdminLayout() {
           </span>
         </div>
 
-        <nav className="layout-nav">
-          <NavLink to="." end>Dashboard</NavLink>
+        <nav className="layout-nav" onClick={navClick}>
+          <NavLink to="." end>
+            Dashboard
+          </NavLink>
           <NavLink to="assets">Assets</NavLink>
           <NavLink to="threats">Threat Intelligence</NavLink>
           <NavLink to="incidents">Incident Management</NavLink>
@@ -111,14 +151,10 @@ export default function AdminLayout() {
 
       {/* ================= MAIN ================= */}
       <div className="enterprise-main">
-
         {/* 🔥 MOBILE HAMBURGER */}
         {isMobile && (
           <div style={{ padding: "10px 16px" }}>
-            <button
-              className="btn"
-              onClick={() => setMenuOpen(v => !v)}
-            >
+            <button className="btn" onClick={() => setMenuOpen((v) => !v)}>
               ☰ Menu
             </button>
           </div>
@@ -132,7 +168,9 @@ export default function AdminLayout() {
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
-            background: "rgba(255,255,255,0.02)"
+            background: "rgba(255,255,255,0.02)",
+            gap: 12,
+            flexWrap: "wrap",
           }}
         >
           <div>
@@ -159,7 +197,7 @@ export default function AdminLayout() {
             justifyContent: "space-between",
             alignItems: "center",
             flexWrap: "wrap",
-            gap: "12px"
+            gap: "12px",
           }}
         >
           <div>
@@ -172,7 +210,7 @@ export default function AdminLayout() {
             style={{ minWidth: 220 }}
           >
             <option value="">All Entities</option>
-            {companies.map(c => (
+            {companies.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
               </option>
@@ -188,7 +226,11 @@ export default function AdminLayout() {
         </main>
 
         {/* ADVISOR PANEL */}
-        <aside className={`enterprise-ai-panel ${advisorOpen ? "open" : "collapsed"}`}>
+        <aside
+          className={`enterprise-ai-panel ${
+            advisorOpen ? "open" : "collapsed"
+          }`}
+        >
           <div className="enterprise-ai-inner">
             <AuthoDevPanel
               getContext={() => ({
@@ -201,10 +243,7 @@ export default function AdminLayout() {
         </aside>
       </div>
 
-      <button
-        className="advisor-fab"
-        onClick={() => setAdvisorOpen(v => !v)}
-      >
+      <button className="advisor-fab" onClick={() => setAdvisorOpen((v) => !v)}>
         {advisorOpen ? "›" : "Advisor"}
       </button>
     </div>
