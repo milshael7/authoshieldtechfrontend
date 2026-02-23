@@ -1,6 +1,6 @@
 /* =========================================================
    AUTOSHIELD FRONTEND API LAYER — FULL PRODUCTION BUILD
-   Hardened + Backward Compatible
+   Hardened + Backward Compatible + Report Safe
 ========================================================= */
 
 const API_BASE = import.meta.env.VITE_API_BASE?.trim();
@@ -203,17 +203,24 @@ const api = {
 
   vulnerabilities: () => req("/api/security/vulnerabilities"),
 
-  /* MAIN EVENT FEED */
   securityEvents: (limit = 50) =>
     req(`/api/security/events?limit=${limit}`),
 
-  /* 🔥 BACKWARD COMPATIBILITY FIX */
+  /* Backward compatibility */
   threatFeed: (limit = 50) =>
     req(`/api/security/events?limit=${limit}`),
 
   incidents: () => req("/api/incidents"),
   createIncident: (payload) =>
     req("/api/incidents", { method: "POST", body: payload }),
+
+  /* ================= REPORTING (FIXED) ================= */
+
+  reportSummary: () =>
+    req("/api/reports/summary"),
+
+  reportExport: () =>
+    req("/api/reports/export"),
 
   /* ================= AUTOPROTECT ================= */
 
