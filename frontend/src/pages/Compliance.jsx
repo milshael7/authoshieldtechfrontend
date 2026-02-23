@@ -1,3 +1,4 @@
+// frontend/src/pages/Compliance.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import { api } from "../lib/api.js";
 
@@ -14,57 +15,36 @@ function safeArray(v) {
 }
 
 function normalizeFromReport(report) {
-  // Try multiple shapes safely
   const r = report?.complianceReport || report || {};
 
-  // Frameworks: prefer explicit frameworks, otherwise build a simple set
   let frameworks =
     safeArray(r.frameworks) ||
     safeArray(r?.controls?.frameworks) ||
     safeArray(r?.summary?.frameworks);
 
   if (!frameworks.length) {
-    // Build “framework-style” cards from known report areas (if present)
-    const auditOk =
-      r?.auditIntegrity?.ok ?? r?.auditOk ?? r?.audit?.ok ?? null;
-
-    const drift =
-      Number(r?.financialIntegrity?.revenueDrift ?? r?.revenueDrift ?? 0) || 0;
+    const auditOk = r?.auditIntegrity?.ok ?? r?.auditOk ?? r?.audit?.ok ?? null;
+    const drift = Number(r?.financialIntegrity?.revenueDrift ?? r?.revenueDrift ?? 0) || 0;
 
     frameworks = [
-      {
-        name: "Audit Integrity",
-        coverage: auditOk === null ? 0 : auditOk ? 100 : 25,
-      },
-      {
-        name: "Financial Drift",
-        coverage: pct(100 - Math.min(100, Math.abs(drift) * 4)),
-      },
-      {
-        name: "Retention & Snapshots",
-        coverage: r?.retentionPolicy ? 85 : 50,
-      },
-      {
-        name: "System Governance",
-        coverage: 75,
-      },
+      { name: "Audit Integrity", coverage: auditOk === null ? 0 : auditOk ? 100 : 25 },
+      { name: "Financial Drift", coverage: pct(100 - Math.min(100, Math.abs(drift) * 4)) },
+      { name: "Retention & Snapshots", coverage: r?.retentionPolicy ? 85 : 50 },
+      { name: "System Governance", coverage: 75 },
     ];
   }
 
-  // Controls: prefer explicit controls/checks, otherwise build from fields
   let controls =
     safeArray(r.controls) ||
     safeArray(r.checks) ||
     safeArray(r?.compliance?.controls) ||
     [];
 
-  // If controls are objects but no name/status, map them
   controls = controls.map((c, i) => {
     if (!c || typeof c !== "object") {
       return { id: i, name: String(c), status: "unknown" };
     }
-    const name =
-      c.name || c.title || c.control || c.key || `Control ${i + 1}`;
+    const name = c.name || c.title || c.control || c.key || `Control ${i + 1}`;
     const status =
       c.status ||
       c.state ||
@@ -72,32 +52,51 @@ function normalizeFromReport(report) {
     return { ...c, id: c.id ?? i, name, status: String(status).toLowerCase() };
   });
 
-  // Normalize status labels to passed/failed/warn/unknown
   controls = controls.map((c) => {
     const s = String(c.status || "").toLowerCase();
     const normalized =
-      s === "pass" || s === "passed" || s === "ok" ? "passed"
-      : s === "fail" || s === "failed" || s === "danger" ? "failed"
-      : s === "warn" || s === "warning" ? "warn"
-      : "unknown";
+      s === "pass" || s === "passed" || s === "ok"
+        ? "passed"
+        : s === "fail" || s === "failed" || s === "danger"
+        ? "failed"
+        : s === "warn" || s === "warning"
+        ? "warn"
+        : "unknown";
     return { ...c, status: normalized };
   });
+
+  frameworks = frameworks.map((fw, i) => ({
+    name: fw?.name || fw?.framework || fw?.title || `Framework ${i + 1}`,
+    coverage: pct(fw?.coverage ?? fw?.score ?? fw?.pct ?? 0),
+  }));
 
   return { frameworks, controls };
 }
 
 function normalizeFromSecurityCompliance(data) {
   const d = data || {};
-  const frameworks = safeArray(d.frameworks).map((fw) => ({
-    name: fw?.name || fw?.framework || "Framework",
-    coverage: pct(fw?.coverage ?? fw?.score ?? 0),
+  const frameworks = safeArray(d.frameworks).map((fw, i) => ({
+    name: fw?.name || fw?.framework || fw?.title || `Framework ${i + 1}`,
+    coverage: pct(fw?.coverage ?? fw?.score ?? fw?.pct ?? 0),
   }));
 
-  const controls = safeArray(d.controls).map((c, i) => ({
-    id: c?.id ?? i,
-    name: c?.name || c?.title || c?.control || `Control ${i + 1}`,
-    status: String(c?.status || "unknown").toLowerCase(),
-  }));
+  const controls = safeArray(d.controls).map((c, i) => {
+    const s = String(c?.status || "unknown").toLowerCase();
+    const normalized =
+      s === "pass" || s === "passed" || s === "ok"
+        ? "passed"
+        : s === "fail" || s === "failed" || s === "danger"
+        ? "failed"
+        : s === "warn" || s === "warning"
+        ? "warn"
+        : "unknown";
+
+    return {
+      id: c?.id ?? i,
+      name: c?.name || c?.title || c?.control || `Control ${i + 1}`,
+      status: normalized,
+    };
+  });
 
   return { frameworks, controls };
 }
@@ -109,7 +108,6 @@ export default function Compliance() {
   const [controls, setControls] = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
-
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
@@ -126,14 +124,14 @@ export default function Compliance() {
     setErr("");
 
     try {
-      // 1) Try security compliance endpoint (works for more roles)
-      // 2) Fallback to admin compliance report if security route doesn't exist/forbidden
+      // Try security compliance (works for more roles)
       try {
         const res = await api.compliance();
         const normalized = normalizeFromSecurityCompliance(res);
         setFrameworks(safeArray(normalized.frameworks));
         setControls(safeArray(normalized.controls));
       } catch {
+        // Fallback to admin compliance report
         const res2 = await api.adminComplianceReport();
         const normalized2 = normalizeFromReport(res2);
         setFrameworks(safeArray(normalized2.frameworks));
@@ -157,8 +155,6 @@ export default function Compliance() {
     [controls]
   );
 
-  /* ================= UI ================= */
-
   return (
     <div style={{ padding: 20, display: "flex", flexDirection: "column", gap: 20 }}>
       {/* HEADER */}
@@ -167,6 +163,7 @@ export default function Compliance() {
         <div style={{ fontSize: 13, opacity: 0.65 }}>
           Regulatory readiness and control coverage
         </div>
+
         {err ? (
           <div style={{ marginTop: 10, color: "#ff5a5f", fontSize: 13 }}>
             <b>Error:</b> {err}
@@ -174,7 +171,7 @@ export default function Compliance() {
         ) : null}
       </div>
 
-      {/* FRAMEWORK STATUS */}
+      {/* FRAMEWORKS */}
       <div
         style={{
           display: "grid",
@@ -183,7 +180,7 @@ export default function Compliance() {
         }}
       >
         {frameworks.map((fw, idx) => (
-          <div key={fw.name + idx} className="card" style={{ padding: 18 }}>
+          <div key={`${fw.name}-${idx}`} className="card" style={{ padding: 18 }}>
             <div style={{ fontWeight: 800 }}>{fw.name}</div>
 
             <div
@@ -235,38 +232,36 @@ export default function Compliance() {
           </div>
 
           <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 10 }}>
-            {safeArray(controls)
-              .slice(0, 12)
-              .map((c, i) => (
-                <div
-                  key={c?.id || i}
+            {safeArray(controls).slice(0, 12).map((c, i) => (
+              <div
+                key={c?.id || i}
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  gap: 12,
+                  padding: 12,
+                  borderRadius: 12,
+                  background: "rgba(255,255,255,.04)",
+                  border: "1px solid rgba(255,255,255,.08)",
+                }}
+              >
+                <span style={{ opacity: 0.95 }}>{c?.name || "Control"}</span>
+                <strong
                   style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    gap: 12,
-                    padding: 12,
-                    borderRadius: 12,
-                    background: "rgba(255,255,255,.04)",
-                    border: "1px solid rgba(255,255,255,.08)",
+                    color:
+                      c?.status === "passed"
+                        ? "#5EC6FF"
+                        : c?.status === "failed"
+                        ? "#ff5a5f"
+                        : c?.status === "warn"
+                        ? "#ffd166"
+                        : "rgba(255,255,255,.65)",
                   }}
                 >
-                  <span style={{ opacity: 0.95 }}>{c?.name || "Control"}</span>
-                  <strong
-                    style={{
-                      color:
-                        c?.status === "passed"
-                          ? "#5EC6FF"
-                          : c?.status === "failed"
-                          ? "#ff5a5f"
-                          : c?.status === "warn"
-                          ? "#ffd166"
-                          : "rgba(255,255,255,.65)",
-                    }}
-                  >
-                    {(c?.status || "unknown").toUpperCase()}
-                  </strong>
-                </div>
-              ))}
+                  {(c?.status || "unknown").toUpperCase()}
+                </strong>
+              </div>
+            ))}
 
             {controls.length === 0 && (
               <div style={{ opacity: 0.65 }}>
