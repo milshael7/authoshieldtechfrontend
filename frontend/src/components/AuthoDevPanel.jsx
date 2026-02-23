@@ -4,38 +4,27 @@ import { readAloud } from "./ReadAloud";
 
 /* ================= CONFIG ================= */
 
-const SESSION_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
+const SESSION_TIMEOUT_MS = 30 * 60 * 1000;
 const MAX_MESSAGES = 50;
 
 /* ================= STORAGE ================= */
 
 function safeGet(key) {
-  try {
-    return localStorage.getItem(key);
-  } catch {
-    return null;
-  }
+  try { return localStorage.getItem(key); } catch { return null; }
 }
 function safeSet(key, value) {
-  try {
-    localStorage.setItem(key, value);
-  } catch {}
+  try { localStorage.setItem(key, value); } catch {}
 }
 function safeRemove(key) {
-  try {
-    localStorage.removeItem(key);
-  } catch {}
+  try { localStorage.removeItem(key); } catch {}
 }
 function getRoomId() {
   if (typeof window === "undefined") return "root";
   return window.location.pathname.replace(/\/+$/, "") || "root";
 }
 function getUser() {
-  try {
-    return JSON.parse(localStorage.getItem("as_user") || "null");
-  } catch {
-    return null;
-  }
+  try { return JSON.parse(localStorage.getItem("as_user") || "null"); }
+  catch { return null; }
 }
 function getStorageKey() {
   const user = getUser();
@@ -43,26 +32,19 @@ function getStorageKey() {
   return `authodev.panel.${tenant}.${getRoomId()}`;
 }
 
-/* ================= COMPONENT ================= */
-
 export default function AuthoDevPanel({
   title = "",
   endpoint = "/api/ai/chat",
   getContext,
 }) {
-  // NOTE: This keeps your stable storage pattern.
-  // If you ever want this to switch per-route instantly without reload,
-  // we can key it from parent with a `key={location.pathname}`.
-  const storageKey = useMemo(() => getStorageKey(), []);
 
+  const storageKey = useMemo(() => getStorageKey(), []);
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // voice
   const [listening, setListening] = useState(false);
   const recognitionRef = useRef(null);
-
   const bottomRef = useRef(null);
   const inactivityTimer = useRef(null);
 
@@ -71,42 +53,30 @@ export default function AuthoDevPanel({
   useEffect(() => {
     const raw = safeGet(storageKey);
     if (!raw) return;
-
     try {
       const parsed = JSON.parse(raw);
       const now = Date.now();
-
-      // expire old sessions
       if (parsed?.lastActive && now - parsed.lastActive > SESSION_TIMEOUT_MS) {
         safeRemove(storageKey);
         return;
       }
-
       setMessages(Array.isArray(parsed?.messages) ? parsed.messages : []);
-    } catch {
-      // ignore corrupted storage
-    }
+    } catch {}
   }, [storageKey]);
 
   useEffect(() => {
-    safeSet(
-      storageKey,
-      JSON.stringify({
-        messages,
-        lastActive: Date.now(),
-      })
-    );
+    safeSet(storageKey, JSON.stringify({
+      messages,
+      lastActive: Date.now(),
+    }));
   }, [messages, storageKey]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  /* ================= AUTO INACTIVITY RESET ================= */
-
   function resetInactivityTimer() {
     if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
-
     inactivityTimer.current = setTimeout(() => {
       setMessages([]);
       safeRemove(storageKey);
@@ -116,22 +86,15 @@ export default function AuthoDevPanel({
   useEffect(() => {
     resetInactivityTimer();
     return () => inactivityTimer.current && clearTimeout(inactivityTimer.current);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messages]);
 
   /* ================= VOICE ================= */
 
   function startListening() {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SR) {
-      alert("Voice input not supported in this browser.");
-      return;
-    }
+    if (!SR) return;
 
-    // stop any previous session
-    try {
-      recognitionRef.current?.stop();
-    } catch {}
+    try { recognitionRef.current?.stop(); } catch {}
 
     const rec = new SR();
     rec.lang = "en-US";
@@ -139,13 +102,11 @@ export default function AuthoDevPanel({
 
     rec.onstart = () => setListening(true);
     rec.onend = () => setListening(false);
-
     rec.onresult = (e) => {
       const last = e.results?.[e.results.length - 1];
       const text = last?.[0]?.transcript || "";
       if (text) setInput(text);
     };
-
     rec.onerror = () => setListening(false);
 
     recognitionRef.current = rec;
@@ -153,48 +114,26 @@ export default function AuthoDevPanel({
   }
 
   function stopListening() {
-    try {
-      recognitionRef.current?.stop();
-    } catch {}
+    try { recognitionRef.current?.stop(); } catch {}
     setListening(false);
   }
 
-  /* ================= MESSAGE ACTIONS ================= */
+  /* ================= ACTIONS ================= */
 
   async function copyText(text) {
-    try {
-      if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(text);
-        return;
-      }
-    } catch {}
-
-    // fallback
-    try {
-      const ta = document.createElement("textarea");
-      ta.value = text;
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand("copy");
-      document.body.removeChild(ta);
-    } catch {}
+    try { await navigator.clipboard.writeText(text); } catch {}
   }
 
   async function shareText(text) {
-    if (!navigator.share) {
-      await copyText(text);
-      return;
-    }
-    try {
-      await navigator.share({ text });
-    } catch {
-      // user cancelled -> ignore
-    }
+    if (!navigator.share) return copyText(text);
+    try { await navigator.share({ text }); } catch {}
   }
 
   function setReaction(index, type) {
     setMessages((m) =>
-      m.map((msg, i) => (i === index ? { ...msg, reaction: type } : msg))
+      m.map((msg, i) =>
+        i === index ? { ...msg, reaction: type } : msg
+      )
     );
   }
 
@@ -204,17 +143,12 @@ export default function AuthoDevPanel({
     const messageText = String(regenText || input || "").trim();
     if (!messageText || loading) return;
 
-    // stop voice if user sends
     if (listening) stopListening();
 
     if (!regenText) {
       setMessages((m) => [
         ...m.slice(-MAX_MESSAGES + 1),
-        {
-          role: "user",
-          text: messageText,
-          ts: new Date().toLocaleTimeString(),
-        },
+        { role: "user", text: messageText, ts: new Date().toLocaleTimeString() }
       ]);
       setInput("");
     }
@@ -263,84 +197,83 @@ export default function AuthoDevPanel({
 
   return (
     <div className="advisor-wrap">
-      {/* HEADER */}
       <div className="advisor-miniTitle">{title || "Advisor"}</div>
 
-      {/* FEED */}
       <div className="advisor-feed">
         {messages.map((m, i) => (
           <div key={i} className={`advisor-row ${m.role}`}>
             <div className="advisor-bubble">{m.text}</div>
 
-            {/* Actions under every AI response (like your screenshot behavior) */}
             {m.role === "ai" && (
               <div className="advisor-actions">
-                <button onClick={() => readAloud(m.speakText)} title="Read aloud">
-                  🔊
-                </button>
-                <button onClick={() => copyText(m.text)} title="Copy">
-                  ⧉
-                </button>
-                <button onClick={() => shareText(m.text)} title="Share">
-                  ⇪
+
+                {/* Copy */}
+                <button className="icon-btn" onClick={() => copyText(m.text)}>
+                  <svg viewBox="0 0 24 24" stroke="currentColor" fill="none" strokeWidth="1.7">
+                    <rect x="9" y="9" width="13" height="13" rx="2"/>
+                    <path d="M5 15V5a2 2 0 0 1 2-2h10"/>
+                  </svg>
                 </button>
 
-                <button
-                  className={m.reaction === "up" ? "active" : ""}
-                  onClick={() => setReaction(i, "up")}
-                  title="Helpful"
-                >
-                  👍
-                </button>
-                <button
-                  className={m.reaction === "down" ? "active" : ""}
-                  onClick={() => setReaction(i, "down")}
-                  title="Not helpful"
-                >
-                  👎
+                {/* Speaker */}
+                <button className="icon-btn" onClick={() => readAloud(m.speakText)}>
+                  <svg viewBox="0 0 24 24" stroke="currentColor" fill="none" strokeWidth="1.7">
+                    <path d="M11 5L6 9H2v6h4l5 4V5z"/>
+                    <path d="M19 5a7 7 0 0 1 0 14"/>
+                  </svg>
                 </button>
 
-                <button onClick={() => sendMessage(m.text)} title="Regenerate">
-                  ↻
+                {/* Thumbs Up */}
+                <button className="icon-btn" onClick={() => setReaction(i, "up")}>
+                  <svg viewBox="0 0 24 24" stroke="currentColor" fill="none" strokeWidth="1.7">
+                    <path d="M14 9V5a3 3 0 0 0-6 0v4H4v11h16V9h-6z"/>
+                  </svg>
                 </button>
+
+                {/* Thumbs Down */}
+                <button className="icon-btn" onClick={() => setReaction(i, "down")}>
+                  <svg viewBox="0 0 24 24" stroke="currentColor" fill="none" strokeWidth="1.7">
+                    <path d="M10 15v4a3 3 0 0 0 6 0v-4h4V4H4v11h6z"/>
+                  </svg>
+                </button>
+
+                {/* Regenerate */}
+                <button className="icon-btn" onClick={() => sendMessage(m.text)}>
+                  <svg viewBox="0 0 24 24" stroke="currentColor" fill="none" strokeWidth="1.7">
+                    <path d="M23 4v6h-6"/>
+                    <path d="M1 20v-6h6"/>
+                  </svg>
+                </button>
+
+                {/* Share */}
+                <button className="icon-btn" onClick={() => shareText(m.text)}>
+                  <svg viewBox="0 0 24 24" stroke="currentColor" fill="none" strokeWidth="1.7">
+                    <circle cx="18" cy="5" r="3"/>
+                    <circle cx="6" cy="12" r="3"/>
+                    <circle cx="18" cy="19" r="3"/>
+                  </svg>
+                </button>
+
               </div>
             )}
 
             <div className="advisor-ts">{m.ts}</div>
           </div>
         ))}
-
         <div ref={bottomRef} />
       </div>
 
-      {/* INPUT BAR — mic LEFT, typing CENTER, send RIGHT (restored) */}
       <div className="advisor-inputBar">
-        {/* MIC LEFT: mic when idle, square when listening */}
         {!listening ? (
-          <button
-            className="advisor-micBtn"
-            onClick={startListening}
-            title="Voice"
-            aria-label="Voice"
-          >
-            🎙
-          </button>
+          <button className="advisor-micBtn" onClick={startListening}>🎙</button>
         ) : (
-          <button
-            className="advisor-micBtn"
-            onClick={stopListening}
-            title="Stop"
-            aria-label="Stop"
-          >
-            ■
-          </button>
+          <button className="advisor-micBtn" onClick={stopListening}>■</button>
         )}
 
-        {/* CENTER INPUT */}
         <div className="advisor-inputCenter">
           <textarea
             className="advisor-textarea"
-            placeholder="Ask about threats, posture, compliance…"
+            placeholder="Ask anything..."
             value={input}
             onChange={(e) => setInput(e.target.value)}
             rows={1}
@@ -351,26 +284,12 @@ export default function AuthoDevPanel({
               }
             }}
           />
-
-          {/* VOICE BARS while listening */}
-          {listening && (
-            <div className="advisor-bars" aria-hidden="true">
-              <span />
-              <span />
-              <span />
-              <span />
-              <span />
-            </div>
-          )}
         </div>
 
-        {/* SEND RIGHT */}
         <button
           className="advisor-sendBtn"
           onClick={() => sendMessage()}
           disabled={loading || !input.trim()}
-          title="Send"
-          aria-label="Send"
         >
           ➤
         </button>
