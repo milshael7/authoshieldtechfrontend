@@ -1,6 +1,5 @@
 // frontend/src/layouts/AdminLayout.jsx
-// Enterprise Admin Layout — Command Architecture v2
-// Mobile-Aware • Institutional Grade • Structural Hardened
+// Enterprise Admin Layout — Clean Unified Command Architecture
 
 import React, { useEffect, useState } from "react";
 import { NavLink, Outlet, useNavigate, useLocation } from "react-router-dom";
@@ -21,8 +20,6 @@ export default function AdminLayout() {
   const [advisorOpen, setAdvisorOpen] = useState(true);
   const [companies, setCompanies] = useState([]);
   const [systemState, setSystemState] = useState(null);
-
-  // ✅ reactive mobile detection (fixes “it worked once then broke”)
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 900);
 
   useEffect(() => {
@@ -31,28 +28,19 @@ export default function AdminLayout() {
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
-  // ✅ auto-close menu when route changes (mobile UX)
   useEffect(() => {
     if (isMobile) setMenuOpen(false);
   }, [location.pathname, isMobile]);
-
-  function closeMenu() {
-    setMenuOpen(false);
-  }
 
   /* ================= SYSTEM HEALTH ================= */
 
   useEffect(() => {
     async function loadHealth() {
       try {
-        // ✅ use backend base so Vercel doesn’t call itself
         const base = import.meta.env.VITE_API_BASE?.trim();
         if (!base) return;
 
-        const res = await fetch(`${base.replace(/\/+$/, "")}/health`, {
-          method: "GET",
-          credentials: "include",
-        });
+        const res = await fetch(`${base.replace(/\/+$/, "")}/health`);
         const data = await res.json();
         setSystemState(data.systemState || null);
       } catch {}
@@ -75,8 +63,6 @@ export default function AdminLayout() {
     loadCompanies();
   }, []);
 
-  /* ================= LOGOUT ================= */
-
   function logout() {
     clearToken();
     clearUser();
@@ -86,7 +72,6 @@ export default function AdminLayout() {
   function handleCompanySelect(e) {
     const id = e.target.value;
     if (!id) return clearScope();
-
     const company = companies.find((c) => String(c.id) === String(id));
     if (company) setCompany(company);
   }
@@ -99,24 +84,18 @@ export default function AdminLayout() {
     return "#999";
   }
 
-  // ✅ helper so NavLink closes menu on mobile
   const navClick = () => {
-    if (isMobile) closeMenu();
+    if (isMobile) setMenuOpen(false);
   };
 
   return (
     <div className={`layout-root enterprise ${menuOpen ? "sidebar-open" : ""}`}>
-      {/* ✅ overlay to close (fixes “can’t get back / can’t scroll” on phone) */}
       {isMobile && menuOpen && (
-        <div className="sidebar-overlay" onClick={closeMenu} />
+        <div className="sidebar-overlay" onClick={() => setMenuOpen(false)} />
       )}
 
       {/* ================= SIDEBAR ================= */}
-      <aside
-        className={`layout-sidebar admin ${
-          isMobile && !menuOpen ? "collapsed" : ""
-        }`}
-      >
+      <aside className="layout-sidebar admin">
         <div className="layout-brand">
           <Logo size="md" />
           <span className="muted" style={{ fontSize: 12 }}>
@@ -125,9 +104,7 @@ export default function AdminLayout() {
         </div>
 
         <nav className="layout-nav" onClick={navClick}>
-          <NavLink to="." end>
-            Dashboard
-          </NavLink>
+          <NavLink to="." end>Dashboard</NavLink>
           <NavLink to="assets">Assets</NavLink>
           <NavLink to="threats">Threat Intelligence</NavLink>
           <NavLink to="incidents">Incident Management</NavLink>
@@ -149,73 +126,52 @@ export default function AdminLayout() {
         </button>
       </aside>
 
-      {/* ================= MAIN ================= */}
+      {/* ================= MAIN WORKSPACE ================= */}
       <div className="enterprise-main">
-        {/* 🔥 MOBILE HAMBURGER */}
-        {isMobile && (
-          <div style={{ padding: "10px 16px" }}>
-            <button className="btn" onClick={() => setMenuOpen((v) => !v)}>
-              ☰ Menu
-            </button>
-          </div>
-        )}
 
-        {/* SYSTEM STATUS BAR */}
+        {/* 🔥 Unified Enterprise Header */}
         <div
           style={{
-            padding: "10px 24px",
+            padding: "14px 28px",
             borderBottom: "1px solid rgba(255,255,255,.08)",
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
             background: "rgba(255,255,255,0.02)",
-            gap: 12,
             flexWrap: "wrap",
+            gap: 16,
           }}
         >
+          <div style={{ display: "flex", gap: 20, alignItems: "center" }}>
+            <div>
+              <strong>Security Status:</strong>{" "}
+              <span style={{ color: getStatusColor(), fontWeight: 700 }}>
+                {systemState?.securityStatus || "Loading..."}
+              </span>
+            </div>
+
+            <div style={{ fontSize: 13, opacity: 0.7 }}>
+              Audit:{" "}
+              {systemState?.lastComplianceCheck
+                ? new Date(systemState.lastComplianceCheck).toLocaleDateString()
+                : "-"}
+            </div>
+          </div>
+
           <div>
-            <strong>Global Security Status:</strong>{" "}
-            <span style={{ color: getStatusColor(), fontWeight: 700 }}>
-              {systemState?.securityStatus || "Loading..."}
-            </span>
+            <select
+              value={activeCompanyId || ""}
+              onChange={handleCompanySelect}
+              style={{ minWidth: 220 }}
+            >
+              <option value="">All Entities</option>
+              {companies.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
           </div>
-
-          <div style={{ fontSize: 13, opacity: 0.7 }}>
-            Last Compliance Audit:{" "}
-            {systemState?.lastComplianceCheck
-              ? new Date(systemState.lastComplianceCheck).toLocaleString()
-              : "-"}
-          </div>
-        </div>
-
-        {/* SCOPE BAR */}
-        <div
-          style={{
-            padding: "12px 24px",
-            borderBottom: "1px solid rgba(255,255,255,.06)",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            flexWrap: "wrap",
-            gap: "12px",
-          }}
-        >
-          <div>
-            <b>Operational Scope:</b> {activeCompanyName}
-          </div>
-
-          <select
-            value={activeCompanyId || ""}
-            onChange={handleCompanySelect}
-            style={{ minWidth: 220 }}
-          >
-            <option value="">All Entities</option>
-            {companies.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
         </div>
 
         {/* CONTENT */}
@@ -226,11 +182,7 @@ export default function AdminLayout() {
         </main>
 
         {/* ADVISOR PANEL */}
-        <aside
-          className={`enterprise-ai-panel ${
-            advisorOpen ? "open" : "collapsed"
-          }`}
-        >
+        <aside className={`enterprise-ai-panel ${advisorOpen ? "open" : "collapsed"}`}>
           <div className="enterprise-ai-inner">
             <AuthoDevPanel
               getContext={() => ({
