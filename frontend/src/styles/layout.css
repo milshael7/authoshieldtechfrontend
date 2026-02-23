@@ -155,7 +155,7 @@ html, body {
 }
 
 /* =========================================================
-   ADVISOR ACTION ICONS (CLEAN PROFESSIONAL STYLE)
+   ADVISOR ACTION ICONS
    ========================================================= */
 
 .advisor-actions{
@@ -174,11 +174,11 @@ html, body {
   display:flex;
   align-items:center;
   justify-content:center;
-  transition:color .2s ease, opacity .2s ease;
+  transition:color .2s ease;
 }
 
 .icon-btn svg{
-  width:18px;     /* slightly smaller as requested */
+  width:18px;
   height:18px;
   stroke:currentColor;
 }
@@ -187,8 +187,104 @@ html, body {
   color:#ffffff;
 }
 
-.icon-btn.active{
-  color:#ffffff;
+/* =========================================================
+   CHATGPT STYLE INPUT PILL
+   ========================================================= */
+
+.advisor-inputBar{
+  padding:16px;
+  border-top:1px solid rgba(255,255,255,.06);
+}
+
+.advisor-pill{
+  display:flex;
+  align-items:center;
+  background:#1f1f1f;
+  border-radius:999px;
+  padding:8px 12px;
+  gap:12px;
+  min-height:48px;
+}
+
+.advisor-pill-input{
+  flex:1;
+  background:transparent;
+  border:none;
+  outline:none;
+  color:#fff;
+  font-size:15px;
+  resize:none;
+}
+
+.advisor-pill-left{
+  background:none;
+  border:none;
+  color:rgba(255,255,255,0.75);
+  cursor:pointer;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  width:28px;
+  height:28px;
+}
+
+.advisor-pill-left.stop{
+  background:#333;
+  border-radius:50%;
+}
+
+.stop-square{
+  width:10px;
+  height:10px;
+  background:#fff;
+}
+
+.advisor-pill-right{
+  width:36px;
+  height:36px;
+  background:#ffffff;
+  border:none;
+  border-radius:50%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  cursor:pointer;
+}
+
+.advisor-pill-right svg{
+  width:18px;
+  height:18px;
+}
+
+.wave-icon span{
+  display:inline-block;
+  width:3px;
+  height:10px;
+  background:#000;
+  margin:0 1px;
+}
+
+.advisor-waveform{
+  display:flex;
+  align-items:center;
+  gap:2px;
+  flex:1;
+}
+
+.advisor-waveform span{
+  width:3px;
+  height:12px;
+  background:#888;
+  animation:wave 1.2s infinite ease-in-out;
+}
+
+.advisor-waveform span:nth-child(odd){
+  animation-delay:.2s;
+}
+
+@keyframes wave{
+  0%,100%{height:6px;}
+  50%{height:18px;}
 }
 
 /* =========================================================
