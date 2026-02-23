@@ -1,8 +1,6 @@
 // frontend/src/App.jsx
-// FULL ROLE-STRUCTURED ROUTING — MULTI-TENANT HARDENED
-// Company Dashboard V2 Activated
-// Safe Silent Refresh (No Login Loop)
-// Scan + Billing Integrated
+// FULL ROLE-STRUCTURED ROUTING — ADMIN OVERVIEW FIXED
+// Executive Command Center Activated
 
 import React, { useEffect, useState } from "react";
 import {
@@ -55,6 +53,7 @@ import NotFound from "./pages/NotFound.jsx";
 
 /* ================= ADMIN ================= */
 
+import AdminOverview from "./pages/admin/AdminOverview.jsx";
 import GlobalControl from "./pages/admin/GlobalControl.jsx";
 
 /* ================= COMPANY ================= */
@@ -87,13 +86,9 @@ function RoleGuard({ user, ready, allow, children }) {
   return children;
 }
 
-/* ========================================================= */
-
 export default function App() {
   const [user, setUser] = useState(null);
   const [ready, setReady] = useState(false);
-
-  /* ================= SAFE AUTH BOOT ================= */
 
   useEffect(() => {
     async function bootAuth() {
@@ -185,7 +180,8 @@ export default function App() {
           <Route path="/signup" element={<Signup />} />
           <Route path="/login" element={<Login />} />
 
-          {/* ADMIN */}
+          {/* ================= ADMIN ================= */}
+
           <Route
             path="/admin/*"
             element={
@@ -194,7 +190,7 @@ export default function App() {
               </RoleGuard>
             }
           >
-            <Route index element={<Posture />} />
+            <Route index element={<AdminOverview />} />
             <Route path="assets" element={<Assets />} />
             <Route path="threats" element={<Threats />} />
             <Route path="incidents" element={<Incidents />} />
@@ -208,7 +204,8 @@ export default function App() {
             <Route path="global" element={<GlobalControl />} />
           </Route>
 
-          {/* MANAGER */}
+          {/* ================= MANAGER ================= */}
+
           <Route
             path="/manager/*"
             element={
@@ -229,6 +226,7 @@ export default function App() {
           </Route>
 
           {/* COMPANY */}
+
           <Route
             path="/company/*"
             element={
@@ -244,6 +242,7 @@ export default function App() {
           </Route>
 
           {/* SMALL COMPANY */}
+
           <Route
             path="/small-company/*"
             element={
@@ -259,6 +258,7 @@ export default function App() {
           </Route>
 
           {/* USER */}
+
           <Route
             path="/user/*"
             element={
