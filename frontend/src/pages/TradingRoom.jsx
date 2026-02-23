@@ -2,9 +2,9 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { createChart } from "lightweight-charts";
-import "../styles/terminal.css"; // ✅ FIXED PATH
+import { api } from "../lib/api.js";
+import "../styles/terminal.css";
 
-const API_BASE = "/api/trading";
 const WS_URL =
   (window.location.protocol === "https:" ? "wss://" : "ws://") +
   window.location.host +
@@ -17,8 +17,11 @@ export default function TradingRoom() {
   const seriesRef = useRef(null);
   const candleDataRef = useRef([]);
   const wsRef = useRef(null);
+  const pollingRef = useRef(null);
 
   const [snapshot, setSnapshot] = useState(null);
+  const [snapshotError, setSnapshotError] = useState("");
+  const [snapshotLoading, setSnapshotLoading] = useState(true);
 
   const [panelOpen, setPanelOpen] = useState(false);
   const [panelDocked, setPanelDocked] = useState(true);
@@ -30,22 +33,39 @@ export default function TradingRoom() {
 
   const [signals, setSignals] = useState([]);
 
-  /* ================= SNAPSHOT ================= */
+  /* ================= SNAPSHOT (HARDENED) ================= */
 
   async function loadSnapshot() {
     try {
-      const res = await fetch(`${API_BASE}/dashboard/snapshot`);
-      const data = await res.json();
-      if (data.ok) setSnapshot(data);
+      setSnapshotError("");
+      const data = await api.tradingSnapshot();
+      setSnapshot(data);
     } catch (e) {
       console.error("Snapshot error:", e);
+      setSnapshotError(e.message || "Failed to load snapshot");
+    } finally {
+      setSnapshotLoading(false);
     }
   }
 
   useEffect(() => {
-    loadSnapshot();
-    const i = setInterval(loadSnapshot, 5000);
-    return () => clearInterval(i);
+    let mounted = true;
+
+    async function initialLoad() {
+      if (!mounted) return;
+      await loadSnapshot();
+    }
+
+    initialLoad();
+
+    pollingRef.current = setInterval(() => {
+      loadSnapshot();
+    }, 5000);
+
+    return () => {
+      mounted = false;
+      clearInterval(pollingRef.current);
+    };
   }, []);
 
   /* ================= CHART INIT ================= */
@@ -71,6 +91,7 @@ export default function TradingRoom() {
     seriesRef.current = chartRef.current.addCandlestickSeries();
 
     const handleResize = () => {
+      if (!chartRef.current) return;
       chartRef.current.applyOptions({
         width: chartContainerRef.current.clientWidth,
         height: chartContainerRef.current.clientHeight,
@@ -82,33 +103,51 @@ export default function TradingRoom() {
 
   }, []);
 
-  /* ================= WEBSOCKET ================= */
+  /* ================= WEBSOCKET (HARDENED) ================= */
 
   useEffect(() => {
     const ws = new WebSocket(WS_URL);
     wsRef.current = ws;
 
+    ws.onopen = () => {
+      console.log("Market WS connected");
+    };
+
     ws.onmessage = (event) => {
-      const msg = JSON.parse(event.data);
+      try {
+        const msg = JSON.parse(event.data);
 
-      if (msg.type === "tick") {
-        updateCandle(msg.price, msg.ts);
-      }
+        if (msg.type === "tick") {
+          updateCandle(msg.price, msg.ts);
+        }
 
-      if (msg.type === "ai_signal") {
-        setSignals((prev) => [
-          {
-            action: msg.action,
-            confidence: msg.confidence,
-            edge: msg.edge,
-            ts: msg.ts,
-          },
-          ...prev.slice(0, 20),
-        ]);
+        if (msg.type === "ai_signal") {
+          setSignals((prev) => [
+            {
+              action: msg.action,
+              confidence: msg.confidence,
+              edge: msg.edge,
+              ts: msg.ts,
+            },
+            ...prev.slice(0, 20),
+          ]);
+        }
+      } catch (e) {
+        console.warn("WS parse error:", e);
       }
     };
 
-    return () => ws.close();
+    ws.onerror = (e) => {
+      console.warn("WS error:", e);
+    };
+
+    ws.onclose = () => {
+      console.warn("Market WS closed");
+    };
+
+    return () => {
+      ws.close();
+    };
   }, []);
 
   /* ================= CANDLE LOGIC ================= */
@@ -201,6 +240,12 @@ export default function TradingRoom() {
         </div>
       </div>
 
+      {snapshotError && (
+        <div style={{ padding: 10, color: "#ff5a5f" }}>
+          {snapshotError}
+        </div>
+      )}
+
       <div className="terminalBody">
 
         <div className="terminalRail">
@@ -226,6 +271,7 @@ export default function TradingRoom() {
             <TradePanel
               side={side}
               snapshot={snapshot}
+              loading={snapshotLoading}
               onDragStart={startDrag}
               setWidth={setPanelWidth}
             />
@@ -244,6 +290,7 @@ export default function TradingRoom() {
             <TradePanel
               side={side}
               snapshot={snapshot}
+              loading={snapshotLoading}
               onDragStart={startDrag}
               setWidth={setPanelWidth}
             />
@@ -269,7 +316,7 @@ export default function TradingRoom() {
   );
 }
 
-function TradePanel({ side, snapshot, onDragStart, setWidth }) {
+function TradePanel({ side, snapshot, loading, onDragStart }) {
 
   return (
     <>
@@ -295,14 +342,18 @@ function TradePanel({ side, snapshot, onDragStart, setWidth }) {
         <div className="terminalAIMetrics">
           <div>
             AI Win Rate:{" "}
-            {snapshot?.ai?.stats?.winRate
+            {loading
+              ? "—"
+              : snapshot?.ai?.stats?.winRate
               ? (snapshot.ai.stats.winRate * 100).toFixed(1) + "%"
               : "—"}
           </div>
 
           <div>
             Risk Multiplier:{" "}
-            {snapshot?.risk?.riskMultiplier?.toFixed?.(2) || "—"}
+            {loading
+              ? "—"
+              : snapshot?.risk?.riskMultiplier?.toFixed?.(2) || "—"}
           </div>
         </div>
 
