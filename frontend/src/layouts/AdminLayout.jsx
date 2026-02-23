@@ -1,8 +1,8 @@
 // frontend/src/layouts/AdminLayout.jsx
-// Enterprise Admin Layout — Clean Unified Command Architecture
-// Trading + Global Integrated Properly
+// Enterprise Admin Layout — Executive-Safe Scope Architecture
+// Scope Selector Isolated (No Dashboard Interference)
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { NavLink, Outlet, useNavigate, useLocation } from "react-router-dom";
 import { clearToken, clearUser, api } from "../lib/api.js";
 import { useCompany } from "../context/CompanyContext";
@@ -13,11 +13,9 @@ import "../styles/layout.css";
 export default function AdminLayout() {
   const navigate = useNavigate();
   const location = useLocation();
-
   const { activeCompanyId, setCompany, clearScope } = useCompany();
 
   const [menuOpen, setMenuOpen] = useState(false);
-
   const [advisorOpen, setAdvisorOpen] = useState(() => {
     const saved = localStorage.getItem("admin.advisor.open");
     return saved !== "false";
@@ -26,6 +24,9 @@ export default function AdminLayout() {
   const [companies, setCompanies] = useState([]);
   const [systemState, setSystemState] = useState(null);
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 900);
+  const [scopeOpen, setScopeOpen] = useState(false);
+
+  const scopeRef = useRef(null);
 
   useEffect(() => {
     localStorage.setItem("admin.advisor.open", advisorOpen);
@@ -40,6 +41,18 @@ export default function AdminLayout() {
   useEffect(() => {
     if (isMobile) setMenuOpen(false);
   }, [location.pathname, isMobile]);
+
+  /* ================= CLOSE SCOPE DROPDOWN ================= */
+
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (scopeRef.current && !scopeRef.current.contains(e.target)) {
+        setScopeOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   /* ================= SYSTEM HEALTH ================= */
 
@@ -78,11 +91,14 @@ export default function AdminLayout() {
     navigate("/login");
   }
 
-  function handleCompanySelect(e) {
-    const id = e.target.value;
-    if (!id) return clearScope();
-    const company = companies.find((c) => String(c.id) === String(id));
-    if (company) setCompany(company);
+  function selectCompany(id) {
+    if (!id) {
+      clearScope();
+    } else {
+      const company = companies.find((c) => String(c.id) === String(id));
+      if (company) setCompany(company);
+    }
+    setScopeOpen(false);
   }
 
   function getStatusColor() {
@@ -96,6 +112,10 @@ export default function AdminLayout() {
   const navClick = () => {
     if (isMobile) setMenuOpen(false);
   };
+
+  const currentScopeLabel = activeCompanyId
+    ? companies.find((c) => String(c.id) === String(activeCompanyId))?.name || "Entity"
+    : "Global";
 
   return (
     <div className={`layout-root enterprise ${menuOpen ? "sidebar-open" : ""}`}>
@@ -113,8 +133,6 @@ export default function AdminLayout() {
         </div>
 
         <nav className="layout-nav" onClick={navClick}>
-
-          {/* Core Command */}
           <NavLink to="." end>Dashboard</NavLink>
           <NavLink to="assets">Assets</NavLink>
           <NavLink to="threats">Threat Intelligence</NavLink>
@@ -122,11 +140,8 @@ export default function AdminLayout() {
           <NavLink to="vulnerabilities">Vulnerability Oversight</NavLink>
           <NavLink to="compliance">Regulatory Compliance</NavLink>
           <NavLink to="reports">Executive Reporting</NavLink>
-
-          {/* 🔥 Newly Integrated */}
           <NavLink to="trading">Trading Command</NavLink>
           <NavLink to="global">Global Control</NavLink>
-
           <NavLink to="notifications">System Notifications</NavLink>
 
           <hr />
@@ -145,48 +160,72 @@ export default function AdminLayout() {
       {/* ================= MAIN WORKSPACE ================= */}
       <div className="enterprise-main">
 
-        {/* Header */}
+        {/* Compact Executive Header */}
         <div
           style={{
-            padding: "14px 28px",
+            padding: "12px 28px",
             borderBottom: "1px solid rgba(255,255,255,.08)",
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
             background: "rgba(255,255,255,0.02)",
-            flexWrap: "wrap",
-            gap: 16,
           }}
         >
-          <div style={{ display: "flex", gap: 20, alignItems: "center" }}>
-            <div>
-              <strong>Security Status:</strong>{" "}
-              <span style={{ color: getStatusColor(), fontWeight: 700 }}>
-                {systemState?.securityStatus || "Loading..."}
-              </span>
-            </div>
-
-            <div style={{ fontSize: 13, opacity: 0.7 }}>
-              Audit:{" "}
-              {systemState?.lastComplianceCheck
-                ? new Date(systemState.lastComplianceCheck).toLocaleDateString()
-                : "-"}
-            </div>
+          <div>
+            <strong>Security Status:</strong>{" "}
+            <span style={{ color: getStatusColor(), fontWeight: 700 }}>
+              {systemState?.securityStatus || "Loading..."}
+            </span>
           </div>
 
-          <div>
-            <select
-              value={activeCompanyId || ""}
-              onChange={handleCompanySelect}
-              style={{ minWidth: 220 }}
+          {/* ISOLATED SCOPE CONTROL */}
+          <div ref={scopeRef} style={{ position: "relative" }}>
+            <button
+              onClick={() => setScopeOpen(v => !v)}
+              style={{
+                padding: "6px 14px",
+                borderRadius: 8,
+                background: "rgba(255,255,255,0.06)",
+                border: "1px solid rgba(255,255,255,0.1)",
+                color: "#fff",
+                cursor: "pointer",
+                fontSize: 13,
+              }}
             >
-              <option value="">All Entities</option>
-              {companies.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
+              Scope: {currentScopeLabel} ▾
+            </button>
+
+            {scopeOpen && (
+              <div
+                style={{
+                  position: "absolute",
+                  right: 0,
+                  marginTop: 8,
+                  background: "#111",
+                  border: "1px solid rgba(255,255,255,0.1)",
+                  borderRadius: 8,
+                  minWidth: 220,
+                  padding: 8,
+                  zIndex: 1000,
+                }}
+              >
+                <div
+                  style={{ padding: 8, cursor: "pointer" }}
+                  onClick={() => selectCompany("")}
+                >
+                  Global
+                </div>
+                {companies.map((c) => (
+                  <div
+                    key={c.id}
+                    style={{ padding: 8, cursor: "pointer" }}
+                    onClick={() => selectCompany(c.id)}
+                  >
+                    {c.name}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
@@ -199,9 +238,7 @@ export default function AdminLayout() {
 
         {/* ADVISOR PANEL */}
         <aside
-          className={`enterprise-ai-panel ${
-            advisorOpen ? "" : "collapsed"
-          }`}
+          className={`enterprise-ai-panel ${advisorOpen ? "" : "collapsed"}`}
         >
           <div className="enterprise-ai-inner">
             <AuthoDevPanel
