@@ -1,5 +1,5 @@
 /* =========================================================
-   AUTOSHIELD FRONTEND API LAYER — STABLE BUILD (FIXED)
+   AUTOSHIELD FRONTEND API LAYER — FULL PRODUCTION BUILD
 ========================================================= */
 
 const API_BASE = import.meta.env.VITE_API_BASE?.trim();
@@ -42,7 +42,7 @@ export function clearUser() {
   localStorage.removeItem(USER_KEY);
 }
 
-/* ================= HELPERS ================= */
+/* ================= CORE HELPERS ================= */
 
 function joinUrl(base, path) {
   const cleanBase = String(base || "").replace(/\/+$/, "");
@@ -69,9 +69,7 @@ async function fetchWithTimeout(url, options = {}, ms = REQUEST_TIMEOUT) {
 async function req(path, { method = "GET", body, auth = true } = {}) {
   if (!API_BASE) throw new Error("API base URL not configured");
 
-  const headers = {
-    "Content-Type": "application/json",
-  };
+  const headers = { "Content-Type": "application/json" };
 
   if (auth) {
     const token = getToken();
@@ -106,11 +104,13 @@ async function req(path, { method = "GET", body, auth = true } = {}) {
 }
 
 /* =========================================================
-   API OBJECT
+   FULL API OBJECT
 ========================================================= */
 
 const api = {
-  /* AUTH */
+
+  /* ================= AUTH ================= */
+
   login: (email, password) =>
     req("/api/auth/login", {
       method: "POST",
@@ -125,27 +125,107 @@ const api = {
       auth: false,
     }),
 
-  /* ADMIN */
+  refresh: () =>
+    req("/api/auth/refresh", {
+      method: "POST",
+    }),
+
+  /* ================= ADMIN ================= */
+
   adminCompanies: () => req("/api/admin/companies"),
+  adminCreateCompany: (payload) =>
+    req("/api/admin/companies", { method: "POST", body: payload }),
+
   adminUsers: () => req("/api/admin/users"),
   adminNotifications: () => req("/api/admin/notifications"),
 
-  /* SECURITY */
+  adminRotateUserId: (id) =>
+    req(`/api/admin/users/${id}/rotate-id`, { method: "POST" }),
+
+  adminUpdateSubscription: (id, payload) =>
+    req(`/api/admin/users/${id}/subscription`, {
+      method: "PATCH",
+      body: payload,
+    }),
+
+  adminForceCompleteScan: (scanId) =>
+    req(`/api/admin/scan/${scanId}/force-complete`, {
+      method: "POST",
+    }),
+
+  adminCancelScan: (scanId) =>
+    req(`/api/admin/scan/${scanId}/cancel`, {
+      method: "POST",
+    }),
+
+  adminOverrideScanRisk: (scanId, riskScore) =>
+    req(`/api/admin/scan/${scanId}/override-risk`, {
+      method: "POST",
+      body: { riskScore },
+    }),
+
+  /* ================= MANAGER ================= */
+
+  managerUsers: () => req("/api/manager/users"),
+  managerNotifications: () => req("/api/manager/notifications"),
+  managerOverview: () => req("/api/manager/overview"),
+  managerAudit: () => req("/api/manager/audit"),
+
+  /* ================= COMPANY ================= */
+
+  companyMe: () => req("/api/company/me"),
+  companyNotifications: () => req("/api/company/notifications"),
+  companyMembers: () => req("/api/company/members"),
+
+  companyAddMember: (userId) =>
+    req("/api/company/members", {
+      method: "POST",
+      body: { userId },
+    }),
+
+  companyRemoveMember: (userId) =>
+    req(`/api/company/members/${userId}`, {
+      method: "DELETE",
+    }),
+
+  companyMarkRead: (id) =>
+    req(`/api/company/notifications/${id}/read`, {
+      method: "POST",
+    }),
+
+  /* ================= SECURITY ================= */
+
   postureSummary: () => req("/api/security/posture-summary"),
   postureChecks: () => req("/api/security/posture-checks"),
-  postureRecent: (minutes = 60) =>
-    req(`/api/security/posture-recent?minutes=${minutes}`),
+  postureRecent: (limit = 20) =>
+    req(`/api/security/posture-recent?limit=${limit}`),
 
   vulnerabilities: () => req("/api/security/vulnerabilities"),
+  securityEvents: (limit = 50) =>
+    req(`/api/security/events?limit=${limit}`),
 
-  /* COMPLIANCE */
-  complianceOverview: () => req("/api/security/compliance"),
-
-  /* 🔥 INCIDENTS — THIS WAS MISSING */
   incidents: () => req("/api/incidents"),
   createIncident: (payload) =>
     req("/api/incidents", { method: "POST", body: payload }),
+
+  /* ================= AUTOPROTECT ================= */
+
+  autoprotectStatus: () => req("/api/autoprotect/status"),
+  autoprotectEnable: () =>
+    req("/api/autoprotect/enable", { method: "POST" }),
+  autoprotectDisable: () =>
+    req("/api/autoprotect/disable", { method: "POST" }),
+
+  /* ================= ASSETS ================= */
+
+  assets: () => req("/api/assets"),
+
+  /* ================= TRADING ================= */
+
+  tradingSnapshot: () =>
+    req("/api/trading/dashboard/snapshot"),
+
 };
 
 /* EXPORT */
-export { api };
+export { api, req };
