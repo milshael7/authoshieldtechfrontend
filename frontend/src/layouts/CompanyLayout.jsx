@@ -2,20 +2,29 @@
 // Company Layout — ORGANIZATION SECURITY CONTROL
 // Company-level visibility only
 // No global leakage
-// Clean SOC structure
-// Phase 2 architecture lock
+// Unified Enterprise Advisor System
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { clearToken, clearUser } from "../lib/api.js";
-import AuthoDevPanel from "../components/AuthoDevPanel";
+import AuthoDevPanel from "../components/AuthoDevPanel.jsx";
 import Logo from "../components/Logo.jsx";
 import "../styles/layout.css";
 
 export default function CompanyLayout() {
   const navigate = useNavigate();
+
   const [menuOpen, setMenuOpen] = useState(false);
-  const [advisorOpen, setAdvisorOpen] = useState(false);
+
+  // 🔐 Standardized advisor persistence
+  const [advisorOpen, setAdvisorOpen] = useState(() => {
+    const saved = localStorage.getItem("company.advisor.open");
+    return saved !== "false";
+  });
+
+  useEffect(() => {
+    localStorage.setItem("company.advisor.open", advisorOpen);
+  }, [advisorOpen]);
 
   function logout() {
     clearToken();
@@ -28,15 +37,13 @@ export default function CompanyLayout() {
   }
 
   return (
-    <div className={`layout-root ${menuOpen ? "sidebar-open" : ""}`}>
-
+    <div className={`layout-root enterprise ${menuOpen ? "sidebar-open" : ""}`}>
       {menuOpen && (
         <div className="sidebar-overlay" onClick={closeMenu} />
       )}
 
       {/* ================= SIDEBAR ================= */}
       <aside className="layout-sidebar company">
-
         <div className="layout-brand">
           <Logo size="md" />
           <span className="muted" style={{ fontSize: 12 }}>
@@ -45,7 +52,6 @@ export default function CompanyLayout() {
         </div>
 
         <nav className="layout-nav">
-
           <NavLink to="." end onClick={closeMenu}>
             Security Overview
           </NavLink>
@@ -77,37 +83,31 @@ export default function CompanyLayout() {
           <NavLink to="notifications" onClick={closeMenu}>
             Notifications
           </NavLink>
-
         </nav>
 
         <button className="btn logout-btn" onClick={logout}>
           Log out
         </button>
-
       </aside>
 
-      {/* ================= MAIN ================= */}
-      <main className="layout-main">
+      {/* ================= MAIN + ADVISOR ================= */}
+      <div className="enterprise-main">
 
-        <section className="layout-content">
-          <Outlet />
-        </section>
+        <main className="layout-main">
+          <section className="layout-content">
+            <Outlet />
+          </section>
+        </main>
 
-        {/* ================= SECURITY ADVISOR ================= */}
-        <section className={`ai-drawer ${advisorOpen ? "open" : ""}`}>
-
-          <div className="ai-drawer-handle">
-            <button
-              className="ai-toggle"
-              onClick={() => setAdvisorOpen(v => !v)}
-            >
-              {advisorOpen ? "▼ Hide Advisor" : "▲ Show Security Advisor"}
-            </button>
-          </div>
-
-          <div className="ai-drawer-body">
+        {/* ===== ADVISOR PANEL ===== */}
+        <aside
+          className={`enterprise-ai-panel ${
+            advisorOpen ? "" : "collapsed"
+          }`}
+        >
+          <div className="enterprise-ai-inner">
             <AuthoDevPanel
-              title="Company Security Advisor"
+              title="Advisor"
               getContext={() => ({
                 role: "company",
                 scope: "organization-only",
@@ -115,10 +115,19 @@ export default function CompanyLayout() {
               })}
             />
           </div>
+        </aside>
 
-        </section>
+      </div>
 
-      </main>
+      {/* ===== FLOATING TOGGLE ===== */}
+      <button
+        className="advisor-fab"
+        onClick={() => setAdvisorOpen(v => !v)}
+        title={advisorOpen ? "Close Advisor" : "Open Advisor"}
+      >
+        {advisorOpen ? "›" : "Advisor"}
+      </button>
+
     </div>
   );
 }
