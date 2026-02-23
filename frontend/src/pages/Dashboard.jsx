@@ -1,24 +1,27 @@
 // frontend/src/pages/Dashboard.jsx
-// Enterprise Admin Dashboard — Clean SaaS Version
+// Enterprise Admin Executive Dashboard — Phase 1 Core
 
 import React, { useEffect, useState } from "react";
 import { api } from "../lib/api.js";
 
 export default function Dashboard() {
-  const [summary, setSummary] = useState(null);
-  const [incidents, setIncidents] = useState([]);
+  const [metrics, setMetrics] = useState(null);
+  const [risk, setRisk] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function load() {
       try {
-        const [posture, incidentData] = await Promise.all([
-          api.postureSummary().catch(() => ({})),
-          api.incidents().catch(() => ({})),
+        const [metricsRes, riskRes] = await Promise.all([
+          api.adminMetrics(),
+          api.adminExecutiveRisk(),
         ]);
 
-        setSummary(posture || {});
-        setIncidents(incidentData?.incidents || []);
+        setMetrics(metricsRes?.metrics || null);
+        setRisk(riskRes?.executiveRisk || null);
+
+      } catch (err) {
+        console.error("Admin dashboard load failed:", err.message);
       } finally {
         setLoading(false);
       }
@@ -27,104 +30,75 @@ export default function Dashboard() {
     load();
   }, []);
 
-  const riskScore = Math.round(summary?.riskScore || 82);
-  const complianceScore = Math.round(summary?.complianceScore || 74);
+  if (loading) {
+    return <div style={{ padding: 28 }}>Loading platform intelligence…</div>;
+  }
+
+  if (!metrics) {
+    return <div style={{ padding: 28 }}>Unable to load platform data.</div>;
+  }
 
   return (
     <div style={{ padding: 28, display: "flex", flexDirection: "column", gap: 28 }}>
 
-      {/* ================= KPI STRIP ================= */}
+      {/* ================= TOP KPI STRIP ================= */}
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))",
-          gap: 18,
+          gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))",
+          gap: 20,
         }}
       >
-        <Card title="Global Security Score" value={`${riskScore}%`} />
-        <Card title="Total Companies" value={summary?.totalCompanies ?? 14} />
-        <Card title="Active Users" value={summary?.totalUsers ?? 478} />
-        <Card title="Open Incidents" value={incidents.length} />
+        <Card title="Total Users" value={metrics.totalUsers} />
+        <Card title="Active Subscribers" value={metrics.activeSubscribers} />
+        <Card title="Trial Users" value={metrics.trialUsers} />
+        <Card title="Locked Users" value={metrics.lockedUsers} />
       </div>
 
-      {/* ================= MAIN GRID ================= */}
+      {/* ================= REVENUE STRIP ================= */}
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "2fr 1fr",
-          gap: 24,
+          gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))",
+          gap: 20,
         }}
       >
+        <Card title="Monthly Recurring Revenue" value={`$${metrics.MRR}`} />
+        <Card title="Total Revenue" value={`$${metrics.totalRevenue}`} />
+        <Card
+          title="Churn Rate"
+          value={`${(metrics.churnRate * 100).toFixed(2)}%`}
+        />
+      </div>
 
-        {/* Threat Activity */}
+      {/* ================= EXECUTIVE RISK ================= */}
+      {risk && (
         <div className="card" style={{ padding: 24 }}>
-          <h3>Threat Activity (Last 30 Days)</h3>
+          <h3>Executive Risk Index</h3>
 
-          <div style={{ marginTop: 20 }}>
+          <div style={{ marginTop: 18 }}>
             <div className="meter">
-              <div style={{ width: `${riskScore}%` }} />
+              <div
+                style={{
+                  width: `${risk.riskIndex}%`,
+                  background:
+                    risk.level === "CRITICAL"
+                      ? "#ff3b30"
+                      : risk.level === "ELEVATED"
+                      ? "#f5b400"
+                      : risk.level === "MODERATE"
+                      ? "#ff9500"
+                      : "#16c784",
+                }}
+              />
             </div>
-            <p style={{ marginTop: 10, opacity: 0.7 }}>
-              Overall threat exposure level across monitored entities.
-            </p>
+
+            <div style={{ marginTop: 12 }}>
+              <strong>{risk.riskIndex}%</strong> — {risk.level}
+            </div>
           </div>
         </div>
-
-        {/* Incident Overview */}
-        <div className="card" style={{ padding: 24 }}>
-          <h3>Incident Overview</h3>
-
-          <ul style={{ marginTop: 20, listStyle: "none", padding: 0 }}>
-            {incidents.length === 0 && (
-              <li style={{ opacity: 0.6 }}>No active incidents</li>
-            )}
-
-            {incidents.slice(0, 5).map((i, idx) => (
-              <li key={idx} style={{ marginBottom: 10 }}>
-                <b>{i.title || "Security Incident"}</b>
-                <div style={{ fontSize: 12, opacity: 0.6 }}>
-                  Status: {i.status || "open"}
-                </div>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </div>
-
-      {/* ================= LOWER GRID ================= */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr",
-          gap: 24,
-        }}
-      >
-        {/* Compliance */}
-        <div className="card" style={{ padding: 24 }}>
-          <h3>Compliance Overview</h3>
-
-          <div style={{ marginTop: 16 }}>
-            <div className="meter">
-              <div style={{ width: `${complianceScore}%` }} />
-            </div>
-            <p style={{ marginTop: 10, opacity: 0.7 }}>
-              Audit readiness score across regulatory frameworks.
-            </p>
-          </div>
-        </div>
-
-        {/* Vulnerability Snapshot */}
-        <div className="card" style={{ padding: 24 }}>
-          <h3>Vulnerability Snapshot</h3>
-
-          <ul style={{ marginTop: 16, listStyle: "none", padding: 0 }}>
-            <li>Critical: {summary?.critical ?? 1}</li>
-            <li>High: {summary?.high ?? 3}</li>
-            <li>Medium: {summary?.medium ?? 7}</li>
-            <li>Low: {summary?.low ?? 11}</li>
-          </ul>
-        </div>
-      </div>
+      )}
 
     </div>
   );
