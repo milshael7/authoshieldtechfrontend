@@ -1,6 +1,6 @@
 /* =========================================================
-   AUTOSHIELD FRONTEND API LAYER — FULL PRODUCTION BUILD
-   EXECUTIVE INTELLIGENCE ALIGNED
+   AUTOSHIELD FRONTEND API LAYER — FULL STABLE BUILD
+   Executive + Backward Compatible
 ========================================================= */
 
 const API_BASE = import.meta.env.VITE_API_BASE?.trim();
@@ -59,9 +59,6 @@ async function fetchWithTimeout(url, options = {}, ms = REQUEST_TIMEOUT) {
 
   try {
     return await fetch(url, { ...options, signal: controller.signal });
-  } catch (err) {
-    if (err?.name === "AbortError") throw new Error("Request timeout");
-    throw err;
   } finally {
     clearTimeout(id);
   }
@@ -85,9 +82,7 @@ async function req(path, { method = "GET", body, auth = true } = {}) {
   });
 
   let data = {};
-  try {
-    data = await res.json();
-  } catch {}
+  try { data = await res.json(); } catch {}
 
   if (res.status === 401 && auth) {
     clearToken();
@@ -96,9 +91,7 @@ async function req(path, { method = "GET", body, auth = true } = {}) {
   }
 
   if (!res.ok) {
-    throw new Error(
-      data?.error || data?.message || `Request failed (${res.status})`
-    );
+    throw new Error(data?.error || `Request failed (${res.status})`);
   }
 
   return data;
@@ -113,146 +106,94 @@ const api = {
   /* ================= AUTH ================= */
 
   login: (email, password) =>
-    req("/api/auth/login", {
-      method: "POST",
-      body: { email, password },
-      auth: false,
-    }),
+    req("/api/auth/login", { method: "POST", body: { email, password }, auth: false }),
 
   signup: (payload) =>
-    req("/api/auth/signup", {
-      method: "POST",
-      body: payload,
-      auth: false,
-    }),
+    req("/api/auth/signup", { method: "POST", body: payload, auth: false }),
 
   refresh: () =>
     req("/api/auth/refresh", { method: "POST" }),
 
-  /* ======================================================
-     🔥 ADMIN — EXECUTIVE COMMAND CENTER
-  ====================================================== */
+  /* ================= ADMIN EXECUTIVE ================= */
 
-  adminMetrics: () =>
-    req("/api/admin/metrics"),
-
+  adminMetrics: () => req("/api/admin/metrics"),
   adminSubscriberGrowth: (days = 90) =>
     req(`/api/admin/subscriber-growth?days=${days}`),
-
-  adminExecutiveRisk: () =>
-    req("/api/admin/executive-risk"),
-
+  adminExecutiveRisk: () => req("/api/admin/executive-risk"),
   adminRevenueRefundOverlay: (days = 90) =>
     req(`/api/admin/revenue-refund-overlay?days=${days}`),
-
-  adminPredictiveChurn: () =>
-    req("/api/admin/predictive-churn"),
-
+  adminPredictiveChurn: () => req("/api/admin/predictive-churn"),
   adminRefundDisputeTimeline: () =>
     req("/api/admin/refund-dispute-timeline"),
-
   adminComplianceReport: () =>
     req("/api/admin/compliance/report"),
-
   adminComplianceHistory: (limit = 20) =>
     req(`/api/admin/compliance/history?limit=${limit}`),
-
-  adminUsers: () =>
-    req("/api/admin/users"),
-
-  adminNotifications: () =>
-    req("/api/admin/notifications"),
-
-  adminCompanies: () =>
-    req("/api/admin/companies"),
-
+  adminUsers: () => req("/api/admin/users"),
+  adminNotifications: () => req("/api/admin/notifications"),
+  adminCompanies: () => req("/api/admin/companies"),
   adminCreateCompany: (payload) =>
     req("/api/admin/companies", { method: "POST", body: payload }),
 
   /* ================= MANAGER ================= */
 
-  managerUsers: () =>
-    req("/api/manager/users"),
-
-  managerNotifications: () =>
-    req("/api/manager/notifications"),
-
-  managerOverview: () =>
-    req("/api/manager/overview"),
-
-  managerAudit: () =>
-    req("/api/manager/audit"),
+  managerUsers: () => req("/api/manager/users"),
+  managerNotifications: () => req("/api/manager/notifications"),
+  managerOverview: () => req("/api/manager/overview"),
+  managerAudit: () => req("/api/manager/audit"),
 
   /* ================= COMPANY ================= */
 
-  companyMe: () =>
-    req("/api/company/me"),
-
-  companyNotifications: () =>
-    req("/api/company/notifications"),
-
-  companyMembers: () =>
-    req("/api/company/members"),
-
+  companyMe: () => req("/api/company/me"),
+  companyNotifications: () => req("/api/company/notifications"),
+  companyMembers: () => req("/api/company/members"),
   companyAddMember: (userId) =>
-    req("/api/company/members", {
-      method: "POST",
-      body: { userId },
-    }),
-
+    req("/api/company/members", { method: "POST", body: { userId } }),
   companyRemoveMember: (userId) =>
-    req(`/api/company/members/${userId}`, {
-      method: "DELETE",
-    }),
-
+    req(`/api/company/members/${userId}`, { method: "DELETE" }),
   companyMarkRead: (id) =>
-    req(`/api/company/notifications/${id}/read`, {
-      method: "POST",
-    }),
+    req(`/api/company/notifications/${id}/read`, { method: "POST" }),
 
   /* ================= SECURITY ================= */
 
-  postureSummary: () =>
-    req("/api/security/posture-summary"),
-
-  vulnerabilities: () =>
-    req("/api/security/vulnerabilities"),
-
+  postureSummary: () => req("/api/security/posture-summary"),
+  postureChecks: () => req("/api/security/posture-checks"),
+  postureRecent: (limit = 20) =>
+    req(`/api/security/posture-recent?limit=${limit}`),
+  vulnerabilities: () => req("/api/security/vulnerabilities"),
   securityEvents: (limit = 50) =>
     req(`/api/security/events?limit=${limit}`),
 
-  compliance: () =>
-    req("/api/security/compliance"),
+  /* 🔥 backward compatibility */
+  threatFeed: (limit = 50) =>
+    req(`/api/security/events?limit=${limit}`),
+
+  /* ================= INCIDENTS ================= */
+
+  incidents: () => req("/api/incidents"),
+  createIncident: (payload) =>
+    req("/api/incidents", { method: "POST", body: payload }),
 
   /* ================= REPORTING ================= */
 
-  reportSummary: () =>
-    req("/api/reports/summary"),
-
-  reportExport: () =>
-    req("/api/reports/export"),
+  reportSummary: () => req("/api/reports/summary"),
+  reportExport: () => req("/api/reports/export"),
 
   /* ================= AUTOPROTECT ================= */
 
-  autoprotectStatus: () =>
-    req("/api/autoprotect/status"),
-
+  autoprotectStatus: () => req("/api/autoprotect/status"),
   autoprotectEnable: () =>
     req("/api/autoprotect/enable", { method: "POST" }),
-
   autoprotectDisable: () =>
     req("/api/autoprotect/disable", { method: "POST" }),
 
   /* ================= ASSETS ================= */
 
-  assets: () =>
-    req("/api/assets"),
+  assets: () => req("/api/assets"),
 
   /* ================= BILLING ================= */
 
-  billingStatus: () =>
-    req("/api/billing/status"),
-
+  billingStatus: () => req("/api/billing/status"),
   createCheckout: () =>
     req("/api/billing/checkout", { method: "POST" }),
 
@@ -260,7 +201,6 @@ const api = {
 
   tradingSnapshot: () =>
     req("/api/trading/dashboard/snapshot"),
-
   placeOrder: (payload) =>
     req("/api/trading/order", { method: "POST", body: payload }),
 };
