@@ -1,8 +1,12 @@
 // frontend/src/layouts/AdminLayout.jsx
-// Enterprise Admin Layout — Fixed Arrow Logic + Full Navigation Restored
+// Enterprise Admin Layout — Stable Build
+// ✔ Navigation preserved
+// ✔ Door push behavior
+// ✔ Triangle above/below ADVISOR text
+// ✔ Direction indicates slide movement
 
 import React, { useEffect, useRef, useState } from "react";
-import { NavLink, Outlet, useNavigate, useLocation } from "react-router-dom";
+import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { clearToken, clearUser, api } from "../lib/api.js";
 import { useCompany } from "../context/CompanyContext";
 import AuthoDevPanel from "../components/AuthoDevPanel.jsx";
@@ -11,22 +15,18 @@ import "../styles/layout.css";
 
 export default function AdminLayout() {
   const navigate = useNavigate();
-  const location = useLocation();
-  const { activeCompanyId, setCompany, clearScope } = useCompany();
+  const { activeCompanyId } = useCompany();
 
   const [advisorOpen, setAdvisorOpen] = useState(() => {
     const saved = localStorage.getItem("admin.advisor.open");
     return saved !== "false";
   });
 
-  const [companies, setCompanies] = useState([]);
   const [systemState, setSystemState] = useState(null);
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 900);
-  const [scopeOpen, setScopeOpen] = useState(false);
-  const scopeRef = useRef(null);
 
   const DRAWER_OPEN_W = 360;
-  const DRAWER_CLOSED_W = 28;
+  const DRAWER_CLOSED_W = 26;
 
   const drawerWidth = advisorOpen ? DRAWER_OPEN_W : DRAWER_CLOSED_W;
 
@@ -34,16 +34,43 @@ export default function AdminLayout() {
     localStorage.setItem("admin.advisor.open", advisorOpen);
   }, [advisorOpen]);
 
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 900);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  useEffect(() => {
+    async function loadHealth() {
+      try {
+        const base = import.meta.env.VITE_API_BASE?.trim();
+        if (!base) return;
+        const res = await fetch(`${base.replace(/\/+$/, "")}/health`);
+        const data = await res.json();
+        setSystemState(data.systemState || null);
+      } catch {}
+    }
+    loadHealth();
+  }, []);
+
   function logout() {
     clearToken();
     clearUser();
     navigate("/login");
   }
 
+  function getStatusColor() {
+    if (!systemState) return "#999";
+    if (systemState.securityStatus === "NORMAL") return "#16c784";
+    if (systemState.securityStatus === "WARNING") return "#f5b400";
+    if (systemState.securityStatus === "LOCKDOWN") return "#ff3b30";
+    return "#999";
+  }
+
   return (
     <div className="layout-root enterprise">
 
-      {/* ================= SIDEBAR (RESTORED FULL NAV) ================= */}
+      {/* ================= SIDEBAR ================= */}
       <aside className="layout-sidebar admin">
         <div className="layout-brand">
           <Logo size="md" />
@@ -126,26 +153,55 @@ export default function AdminLayout() {
               flexDirection: "column",
               alignItems: "center",
               justifyContent: "center",
-              gap: 8,
+              position: "relative",
             }}
           >
-            {/* Arrow indicates direction panel will move */}
-            <div style={{ fontSize: 14 }}>
-              {advisorOpen ? "→" : "←"}
-            </div>
+            {/* CLOSED → panel will slide LEFT */}
+            {!advisorOpen && (
+              <div
+                style={{
+                  position: "absolute",
+                  top: 12,
+                  fontSize: 12,
+                  opacity: 0.9,
+                  userSelect: "none"
+                }}
+              >
+                ◀
+              </div>
+            )}
 
+            {/* ADVISOR TEXT */}
             <div
               style={{
                 transform: "rotate(-90deg)",
                 fontSize: 11,
                 letterSpacing: ".18em",
                 fontWeight: 900,
+                opacity: 0.95,
+                userSelect: "none",
               }}
             >
               ADVISOR
             </div>
+
+            {/* OPEN → panel will slide RIGHT */}
+            {advisorOpen && (
+              <div
+                style={{
+                  position: "absolute",
+                  bottom: 12,
+                  fontSize: 12,
+                  opacity: 0.9,
+                  userSelect: "none"
+                }}
+              >
+                ▶
+              </div>
+            )}
           </button>
 
+          {/* PANEL CONTENT */}
           {advisorOpen && (
             <div style={{ flex: 1 }}>
               <AuthoDevPanel
