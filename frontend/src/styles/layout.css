@@ -1,6 +1,5 @@
 /* =========================================================
    AUTOSHIELD ENTERPRISE LAYOUT — FINAL STRUCTURE FIX
-   Navigation + Mobile + Z-Index Hardened
    ========================================================= */
 
 html, body {
@@ -10,7 +9,7 @@ html, body {
   overflow:hidden;
   background:#0b0f1a;
   color:#eaf1ff;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
 }
 
 /* =========================================================
@@ -43,17 +42,8 @@ html, body {
   z-index:5;
 }
 
-.layout-brand{
-  display:flex;
-  flex-direction:column;
-  gap:4px;
-}
-
-.layout-nav{
-  display:flex;
-  flex-direction:column;
-  gap:6px;
-}
+.layout-brand{ display:flex; flex-direction:column; gap:4px; }
+.layout-nav{ display:flex; flex-direction:column; gap:6px; }
 
 .layout-nav a{
   display:block;
@@ -76,25 +66,7 @@ html, body {
   color:#fff;
 }
 
-.nav-section-label{
-  font-size:12px;
-  font-weight:800;
-  opacity:.6;
-  margin-top:14px;
-  margin-bottom:6px;
-  text-transform:uppercase;
-  letter-spacing:.08em;
-}
-
-.layout-nav hr{
-  border:none;
-  border-top:1px solid rgba(255,255,255,.08);
-  margin:12px 0;
-}
-
-.logout-btn{
-  margin-top:auto;
-}
+.logout-btn{ margin-top:auto; }
 
 /* =========================================================
    MAIN
@@ -139,15 +111,6 @@ html, body {
   z-index:4;
 }
 
-.enterprise-ai-panel.collapsed{
-  width:0;
-  border-left:none;
-}
-
-.enterprise-ai-panel.collapsed .enterprise-ai-inner{
-  display:none;
-}
-
 .enterprise-ai-inner{
   display:flex;
   flex-direction:column;
@@ -155,22 +118,54 @@ html, body {
 }
 
 /* =========================================================
-   ADVISOR ACTION ICONS
+   ADVISOR STRUCTURE (CRITICAL FIX)
    ========================================================= */
+
+.advisor-wrap{
+  display:flex;
+  flex-direction:column;
+  height:100%;
+}
+
+.advisor-miniTitle{
+  padding:16px;
+  font-weight:600;
+  border-bottom:1px solid rgba(255,255,255,.06);
+}
+
+.advisor-feed{
+  flex:1;                 /* grows */
+  overflow-y:auto;        /* scrolls independently */
+  padding:16px;
+  display:flex;
+  flex-direction:column;
+  gap:18px;
+}
+
+.advisor-row{
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+}
+
+.advisor-bubble{
+  font-size:14px;
+  line-height:1.5;
+  white-space:pre-wrap;
+}
 
 .advisor-actions{
   display:flex;
   align-items:center;
-  gap:14px;
-  margin-top:8px;
+  gap:16px;
+  opacity:.8;
 }
 
 .icon-btn{
   background:none;
   border:none;
-  padding:0;
   cursor:pointer;
-  color:rgba(255,255,255,0.75);
+  color:rgba(255,255,255,.7);
   display:flex;
   align-items:center;
   justify-content:center;
@@ -184,11 +179,11 @@ html, body {
 }
 
 .icon-btn:hover{
-  color:#ffffff;
+  color:#fff;
 }
 
 /* =========================================================
-   CHATGPT STYLE INPUT PILL
+   DOCKED INPUT (FIXED PROPERLY)
    ========================================================= */
 
 .advisor-inputBar{
@@ -203,7 +198,7 @@ html, body {
   border-radius:999px;
   padding:8px 12px;
   gap:12px;
-  min-height:48px;
+  min-height:52px;
 }
 
 .advisor-pill-input{
@@ -219,13 +214,13 @@ html, body {
 .advisor-pill-left{
   background:none;
   border:none;
-  color:rgba(255,255,255,0.75);
   cursor:pointer;
+  width:32px;
+  height:32px;
   display:flex;
   align-items:center;
   justify-content:center;
-  width:28px;
-  height:28px;
+  font-size:18px;
 }
 
 .advisor-pill-left.stop{
@@ -240,11 +235,12 @@ html, body {
 }
 
 .advisor-pill-right{
-  width:36px;
-  height:36px;
+  width:40px;
+  height:40px;
+  min-width:40px;
+  border-radius:50%;
   background:#ffffff;
   border:none;
-  border-radius:50%;
   display:flex;
   align-items:center;
   justify-content:center;
@@ -256,92 +252,10 @@ html, body {
   height:18px;
 }
 
-.wave-icon span{
-  display:inline-block;
-  width:3px;
-  height:10px;
-  background:#000;
-  margin:0 1px;
-}
-
-.advisor-waveform{
-  display:flex;
-  align-items:center;
-  gap:2px;
-  flex:1;
-}
-
-.advisor-waveform span{
-  width:3px;
-  height:12px;
-  background:#888;
-  animation:wave 1.2s infinite ease-in-out;
-}
-
-.advisor-waveform span:nth-child(odd){
-  animation-delay:.2s;
-}
-
-@keyframes wave{
-  0%,100%{height:6px;}
-  50%{height:18px;}
-}
-
 /* =========================================================
-   ADVISOR FAB
-   ========================================================= */
-
-.advisor-fab{
-  position:fixed;
-  right:16px;
-  top:16px;
-  z-index:9999;
-  border:1px solid rgba(255,255,255,.14);
-  background:rgba(0,0,0,.6);
-  color:#eaf1ff;
-  padding:10px 14px;
-  border-radius:14px;
-  font-weight:800;
-  font-size:12px;
-  cursor:pointer;
-  backdrop-filter:blur(10px);
-  transition:.2s ease;
-}
-
-.advisor-fab:hover{
-  background:rgba(120,160,255,.15);
-  border-color:rgba(120,160,255,.35);
-}
-
-/* =========================================================
-   MOBILE MODE
+   MOBILE
    ========================================================= */
 
 @media (max-width:900px){
-
-  .layout-root{
-    flex-direction:column;
-  }
-
-  .layout-sidebar{
-    position:fixed;
-    left:0;
-    top:0;
-    bottom:0;
-    transform:translateX(-100%);
-    transition:transform .3s ease;
-    z-index:100;
-  }
-
-  .layout-root.sidebar-open .layout-sidebar{
-    transform:translateX(0);
-  }
-
-  .enterprise-main{
-    flex:1;
-  }
-
-  .enterprise-ai-panel{
-    display:none;
-  }
+  .enterprise-ai-panel{ display:none; }
 }
