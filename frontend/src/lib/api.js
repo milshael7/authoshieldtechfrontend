@@ -1,5 +1,6 @@
 /* =========================================================
    AUTOSHIELD FRONTEND API LAYER — FULL PRODUCTION BUILD
+   Hardened + Backward Compatible
 ========================================================= */
 
 const API_BASE = import.meta.env.VITE_API_BASE?.trim();
@@ -201,7 +202,13 @@ const api = {
     req(`/api/security/posture-recent?limit=${limit}`),
 
   vulnerabilities: () => req("/api/security/vulnerabilities"),
+
+  /* MAIN EVENT FEED */
   securityEvents: (limit = 50) =>
+    req(`/api/security/events?limit=${limit}`),
+
+  /* 🔥 BACKWARD COMPATIBILITY FIX */
+  threatFeed: (limit = 50) =>
     req(`/api/security/events?limit=${limit}`),
 
   incidents: () => req("/api/incidents"),
@@ -220,12 +227,19 @@ const api = {
 
   assets: () => req("/api/assets"),
 
+  /* ================= BILLING ================= */
+
+  billingStatus: () => req("/api/billing/status"),
+  createCheckout: () =>
+    req("/api/billing/checkout", { method: "POST" }),
+
   /* ================= TRADING ================= */
 
   tradingSnapshot: () =>
     req("/api/trading/dashboard/snapshot"),
 
+  placeOrder: (payload) =>
+    req("/api/trading/order", { method: "POST", body: payload }),
 };
 
-/* EXPORT */
 export { api, req };
