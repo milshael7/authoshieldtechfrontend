@@ -207,7 +207,6 @@ export default function AuthoDevPanel({
             {m.role === "ai" && (
               <div className="advisor-actions">
 
-                {/* Copy */}
                 <button className="icon-btn" onClick={() => copyText(m.text)}>
                   <svg viewBox="0 0 24 24" stroke="currentColor" fill="none" strokeWidth="1.7">
                     <rect x="9" y="9" width="13" height="13" rx="2"/>
@@ -215,7 +214,6 @@ export default function AuthoDevPanel({
                   </svg>
                 </button>
 
-                {/* Speaker */}
                 <button className="icon-btn" onClick={() => readAloud(m.speakText)}>
                   <svg viewBox="0 0 24 24" stroke="currentColor" fill="none" strokeWidth="1.7">
                     <path d="M11 5L6 9H2v6h4l5 4V5z"/>
@@ -223,21 +221,18 @@ export default function AuthoDevPanel({
                   </svg>
                 </button>
 
-                {/* Thumbs Up */}
                 <button className="icon-btn" onClick={() => setReaction(i, "up")}>
                   <svg viewBox="0 0 24 24" stroke="currentColor" fill="none" strokeWidth="1.7">
                     <path d="M14 9V5a3 3 0 0 0-6 0v4H4v11h16V9h-6z"/>
                   </svg>
                 </button>
 
-                {/* Thumbs Down */}
                 <button className="icon-btn" onClick={() => setReaction(i, "down")}>
                   <svg viewBox="0 0 24 24" stroke="currentColor" fill="none" strokeWidth="1.7">
                     <path d="M10 15v4a3 3 0 0 0 6 0v-4h4V4H4v11h6z"/>
                   </svg>
                 </button>
 
-                {/* Regenerate */}
                 <button className="icon-btn" onClick={() => sendMessage(m.text)}>
                   <svg viewBox="0 0 24 24" stroke="currentColor" fill="none" strokeWidth="1.7">
                     <path d="M23 4v6h-6"/>
@@ -245,7 +240,6 @@ export default function AuthoDevPanel({
                   </svg>
                 </button>
 
-                {/* Share */}
                 <button className="icon-btn" onClick={() => shareText(m.text)}>
                   <svg viewBox="0 0 24 24" stroke="currentColor" fill="none" strokeWidth="1.7">
                     <circle cx="18" cy="5" r="3"/>
@@ -263,36 +257,61 @@ export default function AuthoDevPanel({
         <div ref={bottomRef} />
       </div>
 
+      {/* ================= CHATGPT STYLE INPUT ================= */}
+
       <div className="advisor-inputBar">
-        {!listening ? (
-          <button className="advisor-micBtn" onClick={startListening}>🎙</button>
-        ) : (
-          <button className="advisor-micBtn" onClick={stopListening}>■</button>
-        )}
+        <div className={`advisor-pill ${listening ? "listening" : ""}`}>
 
-        <div className="advisor-inputCenter">
-          <textarea
-            className="advisor-textarea"
-            placeholder="Ask anything..."
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            rows={1}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                sendMessage();
-              }
-            }}
-          />
+          {!listening ? (
+            <button className="advisor-pill-left" onClick={startListening}>
+              🎤
+            </button>
+          ) : (
+            <button className="advisor-pill-left stop" onClick={stopListening}>
+              <div className="stop-square"/>
+            </button>
+          )}
+
+          {!listening ? (
+            <textarea
+              className="advisor-pill-input"
+              placeholder="Ask anything"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              rows={1}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  sendMessage();
+                }
+              }}
+            />
+          ) : (
+            <div className="advisor-waveform">
+              {Array.from({ length: 30 }).map((_, i) => (
+                <span key={i}/>
+              ))}
+            </div>
+          )}
+
+          <button
+            className="advisor-pill-right"
+            onClick={() => sendMessage()}
+            disabled={loading || (!input.trim() && !listening)}
+          >
+            {!listening ? (
+              <div className="wave-icon">
+                <span/><span/><span/>
+              </div>
+            ) : (
+              <svg viewBox="0 0 24 24" stroke="#000" fill="none" strokeWidth="2">
+                <path d="M12 5v14"/>
+                <path d="M5 12l7-7 7 7"/>
+              </svg>
+            )}
+          </button>
+
         </div>
-
-        <button
-          className="advisor-sendBtn"
-          onClick={() => sendMessage()}
-          disabled={loading || !input.trim()}
-        >
-          ➤
-        </button>
       </div>
 
       {loading && <div className="advisor-loading">Analyzing…</div>}
