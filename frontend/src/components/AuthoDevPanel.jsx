@@ -183,16 +183,16 @@ export default function AuthoDevPanel({
       <div className="advisor-inputBar">
         <div className={`advisor-pill ${listening ? "listening" : ""}`}>
 
-          {/* MIC */}
+          {/* MIC (upgraded size only) */}
           {!listening?(
             <button className="advisor-pill-left" onClick={startListening} title="Voice">
               <svg
-                width="18"
-                height="18"
+                width="22"
+                height="22"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
-                strokeWidth="1.8"
+                strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
               >
