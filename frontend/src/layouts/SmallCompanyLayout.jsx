@@ -1,9 +1,7 @@
 // frontend/src/layouts/SmallCompanyLayout.jsx
-// Small Company Layout — ENTERPRISE-STYLE DOCKED ADVISOR
-// Sticky right advisor
-// True collapse (content expands)
-// Floating top-right toggle
-// Phase 3 Unified Architecture
+// Small Company Layout — Unified Enterprise Advisor Architecture
+// Limited Tier Organization
+// Same Advisor Body • Different Brain
 
 import React, { useEffect, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
@@ -16,25 +14,15 @@ export default function SmallCompanyLayout() {
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
 
-  // Advisor dock state (persisted)
-  const [advisorOpen, setAdvisorOpen] = useState(true);
+  // 🔐 Standardized advisor persistence
+  const [advisorOpen, setAdvisorOpen] = useState(() => {
+    const saved = localStorage.getItem("smallcompany.advisor.open");
+    return saved !== "false";
+  });
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem("as_advisor_open_small_company");
-      if (raw === "0") setAdvisorOpen(false);
-    } catch {}
-  }, []);
-
-  function setAdvisor(next) {
-    setAdvisorOpen(next);
-    try {
-      localStorage.setItem(
-        "as_advisor_open_small_company",
-        next ? "1" : "0"
-      );
-    } catch {}
-  }
+    localStorage.setItem("smallcompany.advisor.open", advisorOpen);
+  }, [advisorOpen]);
 
   function logout() {
     clearToken();
@@ -62,7 +50,6 @@ export default function SmallCompanyLayout() {
         </div>
 
         <nav className="layout-nav">
-
           <NavLink to="." end onClick={closeMenu}>
             Security Overview
           </NavLink>
@@ -92,7 +79,6 @@ export default function SmallCompanyLayout() {
           >
             Upgrade to Full Company
           </NavLink>
-
         </nav>
 
         <button className="btn logout-btn" onClick={logout}>
@@ -109,10 +95,14 @@ export default function SmallCompanyLayout() {
         </main>
 
         {/* RIGHT ADVISOR DOCK */}
-        <aside className={`enterprise-ai-panel ${advisorOpen ? "open" : "collapsed"}`}>
+        <aside
+          className={`enterprise-ai-panel ${
+            advisorOpen ? "" : "collapsed"
+          }`}
+        >
           <div className="enterprise-ai-inner">
             <AuthoDevPanel
-              title=""
+              title="Advisor"
               getContext={() => ({
                 role: "small_company",
                 scope: "organization-only",
@@ -127,10 +117,10 @@ export default function SmallCompanyLayout() {
       {/* FLOATING TOGGLE */}
       <button
         className="advisor-fab"
-        onClick={() => setAdvisor(!advisorOpen)}
+        onClick={() => setAdvisorOpen(v => !v)}
         title={advisorOpen ? "Close Advisor" : "Open Advisor"}
       >
-        {advisorOpen ? "›" : "AuthoShield Advisor"}
+        {advisorOpen ? "›" : "Advisor"}
       </button>
     </div>
   );
