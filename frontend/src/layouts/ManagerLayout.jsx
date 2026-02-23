@@ -13,27 +13,19 @@ import "../styles/layout.css";
 
 export default function ManagerLayout() {
   const navigate = useNavigate();
+
   const [menuOpen, setMenuOpen] = useState(false);
-  const [advisorOpen, setAdvisorOpen] = useState(true);
   const [oversightOpen, setOversightOpen] = useState(true);
 
-  /* ================= ADVISOR STATE ================= */
+  // 🔐 Standardized advisor persistence (same pattern as Admin)
+  const [advisorOpen, setAdvisorOpen] = useState(() => {
+    const saved = localStorage.getItem("manager.advisor.open");
+    return saved !== "false";
+  });
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem("as_manager_advisor_open");
-      if (raw === "0") setAdvisorOpen(false);
-    } catch {}
-  }, []);
-
-  function setAdvisor(next) {
-    setAdvisorOpen(next);
-    try {
-      localStorage.setItem("as_manager_advisor_open", next ? "1" : "0");
-    } catch {}
-  }
-
-  /* ================= LOGOUT ================= */
+    localStorage.setItem("manager.advisor.open", advisorOpen);
+  }, [advisorOpen]);
 
   function logout() {
     clearToken();
@@ -44,8 +36,6 @@ export default function ManagerLayout() {
   function closeMenu() {
     setMenuOpen(false);
   }
-
-  /* ================= UI ================= */
 
   return (
     <div className={`layout-root enterprise ${menuOpen ? "sidebar-open" : ""}`}>
@@ -161,12 +151,12 @@ export default function ManagerLayout() {
         {/* ===== ADVISOR PANEL ===== */}
         <aside
           className={`enterprise-ai-panel ${
-            advisorOpen ? "open" : "collapsed"
+            advisorOpen ? "" : "collapsed"
           }`}
         >
           <div className="enterprise-ai-inner">
             <AuthoDevPanel
-              title=""
+              title="Advisor"
               getContext={() => ({
                 role: "manager",
                 location: window.location.pathname,
@@ -181,10 +171,10 @@ export default function ManagerLayout() {
       {/* ===== FLOATING TOGGLE ===== */}
       <button
         className="advisor-fab"
-        onClick={() => setAdvisor(!advisorOpen)}
+        onClick={() => setAdvisorOpen(v => !v)}
         title={advisorOpen ? "Close Advisor" : "Open Advisor"}
       >
-        {advisorOpen ? "›" : "AuthoShield Advisor"}
+        {advisorOpen ? "›" : "Advisor"}
       </button>
     </div>
   );
