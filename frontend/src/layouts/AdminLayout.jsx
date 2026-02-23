@@ -13,14 +13,23 @@ export default function AdminLayout() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const { activeCompanyId, activeCompanyName, setCompany, clearScope } =
-    useCompany();
+  const { activeCompanyId, setCompany, clearScope } = useCompany();
 
   const [menuOpen, setMenuOpen] = useState(false);
-  const [advisorOpen, setAdvisorOpen] = useState(true);
+
+  // 🔐 persist advisor open state
+  const [advisorOpen, setAdvisorOpen] = useState(() => {
+    const saved = localStorage.getItem("admin.advisor.open");
+    return saved !== "false"; // default true
+  });
+
   const [companies, setCompanies] = useState([]);
   const [systemState, setSystemState] = useState(null);
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 900);
+
+  useEffect(() => {
+    localStorage.setItem("admin.advisor.open", advisorOpen);
+  }, [advisorOpen]);
 
   useEffect(() => {
     const onResize = () => setIsMobile(window.innerWidth < 900);
@@ -129,7 +138,7 @@ export default function AdminLayout() {
       {/* ================= MAIN WORKSPACE ================= */}
       <div className="enterprise-main">
 
-        {/* 🔥 Unified Enterprise Header */}
+        {/* Header */}
         <div
           style={{
             padding: "14px 28px",
@@ -182,9 +191,14 @@ export default function AdminLayout() {
         </main>
 
         {/* ADVISOR PANEL */}
-        <aside className={`enterprise-ai-panel ${advisorOpen ? "open" : "collapsed"}`}>
+        <aside
+          className={`enterprise-ai-panel ${
+            advisorOpen ? "" : "collapsed"
+          }`}
+        >
           <div className="enterprise-ai-inner">
             <AuthoDevPanel
+              title="Advisor"
               getContext={() => ({
                 role: "admin",
                 scope: activeCompanyId ? "entity" : "global",
@@ -195,7 +209,11 @@ export default function AdminLayout() {
         </aside>
       </div>
 
-      <button className="advisor-fab" onClick={() => setAdvisorOpen((v) => !v)}>
+      {/* FAB */}
+      <button
+        className="advisor-fab"
+        onClick={() => setAdvisorOpen((v) => !v)}
+      >
         {advisorOpen ? "›" : "Advisor"}
       </button>
     </div>
