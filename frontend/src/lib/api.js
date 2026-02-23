@@ -1,6 +1,6 @@
 /* =========================================================
    AUTOSHIELD FRONTEND API LAYER — FULL PRODUCTION BUILD
-   Hardened + Backward Compatible + Report Safe
+   Hardened + Backward Compatible + Compliance Safe
 ========================================================= */
 
 const API_BASE = import.meta.env.VITE_API_BASE?.trim();
@@ -127,9 +127,7 @@ const api = {
     }),
 
   refresh: () =>
-    req("/api/auth/refresh", {
-      method: "POST",
-    }),
+    req("/api/auth/refresh", { method: "POST" }),
 
   /* ================= ADMIN ================= */
 
@@ -164,6 +162,10 @@ const api = {
       method: "POST",
       body: { riskScore },
     }),
+
+  /* 🔥 FIX: ADMIN COMPLIANCE REPORT */
+  adminComplianceReport: () =>
+    req("/api/admin/compliance-report"),
 
   /* ================= MANAGER ================= */
 
@@ -214,7 +216,11 @@ const api = {
   createIncident: (payload) =>
     req("/api/incidents", { method: "POST", body: payload }),
 
-  /* ================= REPORTING (FIXED) ================= */
+  /* 🔥 FIX: SECURITY COMPLIANCE (non-admin roles) */
+  compliance: () =>
+    req("/api/security/compliance"),
+
+  /* ================= REPORTING ================= */
 
   reportSummary: () =>
     req("/api/reports/summary"),
