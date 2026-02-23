@@ -15,25 +15,15 @@ export default function UserLayout() {
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
 
-  // Advisor state (persist per user room)
-  const [advisorOpen, setAdvisorOpen] = useState(true);
+  // 🔐 Standardized advisor persistence
+  const [advisorOpen, setAdvisorOpen] = useState(() => {
+    const saved = localStorage.getItem("user.advisor.open");
+    return saved !== "false";
+  });
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem("as_advisor_open_user");
-      if (raw === "0") setAdvisorOpen(false);
-    } catch {}
-  }, []);
-
-  function setAdvisor(next) {
-    setAdvisorOpen(next);
-    try {
-      localStorage.setItem(
-        "as_advisor_open_user",
-        next ? "1" : "0"
-      );
-    } catch {}
-  }
+    localStorage.setItem("user.advisor.open", advisorOpen);
+  }, [advisorOpen]);
 
   function logout() {
     clearToken();
@@ -61,7 +51,6 @@ export default function UserLayout() {
         </div>
 
         <nav className="layout-nav">
-
           <NavLink to="." end onClick={closeMenu}>
             Security Overview
           </NavLink>
@@ -73,7 +62,6 @@ export default function UserLayout() {
           <NavLink to="reports" onClick={closeMenu}>
             My Reports
           </NavLink>
-
         </nav>
 
         <button className="btn logout-btn" onClick={logout}>
@@ -90,14 +78,17 @@ export default function UserLayout() {
         </main>
 
         {/* RIGHT ADVISOR DOCK */}
-        <aside className={`enterprise-ai-panel ${advisorOpen ? "open" : "collapsed"}`}>
+        <aside
+          className={`enterprise-ai-panel ${
+            advisorOpen ? "" : "collapsed"
+          }`}
+        >
           <div className="enterprise-ai-inner">
             <AuthoDevPanel
-              title=""
+              title="Advisor"
               getContext={() => ({
-                role: "user",
+                role: "individual",
                 scope: "individual-only",
-                access: "no-global-visibility",
                 location: window.location.pathname,
               })}
             />
@@ -108,10 +99,10 @@ export default function UserLayout() {
       {/* FLOATING TOGGLE */}
       <button
         className="advisor-fab"
-        onClick={() => setAdvisor(!advisorOpen)}
+        onClick={() => setAdvisorOpen(v => !v)}
         title={advisorOpen ? "Close Advisor" : "Open Advisor"}
       >
-        {advisorOpen ? "›" : "AuthoShield Advisor"}
+        {advisorOpen ? "›" : "Advisor"}
       </button>
     </div>
   );
