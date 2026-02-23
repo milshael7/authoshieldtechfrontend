@@ -2,7 +2,7 @@
 // Enterprise Admin Layout — Stable Build
 // ✔ Navigation preserved
 // ✔ Advisor door preserved
-// ✔ Backend status indicator added cleanly
+// ✔ Ultra-thin live platform status rail
 
 import React, { useEffect, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
@@ -27,7 +27,6 @@ export default function AdminLayout() {
 
   const DRAWER_OPEN_W = 360;
   const DRAWER_CLOSED_W = 26;
-
   const drawerWidth = advisorOpen ? DRAWER_OPEN_W : DRAWER_CLOSED_W;
 
   useEffect(() => {
@@ -57,14 +56,6 @@ export default function AdminLayout() {
     clearToken();
     clearUser();
     navigate("/login");
-  }
-
-  function getStatusColor() {
-    if (!systemState) return "#999";
-    if (systemState.securityStatus === "NORMAL") return "#16c784";
-    if (systemState.securityStatus === "WARNING") return "#f5b400";
-    if (systemState.securityStatus === "LOCKDOWN") return "#ff3b30";
-    return "#999";
   }
 
   return (
@@ -114,25 +105,23 @@ export default function AdminLayout() {
           flexDirection: "column",
         }}
       >
-        {/* ===== Operational Status Strip (NEW) ===== */}
+
+        {/* ===== Ultra Thin Platform Status Rail ===== */}
         <div
           style={{
-            height: 44,
+            height: 24,
             display: "flex",
             alignItems: "center",
-            justifyContent: "space-between",
-            padding: "0 28px",
-            borderBottom: "1px solid rgba(255,255,255,.06)",
-            background: "rgba(255,255,255,.02)",
+            padding: "0 18px",
+            borderBottom: "1px solid rgba(255,255,255,.04)",
+            background: "rgba(255,255,255,.01)",
+            fontSize: 11,
+            letterSpacing: ".05em",
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <strong style={{ fontSize: 13 }}>Platform Status</strong>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <SystemStatusIndicator />
-          </div>
-
-          <div style={{ fontSize: 12, opacity: 0.7 }}>
-            {systemState?.securityStatus || "Checking backend..."}
+            <span style={{ opacity: 0.6 }}>PLATFORM</span>
           </div>
         </div>
 
@@ -162,7 +151,6 @@ export default function AdminLayout() {
             zIndex: 2000,
           }}
         >
-          {/* HANDLE STRIP */}
           <button
             onClick={() => setAdvisorOpen(v => !v)}
             style={{
