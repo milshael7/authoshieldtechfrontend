@@ -25,7 +25,7 @@ function getStorageKey(){
 }
 
 export default function AuthoDevPanel({
-  title="",
+  title="Advisor",
   endpoint="/api/ai/chat",
   getContext,
 }){
@@ -95,7 +95,6 @@ export default function AuthoDevPanel({
       const text=last?.[0]?.transcript||"";
       if(text) setInput(text);
     };
-    rec.onerror=()=>setListening(false);
 
     recognitionRef.current=rec;
     rec.start();
@@ -149,6 +148,7 @@ export default function AuthoDevPanel({
         credentials:"include",
         body:JSON.stringify({message:messageText,context:ctx}),
       });
+
       const data=await res.json().catch(()=>({}));
       const reply=data?.reply||"No response available.";
 
@@ -184,13 +184,13 @@ export default function AuthoDevPanel({
     <div className="advisor-wrap">
 
       <div className="advisor-miniTitle">
-        {title||"Advisor"}
+        {title}
       </div>
 
-      {/* FEED (scrollable) */}
       <div className="advisor-feed">
         {messages.map((m,i)=>(
           <div key={i} className={`advisor-row ${m.role}`}>
+
             <div className="advisor-bubble">{m.text}</div>
 
             {m.role==="ai"&&(
@@ -198,7 +198,7 @@ export default function AuthoDevPanel({
 
                 {/* Speaker */}
                 <button className="icon-btn" onClick={()=>readAloud(m.speakText)}>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
                     <path d="M11 5L6 9H2v6h4l5 4V5z"/>
                     <path d="M19 5a7 7 0 0 1 0 14"/>
                   </svg>
@@ -206,21 +206,21 @@ export default function AuthoDevPanel({
 
                 {/* Thumbs Up */}
                 <button className="icon-btn" onClick={()=>setReaction(i,"up")}>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
                     <path d="M14 9V5a3 3 0 0 0-6 0v4H4v11h16V9h-6z"/>
                   </svg>
                 </button>
 
                 {/* Thumbs Down */}
                 <button className="icon-btn" onClick={()=>setReaction(i,"down")}>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
                     <path d="M10 15v4a3 3 0 0 0 6 0v-4h4V4H4v11h6z"/>
                   </svg>
                 </button>
 
                 {/* Regenerate */}
                 <button className="icon-btn" onClick={()=>sendMessage(m.text)}>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
                     <path d="M23 4v6h-6"/>
                     <path d="M1 20v-6h6"/>
                   </svg>
@@ -228,7 +228,7 @@ export default function AuthoDevPanel({
 
                 {/* Share */}
                 <button className="icon-btn" onClick={()=>shareText(m.text)}>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
                     <circle cx="18" cy="5" r="3"/>
                     <circle cx="6" cy="12" r="3"/>
                     <circle cx="18" cy="19" r="3"/>
@@ -239,18 +239,23 @@ export default function AuthoDevPanel({
             )}
 
             <div className="advisor-ts">{m.ts}</div>
+
           </div>
         ))}
         <div ref={bottomRef}/>
       </div>
 
-      {/* BOTTOM DOCKED PILL */}
       <div className="advisor-inputBar">
         <div className="advisor-pill">
 
+          {/* MIC */}
           {!listening?(
             <button className="advisor-pill-left" onClick={startListening}>
-              🎤
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+                <rect x="9" y="2" width="6" height="12" rx="3"/>
+                <path d="M5 10a7 7 0 0 0 14 0"/>
+                <line x1="12" y1="19" x2="12" y2="22"/>
+              </svg>
             </button>
           ):(
             <button className="advisor-pill-left stop" onClick={stopListening}>
@@ -272,21 +277,20 @@ export default function AuthoDevPanel({
             }}
           />
 
+          {/* SEND */}
           <button
             className="advisor-pill-right"
             onClick={()=>sendMessage()}
             disabled={loading||!input.trim()}
           >
-            <svg viewBox="0 0 24 24" stroke="#000" fill="none" strokeWidth="2">
-              <path d="M5 12h14"/>
-              <path d="M13 5l7 7-7 7"/>
+            <svg viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth="2">
+              <path d="M3 11l18-8-8 18-2-7-8-3z"/>
             </svg>
           </button>
 
         </div>
       </div>
 
-      {loading&&<div className="advisor-loading">Analyzing…</div>}
     </div>
   );
 }
