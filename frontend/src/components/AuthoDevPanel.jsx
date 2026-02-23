@@ -54,7 +54,6 @@ export default function AuthoDevPanel({
       const parsed = JSON.parse(raw);
       const now = Date.now();
 
-      // 🔥 expire old sessions
       if (parsed?.lastActive && now - parsed.lastActive > SESSION_TIMEOUT_MS) {
         safeSet(storageKey, "");
         return;
@@ -75,12 +74,8 @@ export default function AuthoDevPanel({
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  /* ================= AUTO INACTIVITY RESET ================= */
-
   function resetInactivityTimer() {
-    if (inactivityTimer.current) {
-      clearTimeout(inactivityTimer.current);
-    }
+    if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
 
     inactivityTimer.current = setTimeout(() => {
       setMessages([]);
@@ -126,6 +121,28 @@ export default function AuthoDevPanel({
   function stopListening() {
     try { recognitionRef.current?.stop(); } catch {}
     setListening(false);
+  }
+
+  /* ================= MESSAGE ACTIONS ================= */
+
+  function copyText(text) {
+    navigator.clipboard?.writeText(text);
+  }
+
+  function shareText(text) {
+    if (navigator.share) {
+      navigator.share({ text }).catch(() => {});
+    } else {
+      copyText(text);
+    }
+  }
+
+  function setReaction(index, type) {
+    setMessages((m) =>
+      m.map((msg, i) =>
+        i === index ? { ...msg, reaction: type } : msg
+      )
+    );
   }
 
   /* ================= SEND ================= */
@@ -182,7 +199,7 @@ export default function AuthoDevPanel({
     }
   }
 
-  /* ================= UI (UNCHANGED STRUCTURE) ================= */
+  /* ================= UI ================= */
 
   return (
     <div className="advisor-wrap">
@@ -194,50 +211,67 @@ export default function AuthoDevPanel({
         {messages.map((m, i) => (
           <div key={i} className={`advisor-row ${m.role}`}>
             <div className="advisor-bubble">{m.text}</div>
+
+            {m.role === "ai" && (
+              <div className="advisor-actions">
+                <button onClick={() => copyText(m.text)}>⧉</button>
+                <button onClick={() => readAloud(m.speakText)}>🔊</button>
+                <button onClick={() => setReaction(i, "up")}>👍</button>
+                <button onClick={() => setReaction(i, "down")}>👎</button>
+                <button onClick={() => sendMessage(m.text)}>↻</button>
+                <button onClick={() => shareText(m.text)}>⇪</button>
+              </div>
+            )}
+
             <div className="advisor-ts">{m.ts}</div>
           </div>
         ))}
         <div ref={bottomRef} />
       </div>
 
+      {/* ===== NEW CHATGPT STYLE INPUT ===== */}
+
       <div className="advisor-inputBar">
+        <div className="advisor-inputPill">
 
-        {/* MIC LEFT (same position) */}
-        {!listening ? (
-          <button className="advisor-micBtn" onClick={startListening}>🎙</button>
-        ) : (
-          <button className="advisor-micBtn" onClick={stopListening}>■</button>
-        )}
-
-        <div className="advisor-inputCenter">
-          <textarea
-            className="advisor-textarea"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            rows={1}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                sendMessage();
-              }
-            }}
-          />
-
-          {listening && (
-            <div className="advisor-bars">
-              <span /><span /><span /><span /><span />
+          {!listening ? (
+            <textarea
+              className="advisor-textarea"
+              placeholder="Ask anything"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              rows={1}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  sendMessage();
+                }
+              }}
+            />
+          ) : (
+            <div className="advisor-waveContainer">
+              <div className="advisor-waveform">
+                <span /><span /><span /><span /><span />
+                <span /><span /><span />
+              </div>
             </div>
           )}
-        </div>
 
-        {/* SEND RIGHT */}
-        <button
-          className="advisor-sendBtn"
-          onClick={() => sendMessage()}
-          disabled={loading || !input.trim()}
-        >
-          ➤
-        </button>
+          <div className="advisor-controls">
+            {!listening ? (
+              <button onClick={startListening}>🎙</button>
+            ) : (
+              <button onClick={stopListening}>⬛</button>
+            )}
+
+            <button
+              onClick={() => sendMessage()}
+              disabled={loading || (!input.trim() && !listening)}
+            >
+              ⬆
+            </button>
+          </div>
+        </div>
       </div>
 
       {loading && <div className="advisor-loading">Analyzing…</div>}
