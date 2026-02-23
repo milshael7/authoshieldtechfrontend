@@ -1,15 +1,15 @@
 // frontend/src/layouts/AdminLayout.jsx
 // Enterprise Admin Layout — Stable Build
 // ✔ Navigation preserved
-// ✔ Door push behavior
-// ✔ Triangle above/below ADVISOR text
-// ✔ Direction indicates slide movement
+// ✔ Advisor door preserved
+// ✔ Backend status indicator added cleanly
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import { clearToken, clearUser, api } from "../lib/api.js";
+import { clearToken, clearUser } from "../lib/api.js";
 import { useCompany } from "../context/CompanyContext";
 import AuthoDevPanel from "../components/AuthoDevPanel.jsx";
+import SystemStatusIndicator from "../components/SystemStatusIndicator.jsx";
 import Logo from "../components/Logo.jsx";
 import "../styles/layout.css";
 
@@ -110,8 +110,32 @@ export default function AdminLayout() {
         style={{
           marginRight: isMobile ? 0 : drawerWidth,
           transition: "margin-right .22s ease",
+          display: "flex",
+          flexDirection: "column",
         }}
       >
+        {/* ===== Operational Status Strip (NEW) ===== */}
+        <div
+          style={{
+            height: 44,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "0 28px",
+            borderBottom: "1px solid rgba(255,255,255,.06)",
+            background: "rgba(255,255,255,.02)",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <strong style={{ fontSize: 13 }}>Platform Status</strong>
+            <SystemStatusIndicator />
+          </div>
+
+          <div style={{ fontSize: 12, opacity: 0.7 }}>
+            {systemState?.securityStatus || "Checking backend..."}
+          </div>
+        </div>
+
         <main className="layout-main">
           <section className="layout-content">
             <Outlet />
@@ -156,52 +180,30 @@ export default function AdminLayout() {
               position: "relative",
             }}
           >
-            {/* CLOSED → panel will slide LEFT */}
             {!advisorOpen && (
-              <div
-                style={{
-                  position: "absolute",
-                  top: 12,
-                  fontSize: 12,
-                  opacity: 0.9,
-                  userSelect: "none"
-                }}
-              >
+              <div style={{ position: "absolute", top: 12, fontSize: 12 }}>
                 ◀
               </div>
             )}
 
-            {/* ADVISOR TEXT */}
             <div
               style={{
                 transform: "rotate(-90deg)",
                 fontSize: 11,
                 letterSpacing: ".18em",
                 fontWeight: 900,
-                opacity: 0.95,
-                userSelect: "none",
               }}
             >
               ADVISOR
             </div>
 
-            {/* OPEN → panel will slide RIGHT */}
             {advisorOpen && (
-              <div
-                style={{
-                  position: "absolute",
-                  bottom: 12,
-                  fontSize: 12,
-                  opacity: 0.9,
-                  userSelect: "none"
-                }}
-              >
+              <div style={{ position: "absolute", bottom: 12, fontSize: 12 }}>
                 ▶
               </div>
             )}
           </button>
 
-          {/* PANEL CONTENT */}
           {advisorOpen && (
             <div style={{ flex: 1 }}>
               <AuthoDevPanel
