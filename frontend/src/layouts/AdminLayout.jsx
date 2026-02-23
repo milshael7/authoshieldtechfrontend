@@ -1,8 +1,9 @@
 // frontend/src/layouts/AdminLayout.jsx
 // Enterprise Admin Layout — Executive-Safe Scope Architecture
-// Scope Selector Isolated (No Dashboard Interference)
+// ✅ Scope Selector Isolated (No Dashboard Interference)
+// ✅ Advisor Drawer "Door" (overlay, never squeezes dashboards)
 
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { NavLink, Outlet, useNavigate, useLocation } from "react-router-dom";
 import { clearToken, clearUser, api } from "../lib/api.js";
 import { useCompany } from "../context/CompanyContext";
@@ -16,6 +17,8 @@ export default function AdminLayout() {
   const { activeCompanyId, setCompany, clearScope } = useCompany();
 
   const [menuOpen, setMenuOpen] = useState(false);
+
+  // Persist advisor open state
   const [advisorOpen, setAdvisorOpen] = useState(() => {
     const saved = localStorage.getItem("admin.advisor.open");
     return saved !== "false";
@@ -24,9 +27,14 @@ export default function AdminLayout() {
   const [companies, setCompanies] = useState([]);
   const [systemState, setSystemState] = useState(null);
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 900);
-  const [scopeOpen, setScopeOpen] = useState(false);
 
+  // Scope dropdown
+  const [scopeOpen, setScopeOpen] = useState(false);
   const scopeRef = useRef(null);
+
+  // Drawer widths (door behavior)
+  const DRAWER_OPEN_W = 380;
+  const DRAWER_CLOSED_W = 54;
 
   useEffect(() => {
     localStorage.setItem("admin.advisor.open", advisorOpen);
@@ -42,8 +50,7 @@ export default function AdminLayout() {
     if (isMobile) setMenuOpen(false);
   }, [location.pathname, isMobile]);
 
-  /* ================= CLOSE SCOPE DROPDOWN ================= */
-
+  // Close scope dropdown on outside click
   useEffect(() => {
     function handleClickOutside(e) {
       if (scopeRef.current && !scopeRef.current.contains(e.target)) {
@@ -114,7 +121,8 @@ export default function AdminLayout() {
   };
 
   const currentScopeLabel = activeCompanyId
-    ? companies.find((c) => String(c.id) === String(activeCompanyId))?.name || "Entity"
+    ? companies.find((c) => String(c.id) === String(activeCompanyId))?.name ||
+      "Entity"
     : "Global";
 
   return (
@@ -133,7 +141,9 @@ export default function AdminLayout() {
         </div>
 
         <nav className="layout-nav" onClick={navClick}>
-          <NavLink to="." end>Dashboard</NavLink>
+          <NavLink to="." end>
+            Dashboard
+          </NavLink>
           <NavLink to="assets">Assets</NavLink>
           <NavLink to="threats">Threat Intelligence</NavLink>
           <NavLink to="incidents">Incident Management</NavLink>
@@ -158,9 +168,8 @@ export default function AdminLayout() {
       </aside>
 
       {/* ================= MAIN WORKSPACE ================= */}
-      <div className="enterprise-main">
-
-        {/* Compact Executive Header */}
+      <div className="enterprise-main" style={{ position: "relative" }}>
+        {/* Compact Executive Header (never affects dashboard width) */}
         <div
           style={{
             padding: "12px 28px",
@@ -169,28 +178,40 @@ export default function AdminLayout() {
             justifyContent: "space-between",
             alignItems: "center",
             background: "rgba(255,255,255,0.02)",
+            gap: 16,
           }}
         >
-          <div>
-            <strong>Security Status:</strong>{" "}
-            <span style={{ color: getStatusColor(), fontWeight: 700 }}>
-              {systemState?.securityStatus || "Loading..."}
-            </span>
+          <div style={{ display: "flex", gap: 18, alignItems: "center" }}>
+            <div>
+              <strong>Security Status:</strong>{" "}
+              <span style={{ color: getStatusColor(), fontWeight: 700 }}>
+                {systemState?.securityStatus || "Loading..."}
+              </span>
+            </div>
+
+            <div style={{ fontSize: 13, opacity: 0.7 }}>
+              Audit:{" "}
+              {systemState?.lastComplianceCheck
+                ? new Date(systemState.lastComplianceCheck).toLocaleDateString()
+                : "-"}
+            </div>
           </div>
 
-          {/* ISOLATED SCOPE CONTROL */}
+          {/* ISOLATED SCOPE CONTROL (dropdown, no layout squeeze) */}
           <div ref={scopeRef} style={{ position: "relative" }}>
             <button
-              onClick={() => setScopeOpen(v => !v)}
+              onClick={() => setScopeOpen((v) => !v)}
               style={{
                 padding: "6px 14px",
-                borderRadius: 8,
+                borderRadius: 10,
                 background: "rgba(255,255,255,0.06)",
-                border: "1px solid rgba(255,255,255,0.1)",
+                border: "1px solid rgba(255,255,255,0.12)",
                 color: "#fff",
                 cursor: "pointer",
                 fontSize: 13,
+                fontWeight: 700,
               }}
+              title="Select scope"
             >
               Scope: {currentScopeLabel} ▾
             </button>
@@ -201,25 +222,53 @@ export default function AdminLayout() {
                   position: "absolute",
                   right: 0,
                   marginTop: 8,
-                  background: "#111",
-                  border: "1px solid rgba(255,255,255,0.1)",
-                  borderRadius: 8,
-                  minWidth: 220,
+                  background: "rgba(10,12,18,0.98)",
+                  border: "1px solid rgba(255,255,255,0.12)",
+                  borderRadius: 12,
+                  minWidth: 260,
                   padding: 8,
-                  zIndex: 1000,
+                  zIndex: 9999,
+                  boxShadow: "0 14px 40px rgba(0,0,0,.45)",
+                  maxHeight: 360,
+                  overflow: "auto",
                 }}
               >
                 <div
-                  style={{ padding: 8, cursor: "pointer" }}
+                  style={{
+                    padding: "10px 10px",
+                    cursor: "pointer",
+                    borderRadius: 10,
+                    fontWeight: 800,
+                  }}
                   onClick={() => selectCompany("")}
                 >
                   Global
                 </div>
+
+                <div
+                  style={{
+                    height: 1,
+                    background: "rgba(255,255,255,0.08)",
+                    margin: "6px 0",
+                  }}
+                />
+
                 {companies.map((c) => (
                   <div
                     key={c.id}
-                    style={{ padding: 8, cursor: "pointer" }}
+                    style={{
+                      padding: "10px 10px",
+                      cursor: "pointer",
+                      borderRadius: 10,
+                    }}
                     onClick={() => selectCompany(c.id)}
+                    onMouseEnter={(e) =>
+                      (e.currentTarget.style.background =
+                        "rgba(120,160,255,.12)")
+                    }
+                    onMouseLeave={(e) =>
+                      (e.currentTarget.style.background = "transparent")
+                    }
                   >
                     {c.name}
                   </div>
@@ -236,30 +285,93 @@ export default function AdminLayout() {
           </section>
         </main>
 
-        {/* ADVISOR PANEL */}
-        <aside
-          className={`enterprise-ai-panel ${advisorOpen ? "" : "collapsed"}`}
-        >
-          <div className="enterprise-ai-inner">
-            <AuthoDevPanel
-              title="Advisor"
-              getContext={() => ({
-                role: "admin",
-                scope: activeCompanyId ? "entity" : "global",
-                systemStatus: systemState?.securityStatus,
-              })}
-            />
-          </div>
-        </aside>
-      </div>
+        {/* ================= ADVISOR "DOOR" DRAWER (OVERLAY) ================= */}
+        {!isMobile && (
+          <div
+            style={{
+              position: "fixed",
+              top: 0,
+              right: 0,
+              height: "100vh",
+              width: advisorOpen ? DRAWER_OPEN_W : DRAWER_CLOSED_W,
+              transition: "width .22s ease",
+              zIndex: 2000,
+              display: "flex",
+              flexDirection: "row",
+              borderLeft: "1px solid rgba(255,255,255,0.10)",
+              background:
+                "linear-gradient(180deg, rgba(255,255,255,.04), rgba(0,0,0,.55))",
+              backdropFilter: "blur(10px)",
+              overflow: "hidden",
+              boxShadow: advisorOpen
+                ? "0 0 0 1px rgba(94,198,255,.12), 0 18px 60px rgba(0,0,0,.55)"
+                : "none",
+            }}
+          >
+            {/* Door Handle (always visible) */}
+            <button
+              onClick={() => setAdvisorOpen((v) => !v)}
+              title={advisorOpen ? "Close Advisor" : "Open Advisor"}
+              style={{
+                width: DRAWER_CLOSED_W,
+                minWidth: DRAWER_CLOSED_W,
+                height: "100%",
+                border: "none",
+                background: "rgba(0,0,0,.20)",
+                color: "rgba(255,255,255,.88)",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                position: "relative",
+              }}
+            >
+              <div
+                style={{
+                  transform: "rotate(-90deg)",
+                  fontSize: 12,
+                  letterSpacing: ".14em",
+                  fontWeight: 900,
+                  opacity: 0.9,
+                  userSelect: "none",
+                }}
+              >
+                ADVISOR
+              </div>
 
-      {/* FAB */}
-      <button
-        className="advisor-fab"
-        onClick={() => setAdvisorOpen((v) => !v)}
-      >
-        {advisorOpen ? "›" : "Advisor"}
-      </button>
+              {/* little notch icon */}
+              <div
+                style={{
+                  position: "absolute",
+                  bottom: 14,
+                  left: "50%",
+                  transform: "translateX(-50%)",
+                  fontSize: 16,
+                  opacity: 0.9,
+                }}
+              >
+                {advisorOpen ? "›" : "‹"}
+              </div>
+            </button>
+
+            {/* Drawer Content */}
+            <div style={{ flex: 1, height: "100%", display: "flex" }}>
+              {advisorOpen && (
+                <div style={{ flex: 1, height: "100%" }}>
+                  <AuthoDevPanel
+                    title="Advisor"
+                    getContext={() => ({
+                      role: "admin",
+                      scope: activeCompanyId ? "entity" : "global",
+                      systemStatus: systemState?.securityStatus,
+                    })}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
