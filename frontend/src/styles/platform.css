@@ -1,59 +1,74 @@
 /* =========================================================
-   AUTOSHIELD TERMINAL LAYER — TRADING ROOM
-   ========================================================= */
+   AUTOSHIELD TERMINAL — ENTERPRISE INSTITUTIONAL BUILD
+   Clean • Alive • Professional • No Patchwork
+========================================================= */
 
 .terminalRoot {
   display: flex;
   flex-direction: column;
   height: 100%;
   background:
-    linear-gradient(
-      180deg,
-      rgba(255,255,255,.04),
-      rgba(0,0,0,.55)
-    );
+    radial-gradient(circle at top left, rgba(94,198,255,.08), transparent 40%),
+    linear-gradient(180deg, rgba(255,255,255,.04), rgba(0,0,0,.65));
+  overflow: hidden;
 }
 
 /* ================= TOP BAR ================= */
 
 .terminalTopbar {
-  height: 48px;
+  height: 52px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 18px;
+  padding: 0 20px;
 
   background:
-    linear-gradient(
-      180deg,
-      rgba(255,255,255,.06),
-      rgba(0,0,0,.55)
-    );
+    linear-gradient(180deg, rgba(255,255,255,.06), rgba(0,0,0,.55));
 
   border-bottom: 1px solid var(--p-border);
-  backdrop-filter: blur(6px);
+  backdrop-filter: blur(8px);
 }
 
 .terminalSymbol {
-  font-weight: 800;
-  letter-spacing: .6px;
+  font-weight: 900;
+  letter-spacing: .8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.terminalSymbol::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--p-ok);
+  box-shadow: 0 0 10px var(--p-ok);
+  animation: pulse 1.6s infinite;
+}
+
+@keyframes pulse {
+  0% { box-shadow: 0 0 4px var(--p-ok); }
+  50% { box-shadow: 0 0 14px var(--p-ok); }
+  100% { box-shadow: 0 0 4px var(--p-ok); }
 }
 
 /* ================= BUY / SELL ================= */
 
 .terminalActions {
   display: flex;
-  gap: 12px;
+  gap: 14px;
 }
 
 .terminalBuy,
 .terminalSell {
-  padding: 6px 18px;
+  padding: 7px 20px;
   border-radius: 999px;
   font-weight: 800;
   border: 1px solid var(--p-border);
   cursor: pointer;
-  transition: .2s ease;
+  transition: all .2s ease;
+  backdrop-filter: blur(4px);
 }
 
 .terminalBuy {
@@ -68,7 +83,10 @@
 
 .terminalBuy:hover,
 .terminalSell:hover {
-  transform: translateY(-1px);
+  transform: translateY(-2px);
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,.08),
+    0 6px 20px rgba(0,0,0,.45);
 }
 
 /* ================= BODY ================= */
@@ -79,22 +97,18 @@
   position: relative;
 }
 
-/* ================= LEFT TOOL RAIL ================= */
+/* ================= TOOL RAIL ================= */
 
 .terminalRail {
-  width: 56px;
+  width: 60px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding-top: 14px;
-  gap: 18px;
+  padding-top: 18px;
+  gap: 20px;
 
   background:
-    linear-gradient(
-      180deg,
-      rgba(255,255,255,.05),
-      rgba(0,0,0,.65)
-    );
+    linear-gradient(180deg, rgba(255,255,255,.05), rgba(0,0,0,.7));
 
   border-right: 1px solid var(--p-border);
 }
@@ -103,12 +117,13 @@
   font-size: 16px;
   cursor: pointer;
   opacity: .7;
-  transition: .2s ease;
+  transition: all .2s ease;
 }
 
 .terminalRailItem:hover {
   opacity: 1;
   color: var(--p-accent);
+  transform: scale(1.05);
 }
 
 /* ================= CHART AREA ================= */
@@ -117,6 +132,19 @@
   flex: 1;
   position: relative;
   transition: margin .2s ease;
+  overflow: hidden;
+}
+
+.terminalChartArea::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(255,255,255,.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+  opacity: .15;
 }
 
 .terminalChartSurface {
@@ -136,55 +164,45 @@
   flex-direction: column;
 
   background:
-    linear-gradient(
-      180deg,
-      rgba(255,255,255,.06),
-      rgba(0,0,0,.55)
-    );
+    linear-gradient(180deg, rgba(255,255,255,.06), rgba(0,0,0,.6));
 
   border-left: 1px solid var(--p-border);
-  backdrop-filter: blur(8px);
+  backdrop-filter: blur(10px);
+
+  box-shadow:
+    -12px 0 40px rgba(0,0,0,.45);
+
   z-index: 50;
 }
 
 .terminalPanelHeader {
-  padding: 14px 18px;
+  padding: 16px 20px;
   font-weight: 900;
-  letter-spacing: .5px;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: .8px;
   cursor: move;
 
-  background: rgba(0,0,0,.35);
+  background: rgba(0,0,0,.45);
   border-bottom: 1px solid var(--p-border);
 }
 
 .terminalPanelBody {
-  padding: 20px;
+  padding: 22px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 18px;
 }
 
 /* ================= FLOATING MODE ================= */
 
 .terminalPanel.floating {
   height: 420px;
-  border-radius: var(--p-radius-sm);
+  border-radius: 14px;
   border: 1px solid var(--p-border);
-
   box-shadow:
     0 0 0 1px rgba(94,198,255,.15),
-    0 10px 40px rgba(0,0,0,.45);
-}
-
-/* ================= RESIZE HANDLE ================= */
-
-.terminalResize {
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 6px;
-  cursor: ew-resize;
+    0 14px 45px rgba(0,0,0,.5);
 }
 
 /* ================= AI METRICS ================= */
@@ -193,15 +211,21 @@
   font-size: 13px;
   color: var(--p-muted);
   line-height: 1.6;
+  padding: 12px 14px;
+  background: rgba(255,255,255,.04);
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,.06);
 }
 
+/* ================= CONFIRM BUTTON ================= */
+
 .terminalConfirm {
-  padding: 10px;
+  padding: 12px;
   border-radius: 999px;
-  font-weight: 800;
+  font-weight: 900;
   border: 1px solid var(--p-border);
   cursor: pointer;
-  transition: .2s ease;
+  transition: all .2s ease;
 }
 
 .terminalConfirm.buy {
@@ -212,4 +236,44 @@
 .terminalConfirm.sell {
   background: rgba(255,90,95,.18);
   color: var(--p-bad);
+}
+
+.terminalConfirm:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,.08),
+    0 6px 18px rgba(0,0,0,.45);
+}
+
+/* ================= SIGNAL FEED ================= */
+
+.terminalSignalFeed {
+  height: 48px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 20px;
+  border-top: 1px solid var(--p-border);
+  background: rgba(0,0,0,.45);
+  overflow-x: auto;
+}
+
+.terminalSignal {
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.terminalSignal.buy {
+  background: rgba(43,213,118,.2);
+  color: var(--p-ok);
+  box-shadow: 0 0 8px rgba(43,213,118,.3);
+}
+
+.terminalSignal.sell {
+  background: rgba(255,90,95,.2);
+  color: var(--p-bad);
+  box-shadow: 0 0 8px rgba(255,90,95,.3);
 }
