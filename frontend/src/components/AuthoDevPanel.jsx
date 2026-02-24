@@ -26,6 +26,8 @@ function copyText(text){
   try{ navigator.clipboard?.writeText(String(text||"")); }catch{}
 }
 
+/* ================= MAIN COMPONENT ================= */
+
 export default function AuthoDevPanel({
   title="Advisor",
   endpoint="/api/ai/chat",
@@ -64,13 +66,10 @@ export default function AuthoDevPanel({
   function startListening(){
     const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
     if(!SR) return;
-
     try{recognitionRef.current?.stop();}catch{}
-
     const rec=new SR();
     rec.lang="en-US";
     rec.interimResults=true;
-
     rec.onstart=()=>setListening(true);
     rec.onend=()=>setListening(false);
     rec.onresult=(e)=>{
@@ -78,7 +77,6 @@ export default function AuthoDevPanel({
       const text=last?.[0]?.transcript||"";
       if(text) setInput(text);
     };
-
     recognitionRef.current=rec;
     rec.start();
   }
@@ -91,7 +89,6 @@ export default function AuthoDevPanel({
   async function sendMessage(){
     const messageText=String(input||"").trim();
     if(!messageText||loading) return;
-
     if(listening) stopListening();
 
     setMessages(m=>[
@@ -99,7 +96,6 @@ export default function AuthoDevPanel({
       {role:"user",text:messageText,ts:new Date().toLocaleTimeString()}
     ]);
     setInput("");
-
     setLoading(true);
 
     try{
@@ -116,13 +112,13 @@ export default function AuthoDevPanel({
 
       setMessages(prev=>[
         ...prev.slice(-MAX_MESSAGES+1),
-        {role:"ai",text:reply,speakText:reply,ts:new Date().toLocaleTimeString()}
+        {role:"ai",text:reply,ts:new Date().toLocaleTimeString()}
       ]);
 
     }catch{
       setMessages(prev=>[
         ...prev.slice(-MAX_MESSAGES+1),
-        {role:"ai",text:"Assistant unavailable.",speakText:"Assistant unavailable.",ts:new Date().toLocaleTimeString()}
+        {role:"ai",text:"Assistant unavailable.",ts:new Date().toLocaleTimeString()}
       ]);
     }finally{
       setLoading(false);
@@ -130,21 +126,56 @@ export default function AuthoDevPanel({
   }
 
   return(
-    <div className="advisor-wrap">
+    <div style={{
+      display:"flex",
+      flexDirection:"column",
+      height:"100%",
+      maxWidth:880,
+      margin:"0 auto",
+      width:"100%"
+    }}>
 
-      <div className="advisor-miniTitle">{title}</div>
+      <div style={{
+        fontSize:13,
+        opacity:.7,
+        marginBottom:12
+      }}>{title}</div>
 
-      <div className="advisor-feed">
+      {/* FEED */}
+      <div style={{
+        flex:1,
+        overflowY:"auto",
+        display:"flex",
+        flexDirection:"column",
+        gap:18,
+        paddingRight:4
+      }}>
         {messages.map((m,i)=>(
-          <div key={i} className={`advisor-row ${m.role}`}>
-            <div className="advisor-bubble">{m.text}</div>
+          <div key={i} style={{
+            display:"flex",
+            flexDirection:"column",
+            alignItems:m.role==="user"?"flex-end":"flex-start"
+          }}>
+
+            <div style={{
+              maxWidth:"75%",
+              padding:"12px 16px",
+              borderRadius:16,
+              lineHeight:1.4,
+              background:m.role==="user"
+                ?"linear-gradient(135deg,#5EC6FF,#7aa2ff)"
+                :"rgba(255,255,255,.06)",
+              color:"#fff"
+            }}>
+              {m.text}
+            </div>
 
             {m.role==="ai" && (
               <div style={{
-                display:"inline-flex",
-                alignItems:"center",
-                gap:6,
-                marginTop:8,
+                display:"flex",
+                flexWrap:"wrap",
+                gap:10,
+                marginTop:10,
                 opacity:.85
               }}>
                 <IconButton onClick={()=>readAloud(m.text)}><IconSpeaker/></IconButton>
@@ -160,63 +191,54 @@ export default function AuthoDevPanel({
         <div ref={bottomRef}/>
       </div>
 
-      {/* ===== PILL RESTORED ===== */}
+      {/* INPUT */}
+      <div style={{
+        marginTop:14,
+        padding:"8px 12px",
+        borderRadius:999,
+        background:"rgba(255,255,255,0.05)",
+        display:"flex",
+        alignItems:"center",
+        gap:10
+      }}>
 
-      <div className="advisor-inputBar">
-        <div style={{
-          display:"flex",
-          alignItems:"center",
-          gap:8,
-          padding:"6px 10px",
-          borderRadius:999,
-          background:"rgba(255,255,255,0.05)"
-        }}>
+        {!listening?(
+          <CircleButton onClick={startListening}><IconMic/></CircleButton>
+        ):(
+          <CircleButton onClick={stopListening}><IconStop/></CircleButton>
+        )}
 
-          {/* MIC CIRCLE */}
-          {!listening?(
-            <CircleButton onClick={startListening}><IconMic/></CircleButton>
-          ):(
-            <CircleButton onClick={stopListening}><IconStop/></CircleButton>
-          )}
+        <textarea
+          style={{
+            flex:1,
+            background:"transparent",
+            border:"none",
+            outline:"none",
+            color:"#fff",
+            resize:"none",
+            fontSize:14
+          }}
+          placeholder="Ask anything"
+          value={input}
+          onChange={(e)=>setInput(e.target.value)}
+          onKeyDown={(e)=>{
+            if(e.key==="Enter"&&!e.shiftKey){
+              e.preventDefault();
+              sendMessage();
+            }
+          }}
+        />
 
-          {/* BARS OR TEXTAREA */}
-          {listening ? (
-            <VoiceBars/>
-          ) : (
-            <textarea
-              style={{
-                flex:1,
-                background:"transparent",
-                border:"none",
-                outline:"none",
-                color:"#fff",
-                resize:"none"
-              }}
-              placeholder="Ask anything"
-              value={input}
-              onChange={(e)=>setInput(e.target.value)}
-              onKeyDown={(e)=>{
-                if(e.key==="Enter"&&!e.shiftKey){
-                  e.preventDefault();
-                  sendMessage();
-                }
-              }}
-            />
-          )}
+        <CircleButton onClick={sendMessage} white>
+          <IconSend/>
+        </CircleButton>
 
-          {/* SUBMIT CIRCLE */}
-          <CircleButton onClick={sendMessage} white>
-            <IconSend/>
-          </CircleButton>
-
-        </div>
       </div>
-
     </div>
   );
 }
 
-/* ===== BUTTONS ===== */
+/* ================= BUTTONS ================= */
 
 const IconButton = ({ children, onClick }) => (
   <button onClick={onClick} style={{
@@ -234,59 +256,29 @@ const IconButton = ({ children, onClick }) => (
 
 const CircleButton = ({ children, onClick, white }) => (
   <button onClick={onClick} style={{
-    width:36,
-    height:36,
-    minWidth:36,
-    minHeight:36,
+    width:40,
+    height:40,
+    minWidth:40,
+    minHeight:40,
     borderRadius:"50%",
     display:"flex",
     alignItems:"center",
     justifyContent:"center",
     border:"none",
     cursor:"pointer",
-    background:white ? "#fff" : "rgba(255,255,255,0.08)",
-    color:white ? "#000" : "rgba(255,255,255,.9)"
+    background:white ? "#fff" : "rgba(255,255,255,0.08)"
   }}>
     {children}
   </button>
 );
 
-/* ===== VOICE BARS ===== */
-
-const VoiceBars = () => (
-  <div style={{
-    flex:1,
-    display:"flex",
-    alignItems:"center",
-    gap:3,
-    height:20
-  }}>
-    {[...Array(20)].map((_,i)=>(
-      <div key={i} style={{
-        width:2,
-        height:8,
-        background:"#fff",
-        animation:"pulse 1s infinite ease-in-out",
-        animationDelay:`${i*0.05}s`
-      }}/>
-    ))}
-    <style>{`
-      @keyframes pulse {
-        0% { height: 4px; }
-        50% { height: 18px; }
-        100% { height: 4px; }
-      }
-    `}</style>
-  </div>
-);
-
-/* ===== ICONS 16px ===== */
+/* ================= ICONS ================= */
 
 const baseIconProps = {
-  width:16,
-  height:16,
+  width:22,
+  height:22,
   fill:"none",
-  stroke:"currentColor",
+  stroke:"#fff",
   strokeWidth:1.8,
   strokeLinecap:"round",
   strokeLinejoin:"round"
@@ -301,7 +293,7 @@ const IconMic=()=>(
 );
 
 const IconStop=()=>(
-<div style={{width:16,height:16,background:"#c33",borderRadius:3}}/>
+<div style={{width:18,height:18,background:"#c33",borderRadius:4}}/>
 );
 
 const IconSpeaker=()=>(
@@ -350,7 +342,15 @@ const IconShare=()=>(
 );
 
 const IconSend=()=>(
-<svg viewBox="0 0 24 24" {...baseIconProps}>
+<svg viewBox="0 0 24 24"
+  width="20"
+  height="20"
+  fill="none"
+  stroke="#000"
+  strokeWidth="1.8"
+  strokeLinecap="round"
+  strokeLinejoin="round"
+>
 <path d="M22 2L11 13"/>
 <path d="M22 2L15 22l-4-9-9-4 20-7z"/>
 </svg>
