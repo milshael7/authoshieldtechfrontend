@@ -4,6 +4,7 @@ import { api, getToken } from "../lib/api";
 export default function Intelligence() {
   const [items, setItems] = useState([]);
   const [connected, setConnected] = useState(false);
+  const [adaptiveRisk, setAdaptiveRisk] = useState(0);
   const wsRef = useRef(null);
 
   useEffect(() => {
@@ -51,28 +52,64 @@ export default function Intelligence() {
       try {
         const data = JSON.parse(msg.data);
 
-        if (!["security_event", "incident_created"].includes(data.type))
-          return;
+        /* ===== Intelligence Events ===== */
+        if (["security_event", "incident_created"].includes(data.type)) {
+          const payload = {
+            ...data.event,
+            type: data.type,
+            ts: data.event.timestamp || data.event.createdAt
+          };
 
-        const payload = {
-          ...data.event,
-          type: data.type,
-          ts: data.event.timestamp || data.event.createdAt
-        };
+          setItems(prev => sort([payload, ...prev]).slice(0, 200));
+        }
 
-        setItems(prev => sort([payload, ...prev]).slice(0, 200));
+        /* ===== Adaptive Risk ===== */
+        if (data.type === "risk_update") {
+          setAdaptiveRisk(data.riskScore || 0);
+        }
+
       } catch {}
     };
   }
 
+  const risk = levelFromScore(adaptiveRisk);
+
   return (
     <div style={{ padding: 28 }}>
+
+      {/* ===== Header ===== */}
       <div style={{ display: "flex", justifyContent: "space-between" }}>
         <h2>Global Intelligence Stream</h2>
         <Status connected={connected} />
       </div>
 
-      <div style={{ marginTop: 24, display: "flex", flexDirection: "column", gap: 14 }}>
+      {/* ===== Executive Risk Banner ===== */}
+      <div
+        style={{
+          marginTop: 20,
+          padding: 16,
+          borderRadius: 10,
+          background: risk.color,
+          color: "#000",
+          fontWeight: 700,
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+        }}
+      >
+        <div>Adaptive AI Risk Level</div>
+        <div style={{ fontSize: 22 }}>{adaptiveRisk}</div>
+      </div>
+
+      {/* ===== Stream ===== */}
+      <div
+        style={{
+          marginTop: 24,
+          display: "flex",
+          flexDirection: "column",
+          gap: 14,
+        }}
+      >
         {items.map((item) => (
           <div
             key={`${item.type}-${item.id}`}
@@ -104,9 +141,11 @@ export default function Intelligence() {
   );
 }
 
+/* ================= HELPERS ================= */
+
 function sort(list) {
-  return [...list].sort((a, b) =>
-    new Date(b.ts) - new Date(a.ts)
+  return [...list].sort(
+    (a, b) => new Date(b.ts) - new Date(a.ts)
   );
 }
 
@@ -121,6 +160,13 @@ function color(item) {
   if (s === "high") return "#ff9500";
   if (s === "medium") return "#f5b400";
   return "#16c784";
+}
+
+function levelFromScore(score) {
+  if (score >= 75) return { label: "CRITICAL", color: "#ff3b30" };
+  if (score >= 50) return { label: "ELEVATED", color: "#ff9500" };
+  if (score >= 25) return { label: "MODERATE", color: "#f5b400" };
+  return { label: "LOW", color: "#16c784" };
 }
 
 function Status({ connected }) {
