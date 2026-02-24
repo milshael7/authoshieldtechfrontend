@@ -1,6 +1,6 @@
 /* =========================================================
-   AUTOSHIELD FRONTEND API LAYER — FULL STABLE BUILD
-   Executive + Backward Compatible
+   AUTOSHIELD FRONTEND API LAYER — FULL PRODUCTION BUILD
+   Fully Aligned With Backend Routes
 ========================================================= */
 
 const API_BASE = import.meta.env.VITE_API_BASE?.trim();
@@ -43,7 +43,7 @@ export function clearUser() {
   localStorage.removeItem(USER_KEY);
 }
 
-/* ================= CORE HELPERS ================= */
+/* ================= CORE ================= */
 
 function joinUrl(base, path) {
   const cleanBase = String(base || "").replace(/\/+$/, "");
@@ -56,7 +56,6 @@ function joinUrl(base, path) {
 async function fetchWithTimeout(url, options = {}, ms = REQUEST_TIMEOUT) {
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), ms);
-
   try {
     return await fetch(url, { ...options, signal: controller.signal });
   } finally {
@@ -114,45 +113,17 @@ const api = {
   refresh: () =>
     req("/api/auth/refresh", { method: "POST" }),
 
-  /* ================= ADMIN EXECUTIVE ================= */
+  /* ================= ADMIN ================= */
 
   adminMetrics: () => req("/api/admin/metrics"),
-  adminSubscriberGrowth: (days = 90) =>
-    req(`/api/admin/subscriber-growth?days=${days}`),
   adminExecutiveRisk: () => req("/api/admin/executive-risk"),
-  adminRevenueRefundOverlay: (days = 90) =>
-    req(`/api/admin/revenue-refund-overlay?days=${days}`),
   adminPredictiveChurn: () => req("/api/admin/predictive-churn"),
-  adminRefundDisputeTimeline: () =>
-    req("/api/admin/refund-dispute-timeline"),
-  adminComplianceReport: () =>
-    req("/api/admin/compliance/report"),
-  adminComplianceHistory: (limit = 20) =>
-    req(`/api/admin/compliance/history?limit=${limit}`),
+  adminComplianceReport: () => req("/api/admin/compliance/report"),
   adminUsers: () => req("/api/admin/users"),
   adminNotifications: () => req("/api/admin/notifications"),
   adminCompanies: () => req("/api/admin/companies"),
   adminCreateCompany: (payload) =>
     req("/api/admin/companies", { method: "POST", body: payload }),
-
-  /* ================= MANAGER ================= */
-
-  managerUsers: () => req("/api/manager/users"),
-  managerNotifications: () => req("/api/manager/notifications"),
-  managerOverview: () => req("/api/manager/overview"),
-  managerAudit: () => req("/api/manager/audit"),
-
-  /* ================= COMPANY ================= */
-
-  companyMe: () => req("/api/company/me"),
-  companyNotifications: () => req("/api/company/notifications"),
-  companyMembers: () => req("/api/company/members"),
-  companyAddMember: (userId) =>
-    req("/api/company/members", { method: "POST", body: { userId } }),
-  companyRemoveMember: (userId) =>
-    req(`/api/company/members/${userId}`, { method: "DELETE" }),
-  companyMarkRead: (id) =>
-    req(`/api/company/notifications/${id}/read`, { method: "POST" }),
 
   /* ================= SECURITY ================= */
 
@@ -164,45 +135,40 @@ const api = {
   securityEvents: (limit = 50) =>
     req(`/api/security/events?limit=${limit}`),
 
-  /* 🔥 backward compatibility */
-  threatFeed: (limit = 50) =>
-    req(`/api/security/events?limit=${limit}`),
-
   /* ================= INCIDENTS ================= */
 
   incidents: () => req("/api/incidents"),
   createIncident: (payload) =>
     req("/api/incidents", { method: "POST", body: payload }),
 
-  /* ================= REPORTING ================= */
+  /* =========================================================
+     TRADING — FULLY ALIGNED WITH BACKEND
+  ========================================================= */
 
-  reportSummary: () => req("/api/reports/summary"),
-  reportExport: () => req("/api/reports/export"),
+  tradingSymbols: () =>
+    req("/api/trading/symbols", { auth: false }),
 
-  /* ================= AUTOPROTECT ================= */
-
-  autoprotectStatus: () => req("/api/autoprotect/status"),
-  autoprotectEnable: () =>
-    req("/api/autoprotect/enable", { method: "POST" }),
-  autoprotectDisable: () =>
-    req("/api/autoprotect/disable", { method: "POST" }),
-
-  /* ================= ASSETS ================= */
-
-  assets: () => req("/api/assets"),
-
-  /* ================= BILLING ================= */
-
-  billingStatus: () => req("/api/billing/status"),
-  createCheckout: () =>
-    req("/api/billing/checkout", { method: "POST" }),
-
-  /* ================= TRADING ================= */
-
-  tradingSnapshot: () =>
+  tradingDashboard: () =>
     req("/api/trading/dashboard/snapshot"),
-  placeOrder: (payload) =>
-    req("/api/trading/order", { method: "POST", body: payload }),
+
+  tradingPaperSnapshot: () =>
+    req("/api/trading/paper/snapshot"),
+
+  tradingLiveSnapshot: () =>
+    req("/api/trading/live/snapshot"),
+
+  tradingRiskSnapshot: () =>
+    req("/api/trading/risk/snapshot"),
+
+  tradingPortfolioSnapshot: () =>
+    req("/api/trading/portfolio/snapshot"),
+
+  tradingAISnapshot: () =>
+    req("/api/trading/ai/snapshot"),
+
+  tradingRouterHealth: () =>
+    req("/api/trading/router/health"),
+
 };
 
 export { api, req };
