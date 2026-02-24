@@ -1,6 +1,6 @@
 /* =========================================================
    AUTOSHIELD FRONTEND API LAYER — FULL PRODUCTION BUILD
-   Fully Aligned With Backend Routes
+   Stable • Backward Compatible • Trading + Reporting Safe
 ========================================================= */
 
 const API_BASE = import.meta.env.VITE_API_BASE?.trim();
@@ -141,9 +141,15 @@ const api = {
   createIncident: (payload) =>
     req("/api/incidents", { method: "POST", body: payload }),
 
-  /* =========================================================
-     TRADING — FULLY ALIGNED WITH BACKEND
-  ========================================================= */
+  /* ================= REPORTING (RESTORED) ================= */
+
+  reportSummary: () =>
+    req("/api/reports/summary"),
+
+  reportExport: () =>
+    req("/api/reports/export"),
+
+  /* ================= TRADING ================= */
 
   tradingSymbols: () =>
     req("/api/trading/symbols", { auth: false }),
