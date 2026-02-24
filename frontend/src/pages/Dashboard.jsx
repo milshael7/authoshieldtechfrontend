@@ -1,236 +1,327 @@
 // frontend/src/pages/Dashboard.jsx
-// ENTERPRISE ADMIN COMMAND CENTER — PLATFORM MODE
+// Enterprise Admin Dashboard — resilient build (dashboard never acts like a sensor)
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { api } from "../lib/api.js";
 
 export default function Dashboard() {
-
   const [loading, setLoading] = useState(true);
 
-  const [health, setHealth] = useState(null);
-  const [tenants, setTenants] = useState([]);
-  const [protectedTenants, setProtectedTenants] = useState([]);
-  const [defenseMode, setDefenseMode] = useState("auto");
+  // Executive
+  const [metrics, setMetrics] = useState(null);
+  const [risk, setRisk] = useState(null);
+  const [predictive, setPredictive] = useState(null);
 
+  // Security
+  const [posture, setPosture] = useState(null);
   const [events, setEvents] = useState([]);
+  const [vulns, setVulns] = useState([]);
+
+  // Incidents
+  const [incidents, setIncidents] = useState([]);
+
+  // Non-blocking status (per-module)
+  const [moduleStatus, setModuleStatus] = useState({
+    adminMetrics: "loading",
+    adminExecutiveRisk: "loading",
+    adminPredictiveChurn: "loading",
+    postureSummary: "loading",
+    securityEvents: "loading",
+    vulnerabilities: "loading",
+    incidents: "loading",
+  });
+
   const [lastUpdated, setLastUpdated] = useState(null);
 
   async function loadAll() {
-    try {
-      const [
-        healthRes,
-        tenantsRes,
-        scopeRes,
-        eventsRes
-      ] = await Promise.all([
-        api.adminPlatformHealth(),
-        api.adminTenants(),
-        api.adminProtectionScope(),
-        api.securityEvents(20)
-      ]);
+    // Dashboard should NEVER crash if one call fails.
+    const tasks = [
+      ["adminMetrics", api.adminMetrics()],
+      ["adminExecutiveRisk", api.adminExecutiveRisk()],
+      ["adminPredictiveChurn", api.adminPredictiveChurn()],
+      ["postureSummary", api.postureSummary()],
+      ["securityEvents", api.securityEvents(50)],
+      ["vulnerabilities", api.vulnerabilities()],
+      ["incidents", api.incidents()],
+    ];
 
-      setHealth(healthRes?.health || null);
-      setTenants(tenantsRes?.tenants || []);
-      setProtectedTenants(scopeRes?.protectedTenants || []);
-      setDefenseMode(scopeRes?.defenseMode || "auto");
-      setEvents(eventsRes?.events || []);
-      setLastUpdated(new Date());
+    const results = await Promise.allSettled(tasks.map((t) => t[1]));
 
-    } catch (err) {
-      console.error("Admin dashboard load error:", err);
-    } finally {
-      setLoading(false);
-    }
+    const nextStatus = { ...moduleStatus };
+
+    results.forEach((res, idx) => {
+      const key = tasks[idx][0];
+      nextStatus[key] = res.status === "fulfilled" ? "ok" : "error";
+
+      if (res.status !== "fulfilled") {
+        console.warn(`[Dashboard] ${key} failed:`, res.reason);
+        return;
+      }
+
+      const data = res.value;
+
+      switch (key) {
+        case "adminMetrics":
+          setMetrics(data?.metrics || null);
+          break;
+
+        case "adminExecutiveRisk":
+          // backend might return { executiveRisk: { score, level } } or other shape
+          setRisk(data?.executiveRisk || data?.risk || null);
+          break;
+
+        case "adminPredictiveChurn":
+          setPredictive(data?.predictiveChurn || null);
+          break;
+
+        case "postureSummary":
+          // some APIs return {summary}, some return summary directly
+          setPosture(data?.summary || data || null);
+          break;
+
+        case "securityEvents":
+          setEvents(data?.events || data || []);
+          break;
+
+        case "vulnerabilities":
+          setVulns(data?.vulnerabilities || data || []);
+          break;
+
+        case "incidents":
+          setIncidents(data?.incidents || data || []);
+          break;
+
+        default:
+          break;
+      }
+    });
+
+    setModuleStatus(nextStatus);
+    setLastUpdated(new Date());
+    setLoading(false);
   }
 
   useEffect(() => {
     loadAll();
     const interval = setInterval(loadAll, 15000);
     return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function toggleDefense() {
-    const newMode = defenseMode === "auto" ? "manual" : "auto";
-    await api.adminSetDefenseMode(newMode);
-    setDefenseMode(newMode);
-  }
-
-  async function toggleProtection(id) {
-    if (protectedTenants.includes(id)) {
-      const res = await api.adminUnprotectTenant(id);
-      setProtectedTenants(res.protectedTenants);
-    } else {
-      const res = await api.adminProtectTenant(id);
-      setProtectedTenants(res.protectedTenants);
+  const eventSeverity = useMemo(() => {
+    const map = { critical: 0, high: 0, medium: 0, low: 0 };
+    for (const e of events) {
+      const s = String(e.severity || e.level || "").toLowerCase();
+      if (s.includes("crit")) map.critical++;
+      else if (s.includes("high")) map.high++;
+      else if (s.includes("med")) map.medium++;
+      else map.low++;
     }
-  }
+    return map;
+  }, [events]);
+
+  const openIncidents = incidents.filter((i) => i.status !== "Closed");
+
+  const offlineModules = Object.entries(moduleStatus)
+    .filter(([, v]) => v === "error")
+    .map(([k]) => k);
 
   if (loading) {
-    return <div style={{ padding: 30 }}>Initializing Command Center...</div>;
+    // still show something — not a scary “platform unavailable”
+    return <div style={{ padding: 28 }}>Loading dashboard modules…</div>;
   }
 
   return (
     <div style={{ padding: 28, display: "flex", flexDirection: "column", gap: 22 }}>
-
-      {/* ================= COMMAND STRIP ================= */}
-      <div style={{
-        display: "flex",
-        justifyContent: "space-between",
-        padding: "14px 20px",
-        borderRadius: 12,
-        background: "rgba(255,255,255,.03)",
-        border: "1px solid rgba(255,255,255,.08)",
-        fontSize: 13
-      }}>
-        <div>
-          <StatusDot ok />
-          SYSTEM: {health?.systemStatus || "Operational"}
-        </div>
-
-        <div>
-          <StatusDot ok={defenseMode === "auto"} />
-          DEFENSE: {defenseMode.toUpperCase()}
-        </div>
-
-        <div>
-          ACTIVE USERS: {health?.activeUsers || 0}
-        </div>
-
-        <div>
-          EVENTS: {health?.totalEvents || 0}
-        </div>
-
-        <div style={{ opacity: .6 }}>
-          {lastUpdated && `Updated ${lastUpdated.toLocaleTimeString()}`}
-        </div>
-      </div>
-
-      {/* ================= DEFENSE CONTROL ================= */}
-      <div style={panelStyle}>
-        <h3>Defense Engine</h3>
-
-        <div style={{ marginTop: 10 }}>
-          Mode: <strong>{defenseMode.toUpperCase()}</strong>
-        </div>
-
-        <button
-          onClick={toggleDefense}
-          style={buttonStyle}
+      {/* Non-blocking warning (Dashboard is NOT the sensor) */}
+      {offlineModules.length > 0 && (
+        <div
+          style={{
+            padding: 12,
+            borderRadius: 12,
+            border: "1px solid rgba(255,0,0,.25)",
+            background: "rgba(255,0,0,.08)",
+            fontSize: 12,
+          }}
         >
-          Switch to {defenseMode === "auto" ? "Manual" : "Automatic"}
-        </button>
+          <b>Some modules are temporarily offline:</b>{" "}
+          {offlineModules.join(", ")}. <span style={{ opacity: 0.8 }}>
+            Dashboard will keep running; sensor handles connectivity.
+          </span>
+        </div>
+      )}
 
-        <p style={{ marginTop: 12, opacity: .6, fontSize: 13 }}>
-          {defenseMode === "auto"
-            ? "Admin protection actively monitors selected tenants."
-            : "Manual mode — mitigation must be triggered manually."}
-        </p>
-      </div>
+      {/* ================= EXECUTIVE SNAPSHOT ================= */}
+      <Panel title="Executive Snapshot">
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
+          <KPI label="Total Users" value={metrics?.totalUsers} status={moduleStatus.adminMetrics} />
+          <KPI label="Active Subscribers" value={metrics?.activeSubscribers} status={moduleStatus.adminMetrics} />
+          <KPI label="Total Revenue" value={fmtMoney(metrics?.totalRevenue)} status={moduleStatus.adminMetrics} />
+          <KPI label="Executive Risk" value={risk?.score ?? risk?.riskScore} status={moduleStatus.adminExecutiveRisk} />
+          <KPI label="Churn Risk" value={predictive?.riskLevel ?? predictive?.level} status={moduleStatus.adminPredictiveChurn} />
+        </div>
+      </Panel>
 
-      {/* ================= TENANT PROTECTION BOARD ================= */}
-      <div style={panelStyle}>
-        <h3>Admin Protection Scope</h3>
-
-        <div style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit,minmax(240px,1fr))",
-          gap: 12,
-          marginTop: 14
-        }}>
-          {tenants.map(t => (
-            <div key={t.id} style={{
-              padding: 12,
-              borderRadius: 8,
-              border: "1px solid rgba(255,255,255,.06)",
-              background: "rgba(255,255,255,.02)"
-            }}>
-              <div style={{ fontWeight: 600 }}>{t.name}</div>
-              <div style={{ fontSize: 12, opacity: .6 }}>
-                Status: {t.status}
-              </div>
-
-              <button
-                onClick={() => toggleProtection(t.id)}
-                style={{
-                  ...buttonStyle,
-                  marginTop: 10,
-                  background: protectedTenants.includes(t.id)
-                    ? "#ff3b30"
-                    : "#16c784"
-                }}
-              >
-                {protectedTenants.includes(t.id)
-                  ? "Remove Protection"
-                  : "Add to Protection"}
-              </button>
+      {/* ================= SOC THREAT STREAM ================= */}
+      <Panel title="Live Threat Intelligence (Auto-Refreshing)">
+        <SeverityBar counts={eventSeverity} />
+        <div style={{ marginTop: 14, maxHeight: 240, overflowY: "auto" }}>
+          {events.slice(0, 30).map((e, i) => (
+            <div key={i} style={eventRow(e.severity || e.level)}>
+              <strong>{e.severity || e.level || "INFO"}</strong>
+              <span style={{ marginLeft: 12 }}>{e.title || e.message || e.description || "Security Event"}</span>
             </div>
           ))}
+          {events.length === 0 && (
+            <div style={{ padding: "10px 0", opacity: 0.6, fontSize: 13 }}>
+              No events yet. If the sensor is green, the stream is live — it’s just quiet right now.
+            </div>
+          )}
         </div>
-      </div>
+      </Panel>
 
-      {/* ================= LIVE EVENT FEED ================= */}
-      <div style={panelStyle}>
-        <h3>Platform Event Feed</h3>
+      {/* ================= INCIDENT COMMAND CENTER ================= */}
+      <Panel title="Incident Command Center">
+        <div style={{ marginBottom: 10 }}>
+          Open Incidents: <strong>{openIncidents.length}</strong>
+        </div>
 
-        <div style={{
-          maxHeight: 240,
-          overflowY: "auto",
-          marginTop: 12
-        }}>
-          {events.map((e, i) => (
-            <div key={i} style={{
-              padding: "8px 0",
-              borderBottom: "1px solid rgba(255,255,255,.06)",
-              fontSize: 13,
-              color:
-                e.severity === "critical" ? "#ff3b30" :
-                e.severity === "high" ? "#ff9500" :
-                e.severity === "medium" ? "#f5b400" :
-                "#16c784"
-            }}>
-              <strong>{e.severity?.toUpperCase() || "INFO"}</strong>
-              <span style={{ marginLeft: 10 }}>
-                {e.message || e.description}
+        <div style={{ maxHeight: 220, overflowY: "auto" }}>
+          {incidents.slice(0, 20).map((inc, i) => (
+            <div key={i} style={incidentRow(inc.status)}>
+              <strong>{inc.title || "Untitled Incident"}</strong>
+              <span style={{ marginLeft: 12 }}>
+                {inc.severity || "Unknown"} — {inc.status}
               </span>
             </div>
           ))}
+          {incidents.length === 0 && (
+            <div style={{ padding: "10px 0", opacity: 0.6, fontSize: 13 }}>
+              No incidents currently. (Quiet is good.)
+            </div>
+          )}
         </div>
-      </div>
+      </Panel>
 
+      {/* ================= POSTURE + VULNS ================= */}
+      <Panel title="Security Posture">
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
+          <KPI label="Risk Score" value={posture?.riskScore} status={moduleStatus.postureSummary} />
+          <KPI label="Compliance Score" value={posture?.complianceScore} status={moduleStatus.postureSummary} />
+          <KPI label="Critical Vulns" value={countBySeverity(vulns, "critical")} status={moduleStatus.vulnerabilities} />
+          <KPI label="High Vulns" value={countBySeverity(vulns, "high")} status={moduleStatus.vulnerabilities} />
+        </div>
+      </Panel>
+
+      {lastUpdated && (
+        <div style={{ fontSize: 12, opacity: 0.55 }}>
+          Auto Refreshed: {lastUpdated.toLocaleTimeString()}
+        </div>
+      )}
     </div>
   );
 }
 
 /* ================= COMPONENTS ================= */
 
-function StatusDot({ ok }) {
+function Panel({ title, children }) {
   return (
-    <span style={{
-      display: "inline-block",
-      width: 8,
-      height: 8,
-      borderRadius: "50%",
-      marginRight: 6,
-      background: ok ? "#16c784" : "#ff3b30"
-    }} />
+    <div
+      style={{
+        padding: 18,
+        borderRadius: 14,
+        background: "rgba(255,255,255,.03)",
+        border: "1px solid rgba(255,255,255,.08)",
+      }}
+    >
+      <div style={{ fontWeight: 900, marginBottom: 12 }}>{title}</div>
+      {children}
+    </div>
   );
 }
 
-const panelStyle = {
-  padding: 20,
-  borderRadius: 12,
-  background: "rgba(255,255,255,.03)",
-  border: "1px solid rgba(255,255,255,.08)"
-};
+function KPI({ label, value, status }) {
+  const isOffline = status === "error";
+  return (
+    <div
+      style={{
+        padding: 12,
+        borderRadius: 12,
+        border: "1px solid rgba(255,255,255,.08)",
+        background: "rgba(255,255,255,.02)",
+        opacity: isOffline ? 0.55 : 1,
+      }}
+    >
+      <div style={{ fontSize: 12, opacity: 0.7 }}>{label}</div>
+      <div style={{ fontSize: 20, fontWeight: 900, marginTop: 6 }}>
+        {isOffline ? "—" : value ?? "—"}
+      </div>
+      {isOffline && <div style={{ fontSize: 11, opacity: 0.6 }}>module offline</div>}
+    </div>
+  );
+}
 
-const buttonStyle = {
-  marginTop: 12,
-  padding: "8px 14px",
-  borderRadius: 6,
-  border: "none",
-  cursor: "pointer",
-  background: "#1f6feb",
-  color: "#fff",
-  fontSize: 13
-};
+function SeverityBar({ counts }) {
+  const total = Object.values(counts).reduce((a, b) => a + b, 0) || 1;
+
+  return (
+    <div style={{ display: "flex", height: 18, borderRadius: 999, overflow: "hidden" }}>
+      {Object.entries(counts).map(([k, v], i) => (
+        <div
+          key={i}
+          style={{
+            width: `${(v / total) * 100}%`,
+            background:
+              k === "critical" ? "#ff3b30" : k === "high" ? "#ff9500" : k === "medium" ? "#f5b400" : "#16c784",
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+function eventRow(severity) {
+  const color =
+    String(severity).toLowerCase().includes("crit")
+      ? "#ff3b30"
+      : String(severity).toLowerCase().includes("high")
+      ? "#ff9500"
+      : String(severity).toLowerCase().includes("med")
+      ? "#f5b400"
+      : "#16c784";
+
+  return {
+    padding: "8px 0",
+    borderBottom: "1px solid rgba(255,255,255,.06)",
+    fontSize: 13,
+    color,
+  };
+}
+
+function incidentRow(status) {
+  const color =
+    status === "Open"
+      ? "#ff3b30"
+      : status === "Investigating"
+      ? "#ff9500"
+      : status === "Resolved"
+      ? "#16c784"
+      : "#fff";
+
+  return {
+    padding: "8px 0",
+    borderBottom: "1px solid rgba(255,255,255,.06)",
+    fontSize: 13,
+    color,
+  };
+}
+
+function countBySeverity(list, sev) {
+  return (list || []).filter((v) => String(v?.severity || "").toLowerCase() === sev).length;
+}
+
+function fmtMoney(n) {
+  const x = Number(n);
+  if (!Number.isFinite(x)) return "—";
+  return `$${x.toLocaleString()}`;
+}
