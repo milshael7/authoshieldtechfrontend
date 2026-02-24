@@ -1,6 +1,19 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { api } from "../lib/api";
 
+function getColor(risk) {
+  if (risk >= 80) return "#16c784";       // healthy green
+  if (risk >= 60) return "#f5b400";       // elevated yellow
+  if (risk >= 40) return "#ff9500";       // high orange
+  return "#ff3b30";                       // critical red
+}
+
+function getSize(exposure) {
+  if (exposure === "external") return 90;
+  if (exposure === "public") return 80;
+  return 70;
+}
+
 export default function Assets() {
   const [assets, setAssets] = useState([]);
   const [selected, setSelected] = useState(null);
@@ -18,39 +31,17 @@ export default function Assets() {
     load();
   }, []);
 
-  async function triggerScan(id) {
-    await api.req(`/api/assets/${id}/scan`, { method: "POST" });
-    load();
-  }
-
   const analytics = useMemo(() => {
-    if (!assets.length)
-      return {
-        total: 0,
-        critical: 0,
-        avgRisk: 0,
-        vulns: 0,
-        types: {}
-      };
-
     const total = assets.length;
     const critical = assets.filter(a => a.status === "CRITICAL").length;
     const avgRisk =
-      Math.round(
-        assets.reduce((sum, a) => sum + (a.riskScore || 0), 0) / total
-      ) || 0;
+      total > 0
+        ? Math.round(
+            assets.reduce((sum, a) => sum + (a.riskScore || 0), 0) / total
+          )
+        : 0;
 
-    const vulns = assets.reduce(
-      (sum, a) => sum + (a.vulnerabilities || 0),
-      0
-    );
-
-    const types = {};
-    assets.forEach(a => {
-      types[a.type] = (types[a.type] || 0) + 1;
-    });
-
-    return { total, critical, avgRisk, vulns, types };
+    return { total, critical, avgRisk };
   }, [assets]);
 
   if (loading) return <div style={{ padding: 28 }}>Loading…</div>;
@@ -58,49 +49,60 @@ export default function Assets() {
   return (
     <div style={{ padding: 28 }}>
 
-      <h2>Asset Intelligence Center</h2>
+      <h2>Asset Intelligence Heatmap</h2>
 
-      {/* 🔥 ANALYTICS STRIP */}
-      <div style={strip}>
+      {/* TOP STRIP */}
+      <div style={{
+        display: "flex",
+        gap: 20,
+        marginBottom: 28,
+        flexWrap: "wrap"
+      }}>
         <Stat label="Total Assets" value={analytics.total} />
         <Stat label="Critical Assets" value={analytics.critical} danger />
         <Stat label="Average Risk Score" value={analytics.avgRisk} />
-        <Stat label="Total Vulnerabilities" value={analytics.vulns} />
       </div>
 
-      {/* TYPE BREAKDOWN */}
-      <div style={typeBox}>
-        <strong>Asset Type Distribution:</strong>
-        <div style={{ marginTop: 8 }}>
-          {Object.entries(analytics.types).map(([type, count]) => (
-            <div key={type}>
-              {type}: {count}
+      {/* HEATMAP GRID */}
+      <div style={heatmapGrid}>
+        {assets.map(asset => {
+          const color = getColor(asset.riskScore || 0);
+          const size = getSize(asset.exposureLevel);
+          const hasThreat = asset.activeThreats > 0;
+
+          return (
+            <div
+              key={asset.id}
+              onClick={() => setSelected(asset)}
+              style={{
+                width: size,
+                height: size,
+                borderRadius: 12,
+                background: color,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "#000",
+                fontWeight: 700,
+                cursor: "pointer",
+                position: "relative",
+                boxShadow: hasThreat
+                  ? `0 0 20px ${color}`
+                  : "0 4px 12px rgba(0,0,0,.4)",
+                transition: "all .2s ease"
+              }}
+            >
+              {asset.type}
+
+              {hasThreat && (
+                <div style={pulseDot} />
+              )}
             </div>
-          ))}
-        </div>
+          );
+        })}
       </div>
 
-      {/* GRID */}
-      <div style={grid}>
-        {assets.map(a => (
-          <div key={a.id} style={card} onClick={() => setSelected(a)}>
-            <div style={{ fontWeight: 700 }}>{a.name}</div>
-            <div>{a.type}</div>
-            <div>Risk: {a.riskScore}</div>
-            <div style={{
-              color:
-                a.status === "CRITICAL"
-                  ? "#ff3b30"
-                  : a.status === "ELEVATED"
-                  ? "#f5b400"
-                  : "#16c784"
-            }}>
-              {a.status}
-            </div>
-          </div>
-        ))}
-      </div>
-
+      {/* DETAIL PANEL */}
       {selected && (
         <div style={drawer}>
           <div style={{ display: "flex", justifyContent: "space-between" }}>
@@ -109,15 +111,15 @@ export default function Assets() {
           </div>
 
           <p><strong>Type:</strong> {selected.type}</p>
+          <p><strong>Exposure:</strong> {selected.exposureLevel}</p>
           <p><strong>Risk Score:</strong> {selected.riskScore}</p>
-          <p><strong>Vulnerabilities:</strong> {selected.vulnerabilities}</p>
           <p><strong>Status:</strong> {selected.status}</p>
-
-          <button style={scanBtn} onClick={() => triggerScan(selected.id)}>
-            Trigger Scan
-          </button>
+          <p><strong>Active Threats:</strong> {selected.activeThreats}</p>
+          <p><strong>Monitoring:</strong> {selected.monitoringEnabled ? "On" : "Off"}</p>
+          <p><strong>AutoProtect:</strong> {selected.autoProtectEnabled ? "On" : "Off"}</p>
         </div>
       )}
+
     </div>
   );
 }
@@ -129,11 +131,11 @@ function Stat({ label, value, danger }) {
       borderRadius: 12,
       background: "rgba(255,255,255,.05)",
       border: "1px solid rgba(255,255,255,.06)",
-      minWidth: 180
+      minWidth: 200
     }}>
       <div style={{ fontSize: 12, opacity: .6 }}>{label}</div>
       <div style={{
-        fontSize: 22,
+        fontSize: 24,
         fontWeight: 700,
         color: danger ? "#ff3b30" : "#fff"
       }}>
@@ -143,52 +145,31 @@ function Stat({ label, value, danger }) {
   );
 }
 
-const strip = {
+const heatmapGrid = {
   display: "flex",
-  gap: 20,
   flexWrap: "wrap",
-  marginBottom: 24
-};
-
-const typeBox = {
-  marginBottom: 28,
-  padding: 18,
-  borderRadius: 12,
-  background: "rgba(255,255,255,.04)",
-  border: "1px solid rgba(255,255,255,.06)"
-};
-
-const grid = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
   gap: 20
-};
-
-const card = {
-  padding: 20,
-  borderRadius: 12,
-  background: "rgba(255,255,255,.05)",
-  cursor: "pointer",
-  border: "1px solid rgba(255,255,255,.06)"
 };
 
 const drawer = {
   position: "fixed",
   top: 0,
   right: 0,
-  width: 360,
+  width: 380,
   height: "100%",
   background: "#111",
-  padding: 24,
-  borderLeft: "1px solid rgba(255,255,255,.1)"
+  padding: 28,
+  borderLeft: "1px solid rgba(255,255,255,.1)",
+  overflowY: "auto"
 };
 
-const scanBtn = {
-  padding: 12,
-  marginTop: 20,
-  background: "#4f8cff",
-  border: "none",
-  color: "#fff",
-  cursor: "pointer",
-  borderRadius: 8
+const pulseDot = {
+  position: "absolute",
+  top: 6,
+  right: 6,
+  width: 10,
+  height: 10,
+  borderRadius: "50%",
+  background: "#fff",
+  animation: "pulse 1.2s infinite"
 };
