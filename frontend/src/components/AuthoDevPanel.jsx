@@ -25,9 +25,7 @@ function getStorageKey(){
 }
 
 function copyText(text){
-  try{
-    navigator.clipboard?.writeText(String(text||""));
-  }catch{}
+  try{ navigator.clipboard?.writeText(String(text||"")); }catch{}
 }
 
 export default function AuthoDevPanel({
@@ -44,7 +42,6 @@ export default function AuthoDevPanel({
 
   const recognitionRef=useRef(null);
   const bottomRef=useRef(null);
-  const inactivityTimer=useRef(null);
 
   /* ================= LOAD ================= */
 
@@ -53,11 +50,6 @@ export default function AuthoDevPanel({
     if(!raw) return;
     try{
       const parsed=JSON.parse(raw);
-      const now=Date.now();
-      if(parsed?.lastActive && now-parsed.lastActive>SESSION_TIMEOUT_MS){
-        safeRemove(storageKey);
-        return;
-      }
       setMessages(Array.isArray(parsed?.messages)?parsed.messages:[]);
     }catch{}
   },[storageKey]);
@@ -73,16 +65,7 @@ export default function AuthoDevPanel({
     bottomRef.current?.scrollIntoView({behavior:"smooth"});
   },[messages]);
 
-  useEffect(()=>{
-    if(inactivityTimer.current) clearTimeout(inactivityTimer.current);
-    inactivityTimer.current=setTimeout(()=>{
-      setMessages([]);
-      safeRemove(storageKey);
-    },SESSION_TIMEOUT_MS);
-    return ()=>inactivityTimer.current&&clearTimeout(inactivityTimer.current);
-  },[messages]);
-
-  /* ================= VOICE (MIC) ================= */
+  /* ================= VOICE ================= */
 
   function startListening(){
     const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
@@ -113,11 +96,9 @@ export default function AuthoDevPanel({
 
   /* ================= SEND ================= */
 
-  async function sendMessage(regenText=null){
+  async function sendMessage(regenText=null, replaceIndex=null){
     const messageText=String(regenText||input||"").trim();
     if(!messageText||loading) return;
-
-    if(listening) stopListening();
 
     if(!regenText){
       setMessages(m=>[
@@ -139,21 +120,29 @@ export default function AuthoDevPanel({
       });
 
       const data=await res.json().catch(()=>({}));
-      const reply=data?.reply||"No response available.";
+      const reply=data?.reply||"Assistant temporarily unavailable.";
 
-      setMessages(m=>[
-        ...m.slice(-MAX_MESSAGES+1),
-        {
+      setMessages(prev=>{
+        const updated=[...prev];
+        const newMessage={
           role:"ai",
           text:reply,
           speakText:data?.speakText||reply,
           reaction:null,
           ts:new Date().toLocaleTimeString(),
-        },
-      ]);
+        };
+
+        if(replaceIndex!==null){
+          updated[replaceIndex]=newMessage;
+          return updated;
+        }
+
+        return [...updated.slice(-MAX_MESSAGES+1),newMessage];
+      });
+
     }catch{
-      setMessages(m=>[
-        ...m.slice(-MAX_MESSAGES+1),
+      setMessages(prev=>[
+        ...prev.slice(-MAX_MESSAGES+1),
         {
           role:"ai",
           text:"Assistant unavailable.",
@@ -170,10 +159,17 @@ export default function AuthoDevPanel({
   function setReaction(index, value){
     setMessages(prev=>{
       const next=[...prev];
-      if(!next[index]) return prev;
       next[index]={...next[index], reaction:value};
       return next;
     });
+  }
+
+  function handleShare(text){
+    if(navigator.share){
+      navigator.share({ text });
+    }else{
+      copyText(text);
+    }
   }
 
   /* ================= UI ================= */
@@ -181,91 +177,64 @@ export default function AuthoDevPanel({
   return(
     <div className="advisor-wrap">
 
-      <div className="advisor-miniTitle">
-        {title}
-      </div>
+      <div className="advisor-miniTitle">{title}</div>
 
       <div className="advisor-feed">
         {messages.map((m,i)=>(
           <div key={i} className={`advisor-row ${m.role}`}>
             <div className="advisor-bubble">{m.text}</div>
 
-            {/* ACTIONS (AI ONLY) */}
             {m.role==="ai" && (
-              <div
-                style={{
-                  display:"flex",
-                  alignItems:"center",
-                  gap:12,
-                  marginTop:6,
-                  opacity:.58,
-                  userSelect:"none",
-                }}
-              >
+              <div style={{
+                display:"flex",
+                alignItems:"center",
+                gap:10,
+                marginTop:5,
+                opacity:.75,
+              }}>
+
                 {/* Speaker */}
-                <button
-                  type="button"
-                  title="Read aloud"
+                <button title="Read aloud"
                   onClick={()=>readAloud(m.speakText||m.text)}
-                  style={iconBtnStyle}
-                >
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-                    strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M11 5L6 9H2v6h4l5 4V5z"/>
-                    <path d="M15.5 8.5a5 5 0 0 1 0 7"/>
-                    <path d="M18 6a8 8 0 0 1 0 12"/>
-                  </svg>
+                  style={iconBtnStyle}>
+                  <IconSpeaker/>
                 </button>
 
                 {/* Copy */}
-                <button
-                  type="button"
-                  title="Copy"
+                <button title="Copy"
                   onClick={()=>copyText(m.text)}
-                  style={iconBtnStyle}
-                >
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-                    strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="9" y="9" width="13" height="13" rx="2"/>
-                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-                  </svg>
+                  style={iconBtnStyle}>
+                  <IconCopy/>
                 </button>
 
                 {/* Thumbs up */}
-                <button
-                  type="button"
-                  title="Thumbs up"
+                <button title="Thumbs up"
                   onClick={()=>setReaction(i,"up")}
-                  style={{
-                    ...iconBtnStyle,
-                    opacity: m.reaction==="up" ? 1 : 0.75
-                  }}
-                >
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-                    strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M14 9V5a3 3 0 0 0-3-3l-1 7"/>
-                    <path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/>
-                    <path d="M7 11h8a2 2 0 0 1 2 2l-1 7a2 2 0 0 1-2 2H7"/>
-                  </svg>
+                  style={iconBtnStyle}>
+                  <IconThumbUp/>
                 </button>
 
                 {/* Thumbs down */}
-                <button
-                  type="button"
-                  title="Thumbs down"
+                <button title="Thumbs down"
                   onClick={()=>setReaction(i,"down")}
-                  style={{
-                    ...iconBtnStyle,
-                    opacity: m.reaction==="down" ? 1 : 0.75
-                  }}
-                >
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-                    strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M10 15v4a3 3 0 0 0 3 3l1-7"/>
-                    <path d="M17 2h3a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-3"/>
-                    <path d="M17 13H9a2 2 0 0 1-2-2l1-7a2 2 0 0 1 2-2h7"/>
-                  </svg>
+                  style={iconBtnStyle}>
+                  <IconThumbDown/>
                 </button>
+
+                {/* Regenerate */}
+                <button title="Regenerate"
+                  onClick={()=>sendMessage(messages[i-1]?.text, i)}
+                  style={iconBtnStyle}>
+                  <IconRefresh/>
+                </button>
+
+                {/* Share */}
+                <button title="Share"
+                  onClick={()=>handleShare(m.text)}
+                  style={iconBtnStyle}>
+                  <IconShare/>
+                </button>
+
               </div>
             )}
 
@@ -278,26 +247,19 @@ export default function AuthoDevPanel({
       <div className="advisor-inputBar">
         <div className={`advisor-pill ${listening ? "listening" : ""}`}>
 
-          {/* MIC */}
+          {/* Bigger MIC */}
           {!listening?(
-            <button className="advisor-pill-left" onClick={startListening} title="Voice">
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
+            <button className="advisor-pill-left" onClick={startListening}>
+              <svg width="24" height="24" viewBox="0 0 24 24"
+                fill="none" stroke="currentColor"
+                strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3z"/>
                 <path d="M19 11a7 7 0 0 1-14 0"/>
                 <path d="M12 18v4"/>
               </svg>
             </button>
           ):(
-            <button className="advisor-pill-left stop" onClick={stopListening} title="Stop">
+            <button className="advisor-pill-left stop" onClick={stopListening}>
               <div className="stop-square"/>
             </button>
           )}
@@ -307,7 +269,6 @@ export default function AuthoDevPanel({
             placeholder="Ask anything"
             value={input}
             onChange={(e)=>setInput(e.target.value)}
-            rows={1}
             onKeyDown={(e)=>{
               if(e.key==="Enter"&&!e.shiftKey){
                 e.preventDefault();
@@ -316,26 +277,10 @@ export default function AuthoDevPanel({
             }}
           />
 
-          {/* SEND */}
-          <button
-            className="advisor-pill-right"
+          <button className="advisor-pill-right"
             onClick={()=>sendMessage()}
-            disabled={loading||!input.trim()}
-            title="Send"
-          >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="#000"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M22 2L11 13"/>
-              <path d="M22 2L15 22l-4-9-9-4 20-7z"/>
-            </svg>
+            disabled={loading||!input.trim()}>
+            <IconSend/>
           </button>
 
         </div>
@@ -346,13 +291,81 @@ export default function AuthoDevPanel({
   );
 }
 
-const iconBtnStyle = {
-  border: "none",
-  background: "transparent",
-  padding: 0,
-  margin: 0,
-  cursor: "pointer",
-  color: "rgba(255,255,255,.85)",
-  display: "flex",
-  alignItems: "center",
+/* ================= ICONS ================= */
+
+const iconBtnStyle={
+  border:"none",
+  background:"transparent",
+  cursor:"pointer",
+  display:"flex",
+  alignItems:"center",
+  color:"rgba(255,255,255,.85)",
 };
+
+/* 16px clean enterprise icons */
+
+const IconSpeaker=()=>(
+<svg width="16" height="16" viewBox="0 0 24 24"
+fill="none" stroke="currentColor" strokeWidth="1.8"
+strokeLinecap="round" strokeLinejoin="round">
+<path d="M11 5L6 9H2v6h4l5 4V5z"/>
+<path d="M15.5 8.5a5 5 0 0 1 0 7"/>
+</svg>
+);
+
+const IconCopy=()=>(
+<svg width="16" height="16" viewBox="0 0 24 24"
+fill="none" stroke="currentColor" strokeWidth="1.8"
+strokeLinecap="round" strokeLinejoin="round">
+<rect x="9" y="9" width="13" height="13" rx="2"/>
+<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+</svg>
+);
+
+const IconThumbUp=()=>(
+<svg width="16" height="16" viewBox="0 0 24 24"
+fill="none" stroke="currentColor" strokeWidth="1.8"
+strokeLinecap="round" strokeLinejoin="round">
+<path d="M14 9V5a3 3 0 0 0-3-3l-1 7"/>
+<path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/>
+<path d="M7 11h8a2 2 0 0 1 2 2l-1 7a2 2 0 0 1-2 2H7"/>
+</svg>
+);
+
+const IconThumbDown=()=>(
+<svg width="16" height="16" viewBox="0 0 24 24"
+fill="none" stroke="currentColor" strokeWidth="1.8"
+strokeLinecap="round" strokeLinejoin="round">
+<path d="M10 15v4a3 3 0 0 0 3 3l1-7"/>
+<path d="M17 2h3a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-3"/>
+<path d="M17 13H9a2 2 0 0 1-2-2l1-7a2 2 0 0 1 2-2h7"/>
+</svg>
+);
+
+const IconRefresh=()=>(
+<svg width="16" height="16" viewBox="0 0 24 24"
+fill="none" stroke="currentColor" strokeWidth="1.8"
+strokeLinecap="round" strokeLinejoin="round">
+<polyline points="23 4 23 10 17 10"/>
+<path d="M20.49 15A9 9 0 1 1 23 10"/>
+</svg>
+);
+
+const IconShare=()=>(
+<svg width="16" height="16" viewBox="0 0 24 24"
+fill="none" stroke="currentColor" strokeWidth="1.8"
+strokeLinecap="round" strokeLinejoin="round">
+<path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/>
+<polyline points="16 6 12 2 8 6"/>
+<line x1="12" y1="2" x2="12" y2="15"/>
+</svg>
+);
+
+const IconSend=()=>(
+<svg width="18" height="18" viewBox="0 0 24 24"
+fill="none" stroke="currentColor" strokeWidth="1.8"
+strokeLinecap="round" strokeLinejoin="round">
+<path d="M22 2L11 13"/>
+<path d="M22 2L15 22l-4-9-9-4 20-7z"/>
+</svg>
+);
