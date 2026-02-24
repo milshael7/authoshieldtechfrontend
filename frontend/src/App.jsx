@@ -1,5 +1,4 @@
-// frontend/src/App.jsx
-// FULL ROLE-STRUCTURED ROUTING — ADMIN OVERVIEW FIXED
+// FULL ROLE-STRUCTURED ROUTING — ADMIN COMPANIES WIRED
 // Executive Command Center Activated
 
 import React, { useEffect, useState } from "react";
@@ -55,6 +54,7 @@ import NotFound from "./pages/NotFound.jsx";
 
 import AdminOverview from "./pages/admin/AdminOverview.jsx";
 import GlobalControl from "./pages/admin/GlobalControl.jsx";
+import AdminCompanies from "./pages/admin/AdminCompanies.jsx"; // 🔥 ADDED
 
 /* ================= COMPANY ================= */
 
@@ -191,6 +191,7 @@ export default function App() {
             }
           >
             <Route index element={<AdminOverview />} />
+            <Route path="companies" element={<AdminCompanies />} /> {/* 🔥 ADDED */}
             <Route path="assets" element={<Assets />} />
             <Route path="threats" element={<Threats />} />
             <Route path="incidents" element={<Incidents />} />
