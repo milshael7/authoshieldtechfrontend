@@ -16,6 +16,7 @@ export default function SOC() {
 
   const [threatIndex, setThreatIndex] = useState(0);
   const [adaptiveRisk, setAdaptiveRisk] = useState(0);
+  const [forecastRisk, setForecastRisk] = useState(0);
 
   /* ================= INITIAL LOAD ================= */
 
@@ -66,9 +67,14 @@ export default function SOC() {
           });
         }
 
-        /* ===== Adaptive Risk Update ===== */
+        /* ===== Adaptive Risk ===== */
         if (data.type === "risk_update") {
           setAdaptiveRisk(data.riskScore || 0);
+        }
+
+        /* ===== Forecast Risk ===== */
+        if (data.type === "risk_forecast") {
+          setForecastRisk(data.forecast || 0);
         }
 
       } catch {}
@@ -135,10 +141,17 @@ export default function SOC() {
     return { label: "LOW", color: "#16c784" };
   }
 
+  function trendDirection() {
+    if (forecastRisk > adaptiveRisk) return "↑";
+    if (forecastRisk < adaptiveRisk) return "↓";
+    return "→";
+  }
+
   if (loading) return <div style={{ padding: 28 }}>Loading SOC…</div>;
 
   const localRisk = levelFromScore(threatIndex);
   const aiRisk = levelFromScore(adaptiveRisk);
+  const forecastLevel = levelFromScore(forecastRisk);
 
   return (
     <div style={{ padding: 28 }}>
@@ -179,18 +192,22 @@ export default function SOC() {
 
         <div style={{ display: "flex", gap: 40 }}>
 
-          {/* Local Threat Index */}
           <RiskCard
             title="Event Threat Index"
             score={threatIndex}
             risk={localRisk}
           />
 
-          {/* Adaptive AI Risk */}
           <RiskCard
             title="Adaptive AI Risk"
             score={adaptiveRisk}
             risk={aiRisk}
+          />
+
+          <RiskCard
+            title={`Projected Risk ${trendDirection()}`}
+            score={forecastRisk}
+            risk={forecastLevel}
           />
 
         </div>
