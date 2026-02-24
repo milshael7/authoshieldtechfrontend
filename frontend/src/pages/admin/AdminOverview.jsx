@@ -1,5 +1,5 @@
 // frontend/src/pages/admin/AdminOverview.jsx
-// Executive Command Center v8 (Global Banner Integrated)
+// Executive Command Center v9 — Resilient Enterprise Build
 
 import React, { useEffect, useMemo, useState } from "react";
 import { api } from "../../lib/api";
@@ -40,39 +40,57 @@ export default function AdminOverview() {
   const [compliance, setCompliance] = useState(null);
   const [execRisk, setExecRisk] = useState(null);
   const [predictiveChurn, setPredictiveChurn] = useState(null);
+
   const [loading, setLoading] = useState(true);
+  const [moduleErrors, setModuleErrors] = useState([]);
 
   useEffect(() => {
     let alive = true;
 
     async function load() {
-      try {
-        const [
-          summary,
-          metricData,
-          complianceReport,
-          riskRes,
-          churnRes,
-        ] = await Promise.all([
-          api.postureSummary(),
-          api.adminMetrics(),
-          api.adminComplianceReport(),
-          api.adminExecutiveRisk(),
-          api.adminPredictiveChurn(),
-        ]);
+      const results = await Promise.allSettled([
+        api.postureSummary(),
+        api.adminMetrics(),
+        api.adminComplianceReport(),
+        api.adminExecutiveRisk(),
+        api.adminPredictiveChurn(),
+      ]);
 
-        if (!alive) return;
+      if (!alive) return;
 
-        setPosture(summary || null);
-        setMetrics(metricData?.metrics || null);
-        setCompliance(complianceReport?.complianceReport || null);
-        setExecRisk(riskRes?.executiveRisk || null);
-        setPredictiveChurn(churnRes?.predictiveChurn || null);
-      } catch (e) {
-        console.error(e);
-      } finally {
-        if (alive) setLoading(false);
-      }
+      const errors = [];
+
+      results.forEach((res, i) => {
+        if (res.status !== "fulfilled") {
+          errors.push(i);
+          return;
+        }
+
+        const data = res.value;
+
+        switch (i) {
+          case 0:
+            setPosture(data || null);
+            break;
+          case 1:
+            setMetrics(data?.metrics || null);
+            break;
+          case 2:
+            setCompliance(data?.complianceReport || null);
+            break;
+          case 3:
+            setExecRisk(data?.executiveRisk || null);
+            break;
+          case 4:
+            setPredictiveChurn(data?.predictiveChurn || null);
+            break;
+          default:
+            break;
+        }
+      });
+
+      setModuleErrors(errors);
+      setLoading(false);
     }
 
     load();
@@ -92,12 +110,15 @@ export default function AdminOverview() {
     return revenueDrift === 0 ? "metric-positive" : "metric-negative";
   }, [revenueDrift]);
 
-  const riskIndex = Number(execRisk?.riskIndex ?? 0);
+  const riskIndex = Number(execRisk?.riskIndex ?? execRisk?.score ?? 0);
   const riskLevel = execRisk?.level || "UNKNOWN";
   const riskBadge = riskLevelBadge(riskLevel);
 
-  const churnScore = Number(predictiveChurn?.score ?? 0);
-  const churnLevel = predictiveChurn?.level || "UNKNOWN";
+  const churnScore = Number(
+    predictiveChurn?.score ?? predictiveChurn?.probability ?? 0
+  );
+  const churnLevel =
+    predictiveChurn?.level || predictiveChurn?.riskLevel || "UNKNOWN";
   const churnBadge = riskLevelBadge(churnLevel);
 
   if (loading) {
@@ -108,26 +129,16 @@ export default function AdminOverview() {
     );
   }
 
-  if (!posture) {
-    return (
-      <div className="dashboard-error">
-        Unable to load platform data.
-      </div>
-    );
-  }
-
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 40 }}>
 
-      {/* ======================================================
-          🔥 GLOBAL EXECUTIVE RISK BANNER
-      ====================================================== */}
+      {moduleErrors.length > 0 && (
+        <div className="dashboard-warning">
+          Some modules failed to load. Platform remains operational.
+        </div>
+      )}
 
       <ExecutiveRiskBanner />
-
-      {/* ======================================================
-          EXECUTIVE METRICS
-      ====================================================== */}
 
       <div className="sectionTitle">Executive Metrics</div>
 
@@ -157,17 +168,12 @@ export default function AdminOverview() {
       <SubscriberGrowthChart />
       <RefundDisputeChart />
 
-      {/* ======================================================
-          EXECUTIVE INTELLIGENCE
-      ====================================================== */}
-
       <div className="sectionTitle">Executive Intelligence</div>
 
       <div className="postureCard executivePanel executiveGlow">
         <div className="executiveBlock">
           <h3>Executive Risk Index</h3>
           <div className="executiveDivider" />
-
           <p>
             Risk Index: <b>{riskIndex.toFixed(2)}</b>{" "}
             <span className={`badge ${riskBadge.cls}`} style={{ marginLeft: 10 }}>
@@ -179,7 +185,6 @@ export default function AdminOverview() {
         <div className="executiveBlock">
           <h3>Predictive Churn</h3>
           <div className="executiveDivider" />
-
           <p>
             Churn Score: <b>{churnScore.toFixed(2)}</b>{" "}
             <span className={`badge ${churnBadge.cls}`} style={{ marginLeft: 10 }}>
@@ -191,17 +196,12 @@ export default function AdminOverview() {
 
       <RevenueRefundOverlayChart days={90} />
 
-      {/* ======================================================
-          COMPLIANCE
-      ====================================================== */}
-
       <div className="sectionTitle">Compliance & Integrity</div>
 
       <div className="postureCard executivePanel executiveGlow">
         <div className="executiveBlock">
           <h3>Financial Integrity</h3>
           <div className="executiveDivider" />
-
           <p>
             Revenue Drift:{" "}
             <b className={driftClass}>
@@ -220,19 +220,14 @@ export default function AdminOverview() {
         <div className="executiveBlock">
           <h3>Platform Totals</h3>
           <div className="executiveDivider" />
-
           <div className="stats">
-            <div>Users <b>{totals.users}</b></div>
-            <div>Companies <b>{totals.companies}</b></div>
-            <div>Audit Events <b>{totals.auditEvents}</b></div>
-            <div>Notifications <b>{totals.notifications}</b></div>
+            <div>Users <b>{totals.users || 0}</b></div>
+            <div>Companies <b>{totals.companies || 0}</b></div>
+            <div>Audit Events <b>{totals.auditEvents || 0}</b></div>
+            <div>Notifications <b>{totals.notifications || 0}</b></div>
           </div>
         </div>
       </div>
-
-      {/* ======================================================
-          SECURITY OPERATIONS COMMAND
-      ====================================================== */}
 
       <div className="sectionTitle">Security Operations Command</div>
 
