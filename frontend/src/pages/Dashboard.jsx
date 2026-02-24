@@ -1,5 +1,5 @@
 // frontend/src/pages/Dashboard.jsx
-// Enterprise Admin Dashboard — SOC + Incident Command Layer
+// FULL ADMIN GLOBAL DASHBOARD — PLATFORM OVERSIGHT
 
 import React, { useEffect, useMemo, useState } from "react";
 import { api } from "../lib/api.js";
@@ -8,17 +8,11 @@ export default function Dashboard() {
 
   const [loading,setLoading]=useState(true);
 
-  // Executive
   const [metrics,setMetrics]=useState(null);
   const [risk,setRisk]=useState(null);
   const [predictive,setPredictive]=useState(null);
 
-  // Security
-  const [posture,setPosture]=useState(null);
   const [events,setEvents]=useState([]);
-  const [vulns,setVulns]=useState([]);
-
-  // Incidents
   const [incidents,setIncidents]=useState([]);
 
   const [lastUpdated,setLastUpdated]=useState(null);
@@ -27,26 +21,20 @@ export default function Dashboard() {
     try{
       const [
         m,r,p,
-        ps,e,v,
-        i
+        e,i
       ]=await Promise.all([
         api.adminMetrics(),
         api.adminExecutiveRisk(),
         api.adminPredictiveChurn(),
-        api.postureSummary(),
         api.securityEvents(50),
-        api.vulnerabilities(),
         api.incidents()
       ]);
 
-      setMetrics(m?.metrics||null);
-      setRisk(r?.executiveRisk||null);
-      setPredictive(p?.predictiveChurn||null);
+      setMetrics(m?.metrics||m||null);
+      setRisk(r?.executiveRisk||r||null);
+      setPredictive(p?.predictiveChurn||p||null);
 
-      setPosture(ps?.summary||ps||null);
       setEvents(e?.events||e||[]);
-      setVulns(v?.vulnerabilities||v||[]);
-
       setIncidents(i?.incidents||i||[]);
 
       setLastUpdated(new Date());
@@ -60,39 +48,57 @@ export default function Dashboard() {
 
   useEffect(()=>{
     loadAll();
-    const interval=setInterval(loadAll,15000); // 🔥 live refresh every 15s
+    const interval=setInterval(loadAll,15000);
     return ()=>clearInterval(interval);
   },[]);
 
-  const eventSeverity=useMemo(()=>{
+  const openIncidents=incidents.filter(i=>i.status!=="Closed");
+
+  const severityMap=useMemo(()=>{
     const map={critical:0,high:0,medium:0,low:0};
-    for(const e of events){
-      const s=(e.severity||e.level||"").toLowerCase();
+    events.forEach(e=>{
+      const s=(e.severity||"").toLowerCase();
       if(s.includes("crit")) map.critical++;
       else if(s.includes("high")) map.high++;
       else if(s.includes("med")) map.medium++;
       else map.low++;
-    }
+    });
     return map;
   },[events]);
 
-  const openIncidents=incidents.filter(i=>i.status!=="Closed");
-
   if(loading){
-    return <div style={{padding:28}}>Loading SOC Layer...</div>;
+    return <div style={{padding:28}}>Loading Platform Intelligence...</div>;
   }
 
   return(
     <div style={{padding:28,display:"flex",flexDirection:"column",gap:22}}>
 
-      {/* ================= SOC THREAT STREAM ================= */}
+      {/* ================= EXECUTIVE METRICS ================= */}
+      <div style={{
+        display:"grid",
+        gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",
+        gap:16
+      }}>
+        <MetricCard label="Total Companies" value={metrics?.totalCompanies||0}/>
+        <MetricCard label="Total Users" value={metrics?.totalUsers||0}/>
+        <MetricCard label="Executive Risk" value={risk?.score||risk||0}/>
+        <MetricCard label="Predictive Churn" value={predictive?.rate||predictive||0}/>
+      </div>
 
-      <Panel title="Live Threat Intelligence (Auto-Refreshing)">
-        <SeverityBar counts={eventSeverity}/>
-        <div style={{marginTop:14,maxHeight:240,overflowY:"auto"}}>
+      {/* ================= THREAT OVERVIEW ================= */}
+      <Panel title="Global Threat Overview">
+        <SeverityBar counts={severityMap}/>
+        <div style={{marginTop:12}}>
+          Open Incidents: <strong>{openIncidents.length}</strong>
+        </div>
+      </Panel>
+
+      {/* ================= LIVE EVENTS ================= */}
+      <Panel title="Live Security Events">
+        <div style={{maxHeight:260,overflowY:"auto"}}>
           {events.slice(0,30).map((e,i)=>(
-            <div key={i} style={eventRow(e.severity||e.level)}>
-              <strong>{e.severity||e.level||"INFO"}</strong>
+            <div key={i} style={eventRow(e.severity)}>
+              <strong>{e.severity||"INFO"}</strong>
               <span style={{marginLeft:12}}>
                 {e.message||e.description||"Security Event"}
               </span>
@@ -101,14 +107,9 @@ export default function Dashboard() {
         </div>
       </Panel>
 
-      {/* ================= INCIDENT COMMAND CENTER ================= */}
-
+      {/* ================= INCIDENT CENTER ================= */}
       <Panel title="Incident Command Center">
-        <div style={{marginBottom:10}}>
-          Open Incidents: <strong>{openIncidents.length}</strong>
-        </div>
-
-        <div style={{maxHeight:220,overflowY:"auto"}}>
+        <div style={{maxHeight:260,overflowY:"auto"}}>
           {incidents.slice(0,20).map((inc,i)=>(
             <div key={i} style={incidentRow(inc.status)}>
               <strong>{inc.title||"Untitled Incident"}</strong>
@@ -131,6 +132,24 @@ export default function Dashboard() {
 }
 
 /* ================= COMPONENTS ================= */
+
+function MetricCard({label,value}){
+  return(
+    <div style={{
+      padding:18,
+      borderRadius:14,
+      background:"rgba(255,255,255,.03)",
+      border:"1px solid rgba(255,255,255,.08)"
+    }}>
+      <div style={{opacity:.6,fontSize:12}}>
+        {label}
+      </div>
+      <div style={{fontSize:26,fontWeight:900,marginTop:6}}>
+        {value}
+      </div>
+    </div>
+  );
+}
 
 function Panel({title,children}){
   return(
