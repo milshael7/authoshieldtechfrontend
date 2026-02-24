@@ -1,6 +1,7 @@
 /* =========================================================
    AUTOSHIELD FRONTEND API LAYER — FULL PRODUCTION BUILD
    Stable • Backward Compatible • Trading + Reporting Safe
+   + Admin Control Layer Added
 ========================================================= */
 
 const API_BASE = import.meta.env.VITE_API_BASE?.trim();
@@ -125,6 +126,33 @@ const api = {
   adminCreateCompany: (payload) =>
     req("/api/admin/companies", { method: "POST", body: payload }),
 
+  /* ================= ADMIN CONTROL (NEW) ================= */
+
+  adminTenants: () =>
+    req("/api/admin/tenants"),
+
+  adminProtectionScope: () =>
+    req("/api/admin/protection-scope"),
+
+  adminSetDefenseMode: (mode) =>
+    req("/api/admin/defense-mode", {
+      method: "POST",
+      body: { mode }
+    }),
+
+  adminProtectTenant: (tenantId) =>
+    req(`/api/admin/protect/${tenantId}`, {
+      method: "POST"
+    }),
+
+  adminUnprotectTenant: (tenantId) =>
+    req(`/api/admin/protect/${tenantId}`, {
+      method: "DELETE"
+    }),
+
+  adminPlatformHealth: () =>
+    req("/api/admin/platform-health"),
+
   /* ================= SECURITY ================= */
 
   postureSummary: () => req("/api/security/posture-summary"),
@@ -141,7 +169,7 @@ const api = {
   createIncident: (payload) =>
     req("/api/incidents", { method: "POST", body: payload }),
 
-  /* ================= REPORTING (RESTORED) ================= */
+  /* ================= REPORTING ================= */
 
   reportSummary: () =>
     req("/api/reports/summary"),
