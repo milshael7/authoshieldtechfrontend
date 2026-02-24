@@ -1,63 +1,132 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { api, getToken } from "../lib/api";
 
 export default function SOC() {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [socket, setSocket] = useState(null);
+  const [connected, setConnected] = useState(false);
+  const wsRef = useRef(null);
+
+  /* ================= INITIAL LOAD ================= */
 
   useEffect(() => {
     async function loadInitial() {
       try {
         const res = await api.securityEvents(100);
-        setEvents(res?.events || []);
+        const list = (res?.events || []).sort(
+          (a, b) =>
+            new Date(b.timestamp || 0) - new Date(a.timestamp || 0)
+        );
+        setEvents(list);
       } catch {}
       setLoading(false);
     }
 
     loadInitial();
+  }, []);
 
+  /* ================= WEBSOCKET ================= */
+
+  useEffect(() => {
     const token = getToken();
-    const ws = new WebSocket(
-      `${import.meta.env.VITE_API_BASE.replace("http", "ws")}/ws/market?token=${token}`
-    );
+    if (!token) return;
+
+    const wsUrl = `${import.meta.env.VITE_API_BASE.replace(
+      /^http/,
+      "ws"
+    )}/ws/market?token=${token}`;
+
+    const ws = new WebSocket(wsUrl);
+    wsRef.current = ws;
+
+    ws.onopen = () => {
+      setConnected(true);
+    };
+
+    ws.onclose = () => {
+      setConnected(false);
+    };
+
+    ws.onerror = () => {
+      setConnected(false);
+    };
 
     ws.onmessage = (msg) => {
       try {
         const data = JSON.parse(msg.data);
 
-        if (data.type === "security_event") {
-          setEvents((prev) => [data.event, ...prev]);
-        }
+        if (data.type !== "security_event") return;
+
+        setEvents((prev) => {
+          const exists = prev.find((e) => e.id === data.event.id);
+          if (exists) return prev;
+
+          const updated = [data.event, ...prev];
+
+          // Limit to 200 events (enterprise safe cap)
+          return updated.slice(0, 200);
+        });
       } catch {}
     };
-
-    setSocket(ws);
 
     return () => {
       ws.close();
     };
   }, []);
 
-  async function acknowledge(event) {
-    await api.req(`/api/security/events/${event.id}/ack`, {
-      method: "PATCH",
-    });
+  /* ================= ACKNOWLEDGE ================= */
 
-    setEvents((prev) =>
-      prev.map((e) =>
-        e.id === event.id ? { ...e, acknowledged: true } : e
-      )
-    );
+  async function acknowledge(event) {
+    try {
+      await api.req(`/api/security/events/${event.id}/ack`, {
+        method: "PATCH",
+      });
+
+      setEvents((prev) =>
+        prev.map((e) =>
+          e.id === event.id ? { ...e, acknowledged: true } : e
+        )
+      );
+    } catch {
+      alert("Failed to acknowledge event.");
+    }
   }
 
   if (loading) return <div style={{ padding: 28 }}>Loading SOC…</div>;
 
   return (
     <div style={{ padding: 28 }}>
-      <h2>Security Operations Center</h2>
+      <div style={{ display: "flex", justifyContent: "space-between" }}>
+        <h2>Security Operations Center</h2>
 
-      <div style={{ marginTop: 24, display: "flex", flexDirection: "column", gap: 14 }}>
+        <div
+          style={{
+            fontSize: 12,
+            padding: "6px 10px",
+            borderRadius: 20,
+            background: connected ? "#16c784" : "#ff3b30",
+            color: "#000",
+            fontWeight: 600,
+          }}
+        >
+          {connected ? "LIVE" : "DISCONNECTED"}
+        </div>
+      </div>
+
+      <div
+        style={{
+          marginTop: 24,
+          display: "flex",
+          flexDirection: "column",
+          gap: 14,
+        }}
+      >
+        {events.length === 0 && (
+          <div style={{ opacity: 0.5 }}>
+            No security events detected.
+          </div>
+        )}
+
         {events.map((e) => (
           <div
             key={e.id}
@@ -69,18 +138,26 @@ export default function SOC() {
               opacity: e.acknowledged ? 0.6 : 1,
             }}
           >
-            <div style={{ fontWeight: 600 }}>{e.title}</div>
+            <div style={{ fontWeight: 600 }}>
+              {e.title || "Security Event"}
+            </div>
 
             <div style={{ fontSize: 12, opacity: 0.6 }}>
-              {new Date(e.timestamp || Date.now()).toLocaleString()}
+              {new Date(
+                e.timestamp || e.createdAt || Date.now()
+              ).toLocaleString()}
             </div>
 
             <div style={{ marginTop: 6 }}>
               Severity:{" "}
               <span style={{ color: severityColor(e.severity) }}>
-                {e.severity}
+                {e.severity || "low"}
               </span>
             </div>
+
+            {e.description && (
+              <div style={{ marginTop: 6 }}>{e.description}</div>
+            )}
 
             {!e.acknowledged && (
               <button
