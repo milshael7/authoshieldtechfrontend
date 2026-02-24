@@ -1,5 +1,5 @@
-// FULL ROLE-STRUCTURED ROUTING — ADMIN COMPANIES WIRED
-// Executive Command Center Activated
+// FULL ROLE-STRUCTURED ROUTING — SOC INTEGRATED
+// Executive Command Center + SOC Layer Activated
 
 import React, { useEffect, useState } from "react";
 import {
@@ -48,13 +48,14 @@ import Reports from "./pages/Reports.jsx";
 import Notifications from "./pages/Notifications.jsx";
 import TradingRoom from "./pages/TradingRoom.jsx";
 import VulnerabilityCenter from "./pages/VulnerabilityCenter.jsx";
+import SOC from "./pages/SOC.jsx"; // 🔥 NEW
 import NotFound from "./pages/NotFound.jsx";
 
 /* ================= ADMIN ================= */
 
 import AdminOverview from "./pages/admin/AdminOverview.jsx";
 import GlobalControl from "./pages/admin/GlobalControl.jsx";
-import AdminCompanies from "./pages/admin/AdminCompanies.jsx"; // 🔥 ADDED
+import AdminCompanies from "./pages/admin/AdminCompanies.jsx";
 
 /* ================= COMPANY ================= */
 
@@ -191,8 +192,9 @@ export default function App() {
             }
           >
             <Route index element={<AdminOverview />} />
-            <Route path="companies" element={<AdminCompanies />} /> {/* 🔥 ADDED */}
+            <Route path="companies" element={<AdminCompanies />} />
             <Route path="assets" element={<Assets />} />
+            <Route path="soc" element={<SOC />} /> {/* 🔥 NEW */}
             <Route path="threats" element={<Threats />} />
             <Route path="incidents" element={<Incidents />} />
             <Route path="vulnerabilities" element={<Vulnerabilities />} />
@@ -217,6 +219,7 @@ export default function App() {
           >
             <Route index element={<Posture />} />
             <Route path="assets" element={<Assets />} />
+            <Route path="soc" element={<SOC />} /> {/* 🔥 NEW */}
             <Route path="threats" element={<Threats />} />
             <Route path="incidents" element={<Incidents />} />
             <Route path="vulnerabilities" element={<Vulnerabilities />} />
@@ -238,6 +241,7 @@ export default function App() {
           >
             <Route index element={<CompanyDashboardV2 />} />
             <Route path="assets" element={<Assets />} />
+            <Route path="soc" element={<SOC />} /> {/* 🔥 NEW */}
             <Route path="incidents" element={<Incidents />} />
             <Route path="notifications" element={<Notifications />} />
           </Route>
