@@ -4,6 +4,7 @@ import { api } from "../lib/api";
 export default function SOC() {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [creating, setCreating] = useState(null);
 
   async function load() {
     try {
@@ -15,9 +16,30 @@ export default function SOC() {
 
   useEffect(() => {
     load();
-    const interval = setInterval(load, 5000); // auto refresh
+    const interval = setInterval(load, 5000);
     return () => clearInterval(interval);
   }, []);
+
+  async function escalate(event) {
+    try {
+      setCreating(event.id || true);
+
+      await api.req("/api/incidents", {
+        method: "POST",
+        body: {
+          title: event.title || "Security Event Escalation",
+          description: event.description || "",
+          severity: event.severity || "medium",
+        },
+      });
+
+      setCreating(null);
+      alert("Incident created successfully.");
+    } catch {
+      setCreating(null);
+      alert("Failed to create incident.");
+    }
+  }
 
   if (loading) return <div style={{ padding: 28 }}>Loading SOC feed…</div>;
 
@@ -55,6 +77,16 @@ export default function SOC() {
                 {e.description}
               </div>
             )}
+
+            <button
+              style={escalateBtn}
+              disabled={creating === (e.id || true)}
+              onClick={() => escalate(e)}
+            >
+              {creating === (e.id || true)
+                ? "Escalating..."
+                : "Escalate to Incident"}
+            </button>
           </div>
         ))}
       </div>
@@ -81,4 +113,14 @@ const eventCard = {
   borderRadius: 10,
   background: "rgba(255,255,255,.05)",
   border: "1px solid rgba(255,255,255,.06)"
+};
+
+const escalateBtn = {
+  marginTop: 10,
+  padding: "8px 14px",
+  borderRadius: 8,
+  border: "none",
+  background: "#ff3b30",
+  color: "#fff",
+  cursor: "pointer"
 };
