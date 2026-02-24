@@ -1,9 +1,3 @@
-// frontend/src/layouts/AdminLayout.jsx
-// Enterprise Admin Layout — Stable Build
-// ✔ Navigation preserved
-// ✔ Advisor door preserved
-// ✔ Ultra-thin live platform status rail
-
 import React, { useEffect, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { clearToken, clearUser } from "../lib/api.js";
@@ -85,6 +79,10 @@ export default function AdminLayout() {
           <hr />
 
           <div className="nav-section-label">Operational Oversight</div>
+
+          {/* 🔥 NEW — ADMIN COMPANY CONTROL */}
+          <NavLink to="companies">Company Oversight</NavLink>
+
           <NavLink to="/manager">Manager Command</NavLink>
           <NavLink to="/company">Corporate Entities</NavLink>
           <NavLink to="/user">User Governance</NavLink>
@@ -106,7 +104,6 @@ export default function AdminLayout() {
         }}
       >
 
-        {/* ===== Ultra Thin Platform Status Rail ===== */}
         <div
           style={{
             height: 24,
