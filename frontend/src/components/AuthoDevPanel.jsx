@@ -86,16 +86,19 @@ export default function AuthoDevPanel({
     setListening(false);
   }
 
-  async function sendMessage(){
-    const messageText=String(input||"").trim();
+  async function sendMessage(customText=null, replaceIndex=null){
+    const messageText=String(customText ?? input ?? "").trim();
     if(!messageText||loading) return;
     if(listening) stopListening();
 
-    setMessages(m=>[
-      ...m.slice(-MAX_MESSAGES+1),
-      {role:"user",text:messageText,ts:new Date().toLocaleTimeString()}
-    ]);
-    setInput("");
+    if(replaceIndex===null){
+      setMessages(m=>[
+        ...m.slice(-MAX_MESSAGES+1),
+        {role:"user",text:messageText,ts:new Date().toLocaleTimeString()}
+      ]);
+      setInput("");
+    }
+
     setLoading(true);
 
     try{
@@ -110,10 +113,15 @@ export default function AuthoDevPanel({
       const data=await res.json().catch(()=>({}));
       const reply=data?.reply||"Assistant unavailable.";
 
-      setMessages(prev=>[
-        ...prev.slice(-MAX_MESSAGES+1),
-        {role:"ai",text:reply,ts:new Date().toLocaleTimeString()}
-      ]);
+      setMessages(prev=>{
+        const newMsg = {role:"ai",text:reply,ts:new Date().toLocaleTimeString()};
+        if(replaceIndex!==null){
+          const copy=[...prev];
+          copy[replaceIndex]=newMsg;
+          return copy;
+        }
+        return [...prev.slice(-MAX_MESSAGES+1),newMsg];
+      });
 
     }catch{
       setMessages(prev=>[
@@ -123,6 +131,33 @@ export default function AuthoDevPanel({
     }finally{
       setLoading(false);
     }
+  }
+
+  function regenerate(index){
+    const previousUser=[...messages]
+      .slice(0,index)
+      .reverse()
+      .find(m=>m.role==="user");
+
+    if(previousUser?.text){
+      sendMessage(previousUser.text,index);
+    }
+  }
+
+  function share(text){
+    if(navigator.share){
+      navigator.share({text});
+    }else{
+      copyText(text);
+    }
+  }
+
+  function react(index,type){
+    setMessages(prev=>{
+      const copy=[...prev];
+      copy[index]={...copy[index],reaction:type};
+      return copy;
+    });
   }
 
   return(
@@ -135,13 +170,10 @@ export default function AuthoDevPanel({
       width:"100%"
     }}>
 
-      <div style={{
-        fontSize:13,
-        opacity:.7,
-        marginBottom:12
-      }}>{title}</div>
+      <div style={{fontSize:13,opacity:.7,marginBottom:12}}>
+        {title}
+      </div>
 
-      {/* FEED */}
       <div style={{
         flex:1,
         overflowY:"auto",
@@ -180,10 +212,10 @@ export default function AuthoDevPanel({
               }}>
                 <IconButton onClick={()=>readAloud(m.text)}><IconSpeaker/></IconButton>
                 <IconButton onClick={()=>copyText(m.text)}><IconCopy/></IconButton>
-                <IconButton><IconThumbUp/></IconButton>
-                <IconButton><IconThumbDown/></IconButton>
-                <IconButton><IconRefresh/></IconButton>
-                <IconButton><IconShare/></IconButton>
+                <IconButton onClick={()=>react(i,"up")}><IconThumbUp/></IconButton>
+                <IconButton onClick={()=>react(i,"down")}><IconThumbDown/></IconButton>
+                <IconButton onClick={()=>regenerate(i)}><IconRefresh/></IconButton>
+                <IconButton onClick={()=>share(m.text)}><IconShare/></IconButton>
               </div>
             )}
           </div>
@@ -191,7 +223,6 @@ export default function AuthoDevPanel({
         <div ref={bottomRef}/>
       </div>
 
-      {/* INPUT */}
       <div style={{
         marginTop:14,
         padding:"8px 12px",
@@ -202,11 +233,11 @@ export default function AuthoDevPanel({
         gap:10
       }}>
 
-        {!listening?(
+        {!listening?
           <CircleButton onClick={startListening}><IconMic/></CircleButton>
-        ):(
+          :
           <CircleButton onClick={stopListening}><IconStop/></CircleButton>
-        )}
+        }
 
         <textarea
           style={{
@@ -229,7 +260,7 @@ export default function AuthoDevPanel({
           }}
         />
 
-        <CircleButton onClick={sendMessage} white>
+        <CircleButton onClick={()=>sendMessage()} white>
           <IconSend/>
         </CircleButton>
 
