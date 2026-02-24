@@ -1,14 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { readAloud } from "./ReadAloud";
 
-const SESSION_TIMEOUT_MS = 30 * 60 * 1000;
 const MAX_MESSAGES = 50;
 
 /* ================= STORAGE ================= */
 
 function safeGet(key){ try{return localStorage.getItem(key);}catch{return null;} }
 function safeSet(key,val){ try{localStorage.setItem(key,val);}catch{} }
-function safeRemove(key){ try{localStorage.removeItem(key);}catch{} }
 
 function getRoomId(){
   if(typeof window==="undefined") return "root";
@@ -188,47 +186,41 @@ export default function AuthoDevPanel({
               <div style={{
                 display:"flex",
                 alignItems:"center",
-                gap:10,
+                gap:6,
                 marginTop:5,
                 opacity:.75,
               }}>
 
-                {/* Speaker */}
                 <button title="Read aloud"
                   onClick={()=>readAloud(m.speakText||m.text)}
                   style={iconBtnStyle}>
                   <IconSpeaker/>
                 </button>
 
-                {/* Copy */}
                 <button title="Copy"
                   onClick={()=>copyText(m.text)}
                   style={iconBtnStyle}>
                   <IconCopy/>
                 </button>
 
-                {/* Thumbs up */}
                 <button title="Thumbs up"
                   onClick={()=>setReaction(i,"up")}
                   style={iconBtnStyle}>
                   <IconThumbUp/>
                 </button>
 
-                {/* Thumbs down */}
                 <button title="Thumbs down"
                   onClick={()=>setReaction(i,"down")}
                   style={iconBtnStyle}>
                   <IconThumbDown/>
                 </button>
 
-                {/* Regenerate */}
                 <button title="Regenerate"
                   onClick={()=>sendMessage(messages[i-1]?.text, i)}
                   style={iconBtnStyle}>
                   <IconRefresh/>
                 </button>
 
-                {/* Share */}
                 <button title="Share"
                   onClick={()=>handleShare(m.text)}
                   style={iconBtnStyle}>
@@ -247,20 +239,13 @@ export default function AuthoDevPanel({
       <div className="advisor-inputBar">
         <div className={`advisor-pill ${listening ? "listening" : ""}`}>
 
-          {/* Bigger MIC */}
           {!listening?(
             <button className="advisor-pill-left" onClick={startListening}>
-              <svg width="24" height="24" viewBox="0 0 24 24"
-                fill="none" stroke="currentColor"
-                strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3z"/>
-                <path d="M19 11a7 7 0 0 1-14 0"/>
-                <path d="M12 18v4"/>
-              </svg>
+              <IconMic/>
             </button>
           ):(
             <button className="advisor-pill-left stop" onClick={stopListening}>
-              <div className="stop-square"/>
+              <IconStop/>
             </button>
           )}
 
@@ -291,7 +276,7 @@ export default function AuthoDevPanel({
   );
 }
 
-/* ================= ICONS ================= */
+/* ================= ICON STYLE ================= */
 
 const iconBtnStyle={
   border:"none",
@@ -302,7 +287,26 @@ const iconBtnStyle={
   color:"rgba(255,255,255,.85)",
 };
 
-/* 16px clean enterprise icons */
+/* ================= 16px ICONS ================= */
+
+const IconMic=()=>(
+<svg width="16" height="16" viewBox="0 0 24 24"
+fill="none" stroke="currentColor" strokeWidth="1.8"
+strokeLinecap="round" strokeLinejoin="round">
+<path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3z"/>
+<path d="M19 11a7 7 0 0 1-14 0"/>
+<path d="M12 18v4"/>
+</svg>
+);
+
+const IconStop=()=>(
+<div style={{
+  width:16,
+  height:16,
+  background:"#d33",
+  borderRadius:3
+}}/>
+);
 
 const IconSpeaker=()=>(
 <svg width="16" height="16" viewBox="0 0 24 24"
@@ -362,7 +366,7 @@ strokeLinecap="round" strokeLinejoin="round">
 );
 
 const IconSend=()=>(
-<svg width="18" height="18" viewBox="0 0 24 24"
+<svg width="16" height="16" viewBox="0 0 24 24"
 fill="none" stroke="currentColor" strokeWidth="1.8"
 strokeLinecap="round" strokeLinejoin="round">
 <path d="M22 2L11 13"/>
