@@ -39,6 +39,7 @@ export default function AuthoDevPanel({
   const [input,setInput]=useState("");
   const [loading,setLoading]=useState(false);
   const [listening,setListening]=useState(false);
+  const [speakingIndex,setSpeakingIndex]=useState(null);
 
   const recognitionRef=useRef(null);
   const bottomRef=useRef(null);
@@ -63,6 +64,17 @@ export default function AuthoDevPanel({
     bottomRef.current?.scrollIntoView({behavior:"smooth"});
   },[messages]);
 
+  /* ================= SPEECH ================= */
+
+  function handleSpeak(text,index){
+    setSpeakingIndex(index);
+    readAloud(text,()=>{
+      setSpeakingIndex(null);
+    });
+  }
+
+  /* ================= VOICE INPUT ================= */
+
   function startListening(){
     const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
     if(!SR) return;
@@ -85,6 +97,8 @@ export default function AuthoDevPanel({
     try{recognitionRef.current?.stop();}catch{}
     setListening(false);
   }
+
+  /* ================= SEND ================= */
 
   async function sendMessage(customText=null, replaceIndex=null){
     const messageText=String(customText ?? input ?? "").trim();
@@ -146,7 +160,7 @@ export default function AuthoDevPanel({
 
   function share(text){
     if(navigator.share){
-      navigator.share({text});
+      navigator.share({text}).catch(()=>{});
     }else{
       copyText(text);
     }
@@ -159,6 +173,8 @@ export default function AuthoDevPanel({
       return copy;
     });
   }
+
+  /* ================= UI ================= */
 
   return(
     <div style={{
@@ -197,9 +213,30 @@ export default function AuthoDevPanel({
               background:m.role==="user"
                 ?"linear-gradient(135deg,#5EC6FF,#7aa2ff)"
                 :"rgba(255,255,255,.06)",
-              color:"#fff"
+              color:"#fff",
+              position:"relative"
             }}>
               {m.text}
+
+              {speakingIndex===i && (
+                <div style={{
+                  position:"absolute",
+                  bottom:6,
+                  right:8,
+                  display:"flex",
+                  gap:2
+                }}>
+                  {[...Array(6)].map((_,n)=>(
+                    <div key={n} style={{
+                      width:2,
+                      height:6,
+                      background:"#fff",
+                      animation:"pulse 0.8s infinite ease-in-out",
+                      animationDelay:`${n*0.1}s`
+                    }}/>
+                  ))}
+                </div>
+              )}
             </div>
 
             {m.role==="ai" && (
@@ -210,7 +247,7 @@ export default function AuthoDevPanel({
                 marginTop:10,
                 opacity:.85
               }}>
-                <IconButton onClick={()=>readAloud(m.text)}><IconSpeaker/></IconButton>
+                <IconButton onClick={()=>handleSpeak(m.text,i)}><IconSpeaker/></IconButton>
                 <IconButton onClick={()=>copyText(m.text)}><IconCopy/></IconButton>
                 <IconButton onClick={()=>react(i,"up")}><IconThumbUp/></IconButton>
                 <IconButton onClick={()=>react(i,"down")}><IconThumbDown/></IconButton>
@@ -265,6 +302,15 @@ export default function AuthoDevPanel({
         </CircleButton>
 
       </div>
+
+      <style>{`
+        @keyframes pulse {
+          0% { height: 4px; }
+          50% { height: 14px; }
+          100% { height: 4px; }
+        }
+      `}</style>
+
     </div>
   );
 }
