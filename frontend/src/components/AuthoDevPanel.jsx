@@ -3,6 +3,8 @@ import { readAloud } from "./ReadAloud";
 
 const MAX_MESSAGES = 50;
 
+/* ================= STORAGE ================= */
+
 function safeGet(key){ try{return localStorage.getItem(key);}catch{return null;} }
 function safeSet(key,val){ try{localStorage.setItem(key,val);}catch{} }
 
@@ -20,6 +22,12 @@ function getStorageKey(){
   return `authodev.panel.${tenant}.${getRoomId()}`;
 }
 
+function copyText(text){
+  try{ navigator.clipboard?.writeText(String(text||"")); }catch{}
+}
+
+/* ================= MAIN COMPONENT ================= */
+
 export default function AuthoDevPanel({
   title="Advisor",
   endpoint="/api/ai/chat",
@@ -31,6 +39,7 @@ export default function AuthoDevPanel({
   const [input,setInput]=useState("");
   const [loading,setLoading]=useState(false);
   const [listening,setListening]=useState(false);
+
   const recognitionRef=useRef(null);
   const bottomRef=useRef(null);
 
@@ -44,7 +53,10 @@ export default function AuthoDevPanel({
   },[storageKey]);
 
   useEffect(()=>{
-    safeSet(storageKey,JSON.stringify({messages}));
+    safeSet(storageKey,JSON.stringify({
+      messages,
+      lastActive:Date.now(),
+    }));
   },[messages,storageKey]);
 
   useEffect(()=>{
@@ -54,6 +66,7 @@ export default function AuthoDevPanel({
   function startListening(){
     const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
     if(!SR) return;
+    try{recognitionRef.current?.stop();}catch{}
     const rec=new SR();
     rec.lang="en-US";
     rec.interimResults=true;
@@ -74,11 +87,14 @@ export default function AuthoDevPanel({
   }
 
   async function sendMessage(){
-    const text=input.trim();
-    if(!text||loading) return;
+    const messageText=String(input||"").trim();
+    if(!messageText||loading) return;
     if(listening) stopListening();
 
-    setMessages(m=>[...m.slice(-MAX_MESSAGES+1),{role:"user",text}]);
+    setMessages(m=>[
+      ...m.slice(-MAX_MESSAGES+1),
+      {role:"user",text:messageText,ts:new Date().toLocaleTimeString()}
+    ]);
     setInput("");
     setLoading(true);
 
@@ -88,67 +104,86 @@ export default function AuthoDevPanel({
         method:"POST",
         headers:{"Content-Type":"application/json"},
         credentials:"include",
-        body:JSON.stringify({message:text,context:ctx}),
+        body:JSON.stringify({message:messageText,context:ctx}),
       });
+
       const data=await res.json().catch(()=>({}));
       const reply=data?.reply||"Assistant unavailable.";
-      setMessages(prev=>[...prev.slice(-MAX_MESSAGES+1),{role:"ai",text:reply}]);
+
+      setMessages(prev=>[
+        ...prev.slice(-MAX_MESSAGES+1),
+        {role:"ai",text:reply,ts:new Date().toLocaleTimeString()}
+      ]);
+
     }catch{
-      setMessages(prev=>[...prev.slice(-MAX_MESSAGES+1),{role:"ai",text:"Assistant unavailable."}]);
+      setMessages(prev=>[
+        ...prev.slice(-MAX_MESSAGES+1),
+        {role:"ai",text:"Assistant unavailable.",ts:new Date().toLocaleTimeString()}
+      ]);
     }finally{
       setLoading(false);
     }
   }
 
-  async function sendFeedback(type,message){
-    try{
-      await fetch("/api/ai/feedback",{
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({type,message})
-      });
-    }catch{}
-  }
-
-  function resendMessage(text){
-    setInput(text);
-    sendMessage();
-  }
-
-  function shareMessage(text){
-    if(navigator.share){
-      navigator.share({title:"AutoShield AI",text});
-    }else{
-      navigator.clipboard?.writeText(text);
-    }
-  }
-
   return(
-    <div style={{display:"flex",flexDirection:"column",height:"100%"}}>
-      <div style={{fontSize:13,opacity:.6,marginBottom:12}}>{title}</div>
+    <div style={{
+      display:"flex",
+      flexDirection:"column",
+      height:"100%",
+      maxWidth:880,
+      margin:"0 auto",
+      width:"100%"
+    }}>
 
-      <div style={{flex:1,overflowY:"auto",display:"flex",flexDirection:"column",gap:18}}>
+      <div style={{
+        fontSize:13,
+        opacity:.7,
+        marginBottom:12
+      }}>{title}</div>
+
+      {/* FEED */}
+      <div style={{
+        flex:1,
+        overflowY:"auto",
+        display:"flex",
+        flexDirection:"column",
+        gap:18,
+        paddingRight:4
+      }}>
         {messages.map((m,i)=>(
-          <div key={i} style={{display:"flex",flexDirection:"column",alignItems:m.role==="user"?"flex-end":"flex-start"}}>
+          <div key={i} style={{
+            display:"flex",
+            flexDirection:"column",
+            alignItems:m.role==="user"?"flex-end":"flex-start"
+          }}>
+
             <div style={{
               maxWidth:"75%",
               padding:"12px 16px",
               borderRadius:16,
+              lineHeight:1.4,
               background:m.role==="user"
                 ?"linear-gradient(135deg,#5EC6FF,#7aa2ff)"
-                :"rgba(255,255,255,.06)"
+                :"rgba(255,255,255,.06)",
+              color:"#fff"
             }}>
               {m.text}
             </div>
 
             {m.role==="ai" && (
-              <div style={{display:"flex",gap:12,marginTop:8}}>
-                <IconButton onClick={()=>readAloud(m.text)}>🔊</IconButton>
-                <IconButton onClick={()=>navigator.clipboard?.writeText(m.text)}>📋</IconButton>
-                <IconButton onClick={()=>sendFeedback("positive",m.text)}>👍</IconButton>
-                <IconButton onClick={()=>sendFeedback("negative",m.text)}>👎</IconButton>
-                <IconButton onClick={()=>resendMessage(m.text)}>🔄</IconButton>
-                <IconButton onClick={()=>shareMessage(m.text)}>📤</IconButton>
+              <div style={{
+                display:"flex",
+                flexWrap:"wrap",
+                gap:10,
+                marginTop:10,
+                opacity:.85
+              }}>
+                <IconButton onClick={()=>readAloud(m.text)}><IconSpeaker/></IconButton>
+                <IconButton onClick={()=>copyText(m.text)}><IconCopy/></IconButton>
+                <IconButton><IconThumbUp/></IconButton>
+                <IconButton><IconThumbDown/></IconButton>
+                <IconButton><IconRefresh/></IconButton>
+                <IconButton><IconShare/></IconButton>
               </div>
             )}
           </div>
@@ -156,6 +191,7 @@ export default function AuthoDevPanel({
         <div ref={bottomRef}/>
       </div>
 
+      {/* INPUT */}
       <div style={{
         marginTop:14,
         padding:"8px 12px",
@@ -165,10 +201,24 @@ export default function AuthoDevPanel({
         alignItems:"center",
         gap:10
       }}>
-        <button onClick={listening?stopListening:startListening}>🎤</button>
-        <div style={{width:1,height:24,background:"rgba(255,255,255,.2)"}}/>
+
+        {!listening?(
+          <CircleButton onClick={startListening}><IconMic/></CircleButton>
+        ):(
+          <CircleButton onClick={stopListening}><IconStop/></CircleButton>
+        )}
+
         <textarea
-          style={{flex:1,background:"transparent",border:"none",outline:"none",color:"#fff"}}
+          style={{
+            flex:1,
+            background:"transparent",
+            border:"none",
+            outline:"none",
+            color:"#fff",
+            resize:"none",
+            fontSize:14
+          }}
+          placeholder="Ask anything"
           value={input}
           onChange={(e)=>setInput(e.target.value)}
           onKeyDown={(e)=>{
@@ -178,14 +228,130 @@ export default function AuthoDevPanel({
             }
           }}
         />
-        <button onClick={sendMessage}>➤</button>
+
+        <CircleButton onClick={sendMessage} white>
+          <IconSend/>
+        </CircleButton>
+
       </div>
     </div>
   );
 }
 
+/* ================= BUTTONS ================= */
+
 const IconButton = ({ children, onClick }) => (
-  <button onClick={onClick} style={{background:"none",border:"none",cursor:"pointer",fontSize:18}}>
+  <button onClick={onClick} style={{
+    border:"none",
+    background:"transparent",
+    cursor:"pointer",
+    display:"flex",
+    alignItems:"center",
+    padding:0,
+    color:"rgba(255,255,255,.85)"
+  }}>
     {children}
   </button>
+);
+
+const CircleButton = ({ children, onClick, white }) => (
+  <button onClick={onClick} style={{
+    width:40,
+    height:40,
+    minWidth:40,
+    minHeight:40,
+    borderRadius:"50%",
+    display:"flex",
+    alignItems:"center",
+    justifyContent:"center",
+    border:"none",
+    cursor:"pointer",
+    background:white ? "#fff" : "rgba(255,255,255,0.08)"
+  }}>
+    {children}
+  </button>
+);
+
+/* ================= ICONS ================= */
+
+const baseIconProps = {
+  width:22,
+  height:22,
+  fill:"none",
+  stroke:"#fff",
+  strokeWidth:1.8,
+  strokeLinecap:"round",
+  strokeLinejoin:"round"
+};
+
+const IconMic=()=>(
+<svg viewBox="0 0 24 24" {...baseIconProps}>
+<path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3z"/>
+<path d="M19 11a7 7 0 0 1-14 0"/>
+<path d="M12 18v4"/>
+</svg>
+);
+
+const IconStop=()=>(
+<div style={{width:18,height:18,background:"#c33",borderRadius:4}}/>
+);
+
+const IconSpeaker=()=>(
+<svg viewBox="0 0 24 24" {...baseIconProps}>
+<path d="M11 5L6 9H2v6h4l5 4V5z"/>
+<path d="M15.5 8.5a5 5 0 0 1 0 7"/>
+</svg>
+);
+
+const IconCopy=()=>(
+<svg viewBox="0 0 24 24" {...baseIconProps}>
+<rect x="9" y="9" width="13" height="13" rx="2"/>
+<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+</svg>
+);
+
+const IconThumbUp=()=>(
+<svg viewBox="0 0 24 24" {...baseIconProps}>
+<path d="M14 9V5a3 3 0 0 0-3-3l-1 7"/>
+<path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/>
+<path d="M7 11h8a2 2 0 0 1 2 2l-1 7a2 2 0 0 1-2 2H7"/>
+</svg>
+);
+
+const IconThumbDown=()=>(
+<svg viewBox="0 0 24 24" {...baseIconProps}>
+<path d="M10 15v4a3 3 0 0 0 3 3l1-7"/>
+<path d="M17 2h3a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-3"/>
+<path d="M17 13H9a2 2 0 0 1-2-2l1-7a2 2 0 0 1 2-2h7"/>
+</svg>
+);
+
+const IconRefresh=()=>(
+<svg viewBox="0 0 24 24" {...baseIconProps}>
+<polyline points="23 4 23 10 17 10"/>
+<path d="M20.49 15A9 9 0 1 1 23 10"/>
+</svg>
+);
+
+const IconShare=()=>(
+<svg viewBox="0 0 24 24" {...baseIconProps}>
+<path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/>
+<polyline points="16 6 12 2 8 6"/>
+<line x1="12" y1="2" x2="12" y2="15"/>
+</svg>
+);
+
+const IconSend=()=>(
+<svg viewBox="0 0 24 24"
+  width="20"
+  height="20"
+  fill="none"
+  stroke="#000"
+  strokeWidth="1.8"
+  strokeLinecap="round"
+  strokeLinejoin="round"
+>
+<path d="M22 2L11 13"/>
+<path d="M22 2L15 22l-4-9-9-4 20-7z"/>
+</svg>
 );
