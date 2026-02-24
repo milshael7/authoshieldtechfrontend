@@ -4,39 +4,40 @@ import { api } from "../../lib/api";
 // --------------------------------------------------
 // Admin Companies Room
 // --------------------------------------------------
-// Rules:
-// - Admin ONLY
-// - Global visibility (no impersonation)
-// - Stable structure (future-safe)
-// - No room leakage
+// Admin ONLY
+// Global visibility
+// Stable response handling
+// Future-safe structure
 // --------------------------------------------------
 
 export default function AdminCompanies() {
   const [companies, setCompanies] = useState([]);
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
 
   // -----------------------------------------------
   // Load companies
   // -----------------------------------------------
-  useEffect(() => {
-    let mounted = true;
+  async function loadCompanies() {
+    try {
+      setLoading(true);
+      setError("");
 
-    async function load() {
-      try {
-        setLoading(true);
-        const data = await api.adminCompanies();
-        if (mounted) setCompanies(Array.isArray(data) ? data : []);
-      } catch (e) {
-        if (mounted) setError(e?.message || "Failed to load companies");
-      } finally {
-        if (mounted) setLoading(false);
-      }
+      const res = await api.adminCompanies();
+
+      // FIXED: correct response shape
+      setCompanies(res?.companies || []);
+    } catch (e) {
+      setError(e?.message || "Failed to load companies");
+    } finally {
+      setLoading(false);
     }
+  }
 
-    load();
-    return () => (mounted = false);
+  useEffect(() => {
+    loadCompanies();
   }, []);
 
   // -----------------------------------------------
@@ -47,26 +48,37 @@ export default function AdminCompanies() {
     if (!name.trim()) return;
 
     try {
-      await api.adminCreateCompany({ name: name.trim() });
+      setCreating(true);
+
+      await api.adminCreateCompany({
+        name: name.trim(),
+      });
+
       setName("");
-      const refreshed = await api.adminCompanies();
-      setCompanies(refreshed);
+      await loadCompanies();
     } catch (e) {
       alert(e?.message || "Failed to create company");
+    } finally {
+      setCreating(false);
     }
   }
 
   // -----------------------------------------------
   // Render
   // -----------------------------------------------
-  if (loading) return <div className="card">Loading companies…</div>;
-  if (error) return <div className="card error">{error}</div>;
+  if (loading) {
+    return <div className="card">Loading companies…</div>;
+  }
+
+  if (error) {
+    return <div className="card error">{error}</div>;
+  }
 
   return (
     <div className="page">
       <h2>Admin · Companies</h2>
 
-      {/* Create Company */}
+      {/* ================= CREATE COMPANY ================= */}
       <div className="card">
         <form onSubmit={createCompany} className="row">
           <input
@@ -74,17 +86,22 @@ export default function AdminCompanies() {
             value={name}
             onChange={(e) => setName(e.target.value)}
           />
-          <button type="submit">Create</button>
+
+          <button type="submit" disabled={creating}>
+            {creating ? "Creating…" : "Create"}
+          </button>
         </form>
       </div>
 
-      {/* Companies Table */}
+      {/* ================= COMPANIES TABLE ================= */}
       <div className="card">
         <table className="table">
           <thead>
             <tr>
               <th>Company Name</th>
               <th>Members</th>
+              <th>Tier</th>
+              <th>Status</th>
               <th>Created</th>
             </tr>
           </thead>
@@ -94,6 +111,8 @@ export default function AdminCompanies() {
               <tr key={c.id}>
                 <td>{c.name}</td>
                 <td>{c.members?.length || 0}</td>
+                <td>{c.tier || "Standard"}</td>
+                <td>{c.status || "Active"}</td>
                 <td>
                   {c.createdAt
                     ? new Date(c.createdAt).toLocaleDateString()
@@ -105,7 +124,9 @@ export default function AdminCompanies() {
         </table>
 
         {companies.length === 0 && (
-          <div className="muted">No companies created yet.</div>
+          <div className="muted" style={{ marginTop: 16 }}>
+            No companies created yet.
+          </div>
         )}
       </div>
     </div>
