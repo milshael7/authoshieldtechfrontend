@@ -1,5 +1,4 @@
-// FULL ROLE-STRUCTURED ROUTING — SOC INTEGRATED
-// Executive Command Center + SOC Layer Activated
+// FULL ROLE-STRUCTURED ROUTING — INTELLIGENCE LAYER ACTIVATED
 
 import React, { useEffect, useState } from "react";
 import {
@@ -20,23 +19,20 @@ import {
 
 import { CompanyProvider } from "./context/CompanyContext";
 
-/* ================= LAYOUTS ================= */
-
+/* LAYOUTS */
 import AdminLayout from "./layouts/AdminLayout.jsx";
 import ManagerLayout from "./layouts/ManagerLayout.jsx";
 import CompanyLayout from "./layouts/CompanyLayout.jsx";
 import SmallCompanyLayout from "./layouts/SmallCompanyLayout.jsx";
 import UserLayout from "./layouts/UserLayout.jsx";
 
-/* ================= PUBLIC ================= */
-
+/* PUBLIC */
 import Landing from "./pages/public/Landing.jsx";
 import Pricing from "./pages/public/Pricing.jsx";
 import Signup from "./pages/public/Signup.jsx";
 import Login from "./pages/Login.jsx";
 
-/* ================= SHARED ================= */
-
+/* SHARED */
 import Posture from "./pages/Posture.jsx";
 import Assets from "./pages/Assets.jsx";
 import Threats from "./pages/Threats.jsx";
@@ -48,26 +44,24 @@ import Reports from "./pages/Reports.jsx";
 import Notifications from "./pages/Notifications.jsx";
 import TradingRoom from "./pages/TradingRoom.jsx";
 import VulnerabilityCenter from "./pages/VulnerabilityCenter.jsx";
-import SOC from "./pages/SOC.jsx"; // 🔥 NEW
+import SOC from "./pages/SOC.jsx";
+import Intelligence from "./pages/Intelligence.jsx";
 import NotFound from "./pages/NotFound.jsx";
 
-/* ================= ADMIN ================= */
-
+/* ADMIN */
 import AdminOverview from "./pages/admin/AdminOverview.jsx";
 import GlobalControl from "./pages/admin/GlobalControl.jsx";
 import AdminCompanies from "./pages/admin/AdminCompanies.jsx";
 
-/* ================= COMPANY ================= */
-
+/* COMPANY */
 import CompanyDashboardV2 from "./pages/company/CompanyDashboardV2.jsx";
 
-/* ================= USER EXTENSIONS ================= */
-
+/* USER */
 import Scans from "./pages/Scans.jsx";
 import RunScan from "./pages/RunScan.jsx";
 import Billing from "./pages/Billing.jsx";
 
-/* ========================================================= */
+/* ===================== */
 
 function normalizeRole(role) {
   return String(role || "").trim().toLowerCase();
@@ -106,9 +100,6 @@ export default function App() {
       setReady(true);
 
       try {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 8000);
-
         const res = await fetch(
           `${import.meta.env.VITE_API_BASE}/api/auth/refresh`,
           {
@@ -117,31 +108,18 @@ export default function App() {
               "Content-Type": "application/json",
               Authorization: `Bearer ${token}`,
             },
-            signal: controller.signal,
           }
         );
 
-        clearTimeout(timeout);
-
-        if (!res.ok) {
-          if (res.status === 401) {
-            clearToken();
-            clearUser();
-            setUser(null);
-          }
-          return;
-        }
+        if (!res.ok) return;
 
         const data = await res.json();
-
         if (data?.token && data?.user) {
           setToken(data.token);
           saveUser(data.user);
           setUser(data.user);
         }
-      } catch {
-        console.warn("Silent refresh failed. Keeping session.");
-      }
+      } catch {}
     }
 
     bootAuth();
@@ -175,13 +153,10 @@ export default function App() {
       <BrowserRouter>
         <Routes>
 
-          {/* PUBLIC */}
           <Route path="/" element={<Landing />} />
           <Route path="/pricing" element={<Pricing />} />
           <Route path="/signup" element={<Signup />} />
           <Route path="/login" element={<Login />} />
-
-          {/* ================= ADMIN ================= */}
 
           <Route
             path="/admin/*"
@@ -192,95 +167,16 @@ export default function App() {
             }
           >
             <Route index element={<AdminOverview />} />
+            <Route path="intelligence" element={<Intelligence />} />
+            <Route path="soc" element={<SOC />} />
             <Route path="companies" element={<AdminCompanies />} />
             <Route path="assets" element={<Assets />} />
-            <Route path="soc" element={<SOC />} /> {/* 🔥 NEW */}
-            <Route path="threats" element={<Threats />} />
             <Route path="incidents" element={<Incidents />} />
             <Route path="vulnerabilities" element={<Vulnerabilities />} />
-            <Route path="vulnerability-center" element={<VulnerabilityCenter />} />
-            <Route path="compliance" element={<Compliance />} />
-            <Route path="policies" element={<Policies />} />
             <Route path="reports" element={<Reports />} />
-            <Route path="trading" element={<TradingRoom />} />
             <Route path="notifications" element={<Notifications />} />
             <Route path="global" element={<GlobalControl />} />
           </Route>
-
-          {/* ================= MANAGER ================= */}
-
-          <Route
-            path="/manager/*"
-            element={
-              <RoleGuard user={user} ready={ready} allow={["manager", "admin"]}>
-                <ManagerLayout />
-              </RoleGuard>
-            }
-          >
-            <Route index element={<Posture />} />
-            <Route path="assets" element={<Assets />} />
-            <Route path="soc" element={<SOC />} /> {/* 🔥 NEW */}
-            <Route path="threats" element={<Threats />} />
-            <Route path="incidents" element={<Incidents />} />
-            <Route path="vulnerabilities" element={<Vulnerabilities />} />
-            <Route path="compliance" element={<Compliance />} />
-            <Route path="reports" element={<Reports />} />
-            <Route path="trading" element={<TradingRoom />} />
-            <Route path="notifications" element={<Notifications />} />
-          </Route>
-
-          {/* COMPANY */}
-
-          <Route
-            path="/company/*"
-            element={
-              <RoleGuard user={user} ready={ready} allow={["company", "admin", "manager"]}>
-                <CompanyLayout />
-              </RoleGuard>
-            }
-          >
-            <Route index element={<CompanyDashboardV2 />} />
-            <Route path="assets" element={<Assets />} />
-            <Route path="soc" element={<SOC />} /> {/* 🔥 NEW */}
-            <Route path="incidents" element={<Incidents />} />
-            <Route path="notifications" element={<Notifications />} />
-          </Route>
-
-          {/* SMALL COMPANY */}
-
-          <Route
-            path="/small-company/*"
-            element={
-              <RoleGuard user={user} ready={ready} allow={["small_company", "admin", "manager"]}>
-                <SmallCompanyLayout />
-              </RoleGuard>
-            }
-          >
-            <Route index element={<Posture />} />
-            <Route path="assets" element={<Assets />} />
-            <Route path="incidents" element={<Incidents />} />
-            <Route path="notifications" element={<Notifications />} />
-          </Route>
-
-          {/* USER */}
-
-          <Route
-            path="/user/*"
-            element={
-              <RoleGuard user={user} ready={ready} allow={["individual", "admin", "manager"]}>
-                <UserLayout />
-              </RoleGuard>
-            }
-          >
-            <Route index element={<Posture />} />
-            <Route path="notifications" element={<Notifications />} />
-            <Route path="scans" element={<Scans />} />
-            <Route path="run-scan" element={<RunScan />} />
-            <Route path="billing" element={<Billing />} />
-          </Route>
-
-          <Route path="/404" element={<NotFound />} />
-          <Route path="*" element={<Navigate to={defaultRedirect()} replace />} />
 
         </Routes>
       </BrowserRouter>
