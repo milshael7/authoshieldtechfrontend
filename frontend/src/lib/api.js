@@ -1,7 +1,7 @@
 /* =========================================================
-   AUTOSHIELD FRONTEND API LAYER — FULL PRODUCTION BUILD
-   Stable • Backward Compatible • Trading + Reporting Safe
-   + Admin Control Layer Added
+   AUTOSHIELD FRONTEND API LAYER — FULL PRODUCTION BUILD (FIXED)
+   Stable • Token Auth First • Vercel/Render Safe
+   Trading + Reporting Safe
 ========================================================= */
 
 const API_BASE = import.meta.env.VITE_API_BASE?.trim();
@@ -48,9 +48,7 @@ export function clearUser() {
 
 function joinUrl(base, path) {
   const cleanBase = String(base || "").replace(/\/+$/, "");
-  const cleanPath = String(path || "").startsWith("/")
-    ? path
-    : `/${path}`;
+  const cleanPath = String(path || "").startsWith("/") ? path : `/${path}`;
   return `${cleanBase}${cleanPath}`;
 }
 
@@ -64,7 +62,21 @@ async function fetchWithTimeout(url, options = {}, ms = REQUEST_TIMEOUT) {
   }
 }
 
-async function req(path, { method = "GET", body, auth = true } = {}) {
+/**
+ * req(path, opts)
+ * - Token/Bearer auth by default
+ * - Cookies OFF by default (fixes Vercel/Render auth issues)
+ * - If you later move to cookie sessions, pass { withCredentials: true }
+ */
+async function req(
+  path,
+  {
+    method = "GET",
+    body,
+    auth = true,
+    withCredentials = false, // ✅ default OFF
+  } = {}
+) {
   if (!API_BASE) throw new Error("API base URL not configured");
 
   const headers = { "Content-Type": "application/json" };
@@ -77,17 +89,21 @@ async function req(path, { method = "GET", body, auth = true } = {}) {
   const res = await fetchWithTimeout(joinUrl(API_BASE, path), {
     method,
     headers,
-    credentials: "include",
+    // ✅ Cookies OFF unless explicitly enabled
+    ...(withCredentials ? { credentials: "include" } : {}),
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
 
   let data = {};
-  try { data = await res.json(); } catch {}
+  try {
+    data = await res.json();
+  } catch {}
 
+  // ✅ only clear token if the server truly rejected auth
   if (res.status === 401 && auth) {
     clearToken();
     clearUser();
-    throw new Error("Session expired");
+    throw new Error(data?.error || "Session expired");
   }
 
   if (!res.ok) {
@@ -102,17 +118,19 @@ async function req(path, { method = "GET", body, auth = true } = {}) {
 ========================================================= */
 
 const api = {
-
   /* ================= AUTH ================= */
 
   login: (email, password) =>
-    req("/api/auth/login", { method: "POST", body: { email, password }, auth: false }),
+    req("/api/auth/login", {
+      method: "POST",
+      body: { email, password },
+      auth: false,
+    }),
 
   signup: (payload) =>
     req("/api/auth/signup", { method: "POST", body: payload, auth: false }),
 
-  refresh: () =>
-    req("/api/auth/refresh", { method: "POST" }),
+  refresh: () => req("/api/auth/refresh", { method: "POST" }),
 
   /* ================= ADMIN ================= */
 
@@ -126,83 +144,46 @@ const api = {
   adminCreateCompany: (payload) =>
     req("/api/admin/companies", { method: "POST", body: payload }),
 
-  /* ================= ADMIN CONTROL (NEW) ================= */
+  /* ================= ADMIN CONTROL ================= */
 
-  adminTenants: () =>
-    req("/api/admin/tenants"),
-
-  adminProtectionScope: () =>
-    req("/api/admin/protection-scope"),
-
+  adminTenants: () => req("/api/admin/tenants"),
+  adminProtectionScope: () => req("/api/admin/protection-scope"),
   adminSetDefenseMode: (mode) =>
-    req("/api/admin/defense-mode", {
-      method: "POST",
-      body: { mode }
-    }),
-
+    req("/api/admin/defense-mode", { method: "POST", body: { mode } }),
   adminProtectTenant: (tenantId) =>
-    req(`/api/admin/protect/${tenantId}`, {
-      method: "POST"
-    }),
-
+    req(`/api/admin/protect/${tenantId}`, { method: "POST" }),
   adminUnprotectTenant: (tenantId) =>
-    req(`/api/admin/protect/${tenantId}`, {
-      method: "DELETE"
-    }),
-
-  adminPlatformHealth: () =>
-    req("/api/admin/platform-health"),
+    req(`/api/admin/protect/${tenantId}`, { method: "DELETE" }),
+  adminPlatformHealth: () => req("/api/admin/platform-health"),
 
   /* ================= SECURITY ================= */
 
   postureSummary: () => req("/api/security/posture-summary"),
   postureChecks: () => req("/api/security/posture-checks"),
-  postureRecent: (limit = 20) =>
-    req(`/api/security/posture-recent?limit=${limit}`),
+  postureRecent: (limit = 20) => req(`/api/security/posture-recent?limit=${limit}`),
   vulnerabilities: () => req("/api/security/vulnerabilities"),
-  securityEvents: (limit = 50) =>
-    req(`/api/security/events?limit=${limit}`),
+  securityEvents: (limit = 50) => req(`/api/security/events?limit=${limit}`),
 
   /* ================= INCIDENTS ================= */
 
   incidents: () => req("/api/incidents"),
-  createIncident: (payload) =>
-    req("/api/incidents", { method: "POST", body: payload }),
+  createIncident: (payload) => req("/api/incidents", { method: "POST", body: payload }),
 
   /* ================= REPORTING ================= */
 
-  reportSummary: () =>
-    req("/api/reports/summary"),
-
-  reportExport: () =>
-    req("/api/reports/export"),
+  reportSummary: () => req("/api/reports/summary"),
+  reportExport: () => req("/api/reports/export"),
 
   /* ================= TRADING ================= */
 
-  tradingSymbols: () =>
-    req("/api/trading/symbols", { auth: false }),
-
-  tradingDashboard: () =>
-    req("/api/trading/dashboard/snapshot"),
-
-  tradingPaperSnapshot: () =>
-    req("/api/trading/paper/snapshot"),
-
-  tradingLiveSnapshot: () =>
-    req("/api/trading/live/snapshot"),
-
-  tradingRiskSnapshot: () =>
-    req("/api/trading/risk/snapshot"),
-
-  tradingPortfolioSnapshot: () =>
-    req("/api/trading/portfolio/snapshot"),
-
-  tradingAISnapshot: () =>
-    req("/api/trading/ai/snapshot"),
-
-  tradingRouterHealth: () =>
-    req("/api/trading/router/health"),
-
+  tradingSymbols: () => req("/api/trading/symbols", { auth: false }),
+  tradingDashboard: () => req("/api/trading/dashboard/snapshot"),
+  tradingPaperSnapshot: () => req("/api/trading/paper/snapshot"),
+  tradingLiveSnapshot: () => req("/api/trading/live/snapshot"),
+  tradingRiskSnapshot: () => req("/api/trading/risk/snapshot"),
+  tradingPortfolioSnapshot: () => req("/api/trading/portfolio/snapshot"),
+  tradingAISnapshot: () => req("/api/trading/ai/snapshot"),
+  tradingRouterHealth: () => req("/api/trading/router/health"),
 };
 
 export { api, req };
