@@ -1,93 +1,155 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import axios from "axios";
 
 /*
-  Installed Security Controls
-  Operational SOC View
+  Autodev 6.5 Control Center
+  Real Backend Integration
+  Role-Based Behavior
 */
 
-const ACTIVE_TOOLS = [
-  {
-    id: "edr",
-    name: "Endpoint Detection & Response",
-    status: "Healthy",
-    coverage: 92,
-  },
-  {
-    id: "email",
-    name: "Email Protection",
-    status: "Monitoring",
-    coverage: 87,
-  },
-  {
-    id: "cloud",
-    name: "Cloud Data Shield",
-    status: "Warning",
-    coverage: 71,
-  },
-];
-
 export default function InstalledTools() {
-  const [tools] = useState(ACTIVE_TOOLS);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  function statusColor(status) {
-    if (status === "Healthy") return "#2bd576";
-    if (status === "Monitoring") return "#ffd166";
-    return "#ff5a5f";
+  const [allowed, setAllowed] = useState(false);
+  const [enabled, setEnabled] = useState(false);
+  const [limit, setLimit] = useState(0);
+  const [companies, setCompanies] = useState([]);
+
+  async function loadStatus() {
+    try {
+      const res = await axios.get("/api/autoprotect/status");
+      const data = res.data?.autodev;
+
+      setAllowed(data.allowed);
+      setEnabled(data.enabled);
+      setLimit(data.limit === "unlimited" ? "unlimited" : Number(data.limit));
+      setCompanies(data.activeCompanies || []);
+      setLoading(false);
+    } catch (e) {
+      setError("Failed to load Autodev status");
+      setLoading(false);
+    }
   }
+
+  useEffect(() => {
+    loadStatus();
+  }, []);
+
+  async function toggleAutodev() {
+    try {
+      if (enabled) {
+        await axios.post("/api/autoprotect/disable");
+      } else {
+        await axios.post("/api/autoprotect/enable");
+      }
+      loadStatus();
+    } catch {
+      setError("Action failed");
+    }
+  }
+
+  async function attachCompany() {
+    const companyId = prompt("Enter Company ID to protect:");
+    if (!companyId) return;
+
+    try {
+      await axios.post("/api/autoprotect/attach", { companyId });
+      loadStatus();
+    } catch (e) {
+      alert(e.response?.data?.error || "Attach failed");
+    }
+  }
+
+  async function detachCompany(companyId) {
+    try {
+      await axios.post("/api/autoprotect/detach", { companyId });
+      loadStatus();
+    } catch {
+      alert("Detach failed");
+    }
+  }
+
+  if (loading) return <div className="postureCard">Loading Autodev...</div>;
+  if (error) return <div className="postureCard">{error}</div>;
+
+  if (!allowed) {
+    return (
+      <div className="postureCard">
+        <h3>Autodev 6.5</h3>
+        <p>This account is not eligible for Autodev automation.</p>
+      </div>
+    );
+  }
+
+  const usage =
+    limit === "unlimited"
+      ? "Unlimited"
+      : `${companies.length} / ${limit}`;
 
   return (
     <div className="postureCard">
       <div style={{ marginBottom: 24 }}>
-        <h3>Installed Security Controls</h3>
+        <h3>Autodev 6.5 Control Center</h3>
         <small className="muted">
-          Active protection modules across the platform.
+          Automated defense orchestration engine
         </small>
       </div>
 
-      <div className="toolGrid">
-        {tools.map((tool) => (
-          <div key={tool.id} className="toolCard">
+      <div style={{ marginBottom: 20 }}>
+        <div className="toolHeader">
+          <div>
+            <div className="toolTitle">
+              Status: {enabled ? "ACTIVE" : "INACTIVE"}
+            </div>
+            <div className="toolCategory">
+              Company Limit: {usage}
+            </div>
+          </div>
+
+          <button
+            className={`btn ${enabled ? "warn" : "ok"}`}
+            onClick={toggleAutodev}
+          >
+            {enabled ? "Disable" : "Enable"}
+          </button>
+        </div>
+      </div>
+
+      <div>
+        <h4>Protected Companies</h4>
+
+        {companies.length === 0 && (
+          <div className="toolDesc">
+            No companies currently attached.
+          </div>
+        )}
+
+        {companies.map((id) => (
+          <div key={id} className="toolCard">
             <div className="toolHeader">
               <div>
-                <div className="toolTitle">{tool.name}</div>
-                <div
-                  className="toolCategory"
-                  style={{ color: statusColor(tool.status) }}
-                >
-                  {tool.status}
-                </div>
+                <div className="toolTitle">{id}</div>
+                <div className="toolCategory">Protected</div>
               </div>
 
-              <span className="badge ok">
-                {tool.coverage}% Coverage
-              </span>
-            </div>
-
-            <div className="toolDesc">
-              System is actively monitoring threats and enforcing
-              security policy across assigned assets.
-            </div>
-
-            <div style={{ marginTop: 12 }}>
-              <div
-                style={{
-                  height: 8,
-                  background: "rgba(255,255,255,.08)",
-                  borderRadius: 6,
-                  overflow: "hidden",
-                }}
+              <button
+                className="btn warn"
+                onClick={() => detachCompany(id)}
               >
-                <div
-                  style={{
-                    width: `${tool.coverage}%`,
-                    height: "100%",
-                    background: statusColor(tool.status),
-                  }}
-                />
-              </div>
+                Detach
+              </button>
             </div>
           </div>
         ))}
+
+        {enabled && (limit === "unlimited" || companies.length < limit) && (
+          <div style={{ marginTop: 20 }}>
+            <button className="btn ok" onClick={attachCompany}>
+              Attach Company
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
