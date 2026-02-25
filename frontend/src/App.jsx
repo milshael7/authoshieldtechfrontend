@@ -1,5 +1,3 @@
-// FULL ROLE-STRUCTURED ROUTING — INTELLIGENCE LAYER ACTIVATED
-
 import React, { useEffect, useState } from "react";
 import {
   BrowserRouter,
@@ -18,6 +16,7 @@ import {
 } from "./lib/api.js";
 
 import { CompanyProvider } from "./context/CompanyContext";
+import { ToolProvider, useTools } from "./pages/tools/ToolContext.jsx";
 
 /* LAYOUTS */
 import AdminLayout from "./layouts/AdminLayout.jsx";
@@ -33,19 +32,13 @@ import Signup from "./pages/public/Signup.jsx";
 import Login from "./pages/Login.jsx";
 
 /* SHARED */
-import Posture from "./pages/Posture.jsx";
+import Intelligence from "./pages/Intelligence.jsx";
+import SOC from "./pages/SOC.jsx";
 import Assets from "./pages/Assets.jsx";
-import Threats from "./pages/Threats.jsx";
 import Incidents from "./pages/Incidents.jsx";
 import Vulnerabilities from "./pages/Vulnerabilities.jsx";
-import Compliance from "./pages/Compliance.jsx";
-import Policies from "./pages/Policies.jsx";
 import Reports from "./pages/Reports.jsx";
 import Notifications from "./pages/Notifications.jsx";
-import TradingRoom from "./pages/TradingRoom.jsx";
-import VulnerabilityCenter from "./pages/VulnerabilityCenter.jsx";
-import SOC from "./pages/SOC.jsx";
-import Intelligence from "./pages/Intelligence.jsx";
 import NotFound from "./pages/NotFound.jsx";
 
 /* ADMIN */
@@ -53,18 +46,18 @@ import AdminOverview from "./pages/admin/AdminOverview.jsx";
 import GlobalControl from "./pages/admin/GlobalControl.jsx";
 import AdminCompanies from "./pages/admin/AdminCompanies.jsx";
 
-/* COMPANY */
-import CompanyDashboardV2 from "./pages/company/CompanyDashboardV2.jsx";
-
-/* USER */
-import Scans from "./pages/Scans.jsx";
-import RunScan from "./pages/RunScan.jsx";
-import Billing from "./pages/Billing.jsx";
-
-/* ===================== */
+/* ============================= */
+/* AUTH GUARDS */
+/* ============================= */
 
 function normalizeRole(role) {
   return String(role || "").trim().toLowerCase();
+}
+
+function AuthGuard({ user, ready, children }) {
+  if (!ready) return null;
+  if (!user) return <Navigate to="/login" replace />;
+  return children;
 }
 
 function RoleGuard({ user, ready, allow, children }) {
@@ -81,6 +74,114 @@ function RoleGuard({ user, ready, allow, children }) {
   return children;
 }
 
+function SubscriptionGuard({ user, children }) {
+  if (!user) return <Navigate to="/login" replace />;
+
+  if (
+    user.subscriptionStatus === "Locked" ||
+    user.subscriptionStatus === "Past Due"
+  ) {
+    return <Navigate to="/pricing" replace />;
+  }
+
+  return children;
+}
+
+/* ============================= */
+
+function AppRoutes({ user, ready }) {
+  const { loading } = useTools();
+
+  if (!ready || loading) {
+    return <div style={{ padding: 40 }}>Initializing platform…</div>;
+  }
+
+  return (
+    <Routes>
+
+      {/* PUBLIC */}
+      <Route path="/" element={<Landing />} />
+      <Route path="/pricing" element={<Pricing />} />
+      <Route path="/signup" element={<Signup />} />
+      <Route path="/login" element={<Login />} />
+
+      {/* ADMIN */}
+      <Route
+        path="/admin/*"
+        element={
+          <RoleGuard user={user} ready={ready} allow={["admin"]}>
+            <AdminLayout />
+          </RoleGuard>
+        }
+      >
+        <Route index element={<AdminOverview />} />
+        <Route path="intelligence" element={<Intelligence />} />
+        <Route path="soc" element={<SOC />} />
+        <Route path="companies" element={<AdminCompanies />} />
+        <Route path="assets" element={<Assets />} />
+        <Route path="incidents" element={<Incidents />} />
+        <Route path="vulnerabilities" element={<Vulnerabilities />} />
+        <Route path="reports" element={<Reports />} />
+        <Route path="notifications" element={<Notifications />} />
+        <Route path="global" element={<GlobalControl />} />
+      </Route>
+
+      {/* MANAGER */}
+      <Route
+        path="/manager/*"
+        element={
+          <RoleGuard user={user} ready={ready} allow={["manager"]}>
+            <ManagerLayout />
+          </RoleGuard>
+        }
+      />
+
+      {/* COMPANY */}
+      <Route
+        path="/company/*"
+        element={
+          <RoleGuard user={user} ready={ready} allow={["company"]}>
+            <SubscriptionGuard user={user}>
+              <CompanyLayout />
+            </SubscriptionGuard>
+          </RoleGuard>
+        }
+      />
+
+      {/* SMALL COMPANY */}
+      <Route
+        path="/small-company/*"
+        element={
+          <RoleGuard user={user} ready={ready} allow={["small_company"]}>
+            <SubscriptionGuard user={user}>
+              <SmallCompanyLayout />
+            </SubscriptionGuard>
+          </RoleGuard>
+        }
+      />
+
+      {/* INDIVIDUAL */}
+      <Route
+        path="/user/*"
+        element={
+          <RoleGuard user={user} ready={ready} allow={["individual"]}>
+            <SubscriptionGuard user={user}>
+              <UserLayout />
+            </SubscriptionGuard>
+          </RoleGuard>
+        }
+      />
+
+      <Route path="*" element={<NotFound />} />
+
+    </Routes>
+  );
+}
+
+/* ============================= */
+/* MAIN APP */
+/* ============================= */
+
 export default function App() {
   const [user, setUser] = useState(null);
   const [ready, setReady] = useState(false);
@@ -91,13 +192,14 @@ export default function App() {
       const storedUser = getSavedUser();
 
       if (!token || !storedUser) {
+        clearToken();
+        clearUser();
         setUser(null);
         setReady(true);
         return;
       }
 
       setUser(storedUser);
-      setReady(true);
 
       try {
         const res = await fetch(
@@ -111,7 +213,7 @@ export default function App() {
           }
         );
 
-        if (!res.ok) return;
+        if (!res.ok) throw new Error();
 
         const data = await res.json();
         if (data?.token && data?.user) {
@@ -119,67 +221,25 @@ export default function App() {
           saveUser(data.user);
           setUser(data.user);
         }
-      } catch {}
+      } catch {
+        clearToken();
+        clearUser();
+        setUser(null);
+      }
+
+      setReady(true);
     }
 
     bootAuth();
   }, []);
 
-  function defaultRedirect() {
-    if (!user) return "/login";
-
-    switch (normalizeRole(user.role)) {
-      case "admin":
-        return "/admin";
-      case "manager":
-        return "/manager";
-      case "company":
-        return "/company";
-      case "small_company":
-        return "/small-company";
-      case "individual":
-        return "/user";
-      default:
-        return "/login";
-    }
-  }
-
-  if (!ready) {
-    return <div style={{ padding: 40 }}>Validating session…</div>;
-  }
-
   return (
     <CompanyProvider>
-      <BrowserRouter>
-        <Routes>
-
-          <Route path="/" element={<Landing />} />
-          <Route path="/pricing" element={<Pricing />} />
-          <Route path="/signup" element={<Signup />} />
-          <Route path="/login" element={<Login />} />
-
-          <Route
-            path="/admin/*"
-            element={
-              <RoleGuard user={user} ready={ready} allow={["admin"]}>
-                <AdminLayout />
-              </RoleGuard>
-            }
-          >
-            <Route index element={<AdminOverview />} />
-            <Route path="intelligence" element={<Intelligence />} />
-            <Route path="soc" element={<SOC />} />
-            <Route path="companies" element={<AdminCompanies />} />
-            <Route path="assets" element={<Assets />} />
-            <Route path="incidents" element={<Incidents />} />
-            <Route path="vulnerabilities" element={<Vulnerabilities />} />
-            <Route path="reports" element={<Reports />} />
-            <Route path="notifications" element={<Notifications />} />
-            <Route path="global" element={<GlobalControl />} />
-          </Route>
-
-        </Routes>
-      </BrowserRouter>
+      <ToolProvider>
+        <BrowserRouter>
+          <AppRoutes user={user} ready={ready} />
+        </BrowserRouter>
+      </ToolProvider>
     </CompanyProvider>
   );
 }
