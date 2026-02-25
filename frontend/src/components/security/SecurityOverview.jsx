@@ -1,7 +1,7 @@
 import React, { useRef } from "react";
-import { useSecurity } from "../context/SecurityContext";
-import SecurityRadar from "../components/security/SecurityRadar";
-import SecurityToolMarketplace from "../components/security/SecurityToolMarketplace";
+import { useSecurity } from "../../context/SecurityContext.jsx";
+import SecurityRadar from "./SecurityRadar.jsx";
+import SecurityToolMarketplace from "./SecurityToolMarketplace.jsx";
 
 function getRiskColor(score) {
   if (score >= 60) return "#ff4d4f";
@@ -35,8 +35,6 @@ export default function SecurityOverview() {
 
   return (
     <div className="postureWrap">
-
-      {/* ================= COMMAND HEADER ================= */}
 
       <div style={styles.commandHeader}>
 
@@ -79,15 +77,11 @@ export default function SecurityOverview() {
 
       </div>
 
-      {/* ================= INTEGRITY ALERT ================= */}
-
       {integrityAlert && (
         <div style={styles.integrityAlert}>
           ⚠ AUDIT INTEGRITY FAILURE DETECTED
         </div>
       )}
-
-      {/* ================= EXISTING MODULES ================= */}
 
       <SecurityRadar ref={radarRef} />
       <SecurityToolMarketplace onChange={refreshRadar} />
@@ -96,10 +90,7 @@ export default function SecurityOverview() {
   );
 }
 
-/* ================= STYLES ================= */
-
 const styles = {
-
   commandHeader: {
     background: "#0f172a",
     borderRadius: 12,
