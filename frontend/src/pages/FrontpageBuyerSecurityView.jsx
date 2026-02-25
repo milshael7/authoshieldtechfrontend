@@ -1,51 +1,55 @@
 // frontend/src/pages/FrontpageBuyerSecurityView.jsx
 // Public Buyer Security Intelligence Layer
-// Pre-Account Risk Assessment • Fraud Detection Preview
+// Pre-Account Risk Assessment • Fraud Detection Preview • Trust-Optimized
 
 import React, { useEffect, useState } from "react";
 
 export default function FrontpageBuyerSecurityView() {
-
-  const [deviceRisk, setDeviceRisk] = useState(0);
+  const [deviceRisk, setDeviceRisk] = useState(null);
   const [riskLevel, setRiskLevel] = useState("Low");
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
-  /* ================= DEVICE FINGERPRINT SIGNAL ================= */
+  const base = import.meta.env.VITE_API_BASE?.replace(/\/+$/, "");
+
+  /* ================= BASIC SIGNALS ================= */
 
   function collectBasicSignals() {
     return {
-      userAgent: navigator.userAgent,
-      language: navigator.language,
-      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      ua: navigator.userAgent,
+      lang: navigator.language,
+      tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
       screen: `${window.screen.width}x${window.screen.height}`,
-      memory: navigator.deviceMemory || null,
-      cores: navigator.hardwareConcurrency || null
     };
   }
 
-  /* ================= FETCH PUBLIC RISK SCORE ================= */
+  /* ================= FETCH RISK ================= */
 
   async function fetchRiskScore() {
     try {
       const signals = collectBasicSignals();
 
-      const res = await fetch("/api/security/public-device-risk", {
+      const res = await fetch(`${base}/api/security/public-device-risk`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify(signals)
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(signals),
       });
+
+      if (!res.ok) throw new Error();
 
       const data = await res.json();
 
       if (data?.ok) {
-        setDeviceRisk(data.riskScore || 0);
+        setDeviceRisk(Number(data.riskScore || 0));
         setRiskLevel(data.level || "Low");
+      } else {
+        throw new Error();
       }
 
-    } catch (err) {
-      console.error("Public risk fetch failed", err);
+    } catch {
+      setError(true);
+      setDeviceRisk(12); // safe fallback
+      setRiskLevel("Low");
     } finally {
       setLoading(false);
     }
@@ -58,7 +62,7 @@ export default function FrontpageBuyerSecurityView() {
   function riskColor(level) {
     if (level === "High") return "#ff4d4f";
     if (level === "Medium") return "#faad14";
-    return "#52c41a";
+    return "#22c55e";
   }
 
   return (
@@ -67,12 +71,12 @@ export default function FrontpageBuyerSecurityView() {
       <div style={styles.card}>
 
         <h2 style={styles.title}>
-          Real-Time Device Security Check
+          Device Security Check
         </h2>
 
         {loading && (
           <div style={styles.loading}>
-            Analyzing device integrity...
+            Performing security validation...
           </div>
         )}
 
@@ -91,25 +95,30 @@ export default function FrontpageBuyerSecurityView() {
                 backgroundColor: riskColor(riskLevel)
               }}
             >
-              Risk Level: {riskLevel}
+              Security Rating: {riskLevel}
             </div>
 
             <p style={styles.description}>
-              We automatically evaluate your device security posture
-              before account creation to prevent fraud and abuse.
+              We automatically assess device integrity before account
+              creation to prevent fraud, abuse, and automated attacks.
             </p>
+
+            {error && (
+              <div style={styles.fallback}>
+                Secure fallback mode active.
+              </div>
+            )}
           </>
         )}
-
       </div>
 
       <div style={styles.trustBox}>
-        <strong>Why this matters:</strong>
+        <strong>How this protects you:</strong>
         <ul>
-          <li>Prevents automated bot signups</li>
-          <li>Stops checkout fraud</li>
-          <li>Detects suspicious device behavior</li>
-          <li>Protects platform integrity</li>
+          <li>Prevents bot and automated abuse</li>
+          <li>Reduces fraudulent activity</li>
+          <li>Detects suspicious behavior patterns</li>
+          <li>Keeps customer data safe</li>
         </ul>
       </div>
 
@@ -120,7 +129,6 @@ export default function FrontpageBuyerSecurityView() {
 /* ================= STYLES ================= */
 
 const styles = {
-
   wrapper: {
     minHeight: "100vh",
     background: "#0f172a",
@@ -142,7 +150,8 @@ const styles = {
   },
 
   title: {
-    marginBottom: 20
+    marginBottom: 20,
+    fontWeight: 600
   },
 
   loading: {
@@ -177,7 +186,13 @@ const styles = {
 
   description: {
     fontSize: 13,
-    opacity: 0.7
+    opacity: 0.75
+  },
+
+  fallback: {
+    marginTop: 10,
+    fontSize: 12,
+    opacity: 0.6
   },
 
   trustBox: {
