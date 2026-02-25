@@ -45,6 +45,7 @@ import NotFound from "./pages/NotFound.jsx";
 import AdminOverview from "./pages/admin/AdminOverview.jsx";
 import GlobalControl from "./pages/admin/GlobalControl.jsx";
 import AdminCompanies from "./pages/admin/AdminCompanies.jsx";
+import AuditExplorer from "./pages/admin/AuditExplorer.jsx"; // 🔥 NEW
 
 /* ============================= */
 /* AUTH GUARDS */
@@ -124,6 +125,9 @@ function AppRoutes({ user, ready }) {
         <Route path="reports" element={<Reports />} />
         <Route path="notifications" element={<Notifications />} />
         <Route path="global" element={<GlobalControl />} />
+
+        {/* 🔥 NEW — AUDIT EXPLORER */}
+        <Route path="audit" element={<AuditExplorer />} />
       </Route>
 
       {/* MANAGER */}
