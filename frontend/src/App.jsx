@@ -44,8 +44,8 @@ import GlobalControl from "./pages/admin/GlobalControl.jsx";
 import AdminCompanies from "./pages/admin/AdminCompanies.jsx";
 import AuditExplorer from "./pages/admin/AuditExplorer.jsx";
 
-/* 🔥 NEW ADMIN VISUAL SECURITY LAYERS */
-import SecurityOverview from "./pages/SecurityOverview.jsx";
+/* 🔥 FIXED IMPORT PATH */
+import SecurityOverview from "./components/security/SecurityOverview.jsx";
 import RiskMonitor from "./pages/RiskMonitor.jsx";
 import SessionMonitor from "./pages/SessionMonitor.jsx";
 import DeviceIntegrityPanel from "./pages/DeviceIntegrityPanel.jsx";
@@ -75,7 +75,10 @@ function RoleGuard({ user, ready, allow, children }) {
 function SubscriptionGuard({ user, children }) {
   if (!user) return <Navigate to="/login" replace />;
 
-  if (user.subscriptionStatus === "Locked" || user.subscriptionStatus === "Past Due") {
+  if (
+    user.subscriptionStatus === "Locked" ||
+    user.subscriptionStatus === "Past Due"
+  ) {
     return <Navigate to="/pricing" replace />;
   }
 
@@ -118,15 +121,16 @@ function AppRoutes({ user, ready }) {
         <Route path="reports" element={<Reports />} />
         <Route path="notifications" element={<Notifications />} />
         <Route path="global" element={<GlobalControl />} />
-
-        {/* 🔥 AUDIT EXPLORER */}
         <Route path="audit" element={<AuditExplorer />} />
 
-        {/* 🔥 NEW — VISUAL SECURITY LAYERS */}
+        {/* 🔥 SECURITY LAYERS */}
         <Route path="security" element={<SecurityOverview />} />
         <Route path="risk" element={<RiskMonitor />} />
         <Route path="sessions" element={<SessionMonitor />} />
-        <Route path="device-integrity" element={<DeviceIntegrityPanel />} />
+        <Route
+          path="device-integrity"
+          element={<DeviceIntegrityPanel />}
+        />
       </Route>
 
       {/* MANAGER */}
@@ -155,7 +159,11 @@ function AppRoutes({ user, ready }) {
       <Route
         path="/small-company/*"
         element={
-          <RoleGuard user={user} ready={ready} allow={["small_company"]}>
+          <RoleGuard
+            user={user}
+            ready={ready}
+            allow={["small_company"]}
+          >
             <SubscriptionGuard user={user}>
               <SmallCompanyLayout />
             </SubscriptionGuard>
@@ -167,7 +175,11 @@ function AppRoutes({ user, ready }) {
       <Route
         path="/user/*"
         element={
-          <RoleGuard user={user} ready={ready} allow={["individual"]}>
+          <RoleGuard
+            user={user}
+            ready={ready}
+            allow={["individual"]}
+          >
             <SubscriptionGuard user={user}>
               <UserLayout />
             </SubscriptionGuard>
@@ -204,13 +216,16 @@ export default function App() {
       setUser(storedUser);
 
       try {
-        const res = await fetch(`${import.meta.env.VITE_API_BASE}/api/auth/refresh`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-        });
+        const res = await fetch(
+          `${import.meta.env.VITE_API_BASE}/api/auth/refresh`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
 
         if (!res.ok) throw new Error();
 
