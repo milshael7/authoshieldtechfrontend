@@ -13,7 +13,7 @@ import {
 
 import { CompanyProvider } from "./context/CompanyContext";
 import { ToolProvider, useTools } from "./pages/tools/ToolContext.jsx";
-import { SecurityProvider } from "./context/SecurityContext.jsx"; // ✅ NEW
+import { SecurityProvider } from "./context/SecurityContext.jsx";
 
 /* LAYOUTS */
 import AdminLayout from "./layouts/AdminLayout.jsx";
@@ -43,6 +43,12 @@ import AdminOverview from "./pages/admin/AdminOverview.jsx";
 import GlobalControl from "./pages/admin/GlobalControl.jsx";
 import AdminCompanies from "./pages/admin/AdminCompanies.jsx";
 import AuditExplorer from "./pages/admin/AuditExplorer.jsx";
+
+/* 🔥 NEW ADMIN VISUAL SECURITY LAYERS */
+import SecurityOverview from "./pages/SecurityOverview.jsx";
+import RiskMonitor from "./pages/RiskMonitor.jsx";
+import SessionMonitor from "./pages/SessionMonitor.jsx";
+import DeviceIntegrityPanel from "./pages/DeviceIntegrityPanel.jsx";
 
 /* ============================= */
 /* AUTH GUARDS */
@@ -115,6 +121,12 @@ function AppRoutes({ user, ready }) {
 
         {/* 🔥 AUDIT EXPLORER */}
         <Route path="audit" element={<AuditExplorer />} />
+
+        {/* 🔥 NEW — VISUAL SECURITY LAYERS */}
+        <Route path="security" element={<SecurityOverview />} />
+        <Route path="risk" element={<RiskMonitor />} />
+        <Route path="sessions" element={<SessionMonitor />} />
+        <Route path="device-integrity" element={<DeviceIntegrityPanel />} />
       </Route>
 
       {/* MANAGER */}
