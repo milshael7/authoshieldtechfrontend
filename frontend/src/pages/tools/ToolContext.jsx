@@ -1,53 +1,139 @@
-import React, { createContext, useContext, useState } from "react";
+import React, { createContext, useContext, useEffect, useState } from "react";
 
-const ToolContext = createContext();
+/*
+  Enterprise Entitlement Context
+  Global Access Control Brain
+*/
+
+const ToolContext = createContext(null);
 
 export function ToolProvider({ children }) {
-  const [tools, setTools] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState(null);
+  const [tools, setTools] = useState([]);
+  const [autodev, setAutodev] = useState(null);
 
-  function installTool(id) {
-    setTools((prev) => ({
-      ...prev,
-      [id]: {
-        status: "installing",
-        progress: 0,
-      },
-    }));
+  /* =========================================================
+     LOAD USER (REFRESH TOKEN SAFE)
+  ========================================================= */
 
-    // Simulated deployment lifecycle
-    let progress = 0;
+  async function loadUser() {
+    try {
+      const res = await fetch("/api/auth/refresh", {
+        method: "POST",
+        credentials: "include",
+      });
 
-    const interval = setInterval(() => {
-      progress += 20;
+      const data = await res.json();
 
-      setTools((prev) => ({
-        ...prev,
-        [id]: {
-          status: progress >= 100 ? "installed" : "installing",
-          progress,
-        },
-      }));
-
-      if (progress >= 100) {
-        clearInterval(interval);
+      if (data.token && data.user) {
+        setUser(data.user);
       }
-    }, 600);
+    } catch (e) {
+      console.error("User load failed", e);
+    }
   }
 
-  function uninstallTool(id) {
-    setTools((prev) => {
-      const copy = { ...prev };
-      delete copy[id];
-      return copy;
-    });
+  /* =========================================================
+     LOAD TOOL CATALOG
+  ========================================================= */
+
+  async function loadTools() {
+    try {
+      const res = await fetch("/api/tools/catalog", {
+        credentials: "include",
+      });
+
+      const data = await res.json();
+
+      if (data.ok) {
+        setTools(data.tools || []);
+      }
+    } catch (e) {
+      console.error("Tool load failed", e);
+    }
   }
+
+  /* =========================================================
+     LOAD AUTODEV STATUS
+  ========================================================= */
+
+  async function loadAutodev() {
+    try {
+      const res = await fetch("/api/autoprotect/status", {
+        credentials: "include",
+      });
+
+      const data = await res.json();
+
+      if (data.ok) {
+        setAutodev(data.autodev);
+      }
+    } catch (e) {
+      console.error("Autodev load failed", e);
+    }
+  }
+
+  /* =========================================================
+     INITIAL LOAD
+  ========================================================= */
+
+  async function initialize() {
+    setLoading(true);
+    await loadUser();
+    await loadTools();
+    await loadAutodev();
+    setLoading(false);
+  }
+
+  useEffect(() => {
+    initialize();
+  }, []);
+
+  /* =========================================================
+     HELPERS
+  ========================================================= */
+
+  function hasToolAccess(toolId) {
+    const tool = tools.find((t) => t.id === toolId);
+    return tool?.accessible === true;
+  }
+
+  function isAdmin() {
+    return user?.accountType === "ADMIN";
+  }
+
+  function isManager() {
+    return user?.accountType === "MANAGER";
+  }
+
+  function isCompany() {
+    return user?.accountType === "COMPANY";
+  }
+
+  function isIndividual() {
+    return user?.accountType === "INDIVIDUAL";
+  }
+
+  /* =========================================================
+     PROVIDER
+  ========================================================= */
 
   return (
     <ToolContext.Provider
       value={{
+        loading,
+        user,
         tools,
-        installTool,
-        uninstallTool,
+        autodev,
+
+        refresh: initialize,
+
+        hasToolAccess,
+        isAdmin,
+        isManager,
+        isCompany,
+        isIndividual,
       }}
     >
       {children}
