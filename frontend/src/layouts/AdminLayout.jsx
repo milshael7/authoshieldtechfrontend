@@ -1,3 +1,5 @@
+// frontend/src/layouts/AdminLayout.jsx
+
 import React, { useEffect, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { clearToken, clearUser } from "../lib/api.js";
@@ -54,7 +56,6 @@ export default function AdminLayout() {
 
   return (
     <div className="layout-root enterprise">
-
       {/* ================= SIDEBAR ================= */}
       <aside className="layout-sidebar admin">
         <div className="layout-brand">
@@ -65,10 +66,23 @@ export default function AdminLayout() {
         </div>
 
         <nav className="layout-nav">
+          <NavLink to="." end>
+            Dashboard
+          </NavLink>
 
-          <NavLink to="." end>Dashboard</NavLink>
+          <hr />
 
           <div className="nav-section-label">Security Command</div>
+
+          {/* 🔥 NEW VISUAL LAYERS */}
+          <NavLink to="security">Security Overview</NavLink>
+          <NavLink to="risk">Risk Monitor</NavLink>
+          <NavLink to="sessions">Session Monitor</NavLink>
+          <NavLink to="device-integrity">Device Integrity</NavLink>
+
+          <hr />
+
+          <div className="nav-section-label">Security Modules</div>
 
           <NavLink to="assets">Assets</NavLink>
           <NavLink to="threats">Threat Intelligence</NavLink>
@@ -93,7 +107,6 @@ export default function AdminLayout() {
           <NavLink to="/manager">Manager Command</NavLink>
           <NavLink to="/company">Corporate Entities</NavLink>
           <NavLink to="/user">User Governance</NavLink>
-
         </nav>
 
         <button className="btn logout-btn" onClick={logout}>
@@ -111,7 +124,6 @@ export default function AdminLayout() {
           flexDirection: "column",
         }}
       >
-
         <div
           style={{
             height: 24,
@@ -157,7 +169,7 @@ export default function AdminLayout() {
           }}
         >
           <button
-            onClick={() => setAdvisorOpen(v => !v)}
+            onClick={() => setAdvisorOpen((v) => !v)}
             style={{
               width: DRAWER_CLOSED_W,
               minWidth: DRAWER_CLOSED_W,
