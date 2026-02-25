@@ -65,14 +65,23 @@ export default function AdminLayout() {
         </div>
 
         <nav className="layout-nav">
+
           <NavLink to="." end>Dashboard</NavLink>
+
+          <div className="nav-section-label">Security Command</div>
+
           <NavLink to="assets">Assets</NavLink>
           <NavLink to="threats">Threat Intelligence</NavLink>
           <NavLink to="incidents">Incident Management</NavLink>
           <NavLink to="vulnerabilities">Vulnerability Oversight</NavLink>
           <NavLink to="compliance">Regulatory Compliance</NavLink>
           <NavLink to="reports">Executive Reporting</NavLink>
-          <NavLink to="trading">Trading Command</NavLink>
+
+          <hr />
+
+          <div className="nav-section-label">Platform Intelligence</div>
+
+          <NavLink to="audit">Audit Explorer</NavLink>
           <NavLink to="global">Global Control</NavLink>
           <NavLink to="notifications">System Notifications</NavLink>
 
@@ -80,12 +89,11 @@ export default function AdminLayout() {
 
           <div className="nav-section-label">Operational Oversight</div>
 
-          {/* 🔥 NEW — ADMIN COMPANY CONTROL */}
           <NavLink to="companies">Company Oversight</NavLink>
-
           <NavLink to="/manager">Manager Command</NavLink>
           <NavLink to="/company">Corporate Entities</NavLink>
           <NavLink to="/user">User Governance</NavLink>
+
         </nav>
 
         <button className="btn logout-btn" onClick={logout}>
@@ -129,7 +137,7 @@ export default function AdminLayout() {
         </main>
       </div>
 
-      {/* ================= ADVISOR DOOR ================= */}
+      {/* ================= ADVISOR DRAWER ================= */}
       {!isMobile && (
         <div
           style={{
