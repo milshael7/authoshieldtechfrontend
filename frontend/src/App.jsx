@@ -44,15 +44,13 @@ import GlobalControl from "./pages/admin/GlobalControl.jsx";
 import AdminCompanies from "./pages/admin/AdminCompanies.jsx";
 import AuditExplorer from "./pages/admin/AuditExplorer.jsx";
 
-/* 🔥 FIXED IMPORT PATH */
+/* SECURITY */
 import SecurityOverview from "./components/security/SecurityOverview.jsx";
 import RiskMonitor from "./pages/RiskMonitor.jsx";
 import SessionMonitor from "./pages/SessionMonitor.jsx";
 import DeviceIntegrityPanel from "./pages/DeviceIntegrityPanel.jsx";
 
-/* ============================= */
-/* AUTH GUARDS */
-/* ============================= */
+/* ================= AUTH GUARDS ================= */
 
 function normalizeRole(role) {
   return String(role || "").trim().toLowerCase();
@@ -85,7 +83,7 @@ function SubscriptionGuard({ user, children }) {
   return children;
 }
 
-/* ============================= */
+/* ================= ROUTES ================= */
 
 function AppRoutes({ user, ready }) {
   const { loading } = useTools();
@@ -96,13 +94,11 @@ function AppRoutes({ user, ready }) {
 
   return (
     <Routes>
-      {/* PUBLIC */}
       <Route path="/" element={<Landing />} />
       <Route path="/pricing" element={<Pricing />} />
       <Route path="/signup" element={<Signup />} />
       <Route path="/login" element={<Login />} />
 
-      {/* ADMIN */}
       <Route
         path="/admin/*"
         element={
@@ -122,18 +118,12 @@ function AppRoutes({ user, ready }) {
         <Route path="notifications" element={<Notifications />} />
         <Route path="global" element={<GlobalControl />} />
         <Route path="audit" element={<AuditExplorer />} />
-
-        {/* 🔥 SECURITY LAYERS */}
         <Route path="security" element={<SecurityOverview />} />
         <Route path="risk" element={<RiskMonitor />} />
         <Route path="sessions" element={<SessionMonitor />} />
-        <Route
-          path="device-integrity"
-          element={<DeviceIntegrityPanel />}
-        />
+        <Route path="device-integrity" element={<DeviceIntegrityPanel />} />
       </Route>
 
-      {/* MANAGER */}
       <Route
         path="/manager/*"
         element={
@@ -143,7 +133,6 @@ function AppRoutes({ user, ready }) {
         }
       />
 
-      {/* COMPANY */}
       <Route
         path="/company/*"
         element={
@@ -155,15 +144,10 @@ function AppRoutes({ user, ready }) {
         }
       />
 
-      {/* SMALL COMPANY */}
       <Route
         path="/small-company/*"
         element={
-          <RoleGuard
-            user={user}
-            ready={ready}
-            allow={["small_company"]}
-          >
+          <RoleGuard user={user} ready={ready} allow={["small_company"]}>
             <SubscriptionGuard user={user}>
               <SmallCompanyLayout />
             </SubscriptionGuard>
@@ -171,15 +155,10 @@ function AppRoutes({ user, ready }) {
         }
       />
 
-      {/* INDIVIDUAL */}
       <Route
         path="/user/*"
         element={
-          <RoleGuard
-            user={user}
-            ready={ready}
-            allow={["individual"]}
-          >
+          <RoleGuard user={user} ready={ready} allow={["individual"]}>
             <SubscriptionGuard user={user}>
               <UserLayout />
             </SubscriptionGuard>
@@ -192,9 +171,7 @@ function AppRoutes({ user, ready }) {
   );
 }
 
-/* ============================= */
-/* MAIN APP */
-/* ============================= */
+/* ================= MAIN APP ================= */
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -202,20 +179,18 @@ export default function App() {
 
   useEffect(() => {
     async function bootAuth() {
-      const token = getToken();
-      const storedUser = getSavedUser();
-
-      if (!token || !storedUser) {
-        clearToken();
-        clearUser();
-        setUser(null);
-        setReady(true);
-        return;
-      }
-
-      setUser(storedUser);
-
       try {
+        const token = getToken();
+        const storedUser = getSavedUser();
+
+        if (!token || !storedUser) {
+          setReady(true);
+          return;
+        }
+
+        // Temporarily set user to prevent flicker
+        setUser(storedUser);
+
         const res = await fetch(
           `${import.meta.env.VITE_API_BASE}/api/auth/refresh`,
           {
@@ -227,21 +202,26 @@ export default function App() {
           }
         );
 
-        if (!res.ok) throw new Error();
+        if (!res.ok) {
+          throw new Error("Refresh failed");
+        }
 
         const data = await res.json();
+
         if (data?.token && data?.user) {
           setToken(data.token);
           saveUser(data.user);
           setUser(data.user);
+        } else {
+          throw new Error("Invalid refresh response");
         }
-      } catch {
+      } catch (err) {
         clearToken();
         clearUser();
         setUser(null);
+      } finally {
+        setReady(true);
       }
-
-      setReady(true);
     }
 
     bootAuth();
