@@ -1,10 +1,6 @@
+// frontend/src/App.jsx
 import React, { useEffect, useState } from "react";
-import {
-  BrowserRouter,
-  Routes,
-  Route,
-  Navigate,
-} from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
 import {
   getSavedUser,
@@ -17,6 +13,7 @@ import {
 
 import { CompanyProvider } from "./context/CompanyContext";
 import { ToolProvider, useTools } from "./pages/tools/ToolContext.jsx";
+import { SecurityProvider } from "./context/SecurityContext.jsx"; // ✅ NEW
 
 /* LAYOUTS */
 import AdminLayout from "./layouts/AdminLayout.jsx";
@@ -45,7 +42,7 @@ import NotFound from "./pages/NotFound.jsx";
 import AdminOverview from "./pages/admin/AdminOverview.jsx";
 import GlobalControl from "./pages/admin/GlobalControl.jsx";
 import AdminCompanies from "./pages/admin/AdminCompanies.jsx";
-import AuditExplorer from "./pages/admin/AuditExplorer.jsx"; // 🔥 NEW
+import AuditExplorer from "./pages/admin/AuditExplorer.jsx";
 
 /* ============================= */
 /* AUTH GUARDS */
@@ -53,12 +50,6 @@ import AuditExplorer from "./pages/admin/AuditExplorer.jsx"; // 🔥 NEW
 
 function normalizeRole(role) {
   return String(role || "").trim().toLowerCase();
-}
-
-function AuthGuard({ user, ready, children }) {
-  if (!ready) return null;
-  if (!user) return <Navigate to="/login" replace />;
-  return children;
 }
 
 function RoleGuard({ user, ready, allow, children }) {
@@ -78,10 +69,7 @@ function RoleGuard({ user, ready, allow, children }) {
 function SubscriptionGuard({ user, children }) {
   if (!user) return <Navigate to="/login" replace />;
 
-  if (
-    user.subscriptionStatus === "Locked" ||
-    user.subscriptionStatus === "Past Due"
-  ) {
+  if (user.subscriptionStatus === "Locked" || user.subscriptionStatus === "Past Due") {
     return <Navigate to="/pricing" replace />;
   }
 
@@ -99,7 +87,6 @@ function AppRoutes({ user, ready }) {
 
   return (
     <Routes>
-
       {/* PUBLIC */}
       <Route path="/" element={<Landing />} />
       <Route path="/pricing" element={<Pricing />} />
@@ -126,7 +113,7 @@ function AppRoutes({ user, ready }) {
         <Route path="notifications" element={<Notifications />} />
         <Route path="global" element={<GlobalControl />} />
 
-        {/* 🔥 NEW — AUDIT EXPLORER */}
+        {/* 🔥 AUDIT EXPLORER */}
         <Route path="audit" element={<AuditExplorer />} />
       </Route>
 
@@ -177,7 +164,6 @@ function AppRoutes({ user, ready }) {
       />
 
       <Route path="*" element={<NotFound />} />
-
     </Routes>
   );
 }
@@ -206,16 +192,13 @@ export default function App() {
       setUser(storedUser);
 
       try {
-        const res = await fetch(
-          `${import.meta.env.VITE_API_BASE}/api/auth/refresh`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
+        const res = await fetch(`${import.meta.env.VITE_API_BASE}/api/auth/refresh`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        });
 
         if (!res.ok) throw new Error();
 
@@ -240,9 +223,11 @@ export default function App() {
   return (
     <CompanyProvider>
       <ToolProvider>
-        <BrowserRouter>
-          <AppRoutes user={user} ready={ready} />
-        </BrowserRouter>
+        <SecurityProvider>
+          <BrowserRouter>
+            <AppRoutes user={user} ready={ready} />
+          </BrowserRouter>
+        </SecurityProvider>
       </ToolProvider>
     </CompanyProvider>
   );
