@@ -1,80 +1,107 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 
 /*
   Security Tool Marketplace
-  Clean • Professional • No Context • No External Changes
+  Entitlement Driven • Billing Integrated • Enterprise Clean
 */
 
-const TOOL_CATALOG = [
-  {
-    id: "edr",
-    name: "Endpoint Detection & Response",
-    category: "Endpoint",
-    description:
-      "Real-time behavioral monitoring, ransomware blocking, and device-level threat response.",
-  },
-  {
-    id: "itdr",
-    name: "Identity Threat Detection",
-    category: "Identity",
-    description:
-      "Detect credential abuse, privilege escalation, and anomalous login behavior.",
-  },
-  {
-    id: "email",
-    name: "Email Protection",
-    category: "Email Security",
-    description:
-      "AI-driven phishing detection and malicious attachment blocking.",
-  },
-  {
-    id: "cloud",
-    name: "Cloud Data Shield",
-    category: "Cloud",
-    description:
-      "Continuous scanning for exposed storage and misconfigurations.",
-  },
-  {
-    id: "darkweb",
-    name: "Dark Web Monitoring",
-    category: "Threat Intelligence",
-    description:
-      "Monitor credential leaks and compromised data across underground sources.",
-  },
-];
-
 export default function SecurityToolMarketplace() {
-  const [tools, setTools] = useState({});
+  const [catalog, setCatalog] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [processing, setProcessing] = useState(null);
 
-  function installTool(id) {
-    setTools((prev) => ({
-      ...prev,
-      [id]: { status: "installing", progress: 0 },
-    }));
+  /* =========================================================
+     LOAD CATALOG FROM BACKEND
+  ========================================================= */
 
-    let progress = 0;
+  async function loadCatalog() {
+    try {
+      const res = await fetch("/api/tools/catalog", {
+        credentials: "include",
+      });
 
-    const interval = setInterval(() => {
-      progress += 25;
+      const data = await res.json();
 
-      setTools((prev) => ({
-        ...prev,
-        [id]: {
-          status: progress >= 100 ? "installed" : "installing",
-          progress,
-        },
-      }));
+      if (data.ok) {
+        setCatalog(data.tools || []);
+      }
+    } catch (e) {
+      console.error("Failed to load tools", e);
+    }
 
-      if (progress >= 100) clearInterval(interval);
-    }, 500);
+    setLoading(false);
   }
 
-  function uninstallTool(id) {
-    setTools((prev) => {
-      const copy = { ...prev };
-      delete copy[id];
-      return copy;
-    });
+  useEffect(() => {
+    loadCatalog();
+  }, []);
+
+  /* =========================================================
+     BILLING CHECKOUT
+  ========================================================= */
+
+  async function purchaseTool(toolId) {
+    try {
+      setProcessing(toolId);
+
+      const res = await fetch("/api/billing/checkout", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          type: toolId,
+          successUrl: window.location.href,
+          cancelUrl: window.location.href,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (data.ok && data.checkoutUrl) {
+        window.location.href = data.checkoutUrl;
+      } else {
+        alert(data.error || "Checkout failed");
+      }
+    } catch (e) {
+      console.error(e);
+      alert("Billing error");
+    } finally {
+      setProcessing(null);
+    }
+  }
+
+  /* =========================================================
+     TOOL LAUNCH
+  ========================================================= */
+
+  async function launchTool(toolId) {
+    try {
+      const res = await fetch(`/api/tools/access/${toolId}`, {
+        credentials: "include",
+      });
+
+      const data = await res.json();
+
+      if (!data.ok) {
+        alert(data.error || "Access denied");
+        return;
+      }
+
+      alert(`Launching ${data.tool.name}`);
+      // Here you can route to tool page later
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="postureCard">
+        <h3>Loading Marketplace...</h3>
+      </div>
+    );
   }
 
   return (
@@ -82,57 +109,65 @@ export default function SecurityToolMarketplace() {
       <div style={{ marginBottom: 24 }}>
         <h3>Security Control Marketplace</h3>
         <small className="muted">
-          Deploy enterprise-grade security modules.
+          Deploy enterprise-grade security modules powered by Autodev 6.5.
         </small>
       </div>
 
       <div className="toolGrid">
-        {TOOL_CATALOG.map((tool) => {
-          const toolState = tools[tool.id];
-          const isInstalled = toolState?.status === "installed";
-          const isInstalling = toolState?.status === "installing";
+        {catalog.map((tool) => {
+          const locked = !tool.accessible;
+          const isProcessing = processing === tool.id;
 
           return (
-            <div key={tool.id} className="toolCard">
+            <div
+              key={tool.id}
+              className="toolCard"
+              style={{
+                opacity: locked ? 0.7 : 1,
+                border:
+                  tool.tier === "enterprise"
+                    ? "1px solid rgba(255,215,0,.4)"
+                    : undefined,
+              }}
+            >
               <div className="toolHeader">
                 <div>
                   <div className="toolTitle">{tool.name}</div>
-                  <div className="toolCategory">{tool.category}</div>
+                  <div className="toolCategory">
+                    {tool.category} • {tool.tier.toUpperCase()}
+                  </div>
                 </div>
 
                 <span
                   className={`badge ${
-                    isInstalled ? "ok" : isInstalling ? "warn" : ""
+                    locked ? "warn" : "ok"
                   }`}
                 >
-                  {isInstalling
-                    ? `Deploying ${toolState.progress}%`
-                    : isInstalled
-                    ? "Installed"
-                    : "Available"}
+                  {locked ? "Locked" : "Active"}
                 </span>
               </div>
 
-              <div className="toolDesc">{tool.description}</div>
+              <div className="toolDesc">
+                {tool.description || "Enterprise security module."}
+              </div>
 
               <div className="toolActions">
-                <button
-                  className={`btn ${
-                    isInstalled ? "warn" : isInstalling ? "primary" : "ok"
-                  }`}
-                  onClick={() =>
-                    isInstalled
-                      ? uninstallTool(tool.id)
-                      : installTool(tool.id)
-                  }
-                  disabled={isInstalling}
-                >
-                  {isInstalling
-                    ? "Deploying..."
-                    : isInstalled
-                    ? "Uninstall"
-                    : "Install"}
-                </button>
+                {locked ? (
+                  <button
+                    className="btn primary"
+                    onClick={() => purchaseTool(tool.id)}
+                    disabled={isProcessing}
+                  >
+                    {isProcessing ? "Processing..." : "Upgrade"}
+                  </button>
+                ) : (
+                  <button
+                    className="btn ok"
+                    onClick={() => launchTool(tool.id)}
+                  >
+                    Launch
+                  </button>
+                )}
               </div>
             </div>
           );
