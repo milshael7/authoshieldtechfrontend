@@ -35,15 +35,17 @@ export default function AdminLayout() {
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
+  /* ================= SAFE SAME-ORIGIN HEALTH ================= */
+
   useEffect(() => {
     async function loadHealth() {
       try {
-        const base = import.meta.env.VITE_API_BASE?.trim();
-        if (!base) return;
-        const res = await fetch(`${base.replace(/\/+$/, "")}/health`);
+        const res = await fetch("/health");
         const data = await res.json();
         setSystemState(data.systemState || null);
-      } catch {}
+      } catch {
+        setSystemState(null);
+      }
     }
     loadHealth();
   }, []);
@@ -53,6 +55,9 @@ export default function AdminLayout() {
     clearUser();
     navigate("/login");
   }
+
+  const navClass = ({ isActive }) =>
+    isActive ? "nav-link active" : "nav-link";
 
   return (
     <div className="layout-root enterprise">
@@ -66,7 +71,7 @@ export default function AdminLayout() {
         </div>
 
         <nav className="layout-nav">
-          <NavLink to="." end>
+          <NavLink to="." end className={navClass}>
             Dashboard
           </NavLink>
 
@@ -74,39 +79,90 @@ export default function AdminLayout() {
 
           <div className="nav-section-label">Security Command</div>
 
-          {/* 🔥 NEW VISUAL LAYERS */}
-          <NavLink to="security">Security Overview</NavLink>
-          <NavLink to="risk">Risk Monitor</NavLink>
-          <NavLink to="sessions">Session Monitor</NavLink>
-          <NavLink to="device-integrity">Device Integrity</NavLink>
+          <NavLink to="security" className={navClass}>
+            Security Overview
+          </NavLink>
+
+          <NavLink to="risk" className={navClass}>
+            Risk Monitor
+          </NavLink>
+
+          <NavLink to="sessions" className={navClass}>
+            Session Monitor
+          </NavLink>
+
+          <NavLink to="device-integrity" className={navClass}>
+            Device Integrity
+          </NavLink>
+
+          {/* 🔥 INTERNAL TRADING */}
+          <NavLink to="trading" className={navClass}>
+            Internal Trading
+          </NavLink>
 
           <hr />
 
           <div className="nav-section-label">Security Modules</div>
 
-          <NavLink to="assets">Assets</NavLink>
-          <NavLink to="threats">Threat Intelligence</NavLink>
-          <NavLink to="incidents">Incident Management</NavLink>
-          <NavLink to="vulnerabilities">Vulnerability Oversight</NavLink>
-          <NavLink to="compliance">Regulatory Compliance</NavLink>
-          <NavLink to="reports">Executive Reporting</NavLink>
+          <NavLink to="assets" className={navClass}>
+            Assets
+          </NavLink>
+
+          <NavLink to="threats" className={navClass}>
+            Threat Intelligence
+          </NavLink>
+
+          <NavLink to="incidents" className={navClass}>
+            Incident Management
+          </NavLink>
+
+          <NavLink to="vulnerabilities" className={navClass}>
+            Vulnerability Oversight
+          </NavLink>
+
+          <NavLink to="compliance" className={navClass}>
+            Regulatory Compliance
+          </NavLink>
+
+          <NavLink to="reports" className={navClass}>
+            Executive Reporting
+          </NavLink>
 
           <hr />
 
           <div className="nav-section-label">Platform Intelligence</div>
 
-          <NavLink to="audit">Audit Explorer</NavLink>
-          <NavLink to="global">Global Control</NavLink>
-          <NavLink to="notifications">System Notifications</NavLink>
+          <NavLink to="audit" className={navClass}>
+            Audit Explorer
+          </NavLink>
+
+          <NavLink to="global" className={navClass}>
+            Global Control
+          </NavLink>
+
+          <NavLink to="notifications" className={navClass}>
+            System Notifications
+          </NavLink>
 
           <hr />
 
           <div className="nav-section-label">Operational Oversight</div>
 
-          <NavLink to="companies">Company Oversight</NavLink>
-          <NavLink to="/manager">Manager Command</NavLink>
-          <NavLink to="/company">Corporate Entities</NavLink>
-          <NavLink to="/user">User Governance</NavLink>
+          <NavLink to="companies" className={navClass}>
+            Company Oversight
+          </NavLink>
+
+          <NavLink to="/manager" className={navClass}>
+            Manager Command
+          </NavLink>
+
+          <NavLink to="/company" className={navClass}>
+            Corporate Entities
+          </NavLink>
+
+          <NavLink to="/user" className={navClass}>
+            User Governance
+          </NavLink>
         </nav>
 
         <button className="btn logout-btn" onClick={logout}>
