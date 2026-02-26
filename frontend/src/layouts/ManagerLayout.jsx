@@ -2,7 +2,6 @@
 // Manager Layout — MULTI-COMPANY OPERATIONAL CONSOLE
 // Enforcement visibility layer
 // Admin supersedes Manager
-// No override authority
 // Trading = INTERNAL ONLY (Admin + Manager)
 
 import React, { useEffect, useState } from "react";
@@ -18,7 +17,6 @@ export default function ManagerLayout() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [oversightOpen, setOversightOpen] = useState(true);
 
-  // 🔐 Advisor persistence
   const [advisorOpen, setAdvisorOpen] = useState(() => {
     const saved = localStorage.getItem("manager.advisor.open");
     return saved !== "false";
@@ -37,6 +35,9 @@ export default function ManagerLayout() {
   function closeMenu() {
     setMenuOpen(false);
   }
+
+  const navClass = ({ isActive }) =>
+    isActive ? "nav-link active" : "nav-link";
 
   return (
     <div className={`layout-root enterprise ${menuOpen ? "sidebar-open" : ""}`}>
@@ -58,31 +59,31 @@ export default function ManagerLayout() {
             Global Monitoring
           </div>
 
-          <NavLink to="." end onClick={closeMenu}>
+          <NavLink to="." end className={navClass} onClick={closeMenu}>
             Global Posture
           </NavLink>
 
-          <NavLink to="assets" onClick={closeMenu}>
+          <NavLink to="assets" className={navClass} onClick={closeMenu}>
             Global Assets
           </NavLink>
 
-          <NavLink to="threats" onClick={closeMenu}>
+          <NavLink to="threats" className={navClass} onClick={closeMenu}>
             Threat Intelligence
           </NavLink>
 
-          <NavLink to="incidents" onClick={closeMenu}>
+          <NavLink to="incidents" className={navClass} onClick={closeMenu}>
             Incident Oversight
           </NavLink>
 
-          <NavLink to="vulnerabilities" onClick={closeMenu}>
+          <NavLink to="vulnerabilities" className={navClass} onClick={closeMenu}>
             Vulnerabilities
           </NavLink>
 
-          <NavLink to="compliance" onClick={closeMenu}>
+          <NavLink to="compliance" className={navClass} onClick={closeMenu}>
             Compliance View
           </NavLink>
 
-          <NavLink to="reports" onClick={closeMenu}>
+          <NavLink to="reports" className={navClass} onClick={closeMenu}>
             Operational Reports
           </NavLink>
 
@@ -98,19 +99,20 @@ export default function ManagerLayout() {
 
           {oversightOpen && (
             <>
-              <NavLink to="/company" onClick={closeMenu}>
+              {/* Cross-scope navigation intentionally absolute */}
+              <NavLink to="/company" className={navClass} onClick={closeMenu}>
                 All Companies
               </NavLink>
 
-              <NavLink to="/small-company" onClick={closeMenu}>
+              <NavLink to="/small-company" className={navClass} onClick={closeMenu}>
                 Small Companies
               </NavLink>
 
-              <NavLink to="/user" onClick={closeMenu}>
+              <NavLink to="/user" className={navClass} onClick={closeMenu}>
                 Individuals
               </NavLink>
 
-              <NavLink to="/admin/global" onClick={closeMenu}>
+              <NavLink to="/admin/global" className={navClass} onClick={closeMenu}>
                 Approval Queue (Admin Review)
               </NavLink>
             </>
@@ -118,20 +120,19 @@ export default function ManagerLayout() {
 
           <hr style={{ opacity: 0.18 }} />
 
-          {/* ===== INTERNAL TRADING (PRIVATE) ===== */}
+          {/* ===== INTERNAL TRADING ===== */}
           <div className="nav-section-label">
             Internal Trading
           </div>
 
-          {/* Route must exist in App.jsx under /manager/* */}
-          <NavLink to="trading" onClick={closeMenu}>
+          <NavLink to="trading" className={navClass} onClick={closeMenu}>
             Market Activity
           </NavLink>
 
           <hr style={{ opacity: 0.18 }} />
 
           {/* ===== NOTIFICATIONS ===== */}
-          <NavLink to="notifications" onClick={closeMenu}>
+          <NavLink to="notifications" className={navClass} onClick={closeMenu}>
             System Notifications
           </NavLink>
 
