@@ -1,15 +1,19 @@
 /* =========================================================
-   AUTOSHIELD ENTERPRISE LAYOUT — FINAL STRUCTURE FIX
+   AUTOSHIELD ENTERPRISE LAYOUT — MOBILE SAFE VERSION
+   Scroll Fixed • Flex Stable • iOS Safe
    ========================================================= */
 
 html, body {
   margin:0;
   padding:0;
   height:100%;
-  overflow:hidden;
   background:#0b0f1a;
   color:#eaf1ff;
   font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+
+  /* 🔥 FIX: Allow natural scrolling */
+  overflow-y:auto;
+  overflow-x:hidden;
 }
 
 /* =========================================================
@@ -18,9 +22,8 @@ html, body {
 
 .layout-root{
   display:flex;
-  height:100vh;
+  min-height:100vh;      /* 🔥 was height:100vh */
   width:100%;
-  overflow:hidden;
   position:relative;
 }
 
@@ -75,8 +78,7 @@ html, body {
 .enterprise-main{
   flex:1;
   display:flex;
-  height:100%;
-  overflow:hidden;
+  min-height:100vh;  /* 🔥 allow growth */
   position:relative;
 }
 
@@ -85,14 +87,15 @@ html, body {
   display:flex;
   flex-direction:column;
   min-width:0;
-  height:100%;
 }
 
+/* 🔥 THIS IS THE PRIMARY SCROLL CONTAINER */
 .layout-content{
   flex:1;
   padding:28px;
   overflow-y:auto;
   overflow-x:hidden;
+  -webkit-overflow-scrolling: touch; /* 🔥 iOS smooth scroll */
 }
 
 /* =========================================================
@@ -102,28 +105,25 @@ html, body {
 .enterprise-ai-panel{
   width:380px;
   flex-shrink:0;
-  height:100%;
+  min-height:100vh;
   border-left:1px solid rgba(255,255,255,.08);
   background:linear-gradient(180deg, rgba(255,255,255,.04), rgba(0,0,0,.45));
   backdrop-filter:blur(10px);
-  overflow:hidden;
   transition:width .25s ease;
   z-index:4;
+  display:flex;
 }
 
 .enterprise-ai-panel.collapsed{
   width:0;
   border-left:none;
-}
-
-.enterprise-ai-panel.collapsed .enterprise-ai-inner{
-  display:none;
+  overflow:hidden;
 }
 
 .enterprise-ai-inner{
   display:flex;
   flex-direction:column;
-  height:100%;
+  width:100%;
 }
 
 /* =========================================================
@@ -150,6 +150,7 @@ html, body {
   display:flex;
   flex-direction:column;
   gap:22px;
+  -webkit-overflow-scrolling: touch;
 }
 
 .advisor-row{
@@ -171,49 +172,14 @@ html, body {
   letter-spacing:.3px;
 }
 
-/* Actions */
-
-.advisor-actions{
-  display:flex;
-  align-items:center;
-  gap:20px;
-  margin-top:6px;
-}
-
-.icon-btn{
-  background:none;
-  border:none;
-  cursor:pointer;
-  color:rgba(255,255,255,.55);
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  padding:3px;
-  transition:color .2s ease, opacity .2s ease;
-}
-
-.icon-btn svg{
-  width:17px;
-  height:17px;
-  stroke:currentColor;
-}
-
-.icon-btn:hover{
-  color:#ffffff;
-}
-
-.icon-btn.active{
-  color:#ffffff;
-}
-
 /* =========================================================
-   DOCKED INPUT PILL
+   INPUT
    ========================================================= */
 
 .advisor-inputBar{
   padding:18px;
   border-top:1px solid rgba(255,255,255,.05);
-  background:rgba(15,20,30,.9);
+  background:rgba(15,20,30,.95);
 }
 
 .advisor-pill{
@@ -237,7 +203,9 @@ html, body {
   resize:none;
 }
 
-/* 🔥 MIC BUTTON UPGRADE */
+/* =========================================================
+   BUTTONS
+   ========================================================= */
 
 .advisor-pill-left{
   background:none;
@@ -264,28 +232,6 @@ html, body {
   color:#ffffff;
 }
 
-/* Recording state glow */
-.advisor-pill.listening .advisor-pill-left{
-  background:rgba(255,70,70,.15);
-  box-shadow:0 0 0 2px rgba(255,70,70,.25);
-  color:#ff4d4d;
-}
-
-/* Stop button state */
-.advisor-pill-left.stop{
-  background:#ff4d4d;
-  border-radius:50%;
-}
-
-.stop-square{
-  width:14px;
-  height:14px;
-  background:#ffffff;
-  border-radius:2px;
-}
-
-/* SEND BUTTON */
-
 .advisor-pill-right{
   width:44px;
   height:44px;
@@ -309,18 +255,21 @@ html, body {
   height:18px;
 }
 
-/* Loading */
-
-.advisor-loading{
-  font-size:12px;
-  opacity:.65;
-  padding:10px 18px 14px;
-}
-
 /* =========================================================
    MOBILE
    ========================================================= */
 
 @media (max-width:900px){
-  .enterprise-ai-panel{ display:none; }
+
+  .layout-sidebar{
+    width:220px;
+  }
+
+  .enterprise-ai-panel{
+    display:none;
+  }
+
+  .layout-content{
+    padding:18px;
+  }
 }
