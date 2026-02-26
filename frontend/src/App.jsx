@@ -50,6 +50,9 @@ import RiskMonitor from "./pages/RiskMonitor.jsx";
 import SessionMonitor from "./pages/SessionMonitor.jsx";
 import DeviceIntegrityPanel from "./pages/DeviceIntegrityPanel.jsx";
 
+/* 🔒 INTERNAL TRADING (placeholder for now) */
+import TradingRoom from "./pages/TradingRoom.jsx";
+
 /* ================= AUTH GUARDS ================= */
 
 function normalizeRole(role) {
@@ -94,11 +97,13 @@ function AppRoutes({ user, ready }) {
 
   return (
     <Routes>
+      {/* PUBLIC */}
       <Route path="/" element={<Landing />} />
       <Route path="/pricing" element={<Pricing />} />
       <Route path="/signup" element={<Signup />} />
       <Route path="/login" element={<Login />} />
 
+      {/* ADMIN */}
       <Route
         path="/admin/*"
         element={
@@ -122,8 +127,10 @@ function AppRoutes({ user, ready }) {
         <Route path="risk" element={<RiskMonitor />} />
         <Route path="sessions" element={<SessionMonitor />} />
         <Route path="device-integrity" element={<DeviceIntegrityPanel />} />
+        <Route path="trading" element={<TradingRoom />} />
       </Route>
 
+      {/* MANAGER */}
       <Route
         path="/manager/*"
         element={
@@ -131,8 +138,19 @@ function AppRoutes({ user, ready }) {
             <ManagerLayout />
           </RoleGuard>
         }
-      />
+      >
+        <Route index element={<Intelligence />} />
+        <Route path="assets" element={<Assets />} />
+        <Route path="threats" element={<SOC />} />
+        <Route path="incidents" element={<Incidents />} />
+        <Route path="vulnerabilities" element={<Vulnerabilities />} />
+        <Route path="compliance" element={<Reports />} />
+        <Route path="reports" element={<Reports />} />
+        <Route path="notifications" element={<Notifications />} />
+        <Route path="trading" element={<TradingRoom />} />
+      </Route>
 
+      {/* COMPANY */}
       <Route
         path="/company/*"
         element={
@@ -144,6 +162,7 @@ function AppRoutes({ user, ready }) {
         }
       />
 
+      {/* SMALL COMPANY */}
       <Route
         path="/small-company/*"
         element={
@@ -155,6 +174,7 @@ function AppRoutes({ user, ready }) {
         }
       />
 
+      {/* INDIVIDUAL */}
       <Route
         path="/user/*"
         element={
@@ -188,7 +208,6 @@ export default function App() {
           return;
         }
 
-        // Temporarily set user to prevent flicker
         setUser(storedUser);
 
         const res = await fetch(
@@ -202,9 +221,7 @@ export default function App() {
           }
         );
 
-        if (!res.ok) {
-          throw new Error("Refresh failed");
-        }
+        if (!res.ok) throw new Error();
 
         const data = await res.json();
 
@@ -213,9 +230,9 @@ export default function App() {
           saveUser(data.user);
           setUser(data.user);
         } else {
-          throw new Error("Invalid refresh response");
+          throw new Error();
         }
-      } catch (err) {
+      } catch {
         clearToken();
         clearUser();
         setUser(null);
