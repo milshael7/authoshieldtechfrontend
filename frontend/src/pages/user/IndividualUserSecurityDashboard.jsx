@@ -1,6 +1,5 @@
 // frontend/src/pages/user/IndividualUserSecurityDashboard.jsx
-// Personal Security Center
-// Individual Risk • Sessions • Devices • Account Status • Subscription Awareness
+// Personal Security Center + Tool Governance View
 
 import React, { useEffect, useState } from "react";
 import { useSecurity } from "../../context/SecurityContext.jsx";
@@ -24,27 +23,87 @@ function subscriptionColor(status) {
 export default function IndividualUserSecurityDashboard() {
   const { riskScore, deviceAlerts } = useSecurity();
   const user = getSavedUser();
-
-  const [sessions, setSessions] = useState([]);
   const base = import.meta.env.VITE_API_BASE?.replace(/\/+$/, "");
 
-  /* ================= LOAD PERSONAL SESSIONS ================= */
+  const [sessions, setSessions] = useState([]);
+  const [tools, setTools] = useState([]);
+  const [myRequests, setMyRequests] = useState([]);
+
+  const isSeat =
+    Boolean(user?.companyId) && !Boolean(user?.freedomEnabled);
+
+  /* ================= LOAD SESSIONS ================= */
   useEffect(() => {
     async function loadSessions() {
       try {
         const res = await fetch(`${base}/api/security/sessions`, {
           headers: { Authorization: `Bearer ${getToken()}` }
         });
-
         if (!res.ok) return;
-
         const data = await res.json();
         setSessions(data.sessions || []);
       } catch {}
     }
-
     loadSessions();
   }, [base]);
+
+  /* ================= LOAD TOOL CATALOG ================= */
+  useEffect(() => {
+    async function loadTools() {
+      try {
+        const res = await fetch(`${base}/api/tools/catalog`, {
+          headers: { Authorization: `Bearer ${getToken()}` }
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        setTools(data.tools || []);
+      } catch {}
+    }
+
+    async function loadRequests() {
+      try {
+        const res = await fetch(`${base}/api/tools/requests/mine`, {
+          headers: { Authorization: `Bearer ${getToken()}` }
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        setMyRequests(data.requests || []);
+      } catch {}
+    }
+
+    loadTools();
+    loadRequests();
+  }, [base]);
+
+  async function requestTool(toolId) {
+    try {
+      await fetch(`${base}/api/tools/request/${toolId}`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${getToken()}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ note: "User requested access" })
+      });
+
+      // refresh requests
+      const res = await fetch(`${base}/api/tools/requests/mine`, {
+        headers: { Authorization: `Bearer ${getToken()}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setMyRequests(data.requests || []);
+      }
+    } catch {}
+  }
+
+  function hasPendingRequest(toolId) {
+    return myRequests.some(
+      r =>
+        r.toolId === toolId &&
+        ["pending_company", "pending_review", "pending_admin"].includes(r.status)
+    );
+  }
 
   const color = riskColor(riskScore);
 
@@ -53,42 +112,17 @@ export default function IndividualUserSecurityDashboard() {
 
       <div className="sectionTitle">Personal Security Center</div>
 
-      {/* ================= PERSONAL RISK ================= */}
-      <div
-        className="postureCard"
-        style={{ border: `1px solid ${color}50` }}
-      >
+      {/* ================= RISK ================= */}
+      <div className="postureCard" style={{ border: `1px solid ${color}50` }}>
         <h3>Your Risk Score</h3>
-
-        <div
-          style={{
-            fontSize: 40,
-            fontWeight: 900,
-            color
-          }}
-        >
+        <div style={{ fontSize: 40, fontWeight: 900, color }}>
           {Number(riskScore || 0)}
         </div>
-
-        {riskScore >= 80 && (
-          <div
-            style={{
-              marginTop: 10,
-              padding: 10,
-              borderRadius: 8,
-              background: "rgba(255,77,79,.15)",
-              border: "1px solid rgba(255,77,79,.4)"
-            }}
-          >
-            ⚠ Elevated personal risk detected.
-          </div>
-        )}
       </div>
 
-      {/* ================= ACCOUNT STATUS ================= */}
+      {/* ================= ACCOUNT ================= */}
       <div className="postureCard">
         <h3>Account Status</h3>
-
         <div>Status: <b>{user?.status || "Unknown"}</b></div>
         <div style={{ marginTop: 6 }}>
           Subscription:
@@ -96,29 +130,85 @@ export default function IndividualUserSecurityDashboard() {
             {user?.subscriptionStatus || "Unknown"}
           </b>
         </div>
+
+        {isSeat && (
+          <div style={{ marginTop: 10, fontSize: 12, opacity: 0.7 }}>
+            This account is managed by your company.
+            Tool requests must be forwarded by them.
+          </div>
+        )}
       </div>
 
-      {/* ================= PERSONAL SESSIONS ================= */}
+      {/* ================= TOOL ACCESS CENTER ================= */}
+      <div className="postureCard">
+        <h3>Tool Access Center</h3>
+
+        {tools.length === 0 ? (
+          <div className="muted">No tools available.</div>
+        ) : (
+          tools.map(tool => {
+            const pending = hasPendingRequest(tool.id);
+
+            return (
+              <div
+                key={tool.id}
+                style={{
+                  padding: 12,
+                  marginBottom: 10,
+                  border: "1px solid rgba(255,255,255,.08)",
+                  borderRadius: 8
+                }}
+              >
+                <div style={{ fontWeight: 600 }}>
+                  {tool.name}
+                </div>
+
+                <div style={{ fontSize: 12, opacity: 0.6 }}>
+                  {tool.description}
+                </div>
+
+                <div style={{ marginTop: 8 }}>
+
+                  {tool.accessible ? (
+                    <button className="btn small">
+                      Open
+                    </button>
+                  ) : tool.requiresApproval ? (
+                    pending ? (
+                      <button className="btn small muted">
+                        Pending Approval
+                      </button>
+                    ) : (
+                      <button
+                        className="btn small"
+                        onClick={() => requestTool(tool.id)}
+                      >
+                        Request Access
+                      </button>
+                    )
+                  ) : (
+                    <button className="btn small muted">
+                      Not Entitled
+                    </button>
+                  )}
+
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      {/* ================= SESSIONS ================= */}
       <div className="postureCard">
         <h3>Active Sessions</h3>
 
         {sessions.length === 0 ? (
           <div className="muted">No active sessions.</div>
         ) : (
-          sessions.map((session) => (
-            <div
-              key={session.jti}
-              style={{
-                padding: 10,
-                borderBottom: "1px solid rgba(255,255,255,.08)"
-              }}
-            >
-              <div style={{ fontSize: 12 }}>
-                Session ID: {session.jti}
-              </div>
-              <div style={{ fontSize: 12, opacity: 0.6 }}>
-                Created: {new Date(session.createdAt).toLocaleString()}
-              </div>
+          sessions.map(session => (
+            <div key={session.jti} style={{ fontSize: 12 }}>
+              Session ID: {session.jti}
             </div>
           ))
         )}
@@ -137,18 +227,6 @@ export default function IndividualUserSecurityDashboard() {
             </div>
           ))
         )}
-      </div>
-
-      {/* ================= SECURITY TIPS ================= */}
-      <div className="postureCard">
-        <h3>Security Recommendations</h3>
-
-        <ul style={{ paddingLeft: 18, marginTop: 8 }}>
-          <li>Use a strong, unique password.</li>
-          <li>Enable two-factor authentication if available.</li>
-          <li>Revoke sessions you do not recognize.</li>
-          <li>Keep devices updated and patched.</li>
-        </ul>
       </div>
 
     </div>
