@@ -30,8 +30,8 @@ export default function Login() {
       setToken(token);
       saveUser(user);
 
-      // 🔥 Force full reload so App rehydrates correctly
-      window.location.href = redirectByRole(user.role);
+      // 🔥 NO HARD RELOAD
+      navigate(redirectByRole(user.role), { replace: true });
 
     } catch (err) {
       alert(err?.message || "Login failed");
@@ -49,7 +49,7 @@ export default function Login() {
     if (r === "small_company") return "/small-company";
     if (r === "individual") return "/user";
 
-    return "/login";
+    return "/";
   }
 
   const reset = async (e) => {
