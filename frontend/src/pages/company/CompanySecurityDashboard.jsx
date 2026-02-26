@@ -1,6 +1,5 @@
 // frontend/src/pages/company/CompanySecurityDashboard.jsx
-// Corporate Security Control Center
-// Company Scoped Risk • Subscription Health • Seat Usage • Incident & Device Awareness
+// Corporate Security Control Center + Tool Governance
 
 import React, { useEffect, useMemo, useState } from "react";
 import { useSecurity } from "../../context/SecurityContext.jsx";
@@ -24,12 +23,52 @@ function subscriptionColor(status) {
 export default function CompanySecurityDashboard() {
   const { riskScore, assetExposure, deviceAlerts } = useSecurity();
   const user = getSavedUser();
+  const base = import.meta.env.VITE_API_BASE?.replace(/\/+$/, "");
 
   const [incidents, setIncidents] = useState([]);
   const [seatStats, setSeatStats] = useState(null);
   const [compliance, setCompliance] = useState(null);
+  const [seatRequests, setSeatRequests] = useState([]);
 
-  const base = import.meta.env.VITE_API_BASE?.replace(/\/+$/, "");
+  /* ================= LOAD SEAT REQUESTS ================= */
+  async function loadSeatRequests() {
+    try {
+      const res = await fetch(`${base}/api/tools/requests/inbox`, {
+        headers: { Authorization: `Bearer ${getToken()}` }
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      setSeatRequests(data.inbox || []);
+    } catch {}
+  }
+
+  useEffect(() => {
+    loadSeatRequests();
+  }, []);
+
+  async function forwardRequest(id) {
+    await fetch(`${base}/api/tools/requests/${id}/forward`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${getToken()}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ note: "Forwarded by company review" })
+    });
+    loadSeatRequests();
+  }
+
+  async function denyRequest(id) {
+    await fetch(`${base}/api/tools/requests/${id}/deny`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${getToken()}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ note: "Denied by company" })
+    });
+    loadSeatRequests();
+  }
 
   /* ================= LOAD INCIDENTS ================= */
   useEffect(() => {
@@ -44,7 +83,7 @@ export default function CompanySecurityDashboard() {
       } catch {}
     }
     loadIncidents();
-  }, [base]);
+  }, []);
 
   /* ================= LOAD SEAT STATS ================= */
   useEffect(() => {
@@ -59,7 +98,7 @@ export default function CompanySecurityDashboard() {
       } catch {}
     }
     loadSeats();
-  }, [base]);
+  }, []);
 
   /* ================= LOAD COMPLIANCE ================= */
   useEffect(() => {
@@ -74,7 +113,7 @@ export default function CompanySecurityDashboard() {
       } catch {}
     }
     loadCompliance();
-  }, [base]);
+  }, []);
 
   const highExposure = useMemo(() => {
     return Object.entries(assetExposure || {})
@@ -90,100 +129,82 @@ export default function CompanySecurityDashboard() {
       <div className="sectionTitle">Corporate Security Control Center</div>
 
       {/* ================= RISK ================= */}
-      <div
-        className="postureCard"
-        style={{
-          border: `1px solid ${riskLevelColor}50`
-        }}
-      >
+      <div className="postureCard" style={{ border: `1px solid ${riskLevelColor}50` }}>
         <h3>Company Risk Score</h3>
-
-        <div
-          style={{
-            fontSize: 48,
-            fontWeight: 900,
-            color: riskLevelColor
-          }}
-        >
+        <div style={{ fontSize: 48, fontWeight: 900, color: riskLevelColor }}>
           {Number(riskScore || 0)}
         </div>
-
-        {riskScore >= 80 && (
-          <div
-            style={{
-              marginTop: 10,
-              padding: 10,
-              borderRadius: 8,
-              background: "rgba(255,77,79,.15)",
-              border: "1px solid rgba(255,77,79,.4)"
-            }}
-          >
-            ⚠ Elevated corporate risk detected.
-          </div>
-        )}
       </div>
 
       {/* ================= SUBSCRIPTION ================= */}
       <div className="postureCard">
         <h3>Subscription Status</h3>
-
-        <div
-          style={{
-            fontSize: 18,
-            fontWeight: 700,
-            color: subscriptionColor(user?.subscriptionStatus)
-          }}
-        >
+        <div style={{ fontWeight: 700, color: subscriptionColor(user?.subscriptionStatus) }}>
           {user?.subscriptionStatus || "Unknown"}
         </div>
-
-        {user?.subscriptionStatus === "Past Due" && (
-          <div style={{ marginTop: 8, fontSize: 13, opacity: 0.7 }}>
-            Payment action required to avoid service restriction.
-          </div>
-        )}
-
-        {user?.subscriptionStatus === "Locked" && (
-          <div style={{ marginTop: 8, fontSize: 13, opacity: 0.7 }}>
-            Access restricted due to subscription status.
-          </div>
-        )}
       </div>
 
-      {/* ================= SEAT USAGE ================= */}
+      {/* ================= SEAT TOOL REQUESTS ================= */}
       <div className="postureCard">
-        <h3>Seat Usage</h3>
+        <h3>Seat Tool Requests</h3>
 
-        {seatStats ? (
-          <div>
-            <div>Seats Allocated: <b>{seatStats.totalSeats}</b></div>
-            <div>Seats Used: <b>{seatStats.usedSeats}</b></div>
-            <div>Seats Available: <b>{seatStats.availableSeats}</b></div>
-          </div>
+        {seatRequests.length === 0 ? (
+          <div className="muted">No pending seat requests.</div>
         ) : (
-          <div className="muted">Seat data unavailable.</div>
+          seatRequests.map(r => (
+            <div
+              key={r.id}
+              style={{
+                padding: 12,
+                marginBottom: 10,
+                border: "1px solid rgba(255,255,255,.08)",
+                borderRadius: 8
+              }}
+            >
+              <div style={{ fontWeight: 600 }}>
+                {r.toolName}
+              </div>
+
+              <div style={{ fontSize: 12, opacity: 0.6 }}>
+                Requested By: {r.requestedBy}
+              </div>
+
+              {r.note && (
+                <div style={{ fontSize: 12, marginTop: 6, opacity: 0.7 }}>
+                  Note: {r.note}
+                </div>
+              )}
+
+              <div style={{ marginTop: 8 }}>
+                <button
+                  className="btn small"
+                  onClick={() => forwardRequest(r.id)}
+                >
+                  Forward
+                </button>
+
+                <button
+                  className="btn small muted"
+                  style={{ marginLeft: 8 }}
+                  onClick={() => denyRequest(r.id)}
+                >
+                  Deny
+                </button>
+              </div>
+            </div>
+          ))
         )}
       </div>
 
       {/* ================= INCIDENTS ================= */}
       <div className="postureCard">
         <h3>Active Incidents</h3>
-
         {incidents.length === 0 ? (
           <div className="muted">No active incidents.</div>
         ) : (
-          incidents.slice(0, 5).map((incident) => (
-            <div
-              key={incident.id}
-              style={{
-                padding: 10,
-                borderBottom: "1px solid rgba(255,255,255,.08)"
-              }}
-            >
+          incidents.slice(0, 5).map(incident => (
+            <div key={incident.id}>
               <b>{incident.title}</b>
-              <div style={{ fontSize: 12, opacity: 0.7 }}>
-                Severity: {incident.severity}
-              </div>
             </div>
           ))
         )}
@@ -192,27 +213,25 @@ export default function CompanySecurityDashboard() {
       {/* ================= DEVICE ALERTS ================= */}
       <div className="postureCard">
         <h3>Recent Device Alerts</h3>
-
         {deviceAlerts.length === 0 ? (
           <div className="muted">No recent alerts.</div>
         ) : (
           deviceAlerts.slice(0, 5).map((alert, i) => (
-            <div key={i} style={{ marginBottom: 6 }}>
+            <div key={i}>
               {alert.deviceName || "Device"} — {alert.message}
             </div>
           ))
         )}
       </div>
 
-      {/* ================= TOP EXPOSURE ================= */}
+      {/* ================= EXPOSURE ================= */}
       <div className="postureCard">
         <h3>Top Exposure Assets</h3>
-
         {highExposure.length === 0 ? (
           <div className="muted">No exposure detected.</div>
         ) : (
           highExposure.map(([asset, score]) => (
-            <div key={asset} style={{ marginBottom: 6 }}>
+            <div key={asset}>
               {asset} — <b>{score}</b>
             </div>
           ))
@@ -222,7 +241,6 @@ export default function CompanySecurityDashboard() {
       {/* ================= COMPLIANCE ================= */}
       <div className="postureCard">
         <h3>Compliance Overview</h3>
-
         {compliance ? (
           <div>
             <div>Score: <b>{compliance.score}</b></div>
