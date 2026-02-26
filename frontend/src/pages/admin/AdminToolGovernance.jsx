@@ -1,8 +1,9 @@
 // frontend/src/pages/admin/AdminToolGovernance.jsx
 // Enterprise Tool Governance Control Center
 // Pending Review • Dangerous Tools • Active Grants • Extend • Revoke • Auto Refresh
+// Fully aligned with backend v3.1
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { getToken } from "../../lib/api.js";
 
 function timeRemaining(expiresAt) {
@@ -18,15 +19,22 @@ function timeRemaining(expiresAt) {
   return `${minutes}m`;
 }
 
+function safeNumber(v, fallback = 0) {
+  const n = Number(v);
+  return Number.isFinite(n) && n > 0 ? n : fallback;
+}
+
 export default function AdminToolGovernance() {
   const base = import.meta.env.VITE_API_BASE?.replace(/\/+$/, "");
 
   const [requests, setRequests] = useState([]);
   const [grants, setGrants] = useState([]);
   const [durationMap, setDurationMap] = useState({});
+  const [loading, setLoading] = useState(true);
 
   /* ================= LOAD REQUESTS ================= */
-  async function loadRequests() {
+
+  const loadRequests = useCallback(async () => {
     try {
       const res = await fetch(`${base}/api/tools/requests/inbox`, {
         headers: { Authorization: `Bearer ${getToken()}` }
@@ -34,11 +42,14 @@ export default function AdminToolGovernance() {
       if (!res.ok) return;
       const data = await res.json();
       setRequests(data.inbox || []);
-    } catch {}
-  }
+    } catch (e) {
+      console.error("Failed loading requests", e);
+    }
+  }, [base]);
 
   /* ================= LOAD GRANTS ================= */
-  async function loadGrants() {
+
+  const loadGrants = useCallback(async () => {
     try {
       const res = await fetch(`${base}/api/tools/grants`, {
         headers: { Authorization: `Bearer ${getToken()}` }
@@ -46,24 +57,35 @@ export default function AdminToolGovernance() {
       if (!res.ok) return;
       const data = await res.json();
       setGrants(data.grants || []);
-    } catch {}
-  }
+    } catch (e) {
+      console.error("Failed loading grants", e);
+    }
+  }, [base]);
+
+  /* ================= INIT ================= */
 
   useEffect(() => {
-    loadRequests();
-    loadGrants();
+    async function init() {
+      setLoading(true);
+      await loadRequests();
+      await loadGrants();
+      setLoading(false);
+    }
+
+    init();
 
     const interval = setInterval(() => {
       loadRequests();
       loadGrants();
-    }, 15000); // refresh every 15s
+    }, 15000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [loadRequests, loadGrants]);
 
   /* ================= APPROVE ================= */
+
   async function approve(id) {
-    const duration = Number(durationMap[id] || 1440);
+    const duration = safeNumber(durationMap[id], 1440);
 
     await fetch(`${base}/api/tools/requests/${id}/approve`, {
       method: "POST",
@@ -77,11 +99,12 @@ export default function AdminToolGovernance() {
       })
     });
 
-    loadRequests();
-    loadGrants();
+    await loadRequests();
+    await loadGrants();
   }
 
   /* ================= DENY ================= */
+
   async function deny(id) {
     await fetch(`${base}/api/tools/requests/${id}/deny`, {
       method: "POST",
@@ -92,24 +115,24 @@ export default function AdminToolGovernance() {
       body: JSON.stringify({ note: "Denied by admin" })
     });
 
-    loadRequests();
+    await loadRequests();
   }
 
   /* ================= REVOKE ================= */
+
   async function revoke(grantId) {
     await fetch(`${base}/api/tools/grants/${grantId}/revoke`, {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${getToken()}`
-      }
+      headers: { Authorization: `Bearer ${getToken()}` }
     });
 
-    loadGrants();
+    await loadGrants();
   }
 
   /* ================= EXTEND ================= */
+
   async function extend(grantId) {
-    const duration = Number(durationMap[grantId] || 1440);
+    const duration = safeNumber(durationMap[grantId], 1440);
 
     await fetch(`${base}/api/tools/grants/${grantId}/extend`, {
       method: "POST",
@@ -120,14 +143,20 @@ export default function AdminToolGovernance() {
       body: JSON.stringify({ durationMinutes: duration })
     });
 
-    loadGrants();
+    await loadGrants();
+  }
+
+  if (loading) {
+    return <div style={{ padding: 40 }}>Loading governance data…</div>;
   }
 
   return (
     <div style={{ padding: 30, display: "flex", flexDirection: "column", gap: 40 }}>
-      <div className="sectionTitle">Tool Governance Control</div>
+
+      <div className="sectionTitle">Tool Governance Control Center</div>
 
       {/* ================= PENDING REQUESTS ================= */}
+
       <div className="postureCard">
         <h3>Pending Requests</h3>
 
@@ -138,50 +167,53 @@ export default function AdminToolGovernance() {
             <div
               key={req.id}
               style={{
-                padding: 15,
-                marginBottom: 15,
+                padding: 16,
+                marginBottom: 16,
                 border: "1px solid rgba(255,255,255,.08)",
-                borderRadius: 10
+                borderRadius: 12
               }}
             >
               <div style={{ fontWeight: 700, fontSize: 16 }}>
                 {req.toolName}
               </div>
 
-              <div style={{ fontSize: 12, opacity: 0.6 }}>
+              <div style={{ fontSize: 12, opacity: 0.65 }}>
                 Requested By: {req.requestedBy} ({req.requestedRole})
               </div>
 
-              {req.toolDangerous && (
-                <div style={{ marginTop: 6, color: "#ff4d4f", fontSize: 12 }}>
-                  ⚠ Dangerous Tool (Admin Required)
+              {req.seatUser && (
+                <div style={{ fontSize: 12, opacity: 0.5 }}>
+                  Seat User Request (company-scoped routing applied)
                 </div>
               )}
 
-              <div style={{ marginTop: 10 }}>
-                <label style={{ fontSize: 12 }}>Duration (minutes):</label>
+              {req.toolDangerous && (
+                <div style={{ marginTop: 6, color: "#ff4d4f", fontSize: 12 }}>
+                  ⚠ Dangerous Tool — Admin Level Required
+                </div>
+              )}
+
+              <div style={{ marginTop: 12 }}>
+                <label style={{ fontSize: 12 }}>Grant Duration (minutes):</label>
                 <input
                   type="number"
                   value={durationMap[req.id] || 1440}
                   onChange={e =>
-                    setDurationMap({
-                      ...durationMap,
+                    setDurationMap(prev => ({
+                      ...prev,
                       [req.id]: e.target.value
-                    })
+                    }))
                   }
                   style={{
                     marginLeft: 10,
                     width: 120,
-                    padding: 5
+                    padding: 6
                   }}
                 />
               </div>
 
-              <div style={{ marginTop: 12 }}>
-                <button
-                  className="btn small"
-                  onClick={() => approve(req.id)}
-                >
+              <div style={{ marginTop: 14 }}>
+                <button className="btn small" onClick={() => approve(req.id)}>
                   Approve
                 </button>
 
@@ -199,6 +231,7 @@ export default function AdminToolGovernance() {
       </div>
 
       {/* ================= ACTIVE GRANTS ================= */}
+
       <div className="postureCard">
         <h3>Active Tool Grants</h3>
 
@@ -209,17 +242,27 @@ export default function AdminToolGovernance() {
             <div
               key={grant.id}
               style={{
-                padding: 15,
-                marginBottom: 15,
+                padding: 16,
+                marginBottom: 16,
                 border: "1px solid rgba(255,255,255,.08)",
-                borderRadius: 10
+                borderRadius: 12
               }}
             >
               <div style={{ fontWeight: 700 }}>
                 Tool: {grant.toolId}
               </div>
 
-              <div style={{ fontSize: 12, opacity: 0.6 }}>
+              <div style={{ fontSize: 12, opacity: 0.65 }}>
+                Scope:
+                {grant.userId && ` User (${grant.userId})`}
+                {grant.companyId && ` Company (${grant.companyId})`}
+              </div>
+
+              <div style={{ fontSize: 12, opacity: 0.65 }}>
+                Approved By: {grant.approvedByRole}
+              </div>
+
+              <div style={{ fontSize: 12, marginTop: 4 }}>
                 Expires: {new Date(grant.expiresAt).toLocaleString()}
               </div>
 
@@ -227,30 +270,27 @@ export default function AdminToolGovernance() {
                 Time Remaining: {timeRemaining(grant.expiresAt)}
               </div>
 
-              <div style={{ marginTop: 10 }}>
+              <div style={{ marginTop: 12 }}>
                 <label style={{ fontSize: 12 }}>Extend (minutes):</label>
                 <input
                   type="number"
                   value={durationMap[grant.id] || 1440}
                   onChange={e =>
-                    setDurationMap({
-                      ...durationMap,
+                    setDurationMap(prev => ({
+                      ...prev,
                       [grant.id]: e.target.value
-                    })
+                    }))
                   }
                   style={{
                     marginLeft: 10,
                     width: 120,
-                    padding: 5
+                    padding: 6
                   }}
                 />
               </div>
 
-              <div style={{ marginTop: 12 }}>
-                <button
-                  className="btn small"
-                  onClick={() => extend(grant.id)}
-                >
+              <div style={{ marginTop: 14 }}>
+                <button className="btn small" onClick={() => extend(grant.id)}>
                   Extend
                 </button>
 
@@ -266,6 +306,7 @@ export default function AdminToolGovernance() {
           ))
         )}
       </div>
+
     </div>
   );
 }
