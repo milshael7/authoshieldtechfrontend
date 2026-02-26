@@ -1,16 +1,34 @@
-// frontend/src/pages/TradingRoom.jsx
-
 import React, { useEffect, useRef, useState } from "react";
 import { createChart } from "lightweight-charts";
-import { api } from "../lib/api.js";
+import { api, getToken } from "../lib/api.js";
+import { getSavedUser } from "../lib/api.js";
+import { Navigate } from "react-router-dom";
 import "../styles/terminal.css";
 
-const WS_URL =
-  (window.location.protocol === "https:" ? "wss://" : "ws://") +
-  window.location.host +
-  "/ws/market";
+/* ================= WS URL WITH TOKEN ================= */
+
+function buildWsUrl() {
+  const token = getToken();
+  if (!token) return null;
+
+  const protocol = window.location.protocol === "https:" ? "wss://" : "ws://";
+
+  return (
+    protocol +
+    window.location.host +
+    "/ws/market?token=" +
+    encodeURIComponent(token)
+  );
+}
 
 export default function TradingRoom() {
+
+  /* ================= ROLE SAFETY ================= */
+
+  const user = getSavedUser();
+  if (!user || (user.role !== "admin" && user.role !== "manager")) {
+    return <Navigate to="/404" replace />;
+  }
 
   const chartContainerRef = useRef(null);
   const chartRef = useRef(null);
@@ -33,13 +51,16 @@ export default function TradingRoom() {
 
   const [signals, setSignals] = useState([]);
 
-  /* ================= SNAPSHOT (HARDENED) ================= */
+  /* ================= SNAPSHOT ================= */
 
   async function loadSnapshot() {
     try {
       setSnapshotError("");
-      const data = await api.tradingSnapshot();
+
+      // using tradingLiveSnapshot (adjust if needed)
+      const data = await api.tradingLiveSnapshot();
       setSnapshot(data);
+
     } catch (e) {
       console.error("Snapshot error:", e);
       setSnapshotError(e.message || "Failed to load snapshot");
@@ -84,8 +105,6 @@ export default function TradingRoom() {
       },
       width: chartContainerRef.current.clientWidth,
       height: chartContainerRef.current.clientHeight,
-      rightPriceScale: { borderColor: "rgba(255,255,255,.1)" },
-      timeScale: { borderColor: "rgba(255,255,255,.1)" },
     });
 
     seriesRef.current = chartRef.current.addCandlestickSeries();
@@ -103,15 +122,14 @@ export default function TradingRoom() {
 
   }, []);
 
-  /* ================= WEBSOCKET (HARDENED) ================= */
+  /* ================= WEBSOCKET ================= */
 
   useEffect(() => {
-    const ws = new WebSocket(WS_URL);
-    wsRef.current = ws;
+    const wsUrl = buildWsUrl();
+    if (!wsUrl) return;
 
-    ws.onopen = () => {
-      console.log("Market WS connected");
-    };
+    const ws = new WebSocket(wsUrl);
+    wsRef.current = ws;
 
     ws.onmessage = (event) => {
       try {
@@ -135,14 +153,6 @@ export default function TradingRoom() {
       } catch (e) {
         console.warn("WS parse error:", e);
       }
-    };
-
-    ws.onerror = (e) => {
-      console.warn("WS error:", e);
-    };
-
-    ws.onclose = () => {
-      console.warn("Market WS closed");
     };
 
     return () => {
@@ -176,20 +186,16 @@ export default function TradingRoom() {
     }
   }
 
-  /* ================= PANEL LOGIC ================= */
+  /* ================= PANEL ================= */
 
   function togglePanel(type) {
     setSide(type);
-
     if (!panelOpen) {
       setPanelOpen(true);
       setPanelDocked(true);
     } else {
-      if (panelDocked) {
-        setPanelOpen(false);
-      } else {
-        setPanelDocked(true);
-      }
+      if (panelDocked) setPanelOpen(false);
+      else setPanelDocked(true);
     }
   }
 
@@ -247,7 +253,6 @@ export default function TradingRoom() {
       )}
 
       <div className="terminalBody">
-
         <div className="terminalRail">
           <div className="terminalRailItem">✏</div>
           <div className="terminalRailItem">📐</div>
@@ -265,38 +270,6 @@ export default function TradingRoom() {
             className="terminalChartSurface"
           />
         </div>
-
-        {panelOpen && panelDocked && (
-          <div className="terminalPanel" style={{ width: panelWidth }}>
-            <TradePanel
-              side={side}
-              snapshot={snapshot}
-              loading={snapshotLoading}
-              onDragStart={startDrag}
-              setWidth={setPanelWidth}
-            />
-          </div>
-        )}
-
-        {panelOpen && !panelDocked && (
-          <div
-            className="terminalPanel floating"
-            style={{
-              width: panelWidth,
-              left: floatPos.x,
-              top: floatPos.y,
-            }}
-          >
-            <TradePanel
-              side={side}
-              snapshot={snapshot}
-              loading={snapshotLoading}
-              onDragStart={startDrag}
-              setWidth={setPanelWidth}
-            />
-          </div>
-        )}
-
       </div>
 
       <div className="terminalSignalFeed">
@@ -313,55 +286,5 @@ export default function TradingRoom() {
       </div>
 
     </div>
-  );
-}
-
-function TradePanel({ side, snapshot, loading, onDragStart }) {
-
-  return (
-    <>
-      <div className="terminalPanelHeader" onMouseDown={onDragStart}>
-        {side} ORDER
-      </div>
-
-      <div className="terminalPanelBody">
-
-        <div>
-          <label>Quantity</label>
-          <input type="number" placeholder="0.01" />
-        </div>
-
-        <div>
-          <label>Order Type</label>
-          <select>
-            <option>Market</option>
-            <option>Limit</option>
-          </select>
-        </div>
-
-        <div className="terminalAIMetrics">
-          <div>
-            AI Win Rate:{" "}
-            {loading
-              ? "—"
-              : snapshot?.ai?.stats?.winRate
-              ? (snapshot.ai.stats.winRate * 100).toFixed(1) + "%"
-              : "—"}
-          </div>
-
-          <div>
-            Risk Multiplier:{" "}
-            {loading
-              ? "—"
-              : snapshot?.risk?.riskMultiplier?.toFixed?.(2) || "—"}
-          </div>
-        </div>
-
-        <button className={`terminalConfirm ${side === "BUY" ? "buy" : "sell"}`}>
-          Confirm {side}
-        </button>
-
-      </div>
-    </>
   );
 }
