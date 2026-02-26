@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 
 export default function SystemStatusIndicator() {
-  const [status, setStatus] = useState("loading"); 
+  const [status, setStatus] = useState("loading");
   // loading | healthy | degraded | critical
 
   useEffect(() => {
@@ -16,26 +16,26 @@ export default function SystemStatusIndicator() {
       }
 
       try {
-        const healthRes = await fetch(
+        const res = await fetch(
           `${base.replace(/\/+$/, "")}/health`,
           { method: "GET" }
         );
 
-        if (!healthRes.ok) {
+        if (!res.ok) {
           if (mounted) setStatus("critical");
           return;
         }
 
-        const data = await healthRes.json();
+        const data = await res.json();
 
-        if (data?.level === "healthy") {
+        const securityStatus = data?.systemState?.securityStatus;
+
+        if (securityStatus === "secure") {
           if (mounted) setStatus("healthy");
-        } 
-        else if (data?.level === "degraded") {
-          if (mounted) setStatus("degraded");
-        } 
-        else {
+        } else if (securityStatus === "compromised") {
           if (mounted) setStatus("critical");
+        } else {
+          if (mounted) setStatus("degraded");
         }
 
       } catch {
@@ -67,7 +67,7 @@ export default function SystemStatusIndicator() {
       : status === "degraded"
       ? "System partially degraded"
       : status === "critical"
-      ? "System offline or critical failure"
+      ? "System compromised or offline"
       : "Checking system...";
 
   return (
