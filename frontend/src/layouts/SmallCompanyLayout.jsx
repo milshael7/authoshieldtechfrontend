@@ -2,26 +2,29 @@
 // Small Company Layout — Unified Enterprise Advisor Architecture
 // Limited Tier Organization
 // Same Advisor Body • Different Brain
+// Upgrade Path → Full Company (seat-based)
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import { clearToken, clearUser } from "../lib/api.js";
+import { clearToken, clearUser, getSavedUser } from "../lib/api.js";
 import AuthoDevPanel from "../components/AuthoDevPanel.jsx";
 import Logo from "../components/Logo.jsx";
 import "../styles/layout.css";
 
 export default function SmallCompanyLayout() {
   const navigate = useNavigate();
+  const user = useMemo(() => getSavedUser(), []);
+
   const [menuOpen, setMenuOpen] = useState(false);
 
-  // 🔐 Standardized advisor persistence
+  // 🔐 Standardized advisor persistence (match other layouts)
   const [advisorOpen, setAdvisorOpen] = useState(() => {
-    const saved = localStorage.getItem("smallcompany.advisor.open");
+    const saved = localStorage.getItem("small_company.advisor.open");
     return saved !== "false";
   });
 
   useEffect(() => {
-    localStorage.setItem("smallcompany.advisor.open", advisorOpen);
+    localStorage.setItem("small_company.advisor.open", advisorOpen);
   }, [advisorOpen]);
 
   function logout() {
@@ -34,11 +37,11 @@ export default function SmallCompanyLayout() {
     setMenuOpen(false);
   }
 
+  const subscriptionStatus = user?.subscriptionStatus || "Unknown";
+
   return (
     <div className={`layout-root enterprise ${menuOpen ? "sidebar-open" : ""}`}>
-      {menuOpen && (
-        <div className="sidebar-overlay" onClick={closeMenu} />
-      )}
+      {menuOpen && <div className="sidebar-overlay" onClick={closeMenu} />}
 
       {/* ================= SIDEBAR ================= */}
       <aside className="layout-sidebar small-company">
@@ -72,14 +75,17 @@ export default function SmallCompanyLayout() {
 
           <hr style={{ opacity: 0.2 }} />
 
-          <NavLink
-            to="upgrade"
-            className="upgrade-link"
-            onClick={closeMenu}
-          >
+          {/* ✅ Use /pricing so it always exists (avoid missing "upgrade" route) */}
+          <div className="nav-section-label">Upgrade</div>
+
+          <NavLink to="/pricing" className="upgrade-link" onClick={closeMenu}>
             Upgrade to Full Company
           </NavLink>
         </nav>
+
+        <div style={{ padding: "12px 16px", fontSize: 11, opacity: 0.6 }}>
+          Subscription: {subscriptionStatus}
+        </div>
 
         <button className="btn logout-btn" onClick={logout}>
           Log out
@@ -95,11 +101,7 @@ export default function SmallCompanyLayout() {
         </main>
 
         {/* RIGHT ADVISOR DOCK */}
-        <aside
-          className={`enterprise-ai-panel ${
-            advisorOpen ? "" : "collapsed"
-          }`}
-        >
+        <aside className={`enterprise-ai-panel ${advisorOpen ? "" : "collapsed"}`}>
           <div className="enterprise-ai-inner">
             <AuthoDevPanel
               title="Advisor"
@@ -107,6 +109,7 @@ export default function SmallCompanyLayout() {
                 role: "small_company",
                 scope: "organization-only",
                 tier: "limited",
+                subscription: subscriptionStatus,
                 location: window.location.pathname,
               })}
             />
@@ -117,7 +120,7 @@ export default function SmallCompanyLayout() {
       {/* FLOATING TOGGLE */}
       <button
         className="advisor-fab"
-        onClick={() => setAdvisorOpen(v => !v)}
+        onClick={() => setAdvisorOpen((v) => !v)}
         title={advisorOpen ? "Close Advisor" : "Open Advisor"}
       >
         {advisorOpen ? "›" : "Advisor"}
