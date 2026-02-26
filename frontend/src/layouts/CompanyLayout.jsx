@@ -1,22 +1,27 @@
 // frontend/src/layouts/CompanyLayout.jsx
 // Company Layout — ORGANIZATION SECURITY CONTROL
-// Company-level visibility only
-// No global leakage
+// Seat-Based Organization Model
+// Freedom Upgrade Aware
+// No Global Leakage
 // Unified Enterprise Advisor System
 
 import React, { useEffect, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import { clearToken, clearUser } from "../lib/api.js";
+import {
+  clearToken,
+  clearUser,
+  getSavedUser
+} from "../lib/api.js";
 import AuthoDevPanel from "../components/AuthoDevPanel.jsx";
 import Logo from "../components/Logo.jsx";
 import "../styles/layout.css";
 
 export default function CompanyLayout() {
   const navigate = useNavigate();
+  const user = getSavedUser();
 
   const [menuOpen, setMenuOpen] = useState(false);
 
-  // 🔐 Standardized advisor persistence
   const [advisorOpen, setAdvisorOpen] = useState(() => {
     const saved = localStorage.getItem("company.advisor.open");
     return saved !== "false";
@@ -36,11 +41,12 @@ export default function CompanyLayout() {
     setMenuOpen(false);
   }
 
+  const isSeatUser = Boolean(user?.companyId);
+  const subscriptionStatus = user?.subscriptionStatus || "Unknown";
+
   return (
     <div className={`layout-root enterprise ${menuOpen ? "sidebar-open" : ""}`}>
-      {menuOpen && (
-        <div className="sidebar-overlay" onClick={closeMenu} />
-      )}
+      {menuOpen && <div className="sidebar-overlay" onClick={closeMenu} />}
 
       {/* ================= SIDEBAR ================= */}
       <aside className="layout-sidebar company">
@@ -83,7 +89,24 @@ export default function CompanyLayout() {
           <NavLink to="notifications" onClick={closeMenu}>
             Notifications
           </NavLink>
+
+          {/* 🔓 Freedom Upgrade Awareness */}
+          {isSeatUser && (
+            <>
+              <hr style={{ opacity: 0.15 }} />
+              <div className="nav-section-label">
+                Upgrade Options
+              </div>
+              <NavLink to="/pricing" onClick={closeMenu}>
+                Buy Freedom (Become Independent)
+              </NavLink>
+            </>
+          )}
         </nav>
+
+        <div style={{ padding: "12px 16px", fontSize: 11, opacity: 0.6 }}>
+          Subscription: {subscriptionStatus}
+        </div>
 
         <button className="btn logout-btn" onClick={logout}>
           Log out
@@ -92,7 +115,6 @@ export default function CompanyLayout() {
 
       {/* ================= MAIN + ADVISOR ================= */}
       <div className="enterprise-main">
-
         <main className="layout-main">
           <section className="layout-content">
             <Outlet />
@@ -111,12 +133,13 @@ export default function CompanyLayout() {
               getContext={() => ({
                 role: "company",
                 scope: "organization-only",
+                seatUser: isSeatUser,
+                subscription: subscriptionStatus,
                 location: window.location.pathname,
               })}
             />
           </div>
         </aside>
-
       </div>
 
       {/* ===== FLOATING TOGGLE ===== */}
@@ -127,7 +150,6 @@ export default function CompanyLayout() {
       >
         {advisorOpen ? "›" : "Advisor"}
       </button>
-
     </div>
   );
 }
