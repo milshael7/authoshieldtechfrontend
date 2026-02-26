@@ -43,6 +43,7 @@ import AdminOverview from "./pages/admin/AdminOverview.jsx";
 import GlobalControl from "./pages/admin/GlobalControl.jsx";
 import AdminCompanies from "./pages/admin/AdminCompanies.jsx";
 import AuditExplorer from "./pages/admin/AuditExplorer.jsx";
+import AdminToolGovernance from "./pages/admin/AdminToolGovernance.jsx"; // 🔥 Added
 
 /* SECURITY */
 import SecurityOverview from "./components/security/SecurityOverview.jsx";
@@ -123,6 +124,7 @@ function AppRoutes({ user, ready }) {
         <Route path="notifications" element={<Notifications />} />
         <Route path="global" element={<GlobalControl />} />
         <Route path="audit" element={<AuditExplorer />} />
+        <Route path="tool-governance" element={<AdminToolGovernance />} /> {/* 🔥 New */}
         <Route path="security" element={<SecurityOverview />} />
         <Route path="risk" element={<RiskMonitor />} />
         <Route path="sessions" element={<SessionMonitor />} />
@@ -210,7 +212,6 @@ export default function App() {
 
         setUser(storedUser);
 
-        /* 🔥 SAME-ORIGIN SAFE REFRESH */
         const res = await fetch("/api/auth/refresh", {
           method: "POST",
           headers: {
