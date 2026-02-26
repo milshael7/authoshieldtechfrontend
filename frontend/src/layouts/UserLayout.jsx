@@ -1,21 +1,26 @@
 // frontend/src/layouts/UserLayout.jsx
-// Individual User Layout — ENTERPRISE-STYLE DOCKED ADVISOR
-// Sticky right advisor
-// True collapse (content expands)
-// Unified system architecture
+// Individual User Layout — FREEDOM + AUTOPROTECT CONTROL
+// Can Manage Up To 10 External Companies
+// Autoprotect Enabled When Freedom Active
+// Unified Advisor Architecture
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import { clearToken, clearUser } from "../lib/api.js";
+import {
+  clearToken,
+  clearUser,
+  getSavedUser
+} from "../lib/api.js";
 import AuthoDevPanel from "../components/AuthoDevPanel.jsx";
 import Logo from "../components/Logo.jsx";
 import "../styles/layout.css";
 
 export default function UserLayout() {
   const navigate = useNavigate();
+  const user = useMemo(() => getSavedUser(), []);
+
   const [menuOpen, setMenuOpen] = useState(false);
 
-  // 🔐 Standardized advisor persistence
   const [advisorOpen, setAdvisorOpen] = useState(() => {
     const saved = localStorage.getItem("user.advisor.open");
     return saved !== "false";
@@ -34,6 +39,10 @@ export default function UserLayout() {
   function closeMenu() {
     setMenuOpen(false);
   }
+
+  const subscriptionStatus = user?.subscriptionStatus || "Unknown";
+  const freedomEnabled = !!user?.freedomEnabled;
+  const autoprotectEnabled = !!user?.autoprotectEnabled;
 
   return (
     <div className={`layout-root enterprise ${menuOpen ? "sidebar-open" : ""}`}>
@@ -62,7 +71,36 @@ export default function UserLayout() {
           <NavLink to="reports" onClick={closeMenu}>
             My Reports
           </NavLink>
+
+          <hr style={{ opacity: 0.15 }} />
+
+          {/* 🔓 Freedom / Autoprotect Awareness */}
+          <div className="nav-section-label">
+            Managed Companies
+          </div>
+
+          <NavLink to="managed" onClick={closeMenu}>
+            My External Companies (Max 10)
+          </NavLink>
+
+          {!freedomEnabled && (
+            <NavLink to="/pricing" onClick={closeMenu}>
+              Activate Freedom
+            </NavLink>
+          )}
+
+          {freedomEnabled && (
+            <>
+              <NavLink to="autoprotect" onClick={closeMenu}>
+                Autoprotect (Autodev 6.5)
+              </NavLink>
+            </>
+          )}
         </nav>
+
+        <div style={{ padding: "12px 16px", fontSize: 11, opacity: 0.6 }}>
+          Subscription: {subscriptionStatus}
+        </div>
 
         <button className="btn logout-btn" onClick={logout}>
           Log out
@@ -88,7 +126,10 @@ export default function UserLayout() {
               title="Advisor"
               getContext={() => ({
                 role: "individual",
-                scope: "individual-only",
+                scope: "individual-control",
+                freedom: freedomEnabled,
+                autoprotect: autoprotectEnabled,
+                subscription: subscriptionStatus,
                 location: window.location.pathname,
               })}
             />
