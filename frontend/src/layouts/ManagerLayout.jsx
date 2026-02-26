@@ -3,6 +3,7 @@
 // Enforcement visibility layer
 // Admin supersedes Manager
 // No override authority
+// Trading = INTERNAL ONLY (Admin + Manager)
 
 import React, { useEffect, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
@@ -17,7 +18,7 @@ export default function ManagerLayout() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [oversightOpen, setOversightOpen] = useState(true);
 
-  // 🔐 Standardized advisor persistence (same pattern as Admin)
+  // 🔐 Advisor persistence
   const [advisorOpen, setAdvisorOpen] = useState(() => {
     const saved = localStorage.getItem("manager.advisor.open");
     return saved !== "false";
@@ -117,11 +118,12 @@ export default function ManagerLayout() {
 
           <hr style={{ opacity: 0.18 }} />
 
-          {/* ===== TRADING ===== */}
+          {/* ===== INTERNAL TRADING (PRIVATE) ===== */}
           <div className="nav-section-label">
-            Trading Oversight
+            Internal Trading
           </div>
 
+          {/* Route must exist in App.jsx under /manager/* */}
           <NavLink to="trading" onClick={closeMenu}>
             Market Activity
           </NavLink>
