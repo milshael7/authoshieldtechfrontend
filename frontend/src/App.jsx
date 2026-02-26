@@ -50,7 +50,7 @@ import RiskMonitor from "./pages/RiskMonitor.jsx";
 import SessionMonitor from "./pages/SessionMonitor.jsx";
 import DeviceIntegrityPanel from "./pages/DeviceIntegrityPanel.jsx";
 
-/* 🔒 INTERNAL TRADING (placeholder for now) */
+/* INTERNAL TRADING */
 import TradingRoom from "./pages/TradingRoom.jsx";
 
 /* ================= AUTH GUARDS ================= */
@@ -210,16 +210,14 @@ export default function App() {
 
         setUser(storedUser);
 
-        const res = await fetch(
-          `${import.meta.env.VITE_API_BASE}/api/auth/refresh`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
+        /* 🔥 SAME-ORIGIN SAFE REFRESH */
+        const res = await fetch("/api/auth/refresh", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        });
 
         if (!res.ok) throw new Error();
 
