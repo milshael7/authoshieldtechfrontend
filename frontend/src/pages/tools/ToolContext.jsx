@@ -1,22 +1,26 @@
-import React, { createContext, useContext, useEffect, useState, useRef } from "react";
+// frontend/src/pages/tools/ToolContext.jsx
+// Enterprise Tools Governance Context
+// v4 — Single Source of Truth • App-Aligned User • 401 Storm Guard • Drift Eliminated
+
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  useRef,
+} from "react";
 import {
   getToken,
-  getSavedUser,
   clearToken,
   clearUser,
 } from "../../lib/api.js";
 
-/*
-  Enterprise Tools Governance Context
-  v3 — Token Safe • 401 Storm Guard • Drift Safe • Auto Sync Hardened
-*/
-
 const ToolContext = createContext(null);
 
-export function ToolProvider({ children }) {
+export function ToolProvider({ user, children }) {
   const [loading, setLoading] = useState(true);
 
-  const [user, setUser] = useState(null);
+  // User now comes from App (single source of truth)
   const [tools, setTools] = useState([]);
   const [myRequests, setMyRequests] = useState([]);
   const [inbox, setInbox] = useState([]);
@@ -24,11 +28,10 @@ export function ToolProvider({ children }) {
 
   const base = import.meta.env.VITE_API_BASE?.replace(/\/+$/, "");
 
-  // Prevent multiple forced redirects
   const redirectingRef = useRef(false);
 
   /* =========================================================
-     SAFE FETCH WRAPPER (HARDENED)
+     SAFE FETCH
   ========================================================= */
 
   async function safeFetch(url, options = {}) {
@@ -38,7 +41,6 @@ export function ToolProvider({ children }) {
       ...(options.headers || {}),
     };
 
-    // Only attach Authorization if token exists
     if (token) {
       headers.Authorization = `Bearer ${token}`;
     }
@@ -51,13 +53,10 @@ export function ToolProvider({ children }) {
     if (res.status === 401) {
       if (!redirectingRef.current) {
         redirectingRef.current = true;
-
         clearToken();
         clearUser();
-
         window.location.href = "/login";
       }
-
       return null;
     }
 
@@ -65,16 +64,7 @@ export function ToolProvider({ children }) {
   }
 
   /* =========================================================
-     LOAD USER
-  ========================================================= */
-
-  function loadUser() {
-    const stored = getSavedUser();
-    if (stored) setUser(stored);
-  }
-
-  /* =========================================================
-     LOAD TOOL CATALOG
+     DATA LOADERS
   ========================================================= */
 
   async function loadTools() {
@@ -85,10 +75,6 @@ export function ToolProvider({ children }) {
     if (data.ok) setTools(data.tools || []);
   }
 
-  /* =========================================================
-     LOAD MY REQUESTS
-  ========================================================= */
-
   async function loadMyRequests() {
     const res = await safeFetch(`${base}/api/tools/requests/mine`);
     if (!res || !res.ok) return;
@@ -97,10 +83,6 @@ export function ToolProvider({ children }) {
     if (data.ok) setMyRequests(data.requests || []);
   }
 
-  /* =========================================================
-     LOAD INBOX
-  ========================================================= */
-
   async function loadInbox() {
     const res = await safeFetch(`${base}/api/tools/requests/inbox`);
     if (!res || !res.ok) return;
@@ -108,10 +90,6 @@ export function ToolProvider({ children }) {
     const data = await res.json();
     if (data.ok) setInbox(data.inbox || []);
   }
-
-  /* =========================================================
-     LOAD AUTODEV STATUS
-  ========================================================= */
 
   async function loadAutodev() {
     const res = await safeFetch(`${base}/api/autoprotect/status`);
@@ -143,32 +121,35 @@ export function ToolProvider({ children }) {
   }
 
   /* =========================================================
-     INITIALIZE
+     INITIALIZE (runs when user changes)
   ========================================================= */
 
-  async function initialize() {
-    setLoading(true);
-
-    loadUser();
-    await loadTools();
-    await loadMyRequests();
-    await loadInbox();
-    await loadAutodev();
-
-    setLoading(false);
-  }
-
   useEffect(() => {
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+
+    async function initialize() {
+      setLoading(true);
+
+      await loadTools();
+      await loadMyRequests();
+      await loadInbox();
+      await loadAutodev();
+
+      setLoading(false);
+    }
+
     initialize();
 
-    // Auto-refresh every 30s (grant expiration sync)
     const interval = setInterval(() => {
       loadTools();
       loadMyRequests();
     }, 30000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [user]);
 
   /* =========================================================
      HELPERS
@@ -211,15 +192,15 @@ export function ToolProvider({ children }) {
   }
 
   function isCompany() {
-    return normalizeRole() === "company" ||
-           normalizeRole() === "small_company";
+    return (
+      normalizeRole() === "company" ||
+      normalizeRole() === "small_company"
+    );
   }
 
   function isIndividual() {
     return normalizeRole() === "individual";
   }
-
-  /* ========================================================= */
 
   return (
     <ToolContext.Provider
@@ -231,7 +212,15 @@ export function ToolProvider({ children }) {
         inbox,
         autodev,
 
-        refresh: initialize,
+        refresh: () => {
+          if (user) {
+            loadTools();
+            loadMyRequests();
+            loadInbox();
+            loadAutodev();
+          }
+        },
+
         requestTool,
 
         hasToolAccess,
