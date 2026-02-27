@@ -1,6 +1,7 @@
 /* =========================================================
-   AUTOSHIELD FRONTEND API LAYER — ENTERPRISE v3
+   AUTOSHIELD FRONTEND API LAYER — ENTERPRISE v4
    Deterministic Status Handling • Drift Safe • Retry Aware
+   Global Enforcement Integrated
 ========================================================= */
 
 const API_BASE = import.meta.env.VITE_API_BASE?.trim();
@@ -47,7 +48,9 @@ export function clearUser() {
 /* ================= UTIL ================= */
 
 function joinUrl(base, path) {
-  return `${String(base).replace(/\/+$/, "")}${path.startsWith("/") ? path : `/${path}`}`;
+  return `${String(base).replace(/\/+$/, "")}${
+    path.startsWith("/") ? path : `/${path}`
+  }`;
 }
 
 async function fetchWithTimeout(url, options = {}, ms = REQUEST_TIMEOUT) {
@@ -57,6 +60,16 @@ async function fetchWithTimeout(url, options = {}, ms = REQUEST_TIMEOUT) {
     return await fetch(url, { ...options, signal: controller.signal });
   } finally {
     clearTimeout(id);
+  }
+}
+
+/* ================= ENFORCEMENT DISPATCH ================= */
+
+function dispatchEnforcement(type) {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(
+      new CustomEvent("as:enforcement", { detail: type })
+    );
   }
 }
 
@@ -85,6 +98,7 @@ async function attemptRefresh() {
     if (!res.ok) return false;
 
     const data = await res.json();
+
     if (data?.token && data?.user) {
       setToken(data.token);
       saveUser(data.user);
@@ -124,7 +138,7 @@ async function req(
     data = await res.json();
   } catch {}
 
-  /* ===== 401 HANDLING ===== */
+  /* ================= 401 ================= */
   if (res.status === 401 && auth) {
     if (retry) {
       const refreshed = await attemptRefresh();
@@ -135,16 +149,19 @@ async function req(
 
     clearToken();
     clearUser();
+    dispatchEnforcement("SESSION_EXPIRED");
     throw new Error("SESSION_EXPIRED");
   }
 
-  /* ===== 403 HANDLING ===== */
+  /* ================= 403 ================= */
   if (res.status === 403) {
+    dispatchEnforcement("FORBIDDEN");
     throw new Error("FORBIDDEN");
   }
 
-  /* ===== 429 HANDLING ===== */
+  /* ================= 429 ================= */
   if (res.status === 429) {
+    dispatchEnforcement("RATE_LIMITED");
     throw new Error("RATE_LIMITED");
   }
 
