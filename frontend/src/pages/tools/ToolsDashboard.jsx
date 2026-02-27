@@ -1,9 +1,10 @@
 // frontend/src/pages/tools/ToolsDashboard.jsx
-// Enterprise Tools Control Center
-// Fully aligned with backend v4 Tool Governance
+// Enterprise Tools Control Center — Hardened v2
+// Backend v5 Aligned • Subscription Aware • Grant Countdown • Locked Overlay
 
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { useTools } from "./ToolContext.jsx";
+import { getSavedUser } from "../../lib/api.js";
 
 function statusColor(status) {
   switch (status) {
@@ -20,6 +21,19 @@ function statusColor(status) {
   }
 }
 
+function timeRemaining(expiresAt) {
+  if (!expiresAt) return null;
+  const diff = new Date(expiresAt).getTime() - Date.now();
+  if (diff <= 0) return "Expired";
+
+  const mins = Math.floor(diff / 60000);
+  const hours = Math.floor(mins / 60);
+  const minutes = mins % 60;
+
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  return `${minutes}m`;
+}
+
 export default function ToolsDashboard() {
   const {
     loading,
@@ -31,7 +45,15 @@ export default function ToolsDashboard() {
     toolRequiresApproval,
   } = useTools();
 
+  const user = getSavedUser();
   const [requesting, setRequesting] = useState(null);
+  const [tick, setTick] = useState(0);
+
+  // Live countdown refresh
+  useEffect(() => {
+    const i = setInterval(() => setTick((t) => t + 1), 60000);
+    return () => clearInterval(i);
+  }, []);
 
   const requestMap = useMemo(() => {
     const map = {};
@@ -57,7 +79,7 @@ export default function ToolsDashboard() {
         padding: 30,
         display: "flex",
         flexDirection: "column",
-        gap: 24,
+        gap: 28,
       }}
     >
       <div className="sectionTitle">Enterprise Tools Center</div>
@@ -72,82 +94,91 @@ export default function ToolsDashboard() {
         const activeGrant = hasActiveGrant(tool.id);
         const request = requestMap[tool.id];
 
+        const subscriptionLocked =
+          user?.subscriptionStatus === "Locked" ||
+          user?.subscriptionStatus === "Past Due";
+
+        const fullyBlocked = !access && !request;
+
         return (
           <div
             key={tool.id}
             style={{
-              padding: 20,
+              position: "relative",
+              padding: 22,
               border: "1px solid rgba(255,255,255,.08)",
-              borderRadius: 12,
+              borderRadius: 14,
               display: "flex",
               flexDirection: "column",
-              gap: 12,
+              gap: 14,
               background: "rgba(255,255,255,.02)",
             }}
           >
-            {/* Header */}
+            {/* LOCK OVERLAY */}
+            {fullyBlocked && (
+              <div
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  background: "rgba(0,0,0,.55)",
+                  borderRadius: 14,
+                  pointerEvents: "none",
+                }}
+              />
+            )}
+
+            {/* HEADER */}
             <div style={{ display: "flex", justifyContent: "space-between" }}>
               <div>
-                <div style={{ fontSize: 16, fontWeight: 700 }}>
+                <div style={{ fontSize: 17, fontWeight: 700 }}>
                   {tool.name}
                 </div>
-                <div style={{ fontSize: 13, opacity: 0.6 }}>
+
+                <div style={{ fontSize: 13, opacity: 0.65 }}>
                   {tool.description}
                 </div>
               </div>
 
               <div
                 style={{
-                  fontSize: 12,
-                  padding: "4px 10px",
+                  fontSize: 11,
+                  padding: "5px 12px",
                   borderRadius: 999,
                   background:
                     tool.tier === "enterprise"
-                      ? "rgba(255,77,79,.2)"
+                      ? "rgba(255,77,79,.25)"
                       : tool.tier === "paid"
-                      ? "rgba(250,204,21,.2)"
-                      : "rgba(34,197,94,.2)",
+                      ? "rgba(250,204,21,.25)"
+                      : "rgba(34,197,94,.25)",
                 }}
               >
                 {tool.tier?.toUpperCase()}
               </div>
             </div>
 
-            {/* Status Area */}
+            {/* STATUS CHIPS */}
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
               {access && (
-                <div
-                  style={{
-                    fontSize: 12,
-                    color: "#22c55e",
-                    fontWeight: 600,
-                  }}
-                >
+                <div style={{ fontSize: 12, color: "#22c55e", fontWeight: 600 }}>
                   ✔ Accessible
                 </div>
               )}
 
               {requiresApproval && !activeGrant && (
-                <div
-                  style={{
-                    fontSize: 12,
-                    color: "#facc15",
-                    fontWeight: 600,
-                  }}
-                >
+                <div style={{ fontSize: 12, color: "#facc15", fontWeight: 600 }}>
                   ⚠ Requires Approval
                 </div>
               )}
 
               {activeGrant && (
-                <div
-                  style={{
-                    fontSize: 12,
-                    color: "#22c55e",
-                    fontWeight: 600,
-                  }}
-                >
+                <div style={{ fontSize: 12, color: "#22c55e", fontWeight: 600 }}>
                   ⏳ Active Grant
+                </div>
+              )}
+
+              {tool.dangerous && (
+                <div style={{ fontSize: 12, color: "#ff4d4f", fontWeight: 600 }}>
+                  ⚠ Dangerous
                 </div>
               )}
 
@@ -162,17 +193,24 @@ export default function ToolsDashboard() {
                   {request.status.replace("_", " ").toUpperCase()}
                 </div>
               )}
+
+              {subscriptionLocked && (
+                <div style={{ fontSize: 12, color: "#ff4d4f", fontWeight: 600 }}>
+                  Subscription Locked
+                </div>
+              )}
             </div>
 
-            {/* Actions */}
+            {/* ACTIONS */}
             <div style={{ marginTop: 6 }}>
-              {access ? (
+              {subscriptionLocked ? (
+                <button className="btn small muted" disabled>
+                  Subscription Required
+                </button>
+              ) : access ? (
                 <button className="btn small">Open Tool</button>
               ) : request ? (
-                <button
-                  className="btn small muted"
-                  disabled
-                >
+                <button className="btn small muted" disabled>
                   Request Pending
                 </button>
               ) : (
