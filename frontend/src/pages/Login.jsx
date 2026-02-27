@@ -1,10 +1,7 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { api, setToken, saveUser } from "../lib/api.js";
 
 export default function Login() {
-  const navigate = useNavigate();
-
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [mode, setMode] = useState("login");
@@ -26,12 +23,11 @@ export default function Login() {
         throw new Error("Invalid login response from server");
       }
 
-      // Save session
       setToken(token);
       saveUser(user);
 
-      // 🔥 NO HARD RELOAD
-      navigate(redirectByRole(user.role), { replace: true });
+      // 🔥 Full platform rehydrate
+      window.location.replace(redirectByRole(user.role));
 
     } catch (err) {
       alert(err?.message || "Login failed");
