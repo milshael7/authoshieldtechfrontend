@@ -1,23 +1,17 @@
 // frontend/src/layouts/UserLayout.jsx
-// Individual User Layout — FREEDOM + AUTOPROTECT CONTROL
-// Can Manage Up To 10 External Companies
-// Autoprotect Enabled When Freedom Active
-// Unified Advisor Architecture
+// Individual User Layout — Context Aligned v2
+// Single Source of Truth • Drift Eliminated • Clean Logout
 
-import React, { useEffect, useMemo, useState } from "react";
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import {
-  clearToken,
-  clearUser,
-  getSavedUser
-} from "../lib/api.js";
+import React, { useEffect, useState } from "react";
+import { NavLink, Outlet } from "react-router-dom";
+import { clearToken, clearUser } from "../lib/api.js";
+import { useTools } from "../pages/tools/ToolContext.jsx";
 import AuthoDevPanel from "../components/AuthoDevPanel.jsx";
 import Logo from "../components/Logo.jsx";
 import "../styles/layout.css";
 
 export default function UserLayout() {
-  const navigate = useNavigate();
-  const user = useMemo(() => getSavedUser(), []);
+  const { user } = useTools(); // 🔥 single source of truth
 
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -33,7 +27,7 @@ export default function UserLayout() {
   function logout() {
     clearToken();
     clearUser();
-    navigate("/login");
+    window.location.replace("/login"); // 🔥 full rehydrate
   }
 
   function closeMenu() {
@@ -74,7 +68,6 @@ export default function UserLayout() {
 
           <hr style={{ opacity: 0.15 }} />
 
-          {/* 🔓 Freedom / Autoprotect Awareness */}
           <div className="nav-section-label">
             Managed Companies
           </div>
@@ -90,11 +83,9 @@ export default function UserLayout() {
           )}
 
           {freedomEnabled && (
-            <>
-              <NavLink to="autoprotect" onClick={closeMenu}>
-                Autoprotect (Autodev 6.5)
-              </NavLink>
-            </>
+            <NavLink to="autoprotect" onClick={closeMenu}>
+              Autoprotect (Autodev 6.5)
+            </NavLink>
           )}
         </nav>
 
@@ -115,7 +106,6 @@ export default function UserLayout() {
           </section>
         </main>
 
-        {/* RIGHT ADVISOR DOCK */}
         <aside
           className={`enterprise-ai-panel ${
             advisorOpen ? "" : "collapsed"
@@ -137,10 +127,9 @@ export default function UserLayout() {
         </aside>
       </div>
 
-      {/* FLOATING TOGGLE */}
       <button
         className="advisor-fab"
-        onClick={() => setAdvisorOpen(v => !v)}
+        onClick={() => setAdvisorOpen((v) => !v)}
         title={advisorOpen ? "Close Advisor" : "Open Advisor"}
       >
         {advisorOpen ? "›" : "Advisor"}
