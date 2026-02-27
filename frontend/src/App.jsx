@@ -1,6 +1,6 @@
 // frontend/src/App.jsx
 import React, { useEffect, useState } from "react";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from "react-router-dom";
 
 import {
   getSavedUser,
@@ -51,21 +51,26 @@ import RiskMonitor from "./pages/RiskMonitor.jsx";
 import SessionMonitor from "./pages/SessionMonitor.jsx";
 import DeviceIntegrityPanel from "./pages/DeviceIntegrityPanel.jsx";
 
-/* INTERNAL TRADING */
+/* INTERNAL */
 import TradingRoom from "./pages/TradingRoom.jsx";
 
 /* ================= HELPERS ================= */
 
-function normalizeRole(role) {
-  return String(role || "").trim().toLowerCase();
+function normalize(v) {
+  return String(v || "").trim().toLowerCase();
+}
+
+function isInactiveSubscription(status) {
+  const s = normalize(status);
+  return s === "locked" || s === "past due" || s === "past_due";
 }
 
 function RoleGuard({ user, ready, allow, children }) {
   if (!ready) return null;
   if (!user) return <Navigate to="/login" replace />;
 
-  const role = normalizeRole(user.role);
-  const allowed = allow.map(normalizeRole);
+  const role = normalize(user.role);
+  const allowed = allow.map(normalize);
 
   if (!allowed.includes(role)) {
     return <Navigate to="/404" replace />;
@@ -76,14 +81,9 @@ function RoleGuard({ user, ready, allow, children }) {
 
 function SubscriptionGuard({ user, children }) {
   if (!user) return <Navigate to="/login" replace />;
-
-  if (
-    user.subscriptionStatus === "Locked" ||
-    user.subscriptionStatus === "Past Due"
-  ) {
+  if (isInactiveSubscription(user.subscriptionStatus)) {
     return <Navigate to="/pricing" replace />;
   }
-
   return children;
 }
 
@@ -203,6 +203,10 @@ export default function App() {
             Authorization: `Bearer ${token}`,
           },
         });
+
+        if (res.status === 401) {
+          throw new Error("Unauthorized");
+        }
 
         if (!res.ok) throw new Error();
 
