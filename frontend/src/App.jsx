@@ -44,8 +44,6 @@ import GlobalControl from "./pages/admin/GlobalControl.jsx";
 import AdminCompanies from "./pages/admin/AdminCompanies.jsx";
 import AuditExplorer from "./pages/admin/AuditExplorer.jsx";
 import AdminToolGovernance from "./pages/admin/AdminToolGovernance.jsx";
-
-/* 🔥 NEW — COMPANY INTELLIGENCE ROOM */
 import AdminCompanyRoom from "./pages/admin/AdminCompanyRoom.jsx";
 
 /* SECURITY */
@@ -72,7 +70,7 @@ function RoleGuard({ user, ready, allow, children }) {
   if (!ready) return null;
   if (!user) return <Navigate to="/login" replace />;
 
-  const role = normalize(user.role);
+  const role = normalize(user?.role);
   const allowed = allow.map(normalize);
 
   if (!allowed.includes(role)) {
@@ -84,7 +82,7 @@ function RoleGuard({ user, ready, allow, children }) {
 
 function SubscriptionGuard({ user, children }) {
   if (!user) return <Navigate to="/login" replace />;
-  if (isInactiveSubscription(user.subscriptionStatus)) {
+  if (isInactiveSubscription(user?.subscriptionStatus)) {
     return <Navigate to="/pricing" replace />;
   }
   return children;
@@ -116,10 +114,7 @@ function AppRoutes({ user, ready }) {
         <Route path="intelligence" element={<Intelligence />} />
         <Route path="soc" element={<SOC />} />
         <Route path="companies" element={<AdminCompanies />} />
-
-        {/* 🔥 NEW ROUTE */}
         <Route path="company/:companyId" element={<AdminCompanyRoom />} />
-
         <Route path="assets" element={<Assets />} />
         <Route path="incidents" element={<Incidents />} />
         <Route path="vulnerabilities" element={<Vulnerabilities />} />
@@ -188,7 +183,8 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [ready, setReady] = useState(false);
 
-  const base = import.meta.env.VITE_API_BASE?.replace(/\/+$/, "");
+  const base =
+    (import.meta.env.VITE_API_BASE || "").replace(/\/+$/, "");
 
   useEffect(() => {
     async function bootAuth() {
@@ -196,7 +192,7 @@ export default function App() {
         const token = getToken();
         const storedUser = getSavedUser();
 
-        if (!token || !storedUser) {
+        if (!token || !storedUser || !base) {
           setReady(true);
           return;
         }
@@ -210,10 +206,6 @@ export default function App() {
             Authorization: `Bearer ${token}`,
           },
         });
-
-        if (res.status === 401) {
-          throw new Error("Unauthorized");
-        }
 
         if (!res.ok) throw new Error();
 
@@ -236,7 +228,7 @@ export default function App() {
     }
 
     bootAuth();
-  }, []);
+  }, [base]);
 
   return (
     <CompanyProvider>
