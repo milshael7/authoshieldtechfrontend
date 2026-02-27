@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useEffect, useState, useRef } from "react";
 import {
   getToken,
   getSavedUser,
@@ -8,7 +8,7 @@ import {
 
 /*
   Enterprise Tools Governance Context
-  v2 — Subscription Aware • Drift Safe • Auto Refresh Hardened
+  v3 — Token Safe • 401 Storm Guard • Drift Safe • Auto Sync Hardened
 */
 
 const ToolContext = createContext(null);
@@ -24,23 +24,40 @@ export function ToolProvider({ children }) {
 
   const base = import.meta.env.VITE_API_BASE?.replace(/\/+$/, "");
 
+  // Prevent multiple forced redirects
+  const redirectingRef = useRef(false);
+
   /* =========================================================
-     SAFE FETCH WRAPPER
+     SAFE FETCH WRAPPER (HARDENED)
   ========================================================= */
 
   async function safeFetch(url, options = {}) {
+    const token = getToken();
+
+    const headers = {
+      ...(options.headers || {}),
+    };
+
+    // Only attach Authorization if token exists
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+
     const res = await fetch(url, {
       ...options,
-      headers: {
-        Authorization: `Bearer ${getToken()}`,
-        ...(options.headers || {}),
-      },
+      headers,
     });
 
     if (res.status === 401) {
-      clearToken();
-      clearUser();
-      window.location.href = "/login";
+      if (!redirectingRef.current) {
+        redirectingRef.current = true;
+
+        clearToken();
+        clearUser();
+
+        window.location.href = "/login";
+      }
+
       return null;
     }
 
@@ -177,10 +194,8 @@ export function ToolProvider({ children }) {
   }
 
   function subscriptionLocked() {
-    return (
-      user?.subscriptionStatus === "Locked" ||
-      user?.subscriptionStatus === "Past Due"
-    );
+    const s = String(user?.subscriptionStatus || "").toLowerCase();
+    return s === "locked" || s === "past_due";
   }
 
   function normalizeRole() {
@@ -196,10 +211,8 @@ export function ToolProvider({ children }) {
   }
 
   function isCompany() {
-    return (
-      normalizeRole() === "company" ||
-      normalizeRole() === "small_company"
-    );
+    return normalizeRole() === "company" ||
+           normalizeRole() === "small_company";
   }
 
   function isIndividual() {
@@ -212,7 +225,6 @@ export function ToolProvider({ children }) {
     <ToolContext.Provider
       value={{
         loading,
-
         user,
         tools,
         myRequests,
