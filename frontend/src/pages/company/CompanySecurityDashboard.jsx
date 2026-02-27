@@ -1,5 +1,6 @@
 // frontend/src/pages/company/CompanySecurityDashboard.jsx
 // Corporate Security Control Center + Tool Governance
+// Hardened Build-Safe Version (No Env Crash)
 
 import React, { useEffect, useMemo, useState } from "react";
 import { useSecurity } from "../../context/SecurityContext.jsx";
@@ -21,103 +22,102 @@ function subscriptionColor(status) {
 }
 
 export default function CompanySecurityDashboard() {
-  const { riskScore, assetExposure, deviceAlerts } = useSecurity();
+  const { riskScore = 0, assetExposure = {}, deviceAlerts = [] } = useSecurity();
   const user = getSavedUser();
-  const base = import.meta.env.VITE_API_BASE?.replace(/\/+$/, "");
+
+  // 🔒 SAFE ENV HANDLING
+  const rawBase = import.meta.env.VITE_API_BASE;
+  const base = rawBase ? rawBase.replace(/\/+$/, "") : "";
+
+  const token = getToken();
 
   const [incidents, setIncidents] = useState([]);
   const [seatStats, setSeatStats] = useState(null);
   const [compliance, setCompliance] = useState(null);
   const [seatRequests, setSeatRequests] = useState([]);
 
-  /* ================= LOAD SEAT REQUESTS ================= */
-  async function loadSeatRequests() {
+  /* ================= SAFE FETCH HELPER ================= */
+
+  async function safeFetch(path, options = {}) {
+    if (!base || !token) return null;
+
     try {
-      const res = await fetch(`${base}/api/tools/requests/inbox`, {
-        headers: { Authorization: `Bearer ${getToken()}` }
+      const res = await fetch(`${base}${path}`, {
+        ...options,
+        headers: {
+          ...(options.headers || {}),
+          Authorization: `Bearer ${token}`
+        }
       });
-      if (!res.ok) return;
-      const data = await res.json();
-      setSeatRequests(data.inbox || []);
-    } catch {}
+
+      if (!res.ok) return null;
+      return await res.json();
+    } catch {
+      return null;
+    }
   }
 
+  /* ================= LOAD SEAT REQUESTS ================= */
+
   useEffect(() => {
+    async function loadSeatRequests() {
+      const data = await safeFetch("/api/tools/requests/inbox");
+      if (data?.inbox) setSeatRequests(data.inbox);
+    }
     loadSeatRequests();
   }, []);
 
   async function forwardRequest(id) {
-    await fetch(`${base}/api/tools/requests/${id}/forward`, {
+    await safeFetch(`/api/tools/requests/${id}/forward`, {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${getToken()}`,
-        "Content-Type": "application/json"
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ note: "Forwarded by company review" })
     });
-    loadSeatRequests();
   }
 
   async function denyRequest(id) {
-    await fetch(`${base}/api/tools/requests/${id}/deny`, {
+    await safeFetch(`/api/tools/requests/${id}/deny`, {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${getToken()}`,
-        "Content-Type": "application/json"
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ note: "Denied by company" })
     });
-    loadSeatRequests();
   }
 
   /* ================= LOAD INCIDENTS ================= */
+
   useEffect(() => {
     async function loadIncidents() {
-      try {
-        const res = await fetch(`${base}/api/incidents`, {
-          headers: { Authorization: `Bearer ${getToken()}` }
-        });
-        if (!res.ok) return;
-        const data = await res.json();
-        setIncidents(data.incidents || []);
-      } catch {}
+      const data = await safeFetch("/api/incidents");
+      if (data?.incidents) setIncidents(data.incidents);
     }
     loadIncidents();
   }, []);
 
   /* ================= LOAD SEAT STATS ================= */
+
   useEffect(() => {
     async function loadSeats() {
-      try {
-        const res = await fetch(`${base}/api/entitlements`, {
-          headers: { Authorization: `Bearer ${getToken()}` }
-        });
-        if (!res.ok) return;
-        const data = await res.json();
-        setSeatStats(data || null);
-      } catch {}
+      const data = await safeFetch("/api/entitlements");
+      if (data) setSeatStats(data);
     }
     loadSeats();
   }, []);
 
   /* ================= LOAD COMPLIANCE ================= */
+
   useEffect(() => {
     async function loadCompliance() {
-      try {
-        const res = await fetch(`${base}/api/security/compliance`, {
-          headers: { Authorization: `Bearer ${getToken()}` }
-        });
-        if (!res.ok) return;
-        const data = await res.json();
-        setCompliance(data || null);
-      } catch {}
+      const data = await safeFetch("/api/security/compliance");
+      if (data) setCompliance(data);
     }
     loadCompliance();
   }, []);
 
+  /* ================= EXPOSURE ================= */
+
   const highExposure = useMemo(() => {
     return Object.entries(assetExposure || {})
-      .sort((a, b) => b[1] - a[1])
+      .sort((a, b) => (Number(b[1]) || 0) - (Number(a[1]) || 0))
       .slice(0, 5);
   }, [assetExposure]);
 
@@ -125,10 +125,9 @@ export default function CompanySecurityDashboard() {
 
   return (
     <div style={{ padding: 30, display: "flex", flexDirection: "column", gap: 30 }}>
-
       <div className="sectionTitle">Corporate Security Control Center</div>
 
-      {/* ================= RISK ================= */}
+      {/* RISK */}
       <div className="postureCard" style={{ border: `1px solid ${riskLevelColor}50` }}>
         <h3>Company Risk Score</h3>
         <div style={{ fontSize: 48, fontWeight: 900, color: riskLevelColor }}>
@@ -136,7 +135,7 @@ export default function CompanySecurityDashboard() {
         </div>
       </div>
 
-      {/* ================= SUBSCRIPTION ================= */}
+      {/* SUBSCRIPTION */}
       <div className="postureCard">
         <h3>Subscription Status</h3>
         <div style={{ fontWeight: 700, color: subscriptionColor(user?.subscriptionStatus) }}>
@@ -144,7 +143,7 @@ export default function CompanySecurityDashboard() {
         </div>
       </div>
 
-      {/* ================= SEAT TOOL REQUESTS ================= */}
+      {/* SEAT REQUESTS */}
       <div className="postureCard">
         <h3>Seat Tool Requests</h3>
 
@@ -152,19 +151,13 @@ export default function CompanySecurityDashboard() {
           <div className="muted">No pending seat requests.</div>
         ) : (
           seatRequests.map(r => (
-            <div
-              key={r.id}
-              style={{
-                padding: 12,
-                marginBottom: 10,
-                border: "1px solid rgba(255,255,255,.08)",
-                borderRadius: 8
-              }}
-            >
-              <div style={{ fontWeight: 600 }}>
-                {r.toolName}
-              </div>
-
+            <div key={r.id} style={{
+              padding: 12,
+              marginBottom: 10,
+              border: "1px solid rgba(255,255,255,.08)",
+              borderRadius: 8
+            }}>
+              <div style={{ fontWeight: 600 }}>{r.toolName}</div>
               <div style={{ fontSize: 12, opacity: 0.6 }}>
                 Requested By: {r.requestedBy}
               </div>
@@ -176,13 +169,9 @@ export default function CompanySecurityDashboard() {
               )}
 
               <div style={{ marginTop: 8 }}>
-                <button
-                  className="btn small"
-                  onClick={() => forwardRequest(r.id)}
-                >
+                <button className="btn small" onClick={() => forwardRequest(r.id)}>
                   Forward
                 </button>
-
                 <button
                   className="btn small muted"
                   style={{ marginLeft: 8 }}
@@ -196,21 +185,19 @@ export default function CompanySecurityDashboard() {
         )}
       </div>
 
-      {/* ================= INCIDENTS ================= */}
+      {/* INCIDENTS */}
       <div className="postureCard">
         <h3>Active Incidents</h3>
         {incidents.length === 0 ? (
           <div className="muted">No active incidents.</div>
         ) : (
-          incidents.slice(0, 5).map(incident => (
-            <div key={incident.id}>
-              <b>{incident.title}</b>
-            </div>
+          incidents.slice(0, 5).map(i => (
+            <div key={i.id}><b>{i.title}</b></div>
           ))
         )}
       </div>
 
-      {/* ================= DEVICE ALERTS ================= */}
+      {/* DEVICE ALERTS */}
       <div className="postureCard">
         <h3>Recent Device Alerts</h3>
         {deviceAlerts.length === 0 ? (
@@ -218,13 +205,13 @@ export default function CompanySecurityDashboard() {
         ) : (
           deviceAlerts.slice(0, 5).map((alert, i) => (
             <div key={i}>
-              {alert.deviceName || "Device"} — {alert.message}
+              {alert?.deviceName || "Device"} — {alert?.message || ""}
             </div>
           ))
         )}
       </div>
 
-      {/* ================= EXPOSURE ================= */}
+      {/* EXPOSURE */}
       <div className="postureCard">
         <h3>Top Exposure Assets</h3>
         {highExposure.length === 0 ? (
@@ -238,19 +225,18 @@ export default function CompanySecurityDashboard() {
         )}
       </div>
 
-      {/* ================= COMPLIANCE ================= */}
+      {/* COMPLIANCE */}
       <div className="postureCard">
         <h3>Compliance Overview</h3>
         {compliance ? (
           <div>
-            <div>Score: <b>{compliance.score}</b></div>
-            <div>Status: <b>{compliance.status}</b></div>
+            <div>Score: <b>{compliance?.score ?? 0}</b></div>
+            <div>Status: <b>{compliance?.status ?? "Unknown"}</b></div>
           </div>
         ) : (
           <div className="muted">Compliance data unavailable.</div>
         )}
       </div>
-
     </div>
   );
 }
