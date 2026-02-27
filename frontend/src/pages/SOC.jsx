@@ -1,11 +1,23 @@
-import React, { useEffect, useRef, useState } from "react";
-import { api, getToken } from "../lib/api";
+import React, { useEffect, useRef, useState, useMemo } from "react";
+import { api } from "../lib/api";
+import { useSecurity } from "../context/SecurityContext";
+
+/* =========================================================
+   ENTERPRISE SOC COMMAND CONSOLE — v2
+   Context-Aligned • Zero WS Duplication • Risk Adaptive
+========================================================= */
 
 export default function SOC() {
+  const {
+    wsStatus,
+    riskScore,
+    auditFeed,
+    deviceAlerts,
+  } = useSecurity();
+
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [connected, setConnected] = useState(false);
-  const wsRef = useRef(null);
+
   const canvasRef = useRef(null);
 
   const [stats, setStats] = useState({
@@ -16,7 +28,6 @@ export default function SOC() {
   });
 
   const [threatIndex, setThreatIndex] = useState(0);
-  const [adaptiveRisk, setAdaptiveRisk] = useState(0);
   const [riskHistory, setRiskHistory] = useState([]);
 
   /* ================= INITIAL LOAD ================= */
@@ -24,7 +35,7 @@ export default function SOC() {
   useEffect(() => {
     async function loadInitial() {
       try {
-        const res = await api.securityEvents(100);
+        const res = await api.securityEvents();
         const list = res?.events || [];
         const sorted = sortEvents(list);
         setEvents(sorted);
@@ -37,66 +48,28 @@ export default function SOC() {
     loadInitial();
   }, []);
 
-  /* ================= WEBSOCKET ================= */
+  /* ================= LIVE RISK TRACKING ================= */
 
   useEffect(() => {
-    const token = getToken();
-    if (!token) return;
+    if (typeof riskScore !== "number") return;
 
-    const wsUrl = `${import.meta.env.VITE_API_BASE.replace(/^http/, "ws")}/ws/market?token=${token}`;
-    const ws = new WebSocket(wsUrl);
-    wsRef.current = ws;
+    setRiskHistory((prev) => {
+      const updated = [...prev, riskScore];
+      if (updated.length > 60) updated.shift();
+      return updated;
+    });
+  }, [riskScore]);
 
-    ws.onopen = () => setConnected(true);
-    ws.onclose = () => setConnected(false);
-    ws.onerror = () => setConnected(false);
-
-    ws.onmessage = (msg) => {
-      try {
-        const data = JSON.parse(msg.data);
-
-        if (data.type === "security_event") {
-          setEvents((prev) => {
-            const exists = prev.find((e) => e.id === data.event.id);
-            if (exists) return prev;
-
-            const updated = sortEvents([data.event, ...prev]).slice(0, 200);
-            computeStats(updated);
-            computeThreatIndex(updated);
-            return updated;
-          });
-        }
-
-        if (data.type === "risk_update") {
-          const score = data.riskScore || 0;
-          setAdaptiveRisk(score);
-
-          setRiskHistory((prev) => {
-            const updated = [...prev, score];
-            if (updated.length > 50) updated.shift();
-            return updated;
-          });
-        }
-
-      } catch {}
-    };
-
-    return () => ws.close();
-  }, []);
-
-  /* ================= DRAW GRAPH ================= */
+  /* ================= DRAW RISK GRAPH ================= */
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext("2d");
 
+    const ctx = canvas.getContext("2d");
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     if (riskHistory.length < 2) return;
-
-    const max = 100;
-    const min = 0;
 
     const width = canvas.width;
     const height = canvas.height;
@@ -107,14 +80,13 @@ export default function SOC() {
 
     riskHistory.forEach((value, index) => {
       const x = (index / (riskHistory.length - 1)) * width;
-      const y = height - ((value - min) / (max - min)) * height;
+      const y = height - (value / 100) * height;
 
       if (index === 0) ctx.moveTo(x, y);
       else ctx.lineTo(x, y);
     });
 
     ctx.stroke();
-
   }, [riskHistory]);
 
   /* ================= ACKNOWLEDGE ================= */
@@ -132,9 +104,7 @@ export default function SOC() {
       setEvents(updated);
       computeStats(updated);
       computeThreatIndex(updated);
-    } catch {
-      alert("Failed to acknowledge event.");
-    }
+    } catch {}
   }
 
   /* ================= STATS ================= */
@@ -166,22 +136,22 @@ export default function SOC() {
     setThreatIndex(score);
   }
 
-  function levelFromScore(score) {
-    if (score >= 75) return { label: "CRITICAL", color: "#ff3b30" };
-    if (score >= 50) return { label: "ELEVATED", color: "#ff9500" };
-    if (score >= 25) return { label: "MODERATE", color: "#f5b400" };
-    return { label: "LOW", color: "#16c784" };
-  }
+  const localRisk = levelFromScore(threatIndex);
+  const adaptiveRisk = levelFromScore(riskScore || 0);
+
+  const connected = wsStatus === "connected";
+
+  const recentAudit = useMemo(() => {
+    return auditFeed.slice(0, 8);
+  }, [auditFeed]);
 
   if (loading) return <div style={{ padding: 28 }}>Loading SOC…</div>;
-
-  const localRisk = levelFromScore(threatIndex);
-  const aiRisk = levelFromScore(adaptiveRisk);
 
   return (
     <div style={{ padding: 28 }}>
       <div style={{ display: "flex", justifyContent: "space-between" }}>
         <h2>Security Operations Center</h2>
+
         <div
           style={{
             fontSize: 12,
@@ -196,7 +166,8 @@ export default function SOC() {
         </div>
       </div>
 
-      {/* Executive Panel */}
+      {/* ================= EXECUTIVE PANEL ================= */}
+
       <div
         style={{
           marginTop: 24,
@@ -215,12 +186,21 @@ export default function SOC() {
         </div>
 
         <div style={{ display: "flex", gap: 40 }}>
-          <RiskCard title="Event Threat Index" score={threatIndex} risk={localRisk} />
-          <RiskCard title="Adaptive AI Risk" score={adaptiveRisk} risk={aiRisk} />
+          <RiskCard
+            title="Event Threat Index"
+            score={threatIndex}
+            risk={localRisk}
+          />
+          <RiskCard
+            title="Adaptive AI Risk"
+            score={riskScore || 0}
+            risk={adaptiveRisk}
+          />
         </div>
       </div>
 
-      {/* Risk Trend Graph */}
+      {/* ================= RISK TREND ================= */}
+
       <div
         style={{
           marginTop: 24,
@@ -235,16 +215,73 @@ export default function SOC() {
 
         <canvas
           ref={canvasRef}
-          width={800}
-          height={200}
-          style={{ width: "100%", height: 200 }}
+          width={900}
+          height={220}
+          style={{ width: "100%", height: 220 }}
         />
       </div>
 
-      {/* Event List */}
-      <div style={{ marginTop: 28, display: "flex", flexDirection: "column", gap: 14 }}>
+      {/* ================= DEVICE ALERTS ================= */}
+
+      {deviceAlerts.length > 0 && (
+        <div
+          style={{
+            marginTop: 28,
+            padding: 18,
+            borderRadius: 12,
+            background: "rgba(255,59,48,.08)",
+            border: "1px solid rgba(255,59,48,.4)",
+          }}
+        >
+          <div style={{ fontWeight: 700, marginBottom: 8 }}>
+            Device Anomalies Detected
+          </div>
+
+          {deviceAlerts.slice(0, 5).map((d, i) => (
+            <div key={i} style={{ fontSize: 13, opacity: 0.8 }}>
+              {JSON.stringify(d)}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ================= RECENT AUDIT ================= */}
+
+      <div style={{ marginTop: 28 }}>
+        <div style={{ fontWeight: 600, marginBottom: 12 }}>
+          Recent Enforcement Activity
+        </div>
+
+        {recentAudit.map((a) => (
+          <div
+            key={a.id}
+            style={{
+              padding: 12,
+              marginBottom: 8,
+              borderRadius: 8,
+              background: "rgba(255,255,255,.04)",
+              fontSize: 12,
+            }}
+          >
+            <div style={{ opacity: 0.6 }}>
+              {new Date(a.ts).toLocaleString()}
+            </div>
+            <div>{a.action}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* ================= EVENTS ================= */}
+
+      <div style={{ marginTop: 28 }}>
+        <div style={{ fontWeight: 600, marginBottom: 12 }}>
+          Security Events
+        </div>
+
         {events.length === 0 && (
-          <div style={{ opacity: 0.5 }}>No security events detected.</div>
+          <div style={{ opacity: 0.5 }}>
+            No security events detected.
+          </div>
         )}
 
         {events.map((e) => (
@@ -255,13 +292,18 @@ export default function SOC() {
               borderRadius: 10,
               background: "rgba(255,255,255,.05)",
               borderLeft: `4px solid ${severityColor(e.severity)}`,
+              marginBottom: 12,
               opacity: e.acknowledged ? 0.6 : 1,
             }}
           >
-            <div style={{ fontWeight: 600 }}>{e.title || "Security Event"}</div>
+            <div style={{ fontWeight: 600 }}>
+              {e.title || "Security Event"}
+            </div>
 
             <div style={{ fontSize: 12, opacity: 0.6 }}>
-              {new Date(e.timestamp || e.createdAt || Date.now()).toLocaleString()}
+              {new Date(
+                e.timestamp || e.createdAt || Date.now()
+              ).toLocaleString()}
             </div>
 
             <div style={{ marginTop: 6 }}>
@@ -347,4 +389,11 @@ function RiskCard({ title, score, risk }) {
       </div>
     </div>
   );
+}
+
+function levelFromScore(score) {
+  if (score >= 75) return { label: "CRITICAL", color: "#ff3b30" };
+  if (score >= 50) return { label: "ELEVATED", color: "#ff9500" };
+  if (score >= 25) return { label: "MODERATE", color: "#f5b400" };
+  return { label: "LOW", color: "#16c784" };
 }
