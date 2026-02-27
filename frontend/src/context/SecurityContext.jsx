@@ -1,4 +1,7 @@
 // frontend/src/context/SecurityContext.jsx
+// Security Context — Production Hardened v2
+// API_BASE Aware • WS Stable • Backoff Safe • Token Sync Efficient
+
 import React, {
   createContext,
   useContext,
@@ -25,32 +28,38 @@ function safeJsonParse(s) {
 }
 
 export function SecurityProvider({ children }) {
-  // Global system flag (secure/compromised)
+  const API_BASE = import.meta.env.VITE_API_BASE?.replace(/\/+$/, "");
+
   const [systemStatus, setSystemStatus] = useState("secure");
-
-  // Global last-seen integrity alert (if any)
   const [integrityAlert, setIntegrityAlert] = useState(null);
-
-  // Multi-tenant aware maps (companyId => data)
   const [riskByCompany, setRiskByCompany] = useState({});
   const [exposureByCompany, setExposureByCompany] = useState({});
-
-  // Optional local feeds (UI-friendly)
   const [auditFeed, setAuditFeed] = useState([]);
   const [deviceAlerts, setDeviceAlerts] = useState([]);
-
-  // Connection state
-  const [wsStatus, setWsStatus] = useState("disconnected"); // connecting | connected | disconnected
+  const [wsStatus, setWsStatus] = useState("disconnected");
 
   const socketRef = useRef(null);
   const reconnectTimer = useRef(null);
   const backoffRef = useRef({
     attempt: 0,
     nextDelayMs: 1200,
-    lastConnectAt: 0,
   });
 
   const tokenRef = useRef(getToken() || null);
+
+  /* ================= URL DERIVATION ================= */
+
+  function buildWsUrl(token) {
+    if (!API_BASE) return null;
+
+    const httpUrl = new URL(API_BASE);
+    const protocol = httpUrl.protocol === "https:" ? "wss:" : "ws:";
+    return `${protocol}//${httpUrl.host}/ws/market?token=${encodeURIComponent(
+      token
+    )}`;
+  }
+
+  /* ================= CLEANUP ================= */
 
   const clearReconnect = () => {
     if (reconnectTimer.current) {
@@ -61,74 +70,74 @@ export function SecurityProvider({ children }) {
 
   const closeSocket = useCallback(() => {
     clearReconnect();
+
     if (socketRef.current) {
       try {
-        socketRef.current.onopen = null;
-        socketRef.current.onmessage = null;
-        socketRef.current.onerror = null;
-        socketRef.current.onclose = null;
         socketRef.current.close();
       } catch {}
       socketRef.current = null;
     }
+
     setWsStatus("disconnected");
   }, []);
+
+  /* ================= BACKOFF ================= */
 
   const scheduleReconnect = useCallback(() => {
     clearReconnect();
 
     backoffRef.current.attempt += 1;
 
-    // exponential-ish backoff with cap
-    const base = Math.min(15000, Math.round(backoffRef.current.nextDelayMs));
+    const base = Math.min(15000, backoffRef.current.nextDelayMs);
     const jitter = Math.floor(Math.random() * 400);
     const delay = base + jitter;
 
-    // grow delay for next time
-    backoffRef.current.nextDelayMs = Math.min(20000, base * 1.35 + 250);
+    backoffRef.current.nextDelayMs = Math.min(
+      20000,
+      base * 1.4 + 300
+    );
 
     reconnectTimer.current = setTimeout(() => {
       connectSocket();
     }, delay);
   }, []);
 
+  /* ================= MESSAGE HANDLER ================= */
+
   const handleMessage = useCallback((raw) => {
     const data = typeof raw === "string" ? safeJsonParse(raw) : raw;
     if (!data || !data.type) return;
 
-    // default bucket
     const companyId = String(data.companyId || "global");
 
     switch (data.type) {
-      case "risk_update": {
-        const score = Number(data.riskScore || 0);
+      case "risk_update":
         setRiskByCompany((prev) => ({
           ...prev,
           [companyId]: {
-            riskScore: score,
+            riskScore: Number(data.riskScore || 0),
             updatedAt: now(),
           },
         }));
-        return;
-      }
+        break;
 
-      case "asset_exposure_update": {
-        const exposure = data.exposure && typeof data.exposure === "object" ? data.exposure : {};
+      case "asset_exposure_update":
         setExposureByCompany((prev) => ({
           ...prev,
           [companyId]: {
-            exposure,
+            exposure:
+              data.exposure && typeof data.exposure === "object"
+                ? data.exposure
+                : {},
             updatedAt: now(),
           },
         }));
-        return;
-      }
+        break;
 
-      case "integrity_alert": {
+      case "integrity_alert":
         setIntegrityAlert(data);
         setSystemStatus("compromised");
 
-        // also push into auditFeed for visibility
         setAuditFeed((prev) =>
           [
             {
@@ -140,13 +149,14 @@ export function SecurityProvider({ children }) {
             ...prev,
           ].slice(0, 150)
         );
-        return;
-      }
+        break;
 
       default:
-        return;
+        break;
     }
   }, []);
+
+  /* ================= CONNECT ================= */
 
   const connectSocket = useCallback(() => {
     const token = getToken();
@@ -157,19 +167,14 @@ export function SecurityProvider({ children }) {
       return;
     }
 
-    // If already connected/connecting, don’t duplicate
-    if (socketRef.current && (wsStatus === "connected" || wsStatus === "connecting")) {
+    if (socketRef.current && wsStatus !== "disconnected") {
       return;
     }
 
+    const wsUrl = buildWsUrl(token);
+    if (!wsUrl) return;
+
     setWsStatus("connecting");
-
-    const protocol = window.location.protocol === "https:" ? "wss" : "ws";
-    const wsUrl = `${protocol}://${window.location.host}/ws/market?token=${encodeURIComponent(
-      token
-    )}`;
-
-    backoffRef.current.lastConnectAt = now();
 
     let socket;
     try {
@@ -184,7 +189,6 @@ export function SecurityProvider({ children }) {
       setWsStatus("connected");
       backoffRef.current.attempt = 0;
       backoffRef.current.nextDelayMs = 1200;
-      console.log("[SECURITY SOCKET] Connected");
     };
 
     socket.onmessage = (event) => {
@@ -198,23 +202,23 @@ export function SecurityProvider({ children }) {
     };
 
     socket.onclose = () => {
-      setWsStatus("disconnected");
       socketRef.current = null;
-      console.log("[SECURITY SOCKET] Disconnected. Reconnecting...");
+      setWsStatus("disconnected");
       scheduleReconnect();
     };
 
     socketRef.current = socket;
   }, [closeSocket, handleMessage, scheduleReconnect, wsStatus]);
 
-  // Boot connect
+  /* ================= BOOT ================= */
+
   useEffect(() => {
     connectSocket();
     return () => closeSocket();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [connectSocket, closeSocket]);
 
-  // Token watcher (if user logs in/out or refresh changes token)
+  /* ================= TOKEN WATCHER ================= */
+
   useEffect(() => {
     const t = setInterval(() => {
       const latest = getToken() || null;
@@ -223,14 +227,12 @@ export function SecurityProvider({ children }) {
         closeSocket();
         if (latest) connectSocket();
       }
-    }, 1500);
+    }, 5000); // 🔥 reduced from 1500ms
 
     return () => clearInterval(t);
   }, [closeSocket, connectSocket]);
 
-  /* =============================
-     FEED HELPERS (LOCAL UI)
-  ============================== */
+  /* ================= FEED HELPERS ================= */
 
   const pushAudit = useCallback((event) => {
     setAuditFeed((prev) => [event, ...prev].slice(0, 150));
@@ -240,33 +242,24 @@ export function SecurityProvider({ children }) {
     setDeviceAlerts((prev) => [alert, ...prev].slice(0, 75));
   }, []);
 
-  /* =============================
-     DERIVED (GLOBAL DEFAULTS)
-  ============================== */
-
   const globalRiskScore = riskByCompany?.global?.riskScore ?? 0;
   const globalExposure = exposureByCompany?.global?.exposure ?? {};
 
   const value = useMemo(
     () => ({
-      // connection
       wsStatus,
       reconnect: connectSocket,
       disconnect: closeSocket,
 
-      // system
       systemStatus,
       integrityAlert,
 
-      // multi-tenant maps
       riskByCompany,
       exposureByCompany,
 
-      // common defaults (global bucket)
       riskScore: globalRiskScore,
       assetExposure: globalExposure,
 
-      // local feeds
       auditFeed,
       deviceAlerts,
       pushAudit,
@@ -289,7 +282,11 @@ export function SecurityProvider({ children }) {
     ]
   );
 
-  return <SecurityContext.Provider value={value}>{children}</SecurityContext.Provider>;
+  return (
+    <SecurityContext.Provider value={value}>
+      {children}
+    </SecurityContext.Provider>
+  );
 }
 
 export function useSecurity() {
