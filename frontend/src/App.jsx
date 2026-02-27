@@ -1,6 +1,6 @@
 // frontend/src/App.jsx
 import React, { useEffect, useState } from "react";
-import { BrowserRouter, Routes, Route, Navigate, useNavigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
 import {
   getSavedUser,
@@ -44,6 +44,9 @@ import GlobalControl from "./pages/admin/GlobalControl.jsx";
 import AdminCompanies from "./pages/admin/AdminCompanies.jsx";
 import AuditExplorer from "./pages/admin/AuditExplorer.jsx";
 import AdminToolGovernance from "./pages/admin/AdminToolGovernance.jsx";
+
+/* 🔥 NEW — COMPANY INTELLIGENCE ROOM */
+import AdminCompanyRoom from "./pages/admin/AdminCompanyRoom.jsx";
 
 /* SECURITY */
 import SecurityOverview from "./components/security/SecurityOverview.jsx";
@@ -113,6 +116,10 @@ function AppRoutes({ user, ready }) {
         <Route path="intelligence" element={<Intelligence />} />
         <Route path="soc" element={<SOC />} />
         <Route path="companies" element={<AdminCompanies />} />
+
+        {/* 🔥 NEW ROUTE */}
+        <Route path="company/:companyId" element={<AdminCompanyRoom />} />
+
         <Route path="assets" element={<Assets />} />
         <Route path="incidents" element={<Incidents />} />
         <Route path="vulnerabilities" element={<Vulnerabilities />} />
