@@ -44,6 +44,8 @@ import GlobalControl from "./pages/admin/GlobalControl.jsx";
 import AdminCompanies from "./pages/admin/AdminCompanies.jsx";
 import AuditExplorer from "./pages/admin/AuditExplorer.jsx";
 import AdminToolGovernance from "./pages/admin/AdminToolGovernance.jsx";
+
+/* 🔥 NEW — COMPANY INTELLIGENCE ROOM */
 import AdminCompanyRoom from "./pages/admin/AdminCompanyRoom.jsx";
 
 /* SECURITY */
@@ -70,7 +72,7 @@ function RoleGuard({ user, ready, allow, children }) {
   if (!ready) return null;
   if (!user) return <Navigate to="/login" replace />;
 
-  const role = normalize(user?.role);
+  const role = normalize(user.role);
   const allowed = allow.map(normalize);
 
   if (!allowed.includes(role)) {
@@ -82,7 +84,7 @@ function RoleGuard({ user, ready, allow, children }) {
 
 function SubscriptionGuard({ user, children }) {
   if (!user) return <Navigate to="/login" replace />;
-  if (isInactiveSubscription(user?.subscriptionStatus)) {
+  if (isInactiveSubscription(user.subscriptionStatus)) {
     return <Navigate to="/pricing" replace />;
   }
   return children;
@@ -183,8 +185,7 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [ready, setReady] = useState(false);
 
-  const base =
-    (import.meta.env.VITE_API_BASE || "").replace(/\/+$/, "");
+  const base = import.meta.env.VITE_API_BASE?.replace(/\/+$/, "");
 
   useEffect(() => {
     async function bootAuth() {
@@ -192,12 +193,15 @@ export default function App() {
         const token = getToken();
         const storedUser = getSavedUser();
 
-        if (!token || !storedUser || !base) {
+        // No token/user saved = just start normally
+        if (!token || !storedUser) {
+          setUser(null);
           setReady(true);
           return;
         }
 
-        setUser(storedUser);
+        // IMPORTANT: do NOT setUser(storedUser) yet.
+        // We refresh first so nothing else fires requests with an about-to-be-revoked token.
 
         const res = await fetch(`${base}/api/auth/refresh`, {
           method: "POST",
@@ -207,7 +211,7 @@ export default function App() {
           },
         });
 
-        if (!res.ok) throw new Error();
+        if (!res.ok) throw new Error("Refresh failed");
 
         const data = await res.json();
 
@@ -216,7 +220,7 @@ export default function App() {
           saveUser(data.user);
           setUser(data.user);
         } else {
-          throw new Error();
+          throw new Error("Bad refresh payload");
         }
       } catch {
         clearToken();
@@ -232,7 +236,8 @@ export default function App() {
 
   return (
     <CompanyProvider>
-      <ToolProvider user={user}>
+      {/* ToolProvider should only run AFTER ready + user is finalized */}
+      <ToolProvider user={ready ? user : null}>
         <SecurityProvider>
           <BrowserRouter>
             <AppRoutes user={user} ready={ready} />
