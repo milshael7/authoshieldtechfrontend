@@ -1,18 +1,19 @@
 // frontend/src/layouts/ManagerLayout.jsx
-// Manager Layout — MULTI-COMPANY OPERATIONAL CONSOLE
-// Enforcement visibility layer
-// Admin supersedes Manager
-// Trading = INTERNAL ONLY (Admin + Manager)
+// Manager Layout — Enterprise Hardened v3
+// Enforcement Visible • WS Status • System Integrity • Limit Awareness
 
 import React, { useEffect, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import { clearToken, clearUser } from "../lib/api.js";
+import { clearToken, clearUser, getSavedUser } from "../lib/api.js";
+import { useSecurity } from "../context/SecurityContext.jsx";
 import AuthoDevPanel from "../components/AuthoDevPanel.jsx";
 import Logo from "../components/Logo.jsx";
 import "../styles/layout.css";
 
 export default function ManagerLayout() {
   const navigate = useNavigate();
+  const { wsStatus, systemStatus } = useSecurity();
+  const user = getSavedUser();
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [oversightOpen, setOversightOpen] = useState(true);
@@ -39,6 +40,23 @@ export default function ManagerLayout() {
   const navClass = ({ isActive }) =>
     isActive ? "nav-link active" : "nav-link";
 
+  /* ================= STATUS COLORS ================= */
+
+  function wsColor() {
+    if (wsStatus === "connected") return "#22c55e";
+    if (wsStatus === "reconnecting") return "#f59e0b";
+    return "#ef4444";
+  }
+
+  function systemColor() {
+    return systemStatus === "compromised" ? "#ef4444" : "#22c55e";
+  }
+
+  const subscriptionStatus = user?.subscriptionStatus || "Unknown";
+
+  const isUnlimited =
+    user?.role?.toLowerCase() === "manager";
+
   return (
     <div className={`layout-root enterprise ${menuOpen ? "sidebar-open" : ""}`}>
       {menuOpen && <div className="sidebar-overlay" onClick={closeMenu} />}
@@ -54,7 +72,6 @@ export default function ManagerLayout() {
 
         <nav className="layout-nav">
 
-          {/* ===== GLOBAL MONITORING ===== */}
           <div className="nav-section-label">
             Global Monitoring
           </div>
@@ -65,10 +82,6 @@ export default function ManagerLayout() {
 
           <NavLink to="assets" className={navClass} onClick={closeMenu}>
             Global Assets
-          </NavLink>
-
-          <NavLink to="threats" className={navClass} onClick={closeMenu}>
-            Threat Intelligence
           </NavLink>
 
           <NavLink to="incidents" className={navClass} onClick={closeMenu}>
@@ -89,7 +102,6 @@ export default function ManagerLayout() {
 
           <hr style={{ opacity: 0.18 }} />
 
-          {/* ===== ENTITY OVERSIGHT ===== */}
           <div
             className="nav-section-label clickable"
             onClick={() => setOversightOpen(v => !v)}
@@ -99,7 +111,6 @@ export default function ManagerLayout() {
 
           {oversightOpen && (
             <>
-              {/* Cross-scope navigation intentionally absolute */}
               <NavLink to="/company" className={navClass} onClick={closeMenu}>
                 All Companies
               </NavLink>
@@ -111,16 +122,11 @@ export default function ManagerLayout() {
               <NavLink to="/user" className={navClass} onClick={closeMenu}>
                 Individuals
               </NavLink>
-
-              <NavLink to="/admin/global" className={navClass} onClick={closeMenu}>
-                Approval Queue (Admin Review)
-              </NavLink>
             </>
           )}
 
           <hr style={{ opacity: 0.18 }} />
 
-          {/* ===== INTERNAL TRADING ===== */}
           <div className="nav-section-label">
             Internal Trading
           </div>
@@ -131,7 +137,6 @@ export default function ManagerLayout() {
 
           <hr style={{ opacity: 0.18 }} />
 
-          {/* ===== NOTIFICATIONS ===== */}
           <NavLink to="notifications" className={navClass} onClick={closeMenu}>
             System Notifications
           </NavLink>
@@ -143,15 +148,95 @@ export default function ManagerLayout() {
         </button>
       </aside>
 
-      {/* ================= MAIN + ADVISOR ================= */}
-      <div className="enterprise-main">
+      {/* ================= MAIN ================= */}
+      <div className="enterprise-main" style={{ display: "flex", flexDirection: "column" }}>
+
+        {/* ===== STATUS BAR ===== */}
+        <div
+          style={{
+            height: 28,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "0 18px",
+            borderBottom: "1px solid rgba(255,255,255,.05)",
+            background: "rgba(255,255,255,.015)",
+            fontSize: 11,
+            letterSpacing: ".05em",
+          }}
+        >
+          {/* LEFT */}
+          <div style={{ display: "flex", gap: 18, alignItems: "center" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <div
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: "50%",
+                  background: wsColor(),
+                }}
+              />
+              <span style={{ opacity: 0.7 }}>
+                WS: {wsStatus.toUpperCase()}
+              </span>
+            </div>
+
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <div
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: "50%",
+                  background: systemColor(),
+                }}
+              />
+              <span style={{ opacity: 0.7 }}>
+                SYSTEM: {systemStatus.toUpperCase()}
+              </span>
+            </div>
+
+            <div style={{ opacity: 0.6 }}>
+              SCOPE: MULTI-COMPANY
+            </div>
+          </div>
+
+          {/* RIGHT */}
+          <div style={{ display: "flex", gap: 14, alignItems: "center" }}>
+            <div style={{ opacity: 0.7 }}>
+              ROLE: {user?.role?.toUpperCase()}
+            </div>
+
+            <div
+              style={{
+                padding: "2px 8px",
+                borderRadius: 20,
+                fontSize: 10,
+                background:
+                  subscriptionStatus === "Active"
+                    ? "rgba(34,197,94,.15)"
+                    : "rgba(239,68,68,.15)",
+                color:
+                  subscriptionStatus === "Active"
+                    ? "#22c55e"
+                    : "#ef4444",
+              }}
+            >
+              {subscriptionStatus.toUpperCase()}
+            </div>
+
+            <div style={{ opacity: 0.6 }}>
+              AUTODEV: {isUnlimited ? "UNLIMITED" : "LIMITED"}
+            </div>
+          </div>
+        </div>
+
         <main className="layout-main">
           <section className="layout-content">
             <Outlet />
           </section>
         </main>
 
-        {/* ===== ADVISOR PANEL ===== */}
+        {/* ===== ADVISOR ===== */}
         <aside
           className={`enterprise-ai-panel ${
             advisorOpen ? "" : "collapsed"
@@ -165,6 +250,7 @@ export default function ManagerLayout() {
                 location: window.location.pathname,
                 scope: "multi-company-oversight",
                 authority: "approval-visible-no-override",
+                systemStatus,
               })}
             />
           </div>
