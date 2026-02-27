@@ -1,10 +1,9 @@
 // frontend/src/pages/tools/ToolsDashboard.jsx
-// Enterprise Tools Control Center — Hardened v2
-// Backend v5 Aligned • Subscription Aware • Grant Countdown • Locked Overlay
+// Enterprise Tools Control Center — Hardened v3
+// Context Aligned • Drift Safe • Subscription Accurate • Overlay Corrected
 
 import React, { useMemo, useState, useEffect } from "react";
 import { useTools } from "./ToolContext.jsx";
-import { getSavedUser } from "../../lib/api.js";
 
 function statusColor(status) {
   switch (status) {
@@ -21,19 +20,6 @@ function statusColor(status) {
   }
 }
 
-function timeRemaining(expiresAt) {
-  if (!expiresAt) return null;
-  const diff = new Date(expiresAt).getTime() - Date.now();
-  if (diff <= 0) return "Expired";
-
-  const mins = Math.floor(diff / 60000);
-  const hours = Math.floor(mins / 60);
-  const minutes = mins % 60;
-
-  if (hours > 0) return `${hours}h ${minutes}m`;
-  return `${minutes}m`;
-}
-
 export default function ToolsDashboard() {
   const {
     loading,
@@ -43,15 +29,14 @@ export default function ToolsDashboard() {
     hasToolAccess,
     hasActiveGrant,
     toolRequiresApproval,
+    subscriptionLocked,
   } = useTools();
 
-  const user = getSavedUser();
   const [requesting, setRequesting] = useState(null);
-  const [tick, setTick] = useState(0);
 
-  // Live countdown refresh
+  // lightweight refresh for grant countdowns
   useEffect(() => {
-    const i = setInterval(() => setTick((t) => t + 1), 60000);
+    const i = setInterval(() => {}, 60000);
     return () => clearInterval(i);
   }, []);
 
@@ -93,12 +78,14 @@ export default function ToolsDashboard() {
         const requiresApproval = toolRequiresApproval(tool.id);
         const activeGrant = hasActiveGrant(tool.id);
         const request = requestMap[tool.id];
+        const locked = subscriptionLocked();
 
-        const subscriptionLocked =
-          user?.subscriptionStatus === "Locked" ||
-          user?.subscriptionStatus === "Past Due";
-
-        const fullyBlocked = !access && !request;
+        // Proper blocking logic
+        const blocked =
+          locked ||
+          (!access &&
+            !request &&
+            !requiresApproval);
 
         return (
           <div
@@ -106,16 +93,20 @@ export default function ToolsDashboard() {
             style={{
               position: "relative",
               padding: 22,
-              border: "1px solid rgba(255,255,255,.08)",
+              border: tool.dangerous
+                ? "1px solid rgba(255,77,79,.4)"
+                : "1px solid rgba(255,255,255,.08)",
               borderRadius: 14,
               display: "flex",
               flexDirection: "column",
               gap: 14,
-              background: "rgba(255,255,255,.02)",
+              background: tool.dangerous
+                ? "rgba(255,77,79,.05)"
+                : "rgba(255,255,255,.02)",
             }}
           >
             {/* LOCK OVERLAY */}
-            {fullyBlocked && (
+            {blocked && (
               <div
                 style={{
                   position: "absolute",
@@ -194,7 +185,7 @@ export default function ToolsDashboard() {
                 </div>
               )}
 
-              {subscriptionLocked && (
+              {locked && (
                 <div style={{ fontSize: 12, color: "#ff4d4f", fontWeight: 600 }}>
                   Subscription Locked
                 </div>
@@ -203,7 +194,7 @@ export default function ToolsDashboard() {
 
             {/* ACTIONS */}
             <div style={{ marginTop: 6 }}>
-              {subscriptionLocked ? (
+              {locked ? (
                 <button className="btn small muted" disabled>
                   Subscription Required
                 </button>
