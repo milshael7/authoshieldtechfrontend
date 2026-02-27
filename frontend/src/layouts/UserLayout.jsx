@@ -1,17 +1,19 @@
 // frontend/src/layouts/UserLayout.jsx
-// Individual User Layout — Context Aligned v2
-// Single Source of Truth • Drift Eliminated • Clean Logout
+// Individual User Layout — Enterprise Hardened v3
+// Single Source of Truth • Enforcement Visible • Limit Aware • ZeroTrust Aligned
 
 import React, { useEffect, useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import { clearToken, clearUser } from "../lib/api.js";
 import { useTools } from "../pages/tools/ToolContext.jsx";
+import { useSecurity } from "../context/SecurityContext.jsx";
 import AuthoDevPanel from "../components/AuthoDevPanel.jsx";
 import Logo from "../components/Logo.jsx";
 import "../styles/layout.css";
 
 export default function UserLayout() {
   const { user } = useTools(); // 🔥 single source of truth
+  const { wsStatus, systemStatus } = useSecurity();
 
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -27,7 +29,7 @@ export default function UserLayout() {
   function logout() {
     clearToken();
     clearUser();
-    window.location.replace("/login"); // 🔥 full rehydrate
+    window.location.replace("/login");
   }
 
   function closeMenu() {
@@ -37,6 +39,32 @@ export default function UserLayout() {
   const subscriptionStatus = user?.subscriptionStatus || "Unknown";
   const freedomEnabled = !!user?.freedomEnabled;
   const autoprotectEnabled = !!user?.autoprotectEnabled;
+  const managedCompanies = user?.managedCompanies || [];
+
+  /* ================= STATUS COLORS ================= */
+
+  function wsColor() {
+    if (wsStatus === "connected") return "#22c55e";
+    if (wsStatus === "reconnecting") return "#f59e0b";
+    return "#ef4444";
+  }
+
+  function systemColor() {
+    return systemStatus === "compromised" ? "#ef4444" : "#22c55e";
+  }
+
+  function subscriptionColor() {
+    if (subscriptionStatus === "Active") return "#22c55e";
+    if (
+      subscriptionStatus === "Locked" ||
+      subscriptionStatus === "Past Due"
+    )
+      return "#ef4444";
+    return "#f59e0b";
+  }
+
+  const navClass = ({ isActive }) =>
+    isActive ? "nav-link active" : "nav-link";
 
   return (
     <div className={`layout-root enterprise ${menuOpen ? "sidebar-open" : ""}`}>
@@ -49,20 +77,20 @@ export default function UserLayout() {
         <div className="layout-brand">
           <Logo size="sm" />
           <span style={{ fontSize: 12, opacity: 0.75 }}>
-            Personal Security
+            Personal Security Control
           </span>
         </div>
 
         <nav className="layout-nav">
-          <NavLink to="." end onClick={closeMenu}>
+          <NavLink to="." end className={navClass} onClick={closeMenu}>
             Security Overview
           </NavLink>
 
-          <NavLink to="notifications" onClick={closeMenu}>
+          <NavLink to="notifications" className={navClass} onClick={closeMenu}>
             Notifications
           </NavLink>
 
-          <NavLink to="reports" onClick={closeMenu}>
+          <NavLink to="reports" className={navClass} onClick={closeMenu}>
             My Reports
           </NavLink>
 
@@ -72,25 +100,33 @@ export default function UserLayout() {
             Managed Companies
           </div>
 
-          <NavLink to="managed" onClick={closeMenu}>
-            My External Companies (Max 10)
+          <NavLink to="managed" className={navClass} onClick={closeMenu}>
+            My External Companies ({managedCompanies.length}/10)
           </NavLink>
 
           {!freedomEnabled && (
-            <NavLink to="/pricing" onClick={closeMenu}>
+            <NavLink to="/pricing" className={navClass} onClick={closeMenu}>
               Activate Freedom
             </NavLink>
           )}
 
           {freedomEnabled && (
-            <NavLink to="autoprotect" onClick={closeMenu}>
+            <NavLink to="autoprotect" className={navClass} onClick={closeMenu}>
               Autoprotect (Autodev 6.5)
             </NavLink>
           )}
         </nav>
 
-        <div style={{ padding: "12px 16px", fontSize: 11, opacity: 0.6 }}>
-          Subscription: {subscriptionStatus}
+        <div style={{ padding: "12px 16px", fontSize: 11 }}>
+          <div style={{ color: subscriptionColor() }}>
+            Subscription: {subscriptionStatus}
+          </div>
+          <div style={{ opacity: 0.6 }}>
+            Freedom: {freedomEnabled ? "ENABLED" : "DISABLED"}
+          </div>
+          <div style={{ opacity: 0.6 }}>
+            Autodev: {autoprotectEnabled ? "ACTIVE" : "INACTIVE"}
+          </div>
         </div>
 
         <button className="btn logout-btn" onClick={logout}>
@@ -98,14 +134,78 @@ export default function UserLayout() {
         </button>
       </aside>
 
-      {/* ================= MAIN + ADVISOR ================= */}
-      <div className="enterprise-main">
+      {/* ================= MAIN ================= */}
+      <div
+        className="enterprise-main"
+        style={{ display: "flex", flexDirection: "column" }}
+      >
+        {/* ===== STATUS BAR ===== */}
+        <div
+          style={{
+            height: 28,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "0 18px",
+            borderBottom: "1px solid rgba(255,255,255,.05)",
+            background: "rgba(255,255,255,.015)",
+            fontSize: 11,
+            letterSpacing: ".05em",
+          }}
+        >
+          <div style={{ display: "flex", gap: 18, alignItems: "center" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <div
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: "50%",
+                  background: wsColor(),
+                }}
+              />
+              <span style={{ opacity: 0.7 }}>
+                WS: {wsStatus.toUpperCase()}
+              </span>
+            </div>
+
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <div
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: "50%",
+                  background: systemColor(),
+                }}
+              />
+              <span style={{ opacity: 0.7 }}>
+                SYSTEM: {systemStatus.toUpperCase()}
+              </span>
+            </div>
+
+            <div style={{ opacity: 0.6 }}>
+              SCOPE: INDIVIDUAL (NO TENANT ACCESS)
+            </div>
+          </div>
+
+          <div
+            style={{
+              padding: "2px 8px",
+              borderRadius: 20,
+              fontSize: 10,
+              background: "rgba(255,255,255,.06)",
+            }}
+          >
+            {subscriptionStatus.toUpperCase()}
+          </div>
+        </div>
+
         <main className="layout-main">
           <section className="layout-content">
             <Outlet />
           </section>
         </main>
 
+        {/* ===== ADVISOR ===== */}
         <aside
           className={`enterprise-ai-panel ${
             advisorOpen ? "" : "collapsed"
@@ -119,8 +219,10 @@ export default function UserLayout() {
                 scope: "individual-control",
                 freedom: freedomEnabled,
                 autoprotect: autoprotectEnabled,
+                managedCount: managedCompanies.length,
                 subscription: subscriptionStatus,
                 location: window.location.pathname,
+                systemStatus,
               })}
             />
           </div>
