@@ -1,6 +1,6 @@
 // frontend/src/context/SecurityContext.jsx
-// Security Context — Production Hardened v2
-// API_BASE Aware • WS Stable • Backoff Safe • Token Sync Efficient
+// Security Context — Enterprise Hardened v3
+// 1008 Safe • Backoff Controlled • Status Accurate • Blueprint Aligned
 
 import React, {
   createContext,
@@ -46,8 +46,9 @@ export function SecurityProvider({ children }) {
   });
 
   const tokenRef = useRef(getToken() || null);
+  const forceStopRef = useRef(false);
 
-  /* ================= URL DERIVATION ================= */
+  /* ================= URL ================= */
 
   function buildWsUrl(token) {
     if (!API_BASE) return null;
@@ -70,6 +71,7 @@ export function SecurityProvider({ children }) {
 
   const closeSocket = useCallback(() => {
     clearReconnect();
+    forceStopRef.current = true;
 
     if (socketRef.current) {
       try {
@@ -84,9 +86,12 @@ export function SecurityProvider({ children }) {
   /* ================= BACKOFF ================= */
 
   const scheduleReconnect = useCallback(() => {
+    if (forceStopRef.current) return;
+
     clearReconnect();
 
     backoffRef.current.attempt += 1;
+    setWsStatus("reconnecting");
 
     const base = Math.min(15000, backoffRef.current.nextDelayMs);
     const jitter = Math.floor(Math.random() * 400);
@@ -102,7 +107,7 @@ export function SecurityProvider({ children }) {
     }, delay);
   }, []);
 
-  /* ================= MESSAGE HANDLER ================= */
+  /* ================= MESSAGE ================= */
 
   const handleMessage = useCallback((raw) => {
     const data = typeof raw === "string" ? safeJsonParse(raw) : raw;
@@ -116,6 +121,7 @@ export function SecurityProvider({ children }) {
           ...prev,
           [companyId]: {
             riskScore: Number(data.riskScore || 0),
+            signals: data.signals || [],
             updatedAt: now(),
           },
         }));
@@ -167,9 +173,9 @@ export function SecurityProvider({ children }) {
       return;
     }
 
-    if (socketRef.current && wsStatus !== "disconnected") {
-      return;
-    }
+    if (socketRef.current && wsStatus === "connected") return;
+
+    forceStopRef.current = false;
 
     const wsUrl = buildWsUrl(token);
     if (!wsUrl) return;
@@ -201,8 +207,16 @@ export function SecurityProvider({ children }) {
       } catch {}
     };
 
-    socket.onclose = () => {
+    socket.onclose = (event) => {
       socketRef.current = null;
+
+      // 1008 = policy violation (auth/device/subscription)
+      if (event.code === 1008) {
+        forceStopRef.current = true;
+        setWsStatus("disconnected");
+        return;
+      }
+
       setWsStatus("disconnected");
       scheduleReconnect();
     };
@@ -227,12 +241,12 @@ export function SecurityProvider({ children }) {
         closeSocket();
         if (latest) connectSocket();
       }
-    }, 5000); // 🔥 reduced from 1500ms
+    }, 5000);
 
     return () => clearInterval(t);
   }, [closeSocket, connectSocket]);
 
-  /* ================= FEED HELPERS ================= */
+  /* ================= HELPERS ================= */
 
   const pushAudit = useCallback((event) => {
     setAuditFeed((prev) => [event, ...prev].slice(0, 150));
@@ -291,6 +305,7 @@ export function SecurityProvider({ children }) {
 
 export function useSecurity() {
   const ctx = useContext(SecurityContext);
-  if (!ctx) throw new Error("useSecurity must be used inside <SecurityProvider />");
+  if (!ctx)
+    throw new Error("useSecurity must be used inside <SecurityProvider />");
   return ctx;
 }
