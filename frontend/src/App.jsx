@@ -12,7 +12,7 @@ import {
 } from "./lib/api.js";
 
 import { CompanyProvider } from "./context/CompanyContext";
-import { ToolProvider, useTools } from "./pages/tools/ToolContext.jsx";
+import { ToolProvider } from "./pages/tools/ToolContext.jsx";
 import { SecurityProvider } from "./context/SecurityContext.jsx";
 
 /* LAYOUTS */
@@ -43,7 +43,7 @@ import AdminOverview from "./pages/admin/AdminOverview.jsx";
 import GlobalControl from "./pages/admin/GlobalControl.jsx";
 import AdminCompanies from "./pages/admin/AdminCompanies.jsx";
 import AuditExplorer from "./pages/admin/AuditExplorer.jsx";
-import AdminToolGovernance from "./pages/admin/AdminToolGovernance.jsx"; // 🔥 Added
+import AdminToolGovernance from "./pages/admin/AdminToolGovernance.jsx";
 
 /* SECURITY */
 import SecurityOverview from "./components/security/SecurityOverview.jsx";
@@ -54,7 +54,7 @@ import DeviceIntegrityPanel from "./pages/DeviceIntegrityPanel.jsx";
 /* INTERNAL TRADING */
 import TradingRoom from "./pages/TradingRoom.jsx";
 
-/* ================= AUTH GUARDS ================= */
+/* ================= HELPERS ================= */
 
 function normalizeRole(role) {
   return String(role || "").trim().toLowerCase();
@@ -90,21 +90,17 @@ function SubscriptionGuard({ user, children }) {
 /* ================= ROUTES ================= */
 
 function AppRoutes({ user, ready }) {
-  const { loading } = useTools();
-
-  if (!ready || loading) {
+  if (!ready) {
     return <div style={{ padding: 40 }}>Initializing platform…</div>;
   }
 
   return (
     <Routes>
-      {/* PUBLIC */}
       <Route path="/" element={<Landing />} />
       <Route path="/pricing" element={<Pricing />} />
       <Route path="/signup" element={<Signup />} />
       <Route path="/login" element={<Login />} />
 
-      {/* ADMIN */}
       <Route
         path="/admin/*"
         element={
@@ -124,7 +120,7 @@ function AppRoutes({ user, ready }) {
         <Route path="notifications" element={<Notifications />} />
         <Route path="global" element={<GlobalControl />} />
         <Route path="audit" element={<AuditExplorer />} />
-        <Route path="tool-governance" element={<AdminToolGovernance />} /> {/* 🔥 New */}
+        <Route path="tool-governance" element={<AdminToolGovernance />} />
         <Route path="security" element={<SecurityOverview />} />
         <Route path="risk" element={<RiskMonitor />} />
         <Route path="sessions" element={<SessionMonitor />} />
@@ -132,7 +128,6 @@ function AppRoutes({ user, ready }) {
         <Route path="trading" element={<TradingRoom />} />
       </Route>
 
-      {/* MANAGER */}
       <Route
         path="/manager/*"
         element={
@@ -140,19 +135,8 @@ function AppRoutes({ user, ready }) {
             <ManagerLayout />
           </RoleGuard>
         }
-      >
-        <Route index element={<Intelligence />} />
-        <Route path="assets" element={<Assets />} />
-        <Route path="threats" element={<SOC />} />
-        <Route path="incidents" element={<Incidents />} />
-        <Route path="vulnerabilities" element={<Vulnerabilities />} />
-        <Route path="compliance" element={<Reports />} />
-        <Route path="reports" element={<Reports />} />
-        <Route path="notifications" element={<Notifications />} />
-        <Route path="trading" element={<TradingRoom />} />
-      </Route>
+      />
 
-      {/* COMPANY */}
       <Route
         path="/company/*"
         element={
@@ -164,7 +148,6 @@ function AppRoutes({ user, ready }) {
         }
       />
 
-      {/* SMALL COMPANY */}
       <Route
         path="/small-company/*"
         element={
@@ -176,7 +159,6 @@ function AppRoutes({ user, ready }) {
         }
       />
 
-      {/* INDIVIDUAL */}
       <Route
         path="/user/*"
         element={
@@ -199,6 +181,8 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [ready, setReady] = useState(false);
 
+  const base = import.meta.env.VITE_API_BASE?.replace(/\/+$/, "");
+
   useEffect(() => {
     async function bootAuth() {
       try {
@@ -212,7 +196,7 @@ export default function App() {
 
         setUser(storedUser);
 
-        const res = await fetch("/api/auth/refresh", {
+        const res = await fetch(`${base}/api/auth/refresh`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -245,7 +229,7 @@ export default function App() {
 
   return (
     <CompanyProvider>
-      <ToolProvider>
+      <ToolProvider user={user}>
         <SecurityProvider>
           <BrowserRouter>
             <AppRoutes user={user} ready={ready} />
