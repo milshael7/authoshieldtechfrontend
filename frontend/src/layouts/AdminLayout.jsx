@@ -1,24 +1,28 @@
 // frontend/src/layouts/AdminLayout.jsx
+// Enterprise Admin Layout — Hardened v3
+// Status Aware • WS Indicator • Role Badge • Scope Visible • Blueprint Aligned
 
 import React, { useEffect, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import { clearToken, clearUser } from "../lib/api.js";
+import { clearToken, clearUser, getSavedUser } from "../lib/api.js";
 import { useCompany } from "../context/CompanyContext";
+import { useSecurity } from "../context/SecurityContext.jsx";
 import AuthoDevPanel from "../components/AuthoDevPanel.jsx";
-import SystemStatusIndicator from "../components/SystemStatusIndicator.jsx";
 import Logo from "../components/Logo.jsx";
 import "../styles/layout.css";
 
 export default function AdminLayout() {
   const navigate = useNavigate();
   const { activeCompanyId } = useCompany();
+  const { wsStatus, systemStatus } = useSecurity();
+
+  const user = getSavedUser();
 
   const [advisorOpen, setAdvisorOpen] = useState(() => {
     const saved = localStorage.getItem("admin.advisor.open");
     return saved !== "false";
   });
 
-  const [systemState, setSystemState] = useState(null);
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 900);
 
   const DRAWER_OPEN_W = 360;
@@ -35,21 +39,6 @@ export default function AdminLayout() {
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
-  /* ================= SAFE SAME-ORIGIN HEALTH ================= */
-
-  useEffect(() => {
-    async function loadHealth() {
-      try {
-        const res = await fetch("/health");
-        const data = await res.json();
-        setSystemState(data.systemState || null);
-      } catch {
-        setSystemState(null);
-      }
-    }
-    loadHealth();
-  }, []);
-
   function logout() {
     clearToken();
     clearUser();
@@ -58,6 +47,20 @@ export default function AdminLayout() {
 
   const navClass = ({ isActive }) =>
     isActive ? "nav-link active" : "nav-link";
+
+  /* ================= STATUS COLORS ================= */
+
+  function wsColor() {
+    if (wsStatus === "connected") return "#22c55e";
+    if (wsStatus === "reconnecting") return "#f59e0b";
+    return "#ef4444";
+  }
+
+  function systemColor() {
+    return systemStatus === "compromised" ? "#ef4444" : "#22c55e";
+  }
+
+  const subscriptionStatus = user?.subscriptionStatus || "Unknown";
 
   return (
     <div className="layout-root enterprise">
@@ -95,7 +98,6 @@ export default function AdminLayout() {
             Device Integrity
           </NavLink>
 
-          {/* 🔥 INTERNAL TRADING */}
           <NavLink to="trading" className={navClass}>
             Internal Trading
           </NavLink>
@@ -106,10 +108,6 @@ export default function AdminLayout() {
 
           <NavLink to="assets" className={navClass}>
             Assets
-          </NavLink>
-
-          <NavLink to="threats" className={navClass}>
-            Threat Intelligence
           </NavLink>
 
           <NavLink to="incidents" className={navClass}>
@@ -170,7 +168,7 @@ export default function AdminLayout() {
         </button>
       </aside>
 
-      {/* ================= MAIN CONTENT ================= */}
+      {/* ================= MAIN ================= */}
       <div
         className="enterprise-main"
         style={{
@@ -180,21 +178,78 @@ export default function AdminLayout() {
           flexDirection: "column",
         }}
       >
+        {/* ===== ENTERPRISE STATUS BAR ===== */}
         <div
           style={{
-            height: 24,
+            height: 28,
             display: "flex",
             alignItems: "center",
+            justifyContent: "space-between",
             padding: "0 18px",
-            borderBottom: "1px solid rgba(255,255,255,.04)",
-            background: "rgba(255,255,255,.01)",
+            borderBottom: "1px solid rgba(255,255,255,.05)",
+            background: "rgba(255,255,255,.015)",
             fontSize: 11,
             letterSpacing: ".05em",
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <SystemStatusIndicator />
-            <span style={{ opacity: 0.6 }}>PLATFORM</span>
+          {/* LEFT */}
+          <div style={{ display: "flex", gap: 18, alignItems: "center" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <div
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: "50%",
+                  background: wsColor(),
+                }}
+              />
+              <span style={{ opacity: 0.7 }}>
+                WS: {wsStatus.toUpperCase()}
+              </span>
+            </div>
+
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <div
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: "50%",
+                  background: systemColor(),
+                }}
+              />
+              <span style={{ opacity: 0.7 }}>
+                SYSTEM: {systemStatus.toUpperCase()}
+              </span>
+            </div>
+
+            <div style={{ opacity: 0.6 }}>
+              SCOPE: {activeCompanyId ? "ENTITY" : "GLOBAL"}
+            </div>
+          </div>
+
+          {/* RIGHT */}
+          <div style={{ display: "flex", gap: 14, alignItems: "center" }}>
+            <div style={{ opacity: 0.7 }}>
+              ROLE: {user?.role?.toUpperCase()}
+            </div>
+
+            <div
+              style={{
+                padding: "2px 8px",
+                borderRadius: 20,
+                fontSize: 10,
+                background:
+                  subscriptionStatus === "Active"
+                    ? "rgba(34,197,94,.15)"
+                    : "rgba(239,68,68,.15)",
+                color:
+                  subscriptionStatus === "Active"
+                    ? "#22c55e"
+                    : "#ef4444",
+              }}
+            >
+              {subscriptionStatus.toUpperCase()}
+            </div>
           </div>
         </div>
 
@@ -205,7 +260,7 @@ export default function AdminLayout() {
         </main>
       </div>
 
-      {/* ================= ADVISOR DRAWER ================= */}
+      {/* ================= ADVISOR ================= */}
       {!isMobile && (
         <div
           style={{
@@ -238,15 +293,8 @@ export default function AdminLayout() {
               flexDirection: "column",
               alignItems: "center",
               justifyContent: "center",
-              position: "relative",
             }}
           >
-            {!advisorOpen && (
-              <div style={{ position: "absolute", top: 12, fontSize: 12 }}>
-                ◀
-              </div>
-            )}
-
             <div
               style={{
                 transform: "rotate(-90deg)",
@@ -257,12 +305,6 @@ export default function AdminLayout() {
             >
               ADVISOR
             </div>
-
-            {advisorOpen && (
-              <div style={{ position: "absolute", bottom: 12, fontSize: 12 }}>
-                ▶
-              </div>
-            )}
           </button>
 
           {advisorOpen && (
@@ -272,7 +314,7 @@ export default function AdminLayout() {
                 getContext={() => ({
                   role: "admin",
                   scope: activeCompanyId ? "entity" : "global",
-                  systemStatus: systemState?.securityStatus,
+                  systemStatus,
                 })}
               />
             </div>
