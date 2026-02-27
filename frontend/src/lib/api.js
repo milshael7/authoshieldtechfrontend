@@ -1,13 +1,10 @@
 /* =========================================================
-   AUTOSHIELD FRONTEND API LAYER — PRODUCTION SAFE v2
-   Single Auth Path • Token Stable • Drift Safe • Refresh Aligned
+   AUTOSHIELD FRONTEND API LAYER — ENTERPRISE v3
+   Deterministic Status Handling • Drift Safe • Retry Aware
 ========================================================= */
 
 const API_BASE = import.meta.env.VITE_API_BASE?.trim();
-
-if (!API_BASE) {
-  console.error("❌ VITE_API_BASE is missing");
-}
+if (!API_BASE) console.error("❌ VITE_API_BASE is missing");
 
 const TOKEN_KEY = "as_token";
 const USER_KEY = "as_user";
@@ -20,11 +17,9 @@ export function getToken() {
 }
 
 export function setToken(token) {
-  if (token) {
-    localStorage.setItem(TOKEN_KEY, token);
-  } else {
-    localStorage.removeItem(TOKEN_KEY);
-  }
+  token
+    ? localStorage.setItem(TOKEN_KEY, token)
+    : localStorage.removeItem(TOKEN_KEY);
 }
 
 export function clearToken() {
@@ -40,25 +35,19 @@ export function getSavedUser() {
 }
 
 export function saveUser(user) {
-  if (user) {
-    localStorage.setItem(USER_KEY, JSON.stringify(user));
-  } else {
-    localStorage.removeItem(USER_KEY);
-  }
+  user
+    ? localStorage.setItem(USER_KEY, JSON.stringify(user))
+    : localStorage.removeItem(USER_KEY);
 }
 
 export function clearUser() {
   localStorage.removeItem(USER_KEY);
 }
 
-/* ================= CORE ================= */
+/* ================= UTIL ================= */
 
 function joinUrl(base, path) {
-  const cleanBase = String(base || "").replace(/\/+$/, "");
-  const cleanPath = String(path || "").startsWith("/")
-    ? path
-    : `/${path}`;
-  return `${cleanBase}${cleanPath}`;
+  return `${String(base).replace(/\/+$/, "")}${path.startsWith("/") ? path : `/${path}`}`;
 }
 
 async function fetchWithTimeout(url, options = {}, ms = REQUEST_TIMEOUT) {
@@ -71,14 +60,49 @@ async function fetchWithTimeout(url, options = {}, ms = REQUEST_TIMEOUT) {
   }
 }
 
+/* =========================================================
+   CORE REQUEST
+========================================================= */
+
+let refreshInProgress = false;
+
+async function attemptRefresh() {
+  if (refreshInProgress) return false;
+  refreshInProgress = true;
+
+  try {
+    const token = getToken();
+    if (!token) return false;
+
+    const res = await fetch(joinUrl(API_BASE, "/api/auth/refresh"), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!res.ok) return false;
+
+    const data = await res.json();
+    if (data?.token && data?.user) {
+      setToken(data.token);
+      saveUser(data.user);
+      return true;
+    }
+
+    return false;
+  } catch {
+    return false;
+  } finally {
+    refreshInProgress = false;
+  }
+}
+
 async function req(
   path,
-  {
-    method = "GET",
-    body,
-    auth = true,
-    withCredentials = false,
-  } = {}
+  { method = "GET", body, auth = true } = {},
+  retry = true
 ) {
   if (!API_BASE) throw new Error("API base URL not configured");
 
@@ -92,7 +116,6 @@ async function req(
   const res = await fetchWithTimeout(joinUrl(API_BASE, path), {
     method,
     headers,
-    ...(withCredentials ? { credentials: "include" } : {}),
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
 
@@ -101,21 +124,39 @@ async function req(
     data = await res.json();
   } catch {}
 
+  /* ===== 401 HANDLING ===== */
   if (res.status === 401 && auth) {
+    if (retry) {
+      const refreshed = await attemptRefresh();
+      if (refreshed) {
+        return req(path, { method, body, auth }, false);
+      }
+    }
+
     clearToken();
     clearUser();
-    throw new Error(data?.error || "Session expired");
+    throw new Error("SESSION_EXPIRED");
+  }
+
+  /* ===== 403 HANDLING ===== */
+  if (res.status === 403) {
+    throw new Error("FORBIDDEN");
+  }
+
+  /* ===== 429 HANDLING ===== */
+  if (res.status === 429) {
+    throw new Error("RATE_LIMITED");
   }
 
   if (!res.ok) {
-    throw new Error(data?.error || `Request failed (${res.status})`);
+    throw new Error(data?.error || `REQUEST_FAILED_${res.status}`);
   }
 
   return data;
 }
 
 /* =========================================================
-   API OBJECT
+   API OBJECT (PARITY ALIGNED)
 ========================================================= */
 
 const api = {
@@ -135,75 +176,40 @@ const api = {
       auth: false,
     }),
 
-  refresh: () =>
-    req("/api/auth/refresh", {
-      method: "POST",
-    }),
+  refresh: () => req("/api/auth/refresh", { method: "POST" }),
 
   /* ================= ADMIN ================= */
 
   adminMetrics: () => req("/api/admin/metrics"),
   adminExecutiveRisk: () => req("/api/admin/executive-risk"),
-  adminPredictiveChurn: () => req("/api/admin/predictive-churn"),
-  adminComplianceReport: () => req("/api/admin/compliance/report"),
-  adminUsers: () => req("/api/admin/users"),
-  adminNotifications: () => req("/api/admin/notifications"),
-  adminCompanies: () => req("/api/admin/companies"),
-  adminCreateCompany: (payload) =>
-    req("/api/admin/companies", {
-      method: "POST",
-      body: payload,
-    }),
+  adminCompliance: () => req("/api/admin/compliance"),
+  adminAuditPreview: () => req("/api/admin/audit-preview"),
+  adminAuditExplorer: (query = "") =>
+    req(`/api/admin/audit${query ? `?${query}` : ""}`),
+  adminPlatformHealth: () => req("/api/admin/platform-health"),
 
   /* ================= SECURITY ================= */
 
   postureSummary: () => req("/api/security/posture-summary"),
-  postureChecks: () => req("/api/security/posture-checks"),
-  postureRecent: (limit = 20) =>
-    req(`/api/security/posture-recent?limit=${limit}`),
+  compliance: () => req("/api/security/compliance"),
   vulnerabilities: () => req("/api/security/vulnerabilities"),
-  securityEvents: (limit = 50) =>
-    req(`/api/security/events?limit=${limit}`),
+  securityEvents: () => req("/api/security/events"),
+  sessionMonitor: () => req("/api/security/sessions"),
 
-  /* ================= INCIDENTS ================= */
+  /* ================= TOOLS ================= */
 
-  incidents: () => req("/api/incidents"),
-  createIncident: (payload) =>
-    req("/api/incidents", {
-      method: "POST",
-      body: payload,
-    }),
+  toolCatalog: () => req("/api/tools/catalog"),
+  requestTool: (toolId) =>
+    req(`/api/tools/request/${toolId}`, { method: "POST" }),
 
-  /* ================= REPORTING ================= */
+  /* ================= ENTITLEMENTS ================= */
 
-  reportSummary: () => req("/api/reports/summary"),
-  reportExport: () => req("/api/reports/export"),
+  myEntitlements: () => req("/api/entitlements/me"),
 
-  /* ================= TRADING ================= */
+  /* ================= USERS ================= */
 
-  tradingSymbols: () =>
-    req("/api/trading/symbols", { auth: false }),
-
-  tradingDashboard: () =>
-    req("/api/trading/dashboard/snapshot"),
-
-  tradingPaperSnapshot: () =>
-    req("/api/trading/paper/snapshot"),
-
-  tradingLiveSnapshot: () =>
-    req("/api/trading/live/snapshot"),
-
-  tradingRiskSnapshot: () =>
-    req("/api/trading/risk/snapshot"),
-
-  tradingPortfolioSnapshot: () =>
-    req("/api/trading/portfolio/snapshot"),
-
-  tradingAISnapshot: () =>
-    req("/api/trading/ai/snapshot"),
-
-  tradingRouterHealth: () =>
-    req("/api/trading/router/health"),
+  listUsers: () => req("/api/users"),
+  getUser: (id) => req(`/api/users/${id}`),
 };
 
 export { api, req };
