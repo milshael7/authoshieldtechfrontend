@@ -2,7 +2,7 @@
 // ============================================================
 // TRADING ROOM — CLEAN BASE + PROFESSIONAL TOOLS
 // SAME STRUCTURE • NO SIZE CHANGES
-// LIVE STREAM ENABLED
+// 1-MINUTE LIVE MOVING CANDLES
 // ============================================================
 
 import React, { useEffect, useRef, useState } from "react";
@@ -38,8 +38,7 @@ export default function TradingRoom() {
 
   const [panelOpen, setPanelOpen] = useState(true);
   const [activeTab, setActiveTab] = useState("positions");
-  const [timeframe, setTimeframe] = useState("1D");
-  const [candleType, setCandleType] = useState("candles");
+  const [timeframe, setTimeframe] = useState("1M");
 
   /* ================= CHART INIT ================= */
 
@@ -105,17 +104,19 @@ export default function TradingRoom() {
     };
   }, []);
 
+  /* ================= SEED 1-MINUTE DATA ================= */
+
   function seedCandles() {
     const now = Math.floor(Date.now() / 1000);
     const candles = [];
     let base = 1.1000;
 
     for (let i = 200; i > 0; i--) {
-      const time = now - i * 3600;
+      const time = now - i * 60; // 1 minute candles
       const open = base;
-      const close = open + (Math.random() - 0.5) * 0.01;
-      const high = Math.max(open, close) + Math.random() * 0.003;
-      const low = Math.min(open, close) - Math.random() * 0.003;
+      const close = open + (Math.random() - 0.5) * 0.002;
+      const high = Math.max(open, close);
+      const low = Math.min(open, close);
 
       candles.push({ time, open, high, low, close });
       base = close;
@@ -152,9 +153,9 @@ export default function TradingRoom() {
     const last = candleDataRef.current[candleDataRef.current.length - 1];
     if (!last) return;
 
-    const sameCandle = now - last.time < 3600; // matches your seed interval
+    const sameMinute = now - last.time < 60;
 
-    if (sameCandle) {
+    if (sameMinute) {
       last.high = Math.max(last.high, price);
       last.low = Math.min(last.low, price);
       last.close = price;
@@ -175,77 +176,28 @@ export default function TradingRoom() {
   /* ================= UI ================= */
 
   return (
-    <div style={{
-      display: "flex",
-      height: "100vh",
-      background: "#0a0f1c",
-      color: "#fff"
-    }}>
+    <div style={{ display: "flex", height: "100vh", background: "#0a0f1c", color: "#fff" }}>
 
-      <div style={{
-        width: 60,
-        background: "#111827",
-        borderRight: "1px solid rgba(255,255,255,.08)",
-      }} />
+      <div style={{ width: 60, background: "#111827", borderRight: "1px solid rgba(255,255,255,.08)" }} />
 
-      <div style={{
-        flex: 1,
-        display: "flex",
-        flexDirection: "column",
-        padding: 20,
-      }}>
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", padding: 20 }}>
 
-        <div style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: 6
-        }}>
-
-          <div style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            height: 28
-          }}>
-            <div style={{fontWeight:700}}>
-              EURUSD • {timeframe} • LIVE
-            </div>
-
-            <button
-              onClick={() => setPanelOpen(!panelOpen)}
-              style={{
-                padding: "6px 14px",
-                background: "#1e2536",
-                border: "1px solid rgba(255,255,255,.1)",
-                cursor: "pointer"
-              }}
-            >
-              Execute Order
-            </button>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", height: 28 }}>
+          <div style={{ fontWeight: 700 }}>
+            EURUSD • {timeframe} • LIVE
           </div>
 
-          <div style={{
-            display: "flex",
-            gap: 12,
-            alignItems: "center",
-            borderTop: "1px solid rgba(255,255,255,.05)",
-            paddingTop: 6,
-            fontSize: 13
-          }}>
-            {["1M","5M","15M","30M","1H","4H","1D"].map(tf => (
-              <div
-                key={tf}
-                onClick={() => setTimeframe(tf)}
-                style={{
-                  cursor: "pointer",
-                  opacity: timeframe === tf ? 1 : 0.6,
-                  fontWeight: timeframe === tf ? 700 : 400
-                }}
-              >
-                {tf}
-              </div>
-            ))}
-          </div>
+          <button
+            onClick={() => setPanelOpen(!panelOpen)}
+            style={{
+              padding: "6px 14px",
+              background: "#1e2536",
+              border: "1px solid rgba(255,255,255,.1)",
+              cursor: "pointer"
+            }}
+          >
+            Execute Order
+          </button>
         </div>
 
         <div style={{
@@ -253,7 +205,8 @@ export default function TradingRoom() {
           background: "#111827",
           borderRadius: 12,
           overflow: "hidden",
-          border: "1px solid rgba(255,255,255,.08)"
+          border: "1px solid rgba(255,255,255,.08)",
+          marginTop: 10
         }}>
           <div ref={containerRef} style={{ width: "100%", height: "100%" }} />
         </div>
@@ -267,11 +220,7 @@ export default function TradingRoom() {
           display: "flex",
           flexDirection: "column"
         }}>
-
-          <div style={{
-            display: "flex",
-            borderBottom: "1px solid rgba(255,255,255,.08)"
-          }}>
+          <div style={{ display: "flex", borderBottom: "1px solid rgba(255,255,255,.08)" }}>
             {["positions","orders","news","signals"].map(tab => (
               <div
                 key={tab}
@@ -294,8 +243,8 @@ export default function TradingRoom() {
             {activeTab === "news" && <div>News feed active</div>}
             {activeTab === "signals" && <div>AI Signal: BUY • Confidence: 82%</div>}
           </div>
-
         </div>
+
       </div>
 
       {panelOpen && (
@@ -305,7 +254,7 @@ export default function TradingRoom() {
           borderLeft: "1px solid rgba(255,255,255,.08)",
           padding: 20
         }}>
-          <div style={{fontWeight:700, marginBottom:20}}>
+          <div style={{ fontWeight: 700, marginBottom: 20 }}>
             Execute Order
           </div>
           Trading controls ready for backend connection.
