@@ -1,13 +1,13 @@
 // frontend/src/pages/TradingRoom.jsx
 // ============================================================
-// TRADING ROOM — ENTERPRISE STRUCTURE v2
-// Chart Dominant • Execution Panel • AI Ops • Activity Feed
+// TRADING ROOM — ENTERPRISE STRUCTURE v3
+// Dockable + Draggable Execution Panel
 //
-// ARCHITECTURAL NOTES:
-// - WebSocket stream powers live ticks + AI signals.
-// - Snapshot polling is REQUIRED fallback (do not remove).
-// - Role enforcement must remain intact.
-// - This room is Admin-owned, Manager-supervised.
+// ARCHITECTURAL LOCKS:
+// - Do NOT remove snapshot polling (fallback layer).
+// - Do NOT remove WS live stream.
+// - Execution panel must NOT affect chart layout permanently.
+// - Admin owns trading authority.
 // ============================================================
 
 import React, { useEffect, useRef, useState } from "react";
@@ -16,12 +16,7 @@ import { api, getToken, getSavedUser } from "../lib/api.js";
 import { Navigate } from "react-router-dom";
 import "../styles/terminal.css";
 
-/* ================= WS URL WITH TOKEN ================= */
-/*
-ARCHITECTURAL LOCK:
-Using same-origin WS path so reverse proxies (Vercel → Render)
-remain transparent. Do NOT hardcode backend host here.
-*/
+/* ================= WS URL ================= */
 function buildWsUrl() {
   const token = getToken();
   if (!token) return null;
@@ -37,11 +32,6 @@ function buildWsUrl() {
 
 export default function TradingRoom() {
   /* ================= ROLE SAFETY ================= */
-  /*
-  ARCHITECTURAL LOCK:
-  Admin owns trading authority.
-  Manager may view but not override engine ownership logic.
-  */
   const user = getSavedUser();
   const role = String(user?.role || "").toLowerCase();
 
@@ -55,37 +45,30 @@ export default function TradingRoom() {
   const chartRef = useRef(null);
   const seriesRef = useRef(null);
   const candleDataRef = useRef([]);
+
   const wsRef = useRef(null);
   const pollingRef = useRef(null);
 
   const [snapshot, setSnapshot] = useState(null);
-  const [snapshotLoading, setSnapshotLoading] = useState(true);
-  const [snapshotError, setSnapshotError] = useState("");
-
   const [signals, setSignals] = useState([]);
   const [activeTab, setActiveTab] = useState("dashboard");
+
+  /* ===== EXECUTION PANEL STATE ===== */
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [panelDocked, setPanelDocked] = useState(true);
+  const [dragging, setDragging] = useState(false);
+  const [floatPos, setFloatPos] = useState({ x: 300, y: 120 });
 
   const [side, setSide] = useState("BUY");
   const [orderQty, setOrderQty] = useState(1);
   const [orderPrice, setOrderPrice] = useState("");
 
-  /* ================= SNAPSHOT (Fallback Layer) ================= */
-  /*
-  ARCHITECTURAL LOCK:
-  Snapshot polling ensures UI remains populated
-  if WS disconnects. Do NOT remove.
-  */
+  /* ================= SNAPSHOT ================= */
   async function loadSnapshot() {
     try {
-      setSnapshotError("");
-      setSnapshotLoading(true);
       const data = await api.tradingLiveSnapshot();
       setSnapshot(data);
-    } catch (e) {
-      setSnapshotError(e?.message || "Snapshot failed");
-    } finally {
-      setSnapshotLoading(false);
-    }
+    } catch {}
   }
 
   useEffect(() => {
@@ -97,7 +80,6 @@ export default function TradingRoom() {
   }, []);
 
   /* ================= CHART ================= */
-
   useEffect(() => {
     if (!chartContainerRef.current) return;
 
@@ -132,11 +114,6 @@ export default function TradingRoom() {
   }, []);
 
   /* ================= WEBSOCKET ================= */
-  /*
-  ARCHITECTURAL LOCK:
-  Live trading visibility depends on tick + ai_signal stream.
-  Removing this breaks real-time behavior.
-  */
   useEffect(() => {
     const wsUrl = buildWsUrl();
     if (!wsUrl) return;
@@ -166,11 +143,7 @@ export default function TradingRoom() {
       } catch {}
     };
 
-    ws.onerror = () => ws.close();
-
-    return () => {
-      ws.close();
-    };
+    return () => ws.close();
   }, []);
 
   function updateCandle(price, ts) {
@@ -178,7 +151,6 @@ export default function TradingRoom() {
 
     const time = Math.floor(Number(ts) / 1000);
     const p = Number(price);
-
     const last = candleDataRef.current[candleDataRef.current.length - 1];
 
     if (!last || time > last.time) {
@@ -193,6 +165,42 @@ export default function TradingRoom() {
     }
   }
 
+  /* ================= EXECUTION PANEL LOGIC ================= */
+
+  function openPanel(type) {
+    setSide(type);
+    if (!panelOpen) {
+      setPanelOpen(true);
+      setPanelDocked(true);
+    }
+  }
+
+  function startDrag() {
+    setDragging(true);
+    setPanelDocked(false);
+  }
+
+  function onDrag(e) {
+    if (!dragging) return;
+    setFloatPos({
+      x: e.clientX - 200,
+      y: e.clientY - 20,
+    });
+  }
+
+  function stopDrag() {
+    setDragging(false);
+  }
+
+  useEffect(() => {
+    window.addEventListener("mousemove", onDrag);
+    window.addEventListener("mouseup", stopDrag);
+    return () => {
+      window.removeEventListener("mousemove", onDrag);
+      window.removeEventListener("mouseup", stopDrag);
+    };
+  }, [dragging]);
+
   /* ================= RENDER ================= */
 
   return (
@@ -206,107 +214,129 @@ export default function TradingRoom() {
           <button onClick={() => setActiveTab("dashboard")}>Dashboard</button>
           <button onClick={() => setActiveTab("ai")}>AI Ops</button>
           <button onClick={() => setActiveTab("activity")}>Activity</button>
+
+          <button onClick={() => openPanel("BUY")}>BUY</button>
+          <button onClick={() => openPanel("SELL")}>SELL</button>
         </div>
       </div>
 
-      {/* MAIN GRID */}
-      <div style={{ display: "flex", height: "75vh" }}>
-
-        {/* CHART */}
-        <div style={{ flex: 3, position: "relative" }}>
-          <div
-            ref={chartContainerRef}
-            style={{ width: "100%", height: "100%" }}
-          />
-        </div>
+      {/* CHART AREA */}
+      <div style={{ height: "75vh", position: "relative" }}>
+        <div
+          ref={chartContainerRef}
+          style={{ width: "100%", height: "100%" }}
+        />
 
         {/* EXECUTION PANEL */}
-        <div
-          style={{
-            flex: 1,
-            background: "#111827",
-            padding: 20,
-            borderLeft: "1px solid rgba(255,255,255,.08)",
-          }}
-        >
-          <h3 style={{ marginBottom: 10 }}>Execute Order</h3>
-
-          <div style={{ display: "flex", gap: 10 }}>
-            <button
-              style={{ flex: 1 }}
-              onClick={() => setSide("BUY")}
-            >
-              BUY
-            </button>
-            <button
-              style={{ flex: 1 }}
-              onClick={() => setSide("SELL")}
-            >
-              SELL
-            </button>
-          </div>
-
-          <div style={{ marginTop: 15 }}>
-            <label>Quantity</label>
-            <input
-              value={orderQty}
-              onChange={(e) => setOrderQty(e.target.value)}
-            />
-          </div>
-
-          <div style={{ marginTop: 10 }}>
-            <label>Limit Price</label>
-            <input
-              value={orderPrice}
-              onChange={(e) => setOrderPrice(e.target.value)}
-            />
-          </div>
-
-          <button
+        {panelOpen && (
+          <div
             style={{
-              marginTop: 20,
-              width: "100%",
-              background: side === "BUY" ? "#22c55e" : "#ef4444",
+              position: panelDocked ? "absolute" : "fixed",
+              right: panelDocked ? 0 : "auto",
+              top: panelDocked ? 0 : floatPos.y,
+              left: panelDocked ? "auto" : floatPos.x,
+              width: 380,
+              background: "#111827",
+              borderLeft: panelDocked
+                ? "1px solid rgba(255,255,255,.08)"
+                : "none",
+              borderRadius: panelDocked ? 0 : 8,
+              padding: 20,
+              zIndex: 1000,
+              cursor: dragging ? "grabbing" : "default",
             }}
           >
-            Confirm {side}
-          </button>
-        </div>
+            <div
+              style={{
+                fontWeight: "bold",
+                marginBottom: 10,
+                cursor: "grab",
+              }}
+              onMouseDown={startDrag}
+            >
+              Execute Order ({side})
+            </div>
+
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={() => setSide("BUY")}>BUY</button>
+              <button onClick={() => setSide("SELL")}>SELL</button>
+            </div>
+
+            <div style={{ marginTop: 15 }}>
+              <label>Quantity</label>
+              <input
+                value={orderQty}
+                onChange={(e) => setOrderQty(e.target.value)}
+              />
+            </div>
+
+            <div style={{ marginTop: 10 }}>
+              <label>Limit Price</label>
+              <input
+                value={orderPrice}
+                onChange={(e) => setOrderPrice(e.target.value)}
+              />
+            </div>
+
+            <button
+              style={{
+                marginTop: 20,
+                width: "100%",
+                background: side === "BUY" ? "#22c55e" : "#ef4444",
+              }}
+            >
+              Confirm {side}
+            </button>
+
+            {!panelDocked && (
+              <button
+                style={{ marginTop: 10, width: "100%" }}
+                onClick={() => setPanelDocked(true)}
+              >
+                Dock Right
+              </button>
+            )}
+
+            <button
+              style={{ marginTop: 10, width: "100%" }}
+              onClick={() => setPanelOpen(false)}
+            >
+              Close
+            </button>
+          </div>
+        )}
       </div>
 
       {/* TAB CONTENT */}
       <div style={{ padding: 20 }}>
-
         {activeTab === "dashboard" && (
           <div>
             <h3>Open Positions</h3>
-            <div>
-              {snapshot?.positions?.length
-                ? snapshot.positions.map((p, i) => (
-                    <div key={i}>
-                      {p.symbol} — {p.side} — PnL: {p.pnl}
-                    </div>
-                  ))
-                : "No open positions"}
-            </div>
+            {snapshot?.positions?.length
+              ? snapshot.positions.map((p, i) => (
+                  <div key={i}>
+                    {p.symbol} — {p.side} — PnL: {p.pnl}
+                  </div>
+                ))
+              : "No open positions"}
           </div>
         )}
 
         {activeTab === "ai" && (
           <div>
             <h3>AI Operations</h3>
-            <div>Model Version: v1.0</div>
-            <div>Last Signal Confidence:
+            <div>
+              Confidence:
               {signals[0]
                 ? (Number(signals[0].confidence) * 100).toFixed(1) + "%"
                 : "—"}
             </div>
-            <div>Edge Score:
+            <div>
+              Edge:
               {signals[0]
                 ? Number(signals[0].edge || 0).toFixed(2)
                 : "—"}
             </div>
-            <div>Mode: PAPER TRADING</div>
           </div>
         )}
 
