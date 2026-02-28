@@ -44,8 +44,6 @@ import GlobalControl from "./pages/admin/GlobalControl.jsx";
 import AdminCompanies from "./pages/admin/AdminCompanies.jsx";
 import AuditExplorer from "./pages/admin/AuditExplorer.jsx";
 import AdminToolGovernance from "./pages/admin/AdminToolGovernance.jsx";
-
-/* 🔥 NEW — COMPANY INTELLIGENCE ROOM */
 import AdminCompanyRoom from "./pages/admin/AdminCompanyRoom.jsx";
 
 /* SECURITY */
@@ -104,6 +102,7 @@ function AppRoutes({ user, ready }) {
       <Route path="/signup" element={<Signup />} />
       <Route path="/login" element={<Login />} />
 
+      {/* ================= ADMIN ================= */}
       <Route
         path="/admin/*"
         element={
@@ -132,15 +131,7 @@ function AppRoutes({ user, ready }) {
         <Route path="trading" element={<TradingRoom />} />
       </Route>
 
-      <Route
-        path="/manager/*"
-        element={
-          <RoleGuard user={user} ready={ready} allow={["manager"]}>
-            <ManagerLayout />
-          </RoleGuard>
-        }
-      />
-
+      {/* ================= COMPANY ================= */}
       <Route
         path="/company/*"
         element={
@@ -150,8 +141,36 @@ function AppRoutes({ user, ready }) {
             </SubscriptionGuard>
           </RoleGuard>
         }
-      />
+      >
+        <Route index element={<SecurityOverview />} />
+        <Route path="intelligence" element={<Intelligence />} />
+        <Route path="soc" element={<SOC />} />
+        <Route path="assets" element={<Assets />} />
+        <Route path="incidents" element={<Incidents />} />
+        <Route path="vulnerabilities" element={<Vulnerabilities />} />
+        <Route path="reports" element={<Reports />} />
+        <Route path="notifications" element={<Notifications />} />
+        <Route path="risk" element={<RiskMonitor />} />
+        <Route path="sessions" element={<SessionMonitor />} />
+        <Route path="device-integrity" element={<DeviceIntegrityPanel />} />
+        <Route path="trading" element={<TradingRoom />} />
+      </Route>
 
+      {/* ================= MANAGER ================= */}
+      <Route
+        path="/manager/*"
+        element={
+          <RoleGuard user={user} ready={ready} allow={["manager"]}>
+            <ManagerLayout />
+          </RoleGuard>
+        }
+      >
+        <Route index element={<SecurityOverview />} />
+        <Route path="assets" element={<Assets />} />
+        <Route path="incidents" element={<Incidents />} />
+      </Route>
+
+      {/* ================= SMALL COMPANY ================= */}
       <Route
         path="/small-company/*"
         element={
@@ -161,8 +180,11 @@ function AppRoutes({ user, ready }) {
             </SubscriptionGuard>
           </RoleGuard>
         }
-      />
+      >
+        <Route index element={<SecurityOverview />} />
+      </Route>
 
+      {/* ================= USER ================= */}
       <Route
         path="/user/*"
         element={
@@ -172,7 +194,9 @@ function AppRoutes({ user, ready }) {
             </SubscriptionGuard>
           </RoleGuard>
         }
-      />
+      >
+        <Route index element={<SecurityOverview />} />
+      </Route>
 
       <Route path="*" element={<NotFound />} />
     </Routes>
@@ -184,7 +208,6 @@ function AppRoutes({ user, ready }) {
 export default function App() {
   const [user, setUser] = useState(null);
   const [ready, setReady] = useState(false);
-
   const base = import.meta.env.VITE_API_BASE?.replace(/\/+$/, "");
 
   useEffect(() => {
@@ -193,15 +216,11 @@ export default function App() {
         const token = getToken();
         const storedUser = getSavedUser();
 
-        // No token/user saved = just start normally
         if (!token || !storedUser) {
           setUser(null);
           setReady(true);
           return;
         }
-
-        // IMPORTANT: do NOT setUser(storedUser) yet.
-        // We refresh first so nothing else fires requests with an about-to-be-revoked token.
 
         const res = await fetch(`${base}/api/auth/refresh`, {
           method: "POST",
@@ -236,7 +255,6 @@ export default function App() {
 
   return (
     <CompanyProvider>
-      {/* ToolProvider should only run AFTER ready + user is finalized */}
       <ToolProvider user={ready ? user : null}>
         <SecurityProvider>
           <BrowserRouter>
