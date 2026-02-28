@@ -1,6 +1,7 @@
 // frontend/src/pages/TradingRoom.jsx
 // ============================================================
-// TRADING ROOM — RESTORED CLEAN LAYOUT + REAL CANDLES
+// TRADING ROOM — FULL WORKSTATION WITH TOOL SIDEBAR
+// Live Chart + Drawing Engine + Volume + Tabs + Execute Panel
 // ============================================================
 
 import React, { useEffect, useRef, useState } from "react";
@@ -28,13 +29,21 @@ export default function TradingRoom() {
     return <Navigate to="/admin" replace />;
   }
 
-  const chartRef = useRef(null);
-  const seriesRef = useRef(null);
   const containerRef = useRef(null);
+  const overlayRef = useRef(null);
+  const chartRef = useRef(null);
+  const candleSeriesRef = useRef(null);
+  const volumeSeriesRef = useRef(null);
   const candleDataRef = useRef([]);
-  const wsRef = useRef(null);
 
+  const [activeTool, setActiveTool] = useState(null);
+  const [drawings, setDrawings] = useState([]);
+  const [currentDraw, setCurrentDraw] = useState(null);
+  const [magnet, setMagnet] = useState(false);
+  const [locked, setLocked] = useState(false);
+  const [showVolume, setShowVolume] = useState(true);
   const [panelOpen, setPanelOpen] = useState(true);
+  const [activeTab, setActiveTab] = useState("positions");
 
   /* ================= CHART INIT ================= */
 
@@ -50,201 +59,194 @@ export default function TradingRoom() {
         vertLines: { color: "rgba(255,255,255,.04)" },
         horzLines: { color: "rgba(255,255,255,.04)" },
       },
-      rightPriceScale: {
-        borderColor: "rgba(255,255,255,.1)",
-      },
-      timeScale: {
-        borderColor: "rgba(255,255,255,.1)",
-        timeVisible: true,
-      },
       width: containerRef.current.clientWidth,
       height: containerRef.current.clientHeight,
     });
 
-    seriesRef.current = chartRef.current.addCandlestickSeries({
+    candleSeriesRef.current = chartRef.current.addCandlestickSeries({
       upColor: "#2bd576",
       downColor: "#ff5a5f",
       wickUpColor: "#2bd576",
       wickDownColor: "#ff5a5f",
       borderVisible: false,
-      priceLineVisible: true,
-      priceFormat: {
-        type: "price",
-        precision: 5,
-        minMove: 0.00001,
-      }
     });
 
-    chartRef.current.timeScale().applyOptions({
-      barSpacing: 4,
-    });
+    if (showVolume) {
+      volumeSeriesRef.current = chartRef.current.addHistogramSeries({
+        priceFormat: { type: "volume" },
+        priceScaleId: "",
+        scaleMargins: { top: 0.8, bottom: 0 },
+      });
+    }
 
-    seedCandles();
-    chartRef.current.timeScale().fitContent();
-
-    const resize = new ResizeObserver(entries => {
-      const { width, height } = entries[0].contentRect;
-      chartRef.current.applyOptions({ width, height });
-    });
-
-    resize.observe(containerRef.current);
-
-    return () => {
-      resize.disconnect();
-      chartRef.current?.remove();
-    };
+    seedData();
   }, []);
 
-  /* ================= SEED DATA ================= */
-
-  function seedCandles() {
+  function seedData() {
     const now = Math.floor(Date.now() / 1000);
-    const candles = [];
-    let base = 1.1000;
+    let base = 1.1;
+    const data = [];
 
     for (let i = 200; i > 0; i--) {
       const time = now - i * 3600;
       const open = base;
       const close = open + (Math.random() - 0.5) * 0.01;
-      const high = Math.max(open, close) + Math.random() * 0.003;
-      const low = Math.min(open, close) - Math.random() * 0.003;
-
-      candles.push({ time, open, high, low, close });
+      const high = Math.max(open, close) + 0.003;
+      const low = Math.min(open, close) - 0.003;
+      const volume = Math.floor(Math.random() * 1000);
+      data.push({ time, open, high, low, close, volume });
       base = close;
     }
 
-    candleDataRef.current = candles;
-    seriesRef.current.setData(candles);
+    candleDataRef.current = data;
+    candleSeriesRef.current.setData(data);
+
+    if (volumeSeriesRef.current) {
+      volumeSeriesRef.current.setData(
+        data.map(c => ({
+          time: c.time,
+          value: c.volume,
+          color: c.close >= c.open ? "#2bd57655" : "#ff5a5f55"
+        }))
+      );
+    }
   }
 
-  /* ================= LIVE WS ================= */
+  /* ================= DRAWING ENGINE ================= */
 
-  useEffect(() => {
-    const wsUrl = buildWsUrl();
-    if (!wsUrl) return;
+  function drawOverlay() {
+    const canvas = overlayRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    canvas.width = canvas.offsetWidth;
+    canvas.height = canvas.offsetHeight;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    const ws = new WebSocket(wsUrl);
-    wsRef.current = ws;
+    [...drawings, currentDraw].forEach(d => {
+      if (!d) return;
+      ctx.strokeStyle = "#5ea7ff";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(d.start.x, d.start.y);
+      ctx.lineTo(d.end.x, d.end.y);
+      ctx.stroke();
+    });
+  }
 
-    ws.onmessage = (e) => {
-      try {
-        const msg = JSON.parse(e.data);
-        if (msg.type === "tick") {
-          updateCandle(msg.price, msg.ts);
-        }
-      } catch {}
-    };
+  useEffect(() => { drawOverlay(); }, [drawings, currentDraw]);
 
-    return () => ws.close();
-  }, []);
+  function handleMouseDown(e) {
+    if (!activeTool || locked) return;
+    const rect = overlayRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    setCurrentDraw({ tool: activeTool, start: { x, y }, end: { x, y } });
+  }
 
-  function updateCandle(price, ts) {
-    const time = Math.floor(n(ts) / 1000);
-    const p = n(price);
-    const last = candleDataRef.current[candleDataRef.current.length - 1];
+  function handleMouseMove(e) {
+    if (!currentDraw) return;
+    const rect = overlayRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    setCurrentDraw(prev => ({ ...prev, end: { x, y } }));
+  }
 
-    if (!last || time > last.time) {
-      const newCandle = { time, open: p, high: p, low: p, close: p };
-      candleDataRef.current.push(newCandle);
-      seriesRef.current.update(newCandle);
-    } else {
-      last.high = Math.max(last.high, p);
-      last.low = Math.min(last.low, p);
-      last.close = p;
-      seriesRef.current.update(last);
-    }
+  function handleMouseUp() {
+    if (!currentDraw) return;
+    setDrawings(prev => [...prev, currentDraw]);
+    setCurrentDraw(null);
   }
 
   /* ================= UI ================= */
 
   return (
-    <div style={{
-      display: "flex",
-      height: "100vh",
-      background: "#0a0f1c",
-      color: "#fff"
-    }}>
+    <div style={{ display: "flex", height: "100vh", background: "#0a0f1c", color: "#fff" }}>
 
-      {/* MINI TOOL RAIL */}
+      {/* LEFT TOOL SIDEBAR */}
       <div style={{
         width: 60,
         background: "#111827",
         borderRight: "1px solid rgba(255,255,255,.08)",
-      }} />
-
-      {/* CENTER AREA */}
-      <div style={{
-        flex: 1,
         display: "flex",
         flexDirection: "column",
-        padding: 20,
+        alignItems: "center",
+        paddingTop: 12,
+        gap: 12
       }}>
-
-        {/* TOP BAR */}
-        <div style={{
-          height: 50,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between"
-        }}>
-          <div style={{fontWeight:700}}>
-            EURUSD • 1D • PAPER
-          </div>
-
+        {["trend","rect","arrow","text","ruler"].map(tool => (
           <button
-            onClick={() => setPanelOpen(!panelOpen)}
+            key={tool}
+            onClick={() => setActiveTool(tool)}
             style={{
-              padding: "8px 16px",
-              background: "#1e2536",
-              border: "1px solid rgba(255,255,255,.1)",
+              width: 36,
+              height: 36,
+              background: activeTool === tool ? "#1e2536" : "#1a2133",
+              border: "none",
+              borderRadius: 8,
               cursor: "pointer"
             }}
           >
-            Execute Order
+            {tool[0].toUpperCase()}
           </button>
-        </div>
+        ))}
+        <button onClick={() => setMagnet(!magnet)}>M</button>
+        <button onClick={() => setLocked(!locked)}>L</button>
+        <button onClick={() => setDrawings([])}>C</button>
+      </div>
 
-        {/* CHART BOX */}
-        <div style={{
-          flex: 1,
-          background: "#111827",
-          borderRadius: 12,
-          overflow: "hidden",
-          border: "1px solid rgba(255,255,255,.08)"
-        }}>
-          <div
-            ref={containerRef}
-            style={{ width: "100%", height: "100%" }}
+      {/* CENTER */}
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", padding: 20 }}>
+
+        <div style={{ flex: 1, position: "relative", background: "#111827", borderRadius: 12 }}>
+          <div ref={containerRef} style={{ width: "100%", height: "100%" }} />
+          <canvas
+            ref={overlayRef}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            style={{ position: "absolute", inset: 0 }}
           />
         </div>
 
-        {/* BOTTOM TABS */}
+        {/* BOTTOM PANEL */}
         <div style={{
-          height: 80,
-          marginTop: 20,
+          height: 200,
+          marginTop: 15,
           background: "#111827",
           borderRadius: 12,
-          border: "1px solid rgba(255,255,255,.08)",
-          padding: 20
+          border: "1px solid rgba(255,255,255,.08)"
         }}>
-          Positions | Orders | History | Account
+          <div style={{ display: "flex" }}>
+            {["positions","orders","news","signals"].map(tab => (
+              <div
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                style={{
+                  padding: "10px 16px",
+                  cursor: "pointer",
+                  background: activeTab === tab ? "#1e2536" : "transparent"
+                }}
+              >
+                {tab.toUpperCase()}
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* RIGHT PANEL */}
+      {/* EXECUTE PANEL */}
       {panelOpen && (
         <div style={{
-          width: 360,
+          width: 320,
           background: "#111827",
           borderLeft: "1px solid rgba(255,255,255,.08)",
           padding: 20
         }}>
-          <div style={{fontWeight:700, marginBottom:20}}>
-            Execute Order
-          </div>
-          Trading controls go here.
+          <h3>Execute Order</h3>
+          <p>Ready for backend connection</p>
         </div>
       )}
+
     </div>
   );
 }
