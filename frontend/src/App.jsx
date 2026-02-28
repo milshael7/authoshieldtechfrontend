@@ -66,14 +66,32 @@ function isInactiveSubscription(status) {
   return s === "locked" || s === "past due" || s === "past_due";
 }
 
+/*
+  HIERARCHY ORDER
+  admin > manager > company > small_company > individual
+*/
+const ROLE_HIERARCHY = {
+  admin: 5,
+  manager: 4,
+  company: 3,
+  small_company: 2,
+  individual: 1,
+};
+
+function hasAccess(userRole, allowedRoles) {
+  const userLevel = ROLE_HIERARCHY[normalize(userRole)] || 0;
+
+  return allowedRoles.some((role) => {
+    const requiredLevel = ROLE_HIERARCHY[normalize(role)] || 0;
+    return userLevel >= requiredLevel;
+  });
+}
+
 function RoleGuard({ user, ready, allow, children }) {
   if (!ready) return null;
   if (!user) return <Navigate to="/login" replace />;
 
-  const role = normalize(user.role);
-  const allowed = allow.map(normalize);
-
-  if (!allowed.includes(role)) {
+  if (!hasAccess(user.role, allow)) {
     return <Navigate to="/404" replace />;
   }
 
@@ -131,31 +149,6 @@ function AppRoutes({ user, ready }) {
         <Route path="trading" element={<TradingRoom />} />
       </Route>
 
-      {/* ================= COMPANY ================= */}
-      <Route
-        path="/company/*"
-        element={
-          <RoleGuard user={user} ready={ready} allow={["company"]}>
-            <SubscriptionGuard user={user}>
-              <CompanyLayout />
-            </SubscriptionGuard>
-          </RoleGuard>
-        }
-      >
-        <Route index element={<SecurityOverview />} />
-        <Route path="intelligence" element={<Intelligence />} />
-        <Route path="soc" element={<SOC />} />
-        <Route path="assets" element={<Assets />} />
-        <Route path="incidents" element={<Incidents />} />
-        <Route path="vulnerabilities" element={<Vulnerabilities />} />
-        <Route path="reports" element={<Reports />} />
-        <Route path="notifications" element={<Notifications />} />
-        <Route path="risk" element={<RiskMonitor />} />
-        <Route path="sessions" element={<SessionMonitor />} />
-        <Route path="device-integrity" element={<DeviceIntegrityPanel />} />
-        <Route path="trading" element={<TradingRoom />} />
-      </Route>
-
       {/* ================= MANAGER ================= */}
       <Route
         path="/manager/*"
@@ -168,6 +161,24 @@ function AppRoutes({ user, ready }) {
         <Route index element={<SecurityOverview />} />
         <Route path="assets" element={<Assets />} />
         <Route path="incidents" element={<Incidents />} />
+      </Route>
+
+      {/* ================= COMPANY ================= */}
+      <Route
+        path="/company/*"
+        element={
+          <RoleGuard user={user} ready={ready} allow={["company"]}>
+            <SubscriptionGuard user={user}>
+              <CompanyLayout />
+            </SubscriptionGuard>
+          </RoleGuard>
+        }
+      >
+        <Route index element={<SecurityOverview />} />
+        <Route path="assets" element={<Assets />} />
+        <Route path="incidents" element={<Incidents />} />
+        <Route path="vulnerabilities" element={<Vulnerabilities />} />
+        <Route path="reports" element={<Reports />} />
       </Route>
 
       {/* ================= SMALL COMPANY ================= */}
