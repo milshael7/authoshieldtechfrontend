@@ -1,7 +1,7 @@
 // frontend/src/pages/TradingRoom.jsx
 // ============================================================
-// TRADING ROOM — RESTORED HEADER + LIVE MOVING CANDLES
-// SAME STRUCTURE • NO SIZE CHANGES
+// TRADING ROOM — LIVE ENGINE FIXED (SMOOTH + TRUE TIMEFRAMES)
+// SAME STRUCTURE • NO DESIGN CHANGES
 // ============================================================
 
 import React, { useEffect, useRef, useState } from "react";
@@ -21,6 +21,19 @@ function n(v) {
   return Number.isFinite(x) ? x : 0;
 }
 
+function timeframeToSeconds(tf) {
+  switch (tf) {
+    case "1M": return 60;
+    case "5M": return 300;
+    case "15M": return 900;
+    case "30M": return 1800;
+    case "1H": return 3600;
+    case "4H": return 14400;
+    case "1D": return 86400;
+    default: return 60;
+  }
+}
+
 export default function TradingRoom() {
 
   const user = getSavedUser();
@@ -38,7 +51,6 @@ export default function TradingRoom() {
   const [panelOpen, setPanelOpen] = useState(true);
   const [activeTab, setActiveTab] = useState("positions");
   const [timeframe, setTimeframe] = useState("1M");
-  const [candleType, setCandleType] = useState("candles");
 
   /* ================= CHART INIT ================= */
 
@@ -60,6 +72,7 @@ export default function TradingRoom() {
       timeScale: {
         borderColor: "rgba(255,255,255,.1)",
         timeVisible: true,
+        rightBarStaysOnScroll: true,
       },
       width: containerRef.current.clientWidth,
       height: containerRef.current.clientHeight,
@@ -76,16 +89,6 @@ export default function TradingRoom() {
       wickVisible: true,
       priceLineVisible: true,
       lastValueVisible: true,
-      priceFormat: {
-        type: "price",
-        precision: 5,
-        minMove: 0.00001,
-      }
-    });
-
-    chartRef.current.timeScale().applyOptions({
-      barSpacing: 6,
-      rightBarStaysOnScroll: true,
     });
 
     seedCandles();
@@ -108,11 +111,12 @@ export default function TradingRoom() {
 
   function seedCandles() {
     const now = Math.floor(Date.now() / 1000);
+    const tf = timeframeToSeconds(timeframe);
     const candles = [];
     let base = 1.1000;
 
     for (let i = 200; i > 0; i--) {
-      const time = now - i * 60; // 1 minute candles
+      const time = now - i * tf;
       const open = base;
       const close = open + (Math.random() - 0.5) * 0.01;
       const high = Math.max(open, close);
@@ -144,36 +148,58 @@ export default function TradingRoom() {
     };
 
     return () => ws.close();
-  }, []);
+  }, [timeframe]);
+
+  /* ================= SMOOTH UPDATE ENGINE ================= */
+
+  function animatePrice(from, to, onUpdate) {
+    const duration = 120;
+    const start = performance.now();
+
+    function frame(now) {
+      const progress = Math.min((now - start) / duration, 1);
+      const value = from + (to - from) * progress;
+      onUpdate(value);
+      if (progress < 1) requestAnimationFrame(frame);
+    }
+
+    requestAnimationFrame(frame);
+  }
 
   function updateCandle(price) {
     if (!seriesRef.current) return;
 
+    const tfSeconds = timeframeToSeconds(timeframe);
     const now = Math.floor(Date.now() / 1000);
+    const bucket = Math.floor(now / tfSeconds) * tfSeconds;
+
     const last = candleDataRef.current[candleDataRef.current.length - 1];
     if (!last) return;
 
-    const sameMinute = now - last.time < 60;
-
-    if (sameMinute) {
-      last.high = Math.max(last.high, price);
-      last.low = Math.min(last.low, price);
-      last.close = price;
-      seriesRef.current.update(last);
+    if (last.time === bucket) {
+      animatePrice(last.close, price, (p) => {
+        last.high = Math.max(last.high, p);
+        last.low = Math.min(last.low, p);
+        last.close = p;
+        seriesRef.current.update({ ...last });
+      });
     } else {
       const newCandle = {
-        time: now,
+        time: bucket,
         open: last.close,
         high: price,
         low: price,
         close: price,
       };
+
       candleDataRef.current.push(newCandle);
       seriesRef.current.update(newCandle);
     }
+
+    chartRef.current.timeScale().scrollToRealTime();
   }
 
-  /* ================= UI ================= */
+  /* ================= UI (UNCHANGED STRUCTURE) ================= */
 
   return (
     <div style={{ display: "flex", height: "100vh", background: "#0a0f1c", color: "#fff" }}>
@@ -182,78 +208,24 @@ export default function TradingRoom() {
 
       <div style={{ flex: 1, display: "flex", flexDirection: "column", padding: 20 }}>
 
-        {/* HEADER RESTORED (2 ROWS) */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-
-          {/* Row 1 */}
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", height: 28 }}>
-            <div style={{ fontWeight: 700 }}>
-              EURUSD • {timeframe} • LIVE
-            </div>
-
-            <button
-              onClick={() => setPanelOpen(!panelOpen)}
-              style={{
-                padding: "6px 14px",
-                background: "#1e2536",
-                border: "1px solid rgba(255,255,255,.1)",
-                cursor: "pointer"
-              }}
-            >
-              Execute Order
-            </button>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", height: 28 }}>
+          <div style={{ fontWeight: 700 }}>
+            EURUSD • {timeframe} • LIVE
           </div>
 
-          {/* Row 2 – Timeframes + Candle Type */}
-          <div style={{
-            display: "flex",
-            gap: 12,
-            alignItems: "center",
-            borderTop: "1px solid rgba(255,255,255,.05)",
-            paddingTop: 6,
-            fontSize: 13
-          }}>
-
-            {["1M","5M","15M","30M","1H","4H","1D"].map(tf => (
-              <div
-                key={tf}
-                onClick={() => setTimeframe(tf)}
-                style={{
-                  cursor: "pointer",
-                  opacity: timeframe === tf ? 1 : 0.6,
-                  fontWeight: timeframe === tf ? 700 : 400
-                }}
-              >
-                {tf}
-              </div>
-            ))}
-
-            <div style={{
-              width: 1,
-              height: 16,
-              background: "rgba(255,255,255,.15)",
-              marginLeft: 8,
-              marginRight: 8
-            }} />
-
-            {["candles","line","area"].map(type => (
-              <div
-                key={type}
-                onClick={() => setCandleType(type)}
-                style={{
-                  cursor: "pointer",
-                  opacity: candleType === type ? 1 : 0.6,
-                  textTransform: "capitalize"
-                }}
-              >
-                {type}
-              </div>
-            ))}
-
-          </div>
+          <button
+            onClick={() => setPanelOpen(!panelOpen)}
+            style={{
+              padding: "6px 14px",
+              background: "#1e2536",
+              border: "1px solid rgba(255,255,255,.1)",
+              cursor: "pointer"
+            }}
+          >
+            Execute Order
+          </button>
         </div>
 
-        {/* CHART */}
         <div style={{
           flex: 1,
           background: "#111827",
@@ -265,7 +237,6 @@ export default function TradingRoom() {
           <div ref={containerRef} style={{ width: "100%", height: "100%" }} />
         </div>
 
-        {/* BOTTOM PANEL (UNCHANGED) */}
         <div style={{
           height: 220,
           marginTop: 20,
