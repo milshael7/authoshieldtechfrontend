@@ -1,6 +1,6 @@
 // frontend/src/pages/tools/ToolContext.jsx
 // Enterprise Tools Governance Context
-// v4 — Single Source of Truth • App-Aligned User • 401 Storm Guard • Drift Eliminated
+// v5 — Stable Session • No Auto-Nuke • Refresh Safe • Race Condition Removed
 
 import React, {
   createContext,
@@ -19,48 +19,45 @@ const ToolContext = createContext(null);
 
 export function ToolProvider({ user, children }) {
   const [loading, setLoading] = useState(true);
-
-  // User now comes from App (single source of truth)
   const [tools, setTools] = useState([]);
   const [myRequests, setMyRequests] = useState([]);
   const [inbox, setInbox] = useState([]);
   const [autodev, setAutodev] = useState(null);
 
   const base = import.meta.env.VITE_API_BASE?.replace(/\/+$/, "");
-
   const redirectingRef = useRef(false);
 
   /* =========================================================
-     SAFE FETCH
+     SAFE FETCH (NO HARD LOGOUT)
   ========================================================= */
 
   async function safeFetch(url, options = {}) {
     const token = getToken();
 
+    if (!token) return null;
+
     const headers = {
       ...(options.headers || {}),
+      Authorization: `Bearer ${token}`,
     };
 
-    if (token) {
-      headers.Authorization = `Bearer ${token}`;
-    }
+    try {
+      const res = await fetch(url, {
+        ...options,
+        headers,
+      });
 
-    const res = await fetch(url, {
-      ...options,
-      headers,
-    });
-
-    if (res.status === 401) {
-      if (!redirectingRef.current) {
-        redirectingRef.current = true;
-        clearToken();
-        clearUser();
-        window.location.href = "/login";
+      // 🔥 DO NOT AUTO LOGOUT ON 401
+      if (res.status === 401) {
+        console.warn("401 detected on:", url);
+        return null;
       }
+
+      return res;
+    } catch (err) {
+      console.warn("Fetch error on:", url);
       return null;
     }
-
-    return res;
   }
 
   /* =========================================================
@@ -133,10 +130,12 @@ export function ToolProvider({ user, children }) {
     async function initialize() {
       setLoading(true);
 
-      await loadTools();
-      await loadMyRequests();
-      await loadInbox();
-      await loadAutodev();
+      await Promise.all([
+        loadTools(),
+        loadMyRequests(),
+        loadInbox(),
+        loadAutodev(),
+      ]);
 
       setLoading(false);
     }
