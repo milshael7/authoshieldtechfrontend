@@ -1,8 +1,7 @@
 // frontend/src/pages/TradingRoom.jsx
 // ============================================================
-// TRADING ROOM — CLEAN BASE + PROFESSIONAL TOOLS
+// TRADING ROOM — RESTORED HEADER + LIVE MOVING CANDLES
 // SAME STRUCTURE • NO SIZE CHANGES
-// 1-MINUTE LIVE MOVING CANDLES
 // ============================================================
 
 import React, { useEffect, useRef, useState } from "react";
@@ -39,6 +38,7 @@ export default function TradingRoom() {
   const [panelOpen, setPanelOpen] = useState(true);
   const [activeTab, setActiveTab] = useState("positions");
   const [timeframe, setTimeframe] = useState("1M");
+  const [candleType, setCandleType] = useState("candles");
 
   /* ================= CHART INIT ================= */
 
@@ -104,7 +104,7 @@ export default function TradingRoom() {
     };
   }, []);
 
-  /* ================= SEED 1-MINUTE DATA ================= */
+  /* ================= SEED DATA ================= */
 
   function seedCandles() {
     const now = Math.floor(Date.now() / 1000);
@@ -114,7 +114,7 @@ export default function TradingRoom() {
     for (let i = 200; i > 0; i--) {
       const time = now - i * 60; // 1 minute candles
       const open = base;
-      const close = open + (Math.random() - 0.5) * 0.002;
+      const close = open + (Math.random() - 0.5) * 0.01;
       const high = Math.max(open, close);
       const low = Math.min(open, close);
 
@@ -182,24 +182,78 @@ export default function TradingRoom() {
 
       <div style={{ flex: 1, display: "flex", flexDirection: "column", padding: 20 }}>
 
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", height: 28 }}>
-          <div style={{ fontWeight: 700 }}>
-            EURUSD • {timeframe} • LIVE
+        {/* HEADER RESTORED (2 ROWS) */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+
+          {/* Row 1 */}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", height: 28 }}>
+            <div style={{ fontWeight: 700 }}>
+              EURUSD • {timeframe} • LIVE
+            </div>
+
+            <button
+              onClick={() => setPanelOpen(!panelOpen)}
+              style={{
+                padding: "6px 14px",
+                background: "#1e2536",
+                border: "1px solid rgba(255,255,255,.1)",
+                cursor: "pointer"
+              }}
+            >
+              Execute Order
+            </button>
           </div>
 
-          <button
-            onClick={() => setPanelOpen(!panelOpen)}
-            style={{
-              padding: "6px 14px",
-              background: "#1e2536",
-              border: "1px solid rgba(255,255,255,.1)",
-              cursor: "pointer"
-            }}
-          >
-            Execute Order
-          </button>
+          {/* Row 2 – Timeframes + Candle Type */}
+          <div style={{
+            display: "flex",
+            gap: 12,
+            alignItems: "center",
+            borderTop: "1px solid rgba(255,255,255,.05)",
+            paddingTop: 6,
+            fontSize: 13
+          }}>
+
+            {["1M","5M","15M","30M","1H","4H","1D"].map(tf => (
+              <div
+                key={tf}
+                onClick={() => setTimeframe(tf)}
+                style={{
+                  cursor: "pointer",
+                  opacity: timeframe === tf ? 1 : 0.6,
+                  fontWeight: timeframe === tf ? 700 : 400
+                }}
+              >
+                {tf}
+              </div>
+            ))}
+
+            <div style={{
+              width: 1,
+              height: 16,
+              background: "rgba(255,255,255,.15)",
+              marginLeft: 8,
+              marginRight: 8
+            }} />
+
+            {["candles","line","area"].map(type => (
+              <div
+                key={type}
+                onClick={() => setCandleType(type)}
+                style={{
+                  cursor: "pointer",
+                  opacity: candleType === type ? 1 : 0.6,
+                  textTransform: "capitalize"
+                }}
+              >
+                {type}
+              </div>
+            ))}
+
+          </div>
         </div>
 
+        {/* CHART */}
         <div style={{
           flex: 1,
           background: "#111827",
@@ -211,6 +265,7 @@ export default function TradingRoom() {
           <div ref={containerRef} style={{ width: "100%", height: "100%" }} />
         </div>
 
+        {/* BOTTOM PANEL (UNCHANGED) */}
         <div style={{
           height: 220,
           marginTop: 20,
