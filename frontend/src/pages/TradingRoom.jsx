@@ -1,12 +1,8 @@
 // frontend/src/pages/TradingRoom.jsx
 // ============================================================
-// TRADING ROOM — DARK DASHBOARD MATCH
-// Blueprint Layout + Platform Theme Integration
-//
-// ARCHITECTURAL LOCKS (DO NOT REMOVE):
-// 1) Same-origin WS (/ws/market)
-// 2) Snapshot polling fallback
-// 3) Role guard enforcement
+// TRADING ROOM — DARK BLUEPRINT MATCH (FINAL STRUCTURE)
+// Layout matched to AI blueprint
+// Backend architecture preserved
 // ============================================================
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
@@ -14,7 +10,7 @@ import { createChart } from "lightweight-charts";
 import { getSavedUser, getToken, req, api } from "../lib/api.js";
 import { Navigate } from "react-router-dom";
 
-/* ================= WS URL (KEEP SAME ORIGIN) ================= */
+/* ================= SAME-ORIGIN WS (DO NOT TOUCH) ================= */
 function buildWsUrl() {
   const token = getToken();
   if (!token) return null;
@@ -24,13 +20,9 @@ function buildWsUrl() {
   )}`;
 }
 
-function n(v, fallback = 0) {
+function n(v, f = 0) {
   const x = Number(v);
-  return Number.isFinite(x) ? x : fallback;
-}
-
-function clamp(v, min, max) {
-  return Math.max(min, Math.min(max, v));
+  return Number.isFinite(x) ? x : f;
 }
 
 export default function TradingRoom() {
@@ -52,35 +44,16 @@ export default function TradingRoom() {
   /* ================= STATE ================= */
   const [symbol, setSymbol] = useState("EURUSD");
   const [timeframe, setTimeframe] = useState("1D");
-
   const [snapshot, setSnapshot] = useState({});
-  const [snapshotLoading, setSnapshotLoading] = useState(true);
-
-  const [execOpen, setExecOpen] = useState(true);
-  const [execDocked, setExecDocked] = useState(true);
-  const [execPos, setExecPos] = useState({ x: 900, y: 110 });
-  const [dragging, setDragging] = useState(false);
-  const dragOffsetRef = useRef({ x: 0, y: 0 });
-
+  const [execOpen, setExecOpen] = useState(false);
   const [side, setSide] = useState("BUY");
-  const [orderType, setOrderType] = useState("LIMIT");
   const [orderPrice, setOrderPrice] = useState("");
   const [orderQty, setOrderQty] = useState("1000");
-  const [takeProfit, setTakeProfit] = useState("");
-  const [stopLoss, setStopLoss] = useState("");
-
   const [bottomTab, setBottomTab] = useState("positions");
-  const [signals, setSignals] = useState([]);
-  const [ticks, setTicks] = useState([]);
 
-  const lastPrice = useMemo(() => {
-    return snapshot?.lastPrice ?? ticks[0]?.price ?? null;
-  }, [snapshot, ticks]);
-
-  /* ================= SNAPSHOT (DO NOT REMOVE) ================= */
+  /* ================= SNAPSHOT POLLING (LOCK) ================= */
   async function loadSnapshot() {
     try {
-      setSnapshotLoading(true);
       let data = {};
       if (typeof api?.tradingLiveSnapshot === "function") {
         data = await api.tradingLiveSnapshot();
@@ -92,7 +65,6 @@ export default function TradingRoom() {
       }
       setSnapshot(data || {});
     } catch {}
-    setSnapshotLoading(false);
   }
 
   useEffect(() => {
@@ -108,7 +80,7 @@ export default function TradingRoom() {
     chartRef.current = createChart(chartContainerRef.current, {
       layout: {
         background: { color: "transparent" },
-        textColor: "rgba(255,255,255,.9)",
+        textColor: "#fff",
       },
       grid: {
         vertLines: { color: "rgba(255,255,255,.05)" },
@@ -136,7 +108,7 @@ export default function TradingRoom() {
     };
   }, []);
 
-  /* ================= WS (DO NOT REMOVE) ================= */
+  /* ================= WS (LOCK) ================= */
   useEffect(() => {
     const wsUrl = buildWsUrl();
     if (!wsUrl) return;
@@ -147,10 +119,7 @@ export default function TradingRoom() {
     ws.onmessage = (event) => {
       try {
         const msg = JSON.parse(event.data);
-        if (msg.type === "tick") {
-          updateCandle(msg.price, msg.ts);
-          setTicks((prev) => [{ price: n(msg.price), ts: msg.ts }, ...prev].slice(0, 20));
-        }
+        if (msg.type === "tick") updateCandle(msg.price, msg.ts);
       } catch {}
     };
 
@@ -176,16 +145,12 @@ export default function TradingRoom() {
     }
   }
 
-  /* ================= ORDER SUBMIT ================= */
   async function placeOrder() {
     const payload = {
       symbol,
       side,
-      type: orderType,
       quantity: n(orderQty),
       price: orderPrice ? n(orderPrice) : undefined,
-      takeProfit: takeProfit ? n(takeProfit) : undefined,
-      stopLoss: stopLoss ? n(stopLoss) : undefined,
       mode: "paper",
     };
 
@@ -198,13 +163,12 @@ export default function TradingRoom() {
     loadSnapshot();
   }
 
-  /* ================= STYLES ================= */
-
+  /* ================= THEME ================= */
   const page = {
     height: "calc(100vh - 60px)",
     padding: 12,
-    background: "linear-gradient(135deg, #0b0f19 0%, #111827 100%)",
-    color: "rgba(255,255,255,.92)",
+    background: "linear-gradient(135deg,#0b0f19 0%,#111827 100%)",
+    color: "#fff",
   };
 
   const card = {
@@ -214,11 +178,11 @@ export default function TradingRoom() {
     backdropFilter: "blur(12px)",
   };
 
-  const button = {
+  const btn = {
     background: "rgba(255,255,255,.05)",
     border: "1px solid rgba(255,255,255,.12)",
     borderRadius: 8,
-    padding: "8px 12px",
+    padding: "6px 10px",
     color: "#fff",
     cursor: "pointer",
   };
@@ -227,93 +191,111 @@ export default function TradingRoom() {
 
   return (
     <div style={page}>
-      {/* TOP BAR */}
-      <div style={{ ...card, display: "flex", justifyContent: "space-between", padding: 10 }}>
+
+      {/* ===== TOP TOOLBAR (Blueprint Style) ===== */}
+      <div style={{ ...card, padding: 10, display: "flex", justifyContent: "space-between" }}>
         <div style={{ display: "flex", gap: 8 }}>
-          <select value={symbol} onChange={(e) => setSymbol(e.target.value)} style={button}>
+          <select value={symbol} onChange={(e) => setSymbol(e.target.value)} style={btn}>
             <option>EURUSD</option>
             <option>BTCUSDT</option>
           </select>
 
-          <select value={timeframe} onChange={(e) => setTimeframe(e.target.value)} style={button}>
+          <select value={timeframe} onChange={(e) => setTimeframe(e.target.value)} style={btn}>
             <option>1D</option>
             <option>4H</option>
           </select>
         </div>
 
-        <div style={{ display: "flex", gap: 10 }}>
-          <button style={button} onClick={() => setExecOpen(true)}>
-            Execute Order
-          </button>
-        </div>
+        <button style={btn} onClick={() => setExecOpen(true)}>
+          Execute Order
+        </button>
       </div>
 
-      {/* MAIN */}
+      {/* ===== MAIN GRID ===== */}
       <div style={{ display: "flex", gap: 12, marginTop: 12 }}>
+
+        {/* LEFT TOOL RAIL */}
+        <div style={{ ...card, width: 50, padding: 8, display: "flex", flexDirection: "column", gap: 10 }}>
+          {["↖","✎","╱","T","⌁","⎘","⊕","⚲","⌂","👁"].map((i,idx)=>(
+            <div key={idx}>{i}</div>
+          ))}
+        </div>
+
         {/* CHART */}
-        <div style={{ ...card, flex: 1, padding: 12 }}>
+        <div style={{ ...card, flex: 1, padding: 12, position:"relative" }}>
           <div style={{ fontWeight: 900, marginBottom: 8 }}>
             {symbol} • {timeframe} • PAPER
           </div>
-          <div ref={chartContainerRef} style={{ height: 400 }} />
+          <div ref={chartContainerRef} style={{ height: 420 }} />
         </div>
-
-        {/* EXEC PANEL */}
-        {execOpen && (
-          <div style={{ ...card, width: 320, padding: 12 }}>
-            <div style={{ fontWeight: 900, marginBottom: 10 }}>
-              Execute Order
-            </div>
-
-            <div style={{ display: "flex", gap: 6 }}>
-              <button
-                style={{
-                  ...button,
-                  background: side === "BUY" ? "#22c55e" : "rgba(255,255,255,.05)",
-                }}
-                onClick={() => setSide("BUY")}
-              >
-                BUY
-              </button>
-              <button
-                style={{
-                  ...button,
-                  background: side === "SELL" ? "#ef4444" : "rgba(255,255,255,.05)",
-                }}
-                onClick={() => setSide("SELL")}
-              >
-                SELL
-              </button>
-            </div>
-
-            <input
-              value={orderPrice}
-              onChange={(e) => setOrderPrice(e.target.value)}
-              placeholder="Order Price"
-              style={{ ...button, width: "100%", marginTop: 8 }}
-            />
-
-            <input
-              value={orderQty}
-              onChange={(e) => setOrderQty(e.target.value)}
-              placeholder="Quantity"
-              style={{ ...button, width: "100%", marginTop: 8 }}
-            />
-
-            <button
-              style={{
-                ...button,
-                width: "100%",
-                marginTop: 10,
-                background: side === "BUY" ? "#22c55e" : "#ef4444",
-              }}
-              onClick={placeOrder}
-            >
-              Confirm {side}
-            </button>
-          </div>
-        )}
       </div>
+
+      {/* ===== BOTTOM TERMINAL ===== */}
+      <div style={{ ...card, marginTop: 12, padding: 12 }}>
+        <div style={{ display: "flex", gap: 12 }}>
+          {["positions","orders","history","account"].map(t=>(
+            <div key={t}
+              style={{ cursor:"pointer", opacity: bottomTab===t?1:.6 }}
+              onClick={()=>setBottomTab(t)}>
+              {t.toUpperCase()}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ===== FLOATING EXEC PANEL (TOP BUTTON TRIGGER) ===== */}
+      {execOpen && (
+        <div style={{
+          position:"fixed",
+          right:40,
+          top:120,
+          width:320,
+          ...card,
+          padding:14
+        }}>
+          <div style={{ fontWeight:900, marginBottom:10 }}>Execute Order</div>
+
+          <div style={{ display:"flex", gap:6 }}>
+            <button style={{ ...btn, background: side==="BUY"?"#22c55e":"rgba(255,255,255,.05)" }}
+              onClick={()=>setSide("BUY")}>BUY</button>
+            <button style={{ ...btn, background: side==="SELL"?"#ef4444":"rgba(255,255,255,.05)" }}
+              onClick={()=>setSide("SELL")}>SELL</button>
+          </div>
+
+          <input
+            value={orderPrice}
+            onChange={(e)=>setOrderPrice(e.target.value)}
+            placeholder="Order Price"
+            style={{ ...btn, width:"100%", marginTop:8 }}
+          />
+
+          <input
+            value={orderQty}
+            onChange={(e)=>setOrderQty(e.target.value)}
+            placeholder="Quantity"
+            style={{ ...btn, width:"100%", marginTop:8 }}
+          />
+
+          <button
+            onClick={placeOrder}
+            style={{
+              ...btn,
+              width:"100%",
+              marginTop:10,
+              background: side==="BUY"?"#22c55e":"#ef4444"
+            }}>
+            Confirm {side}
+          </button>
+
+          <div style={{ marginTop:8, fontSize:11, opacity:.6 }}>
+            Mode: PAPER • Owner: ADMIN • Supervisor: MANAGER
+          </div>
+
+          <div style={{ textAlign:"right", marginTop:8 }}>
+            <button style={btn} onClick={()=>setExecOpen(false)}>Close</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
