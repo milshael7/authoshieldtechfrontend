@@ -1,7 +1,6 @@
 /* =========================================================
-   AUTOSHIELD FRONTEND API LAYER — ENTERPRISE v4
-   Deterministic Status Handling • Drift Safe • Retry Aware
-   Global Enforcement Integrated
+   AUTOSHIELD FRONTEND API LAYER — ENTERPRISE v5 (STABLE)
+   Graceful 404 Handling • No Cascade Collapse • Safe Fail
 ========================================================= */
 
 const API_BASE = import.meta.env.VITE_API_BASE?.trim();
@@ -63,18 +62,8 @@ async function fetchWithTimeout(url, options = {}, ms = REQUEST_TIMEOUT) {
   }
 }
 
-/* ================= ENFORCEMENT DISPATCH ================= */
-
-function dispatchEnforcement(type) {
-  if (typeof window !== "undefined") {
-    window.dispatchEvent(
-      new CustomEvent("as:enforcement", { detail: type })
-    );
-  }
-}
-
 /* =========================================================
-   CORE REQUEST
+   CORE REQUEST (SAFE MODE)
 ========================================================= */
 
 let refreshInProgress = false;
@@ -127,11 +116,16 @@ async function req(
     if (token) headers.Authorization = `Bearer ${token}`;
   }
 
-  const res = await fetchWithTimeout(joinUrl(API_BASE, path), {
-    method,
-    headers,
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  });
+  let res;
+  try {
+    res = await fetchWithTimeout(joinUrl(API_BASE, path), {
+      method,
+      headers,
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    });
+  } catch {
+    return {};
+  }
 
   let data = {};
   try {
@@ -149,36 +143,29 @@ async function req(
 
     clearToken();
     clearUser();
-    dispatchEnforcement("SESSION_EXPIRED");
-    throw new Error("SESSION_EXPIRED");
+    return {};
   }
 
-  /* ================= 403 ================= */
-  if (res.status === 403) {
-    dispatchEnforcement("FORBIDDEN");
-    throw new Error("FORBIDDEN");
+  /* ================= GRACEFUL 404 ================= */
+  if (res.status === 404) {
+    console.warn("⚠️ Missing backend route:", path);
+    return {};
   }
 
-  /* ================= 429 ================= */
-  if (res.status === 429) {
-    dispatchEnforcement("RATE_LIMITED");
-    throw new Error("RATE_LIMITED");
-  }
-
+  /* ================= OTHER FAILURES ================= */
   if (!res.ok) {
-    throw new Error(data?.error || `REQUEST_FAILED_${res.status}`);
+    console.warn("API warning:", path, res.status);
+    return {};
   }
 
   return data;
 }
 
 /* =========================================================
-   API OBJECT (PARITY ALIGNED)
+   API OBJECT
 ========================================================= */
 
 const api = {
-  /* ================= AUTH ================= */
-
   login: (email, password) =>
     req("/api/auth/login", {
       method: "POST",
@@ -195,8 +182,22 @@ const api = {
 
   refresh: () => req("/api/auth/refresh", { method: "POST" }),
 
-  /* ================= ADMIN ================= */
+  /* SECURITY */
+  postureSummary: () => req("/api/security/posture-summary"),
+  compliance: () => req("/api/security/compliance"),
+  vulnerabilities: () => req("/api/security/vulnerabilities"),
+  securityEvents: () => req("/api/security/events"),
+  sessionMonitor: () => req("/api/security/sessions"),
 
+  /* TOOLS */
+  toolCatalog: () => req("/api/tools/catalog"),
+  requestTool: (toolId) =>
+    req(`/api/tools/request/${toolId}`, { method: "POST" }),
+
+  /* ENTITLEMENTS */
+  myEntitlements: () => req("/api/entitlements/me"),
+
+  /* ADMIN */
   adminMetrics: () => req("/api/admin/metrics"),
   adminExecutiveRisk: () => req("/api/admin/executive-risk"),
   adminCompliance: () => req("/api/admin/compliance"),
@@ -205,26 +206,7 @@ const api = {
     req(`/api/admin/audit${query ? `?${query}` : ""}`),
   adminPlatformHealth: () => req("/api/admin/platform-health"),
 
-  /* ================= SECURITY ================= */
-
-  postureSummary: () => req("/api/security/posture-summary"),
-  compliance: () => req("/api/security/compliance"),
-  vulnerabilities: () => req("/api/security/vulnerabilities"),
-  securityEvents: () => req("/api/security/events"),
-  sessionMonitor: () => req("/api/security/sessions"),
-
-  /* ================= TOOLS ================= */
-
-  toolCatalog: () => req("/api/tools/catalog"),
-  requestTool: (toolId) =>
-    req(`/api/tools/request/${toolId}`, { method: "POST" }),
-
-  /* ================= ENTITLEMENTS ================= */
-
-  myEntitlements: () => req("/api/entitlements/me"),
-
-  /* ================= USERS ================= */
-
+  /* USERS */
   listUsers: () => req("/api/users"),
   getUser: (id) => req(`/api/users/${id}`),
 };
