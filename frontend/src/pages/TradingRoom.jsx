@@ -1,7 +1,6 @@
 // frontend/src/pages/TradingRoom.jsx
 // ============================================================
-// TRADING ROOM — INSTITUTIONAL TERMINAL v2
-// Full Layout Architecture Upgrade
+// TRADING ROOM — DRAWING ENGINE PHASE 1
 // ============================================================
 
 import React, { useEffect, useRef, useState } from "react";
@@ -30,32 +29,18 @@ export default function TradingRoom() {
   }
 
   const chartContainerRef = useRef(null);
+  const overlayRef = useRef(null);
   const chartRef = useRef(null);
+  const seriesRef = useRef(null);
+
+  const [drawingMode, setDrawingMode] = useState(null); // "trend" | "ruler"
+  const [drawings, setDrawings] = useState([]);
+  const [currentDraw, setCurrentDraw] = useState(null);
 
   const [symbol, setSymbol] = useState("EURUSD");
-  const [timeframe, setTimeframe] = useState("1D");
-  const [activeTab, setActiveTab] = useState("positions");
-  const [execOpen, setExecOpen] = useState(false);
-
-  const [snapshot, setSnapshot] = useState({});
   const [lastPrice, setLastPrice] = useState(null);
-  const [priceColor, setPriceColor] = useState("#ffffff");
 
-  /* ================= SNAPSHOT ================= */
-
-  useEffect(() => {
-    const load = async () => {
-      let data = {};
-      if (api?.tradingLiveSnapshot) data = await api.tradingLiveSnapshot();
-      else data = await req("/api/trading/live-snapshot");
-      setSnapshot(data || {});
-    };
-    load();
-    const i = setInterval(load, 5000);
-    return () => clearInterval(i);
-  }, []);
-
-  /* ================= CHART ================= */
+  /* ================= CHART INIT ================= */
 
   useEffect(() => {
     if (!chartContainerRef.current) return;
@@ -66,13 +51,11 @@ export default function TradingRoom() {
         vertLines: { color: "rgba(255,255,255,.04)" },
         horzLines: { color: "rgba(255,255,255,.04)" },
       },
-      rightPriceScale: { borderColor: "rgba(255,255,255,.08)" },
-      timeScale: { borderColor: "rgba(255,255,255,.08)" },
       width: chartContainerRef.current.clientWidth,
       height: chartContainerRef.current.clientHeight,
     });
 
-    chartRef.current.addCandlestickSeries({
+    seriesRef.current = chartRef.current.addCandlestickSeries({
       upColor: "#16a34a",
       downColor: "#dc2626",
       wickUpColor: "#16a34a",
@@ -85,6 +68,7 @@ export default function TradingRoom() {
         width: chartContainerRef.current.clientWidth,
         height: chartContainerRef.current.clientHeight,
       });
+      drawOverlay();
     };
 
     window.addEventListener("resize", resize);
@@ -94,31 +78,100 @@ export default function TradingRoom() {
     };
   }, []);
 
-  /* ================= WEBSOCKET ================= */
+  /* ================= DRAWING ENGINE ================= */
+
+  function chartToCanvasCoords(param) {
+    if (!param || !param.point) return null;
+    const price = seriesRef.current.coordinateToPrice(param.point.y);
+    const time = param.time;
+    return {
+      x: param.point.x,
+      y: param.point.y,
+      price,
+      time,
+    };
+  }
+
+  function handleMouseDown(param) {
+    if (!drawingMode) return;
+    const coords = chartToCanvasCoords(param);
+    if (!coords) return;
+
+    setCurrentDraw({
+      mode: drawingMode,
+      start: coords,
+      end: coords,
+    });
+  }
+
+  function handleMouseMove(param) {
+    if (!currentDraw) return;
+    const coords = chartToCanvasCoords(param);
+    if (!coords) return;
+
+    setCurrentDraw(prev => ({
+      ...prev,
+      end: coords,
+    }));
+  }
+
+  function handleMouseUp() {
+    if (!currentDraw) return;
+    setDrawings(prev => [...prev, currentDraw]);
+    setCurrentDraw(null);
+  }
 
   useEffect(() => {
-    const wsUrl = buildWsUrl();
-    if (!wsUrl) return;
+    if (!chartRef.current) return;
 
-    const ws = new WebSocket(wsUrl);
+    chartRef.current.subscribeCrosshairMove(handleMouseMove);
+    chartRef.current.subscribeClick(handleMouseDown);
 
-    ws.onmessage = (e) => {
-      try {
-        const msg = JSON.parse(e.data);
-        if (msg.type === "tick") {
-          const price = n(msg.price);
-          setPriceColor(prev =>
-            lastPrice && price > lastPrice ? "#16a34a" :
-            lastPrice && price < lastPrice ? "#dc2626" :
-            prev
-          );
-          setLastPrice(price);
-        }
-      } catch {}
+    const container = chartContainerRef.current;
+    container.addEventListener("mouseup", handleMouseUp);
+
+    return () => {
+      chartRef.current.unsubscribeCrosshairMove(handleMouseMove);
+      chartRef.current.unsubscribeClick(handleMouseDown);
+      container.removeEventListener("mouseup", handleMouseUp);
     };
+  }, [currentDraw, drawingMode]);
 
-    return () => ws.close();
-  }, [symbol, lastPrice]);
+  function drawOverlay() {
+    const canvas = overlayRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext("2d");
+    canvas.width = canvas.offsetWidth;
+    canvas.height = canvas.offsetHeight;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.strokeStyle = "#3b82f6";
+    ctx.lineWidth = 1.5;
+
+    [...drawings, currentDraw].forEach(draw => {
+      if (!draw) return;
+
+      const { start, end, mode } = draw;
+      ctx.beginPath();
+      ctx.moveTo(start.x, start.y);
+      ctx.lineTo(end.x, end.y);
+      ctx.stroke();
+
+      if (mode === "ruler") {
+        const diff = end.price - start.price;
+        const pct = ((diff / start.price) * 100).toFixed(2);
+        ctx.fillStyle = "#ffffff";
+        ctx.fillText(`${diff.toFixed(2)} (${pct}%)`, end.x + 6, end.y - 6);
+      }
+    });
+  }
+
+  useEffect(() => {
+    drawOverlay();
+  }, [drawings, currentDraw]);
+
+  /* ================= UI ================= */
 
   return (
     <div style={{
@@ -129,149 +182,56 @@ export default function TradingRoom() {
       color: "#d1d5db"
     }}>
 
-      {/* ================= TOP BAR ================= */}
+      {/* LEFT TOOL RAIL */}
       <div style={{
         position: "absolute",
         top: 0,
-        left: 0,
-        right: 0,
-        height: 40,
-        background: "#111827",
-        display: "flex",
-        alignItems: "center",
-        padding: "0 12px",
-        borderBottom: "1px solid rgba(255,255,255,.06)",
-        zIndex: 20
-      }}>
-        <div style={{ fontWeight: 700 }}>
-          {symbol} · {timeframe}
-        </div>
-
-        <div style={{ marginLeft: 12 }}>
-          <select value={symbol} onChange={(e)=>setSymbol(e.target.value)}>
-            <option>EURUSD</option>
-            <option>BTCUSDT</option>
-          </select>
-        </div>
-
-        <div style={{ marginLeft: 6 }}>
-          <select value={timeframe} onChange={(e)=>setTimeframe(e.target.value)}>
-            <option>1D</option>
-            <option>4H</option>
-            <option>1H</option>
-          </select>
-        </div>
-
-        <div style={{ marginLeft: "auto", color: priceColor, fontWeight: 700 }}>
-          {lastPrice ? lastPrice.toFixed(5) : "--"}
-        </div>
-      </div>
-
-      {/* ================= LEFT TOOL RAIL ================= */}
-      <div style={{
-        position: "absolute",
-        top: 40,
-        bottom: 200,
+        bottom: 0,
         left: 0,
         width: 46,
         background: "#111827",
-        borderRight: "1px solid rgba(255,255,255,.06)",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
-        paddingTop: 8,
-        gap: 12
+        paddingTop: 12,
+        gap: 12,
+        zIndex: 20
       }}>
-        {["✎","╱","T","⌁","⊕","⚲","👁"].map((i,idx)=>(
-          <div key={idx} style={{
-            width:32,
-            height:32,
-            display:"flex",
-            alignItems:"center",
-            justifyContent:"center",
-            borderRadius:4,
-            cursor:"pointer",
-            opacity:.7
-          }}>
-            {i}
-          </div>
-        ))}
+        <div onClick={()=>setDrawingMode("trend")} style={{cursor:"pointer"}}>
+          📈
+        </div>
+        <div onClick={()=>setDrawingMode("ruler")} style={{cursor:"pointer"}}>
+          📏
+        </div>
+        <div onClick={()=>setDrawingMode(null)} style={{cursor:"pointer"}}>
+          ✖
+        </div>
       </div>
 
-      {/* ================= RIGHT WATCHLIST ================= */}
-      <div style={{
-        position: "absolute",
-        top: 40,
-        bottom: 200,
-        right: 0,
-        width: 220,
-        background: "#111827",
-        borderLeft: "1px solid rgba(255,255,255,.06)",
-        padding: 12
-      }}>
-        <div style={{ fontWeight: 700, marginBottom: 10 }}>Watchlist</div>
-        {["EURUSD","BTCUSDT"].map(s=>(
-          <div key={s} style={{
-            padding:"6px 4px",
-            cursor:"pointer",
-            fontSize:14
-          }} onClick={()=>setSymbol(s)}>
-            {s}
-          </div>
-        ))}
-      </div>
-
-      {/* ================= CHART AREA ================= */}
+      {/* CHART */}
       <div
         ref={chartContainerRef}
         style={{
           position: "absolute",
-          top: 40,
           left: 46,
-          right: 220,
-          bottom: 200
+          right: 0,
+          top: 0,
+          bottom: 0,
         }}
       />
 
-      {/* ================= BOTTOM TERMINAL ================= */}
-      <div style={{
-        position: "absolute",
-        bottom: 0,
-        left: 0,
-        right: 0,
-        height: 200,
-        background: "#111827",
-        borderTop: "1px solid rgba(255,255,255,.06)"
-      }}>
-        <div style={{
-          display: "flex",
-          borderBottom: "1px solid rgba(255,255,255,.06)"
-        }}>
-          {["positions","orders","history"].map(tab=>(
-            <div key={tab}
-              onClick={()=>setActiveTab(tab)}
-              style={{
-                padding:"10px 16px",
-                cursor:"pointer",
-                background: activeTab===tab ? "#1f2937" : "transparent"
-              }}>
-              {tab.toUpperCase()}
-            </div>
-          ))}
-        </div>
-
-        <div style={{ padding: 12 }}>
-          {activeTab==="positions" && (
-            <div>Open Positions: {snapshot?.positions?.length ?? 0}</div>
-          )}
-          {activeTab==="orders" && (
-            <div>Pending Orders</div>
-          )}
-          {activeTab==="history" && (
-            <div>Trade History</div>
-          )}
-        </div>
-      </div>
+      {/* OVERLAY CANVAS */}
+      <canvas
+        ref={overlayRef}
+        style={{
+          position: "absolute",
+          left: 46,
+          right: 0,
+          top: 0,
+          bottom: 0,
+          pointerEvents: "none"
+        }}
+      />
 
     </div>
   );
