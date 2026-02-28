@@ -1,5 +1,6 @@
 /* =========================================================
-   AUTOSHIELD FRONTEND API LAYER — ENTERPRISE v6 (SYNCED)
+   AUTOSHIELD FRONTEND API LAYER — ENTERPRISE v7 (TRADING FIXED)
+   Stable • No Crash • Trading Synced
 ========================================================= */
 
 const API_BASE = import.meta.env.VITE_API_BASE?.trim();
@@ -132,6 +133,9 @@ const api = {
   vulnerabilities: () => req("/api/security/vulnerabilities"),
   securityEvents: () => req("/api/security/events"),
   sessionMonitor: () => req("/api/security/sessions"),
+
+  /* 🔥 TRADING (FIXED) */
+  tradingLiveSnapshot: () => req("/api/trading/live-snapshot"),
 
   /* TOOLS */
   toolCatalog: () => req("/api/tools/catalog"),
