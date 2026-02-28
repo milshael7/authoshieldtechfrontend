@@ -1,275 +1,326 @@
-// frontend/src/pages/TradingRoom.jsx
-// ============================================================
-// TRADING ROOM — LIVE TERMINAL + NEWS + SIGNALS
-// SAME LAYOUT • PROFESSIONAL CANDLES • TOOL SIDEBAR ADDED
-// ============================================================
+// frontend/src/layouts/AdminLayout.jsx
+// Enterprise Admin Layout — Hardened v3
+// Status Aware • WS Indicator • Role Badge • Scope Visible • Blueprint Aligned
 
-import React, { useEffect, useRef, useState } from "react";
-import { createChart } from "lightweight-charts";
-import { getSavedUser, getToken } from "../lib/api.js";
-import { Navigate } from "react-router-dom";
+import React, { useEffect, useState } from "react";
+import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { clearToken, clearUser, getSavedUser } from "../lib/api.js";
+import { useCompany } from "../context/CompanyContext";
+import { useSecurity } from "../context/SecurityContext.jsx";
+import AuthoDevPanel from "../components/AuthoDevPanel.jsx";
+import Logo from "../components/Logo.jsx";
+import "../styles/layout.css";
 
-function buildWsUrl() {
-  const token = getToken();
-  if (!token) return null;
-  const protocol = window.location.protocol === "https:" ? "wss://" : "ws://";
-  return `${protocol}${window.location.host}/ws/market?token=${encodeURIComponent(token)}`;
-}
-
-function n(v) {
-  const x = Number(v);
-  return Number.isFinite(x) ? x : 0;
-}
-
-/* ================= SVG ICONS ================= */
-
-const Icon = ({ children }) => (
-  <svg
-    width="18"
-    height="18"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="rgba(255,255,255,.8)"
-    strokeWidth="1.5"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    {children}
-  </svg>
-);
-
-export default function TradingRoom() {
+export default function AdminLayout() {
+  const navigate = useNavigate();
+  const { activeCompanyId } = useCompany();
+  const { wsStatus, systemStatus } = useSecurity();
 
   const user = getSavedUser();
-  const role = String(user?.role || "").toLowerCase();
-  if (!user || (role !== "admin" && role !== "manager")) {
-    return <Navigate to="/admin" replace />;
-  }
 
-  const chartRef = useRef(null);
-  const seriesRef = useRef(null);
-  const containerRef = useRef(null);
-  const candleDataRef = useRef([]);
-  const wsRef = useRef(null);
+  const [advisorOpen, setAdvisorOpen] = useState(() => {
+    const saved = localStorage.getItem("admin.advisor.open");
+    return saved !== "false";
+  });
 
-  const [panelOpen, setPanelOpen] = useState(true);
-  const [activeTab, setActiveTab] = useState("positions");
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 900);
 
-  /* ================= CHART INIT ================= */
+  const DRAWER_OPEN_W = 360;
+  const DRAWER_CLOSED_W = 26;
+  const drawerWidth = advisorOpen ? DRAWER_OPEN_W : DRAWER_CLOSED_W;
 
   useEffect(() => {
-    if (!containerRef.current) return;
+    localStorage.setItem("admin.advisor.open", advisorOpen);
+  }, [advisorOpen]);
 
-    chartRef.current = createChart(containerRef.current, {
-      layout: {
-        background: { color: "#0f1626" },
-        textColor: "#d1d5db",
-      },
-      grid: {
-        vertLines: { color: "rgba(255,255,255,.04)" },
-        horzLines: { color: "rgba(255,255,255,.04)" },
-      },
-      rightPriceScale: {
-        borderColor: "rgba(255,255,255,.1)",
-      },
-      timeScale: {
-        borderColor: "rgba(255,255,255,.1)",
-        timeVisible: true,
-      },
-      width: containerRef.current.clientWidth,
-      height: containerRef.current.clientHeight,
-    });
-
-    seriesRef.current = chartRef.current.addCandlestickSeries({
-      upColor: "#16a34a",
-      downColor: "#dc2626",
-      wickUpColor: "#16a34a",
-      wickDownColor: "#dc2626",
-      borderUpColor: "#16a34a",
-      borderDownColor: "#dc2626",
-      borderVisible: true,
-      wickVisible: true,
-      priceLineVisible: true,
-      lastValueVisible: true,
-      priceFormat: {
-        type: "price",
-        precision: 5,
-        minMove: 0.00001,
-      }
-    });
-
-    chartRef.current.timeScale().applyOptions({
-      barSpacing: 6,
-      rightBarStaysOnScroll: true,
-    });
-
-    seedCandles();
-    chartRef.current.timeScale().fitContent();
-
-    const resizeObserver = new ResizeObserver(entries => {
-      const { width, height } = entries[0].contentRect;
-      chartRef.current.applyOptions({ width, height });
-    });
-
-    resizeObserver.observe(containerRef.current);
-
-    return () => {
-      resizeObserver.disconnect();
-      chartRef.current?.remove();
-    };
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 900);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
   }, []);
 
-  function seedCandles() {
-    const now = Math.floor(Date.now() / 1000);
-    const candles = [];
-    let base = 1.1000;
-
-    for (let i = 200; i > 0; i--) {
-      const time = now - i * 3600;
-      const open = base;
-      const close = open + (Math.random() - 0.5) * 0.01;
-      const high = Math.max(open, close) + Math.random() * 0.003;
-      const low = Math.min(open, close) - Math.random() * 0.003;
-
-      candles.push({ time, open, high, low, close });
-      base = close;
-    }
-
-    candleDataRef.current = candles;
-    seriesRef.current.setData(candles);
+  function logout() {
+    clearToken();
+    clearUser();
+    navigate("/login");
   }
 
-  /* ================= UI ================= */
+  const navClass = ({ isActive }) =>
+    isActive ? "nav-link active" : "nav-link";
+
+  /* ================= STATUS COLORS ================= */
+
+  function wsColor() {
+    if (wsStatus === "connected") return "#22c55e";
+    if (wsStatus === "reconnecting") return "#f59e0b";
+    return "#ef4444";
+  }
+
+  function systemColor() {
+    return systemStatus === "compromised" ? "#ef4444" : "#22c55e";
+  }
+
+  const subscriptionStatus = user?.subscriptionStatus || "Unknown";
 
   return (
-    <div style={{
-      display: "flex",
-      height: "100vh",
-      background: "#0a0f1c",
-      color: "#fff"
-    }}>
+    <div className="layout-root enterprise">
+      {/* ================= SIDEBAR ================= */}
+      <aside className="layout-sidebar admin">
+        <div className="layout-brand">
+          <Logo size="md" />
+          <span className="muted" style={{ fontSize: 12 }}>
+            Enterprise Administration
+          </span>
+        </div>
 
-      {/* LEFT RAIL — EXACT TOOL ORDER */}
-      <div style={{
-        width: 60,
-        background: "#111827",
-        borderRight: "1px solid rgba(255,255,255,.08)",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        paddingTop: 14,
-        gap: 16
-      }}>
+        <nav className="layout-nav">
+          <NavLink to="." end className={navClass}>
+            Dashboard
+          </NavLink>
 
-        {/* Crosshair */}
-        <Icon><line x1="4" y1="12" x2="20" y2="12"/><line x1="12" y1="4" x2="12" y2="20"/></Icon>
+          <hr />
 
-        {/* Trend Line */}
-        <Icon><line x1="5" y1="19" x2="19" y2="5"/><circle cx="5" cy="19" r="1.5"/><circle cx="19" cy="5" r="1.5"/></Icon>
+          <div className="nav-section-label">Security Command</div>
 
-        {/* Brush */}
-        <Icon><path d="M4 20c4-8 8-4 12-12"/></Icon>
+          <NavLink to="security" className={navClass}>
+            Security Overview
+          </NavLink>
 
-        {/* Curve */}
-        <Icon><path d="M4 16c4-8 8 8 16-4"/></Icon>
+          <NavLink to="risk" className={navClass}>
+            Risk Monitor
+          </NavLink>
 
-        {/* Text */}
-        <Icon><line x1="4" y1="6" x2="20" y2="6"/><line x1="12" y1="6" x2="12" y2="20"/></Icon>
+          <NavLink to="sessions" className={navClass}>
+            Session Monitor
+          </NavLink>
 
-        {/* Pattern */}
-        <Icon><circle cx="6" cy="6" r="1.5"/><circle cx="18" cy="6" r="1.5"/><circle cx="6" cy="18" r="1.5"/><circle cx="18" cy="18" r="1.5"/><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></Icon>
+          <NavLink to="device-integrity" className={navClass}>
+            Device Integrity
+          </NavLink>
 
-        {/* Parallel */}
-        <Icon><line x1="4" y1="8" x2="20" y2="8"/><line x1="4" y1="16" x2="20" y2="16"/></Icon>
+          <NavLink to="trading" className={navClass}>
+            Internal Trading
+          </NavLink>
 
-        <div style={{ width:"60%", height:1, background:"rgba(255,255,255,.1)" }} />
+          <hr />
 
-        {/* Ruler */}
-        <Icon><line x1="4" y1="16" x2="20" y2="8"/></Icon>
+          <div className="nav-section-label">Security Modules</div>
 
-        {/* Zoom */}
-        <Icon><circle cx="11" cy="11" r="6"/><line x1="20" y1="20" x2="16" y2="16"/></Icon>
+          <NavLink to="assets" className={navClass}>
+            Assets
+          </NavLink>
 
-        <div style={{ width:"60%", height:1, background:"rgba(255,255,255,.1)" }} />
+          <NavLink to="incidents" className={navClass}>
+            Incident Management
+          </NavLink>
 
-        {/* Magnet */}
-        <Icon><path d="M6 6v6a6 6 0 0 0 12 0V6"/></Icon>
+          <NavLink to="vulnerabilities" className={navClass}>
+            Vulnerability Oversight
+          </NavLink>
 
-        {/* Lock */}
-        <Icon><rect x="6" y="10" width="12" height="10"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></Icon>
+          <NavLink to="compliance" className={navClass}>
+            Regulatory Compliance
+          </NavLink>
 
-      </div>
+          <NavLink to="reports" className={navClass}>
+            Executive Reporting
+          </NavLink>
 
-      {/* CENTER */}
-      <div style={{
-        flex: 1,
-        display: "flex",
-        flexDirection: "column",
-        padding: 20,
-      }}>
+          <hr />
 
-        {/* TOP BAR — TOOLS INTEGRATED */}
-        <div style={{
-          height: 50,
+          <div className="nav-section-label">Platform Intelligence</div>
+
+          <NavLink to="audit" className={navClass}>
+            Audit Explorer
+          </NavLink>
+
+          <NavLink to="global" className={navClass}>
+            Global Control
+          </NavLink>
+
+          <NavLink to="notifications" className={navClass}>
+            System Notifications
+          </NavLink>
+
+          <hr />
+
+          <div className="nav-section-label">Operational Oversight</div>
+
+          <NavLink to="companies" className={navClass}>
+            Company Oversight
+          </NavLink>
+
+          <NavLink to="/manager" className={navClass}>
+            Manager Command
+          </NavLink>
+
+          <NavLink to="/company" className={navClass}>
+            Corporate Entities
+          </NavLink>
+
+          <NavLink to="/user" className={navClass}>
+            User Governance
+          </NavLink>
+        </nav>
+
+        <button className="btn logout-btn" onClick={logout}>
+          Secure Log Out
+        </button>
+      </aside>
+
+      {/* ================= MAIN ================= */}
+      <div
+        className="enterprise-main"
+        style={{
+          marginRight: isMobile ? 0 : drawerWidth,
+          transition: "margin-right .22s ease",
           display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between"
-        }}>
-
-          <div style={{ display:"flex", alignItems:"center", gap:20 }}>
-            <div style={{fontWeight:700}}>
-              EURUSD • 1D • PAPER
+          flexDirection: "column",
+        }}
+      >
+        {/* ===== ENTERPRISE STATUS BAR ===== */}
+        <div
+          style={{
+            height: 28,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "0 18px",
+            borderBottom: "1px solid rgba(255,255,255,.05)",
+            background: "rgba(255,255,255,.015)",
+            fontSize: 11,
+            letterSpacing: ".05em",
+          }}
+        >
+          {/* LEFT */}
+          <div style={{ display: "flex", gap: 18, alignItems: "center" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <div
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: "50%",
+                  background: wsColor(),
+                }}
+              />
+              <span style={{ opacity: 0.7 }}>
+                WS: {wsStatus.toUpperCase()}
+              </span>
             </div>
 
-            {/* Timeframe tools */}
-            <div style={{ display:"flex", gap:10 }}>
-              <button style={{background:"transparent", border:"none", color:"#fff", cursor:"pointer"}}>1m</button>
-              <button style={{background:"transparent", border:"none", color:"#fff", cursor:"pointer"}}>30m</button>
-              <button style={{background:"transparent", border:"none", color:"#fff", cursor:"pointer"}}>1h</button>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <div
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: "50%",
+                  background: systemColor(),
+                }}
+              />
+              <span style={{ opacity: 0.7 }}>
+                SYSTEM: {systemStatus.toUpperCase()}
+              </span>
+            </div>
+
+            <div style={{ opacity: 0.6 }}>
+              SCOPE: {activeCompanyId ? "ENTITY" : "GLOBAL"}
             </div>
           </div>
 
+          {/* RIGHT */}
+          <div style={{ display: "flex", gap: 14, alignItems: "center" }}>
+            <div style={{ opacity: 0.7 }}>
+              ROLE: {user?.role?.toUpperCase()}
+            </div>
+
+            <div
+              style={{
+                padding: "2px 8px",
+                borderRadius: 20,
+                fontSize: 10,
+                background:
+                  subscriptionStatus === "Active"
+                    ? "rgba(34,197,94,.15)"
+                    : "rgba(239,68,68,.15)",
+                color:
+                  subscriptionStatus === "Active"
+                    ? "#22c55e"
+                    : "#ef4444",
+              }}
+            >
+              {subscriptionStatus.toUpperCase()}
+            </div>
+          </div>
+        </div>
+
+        <main className="layout-main">
+          <section className="layout-content">
+            <Outlet />
+          </section>
+        </main>
+      </div>
+
+      {/* ================= ADVISOR ================= */}
+      {!isMobile && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            right: 0,
+            height: "100vh",
+            width: drawerWidth,
+            transition: "width .22s ease",
+            display: "flex",
+            borderLeft: "1px solid rgba(255,255,255,0.10)",
+            background:
+              "linear-gradient(180deg, rgba(255,255,255,.04), rgba(0,0,0,.55))",
+            backdropFilter: "blur(10px)",
+            overflow: "hidden",
+            zIndex: 2000,
+          }}
+        >
           <button
-            onClick={() => setPanelOpen(!panelOpen)}
+            onClick={() => setAdvisorOpen((v) => !v)}
             style={{
-              padding: "8px 16px",
-              background: "#1e2536",
-              border: "1px solid rgba(255,255,255,.1)",
-              cursor: "pointer"
+              width: DRAWER_CLOSED_W,
+              minWidth: DRAWER_CLOSED_W,
+              height: "100%",
+              border: "none",
+              background: "rgba(0,0,0,.22)",
+              color: "#ffffff",
+              cursor: "pointer",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
             }}
           >
-            Execute Order
+            <div
+              style={{
+                transform: "rotate(-90deg)",
+                fontSize: 11,
+                letterSpacing: ".18em",
+                fontWeight: 900,
+              }}
+            >
+              ADVISOR
+            </div>
           </button>
-        </div>
 
-        {/* CHART */}
-        <div style={{
-          flex: 1,
-          background: "#111827",
-          borderRadius: 12,
-          overflow: "hidden",
-          border: "1px solid rgba(255,255,255,.08)"
-        }}>
-          <div ref={containerRef} style={{ width: "100%", height: "100%" }} />
-        </div>
-
-      </div>
-
-      {/* RIGHT PANEL */}
-      {panelOpen && (
-        <div style={{
-          width: 360,
-          background: "#111827",
-          borderLeft: "1px solid rgba(255,255,255,.08)",
-          padding: 20
-        }}>
-          <div style={{fontWeight:700, marginBottom:20}}>
-            Execute Order
-          </div>
-          Trading controls ready for backend connection.
+          {advisorOpen && (
+            <div style={{ flex: 1 }}>
+              <AuthoDevPanel
+                title="Advisor"
+                getContext={() => ({
+                  role: "admin",
+                  scope: activeCompanyId ? "entity" : "global",
+                  systemStatus,
+                })}
+              />
+            </div>
+          )}
         </div>
       )}
-
     </div>
   );
 }
