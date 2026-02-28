@@ -1,7 +1,7 @@
 // frontend/src/pages/TradingRoom.jsx
 // ============================================================
-// TRADING ROOM — STRUCTURAL DUPLICATE (TV STYLE)
-// Absolute layered layout
+// TRADING ROOM — TV STYLE STRUCTURAL DUPLICATE
+// Exact Proportions + Dark Order Panel
 // Backend logic preserved
 // ============================================================
 
@@ -36,15 +36,17 @@ export default function TradingRoom() {
   const chartRef = useRef(null);
   const containerRef = useRef(null);
   const wsRef = useRef(null);
-  const candleDataRef = useRef([]);
 
   /* ===== STATE ===== */
   const [symbol, setSymbol] = useState("EURUSD");
   const [timeframe, setTimeframe] = useState("1D");
   const [execOpen, setExecOpen] = useState(false);
   const [side, setSide] = useState("SELL");
+  const [orderType, setOrderType] = useState("LIMIT");
   const [orderPrice, setOrderPrice] = useState("");
   const [orderQty, setOrderQty] = useState("1000");
+  const [takeProfit, setTakeProfit] = useState("");
+  const [stopLoss, setStopLoss] = useState("");
 
   /* ===== SNAPSHOT POLLING ===== */
   useEffect(() => {
@@ -104,7 +106,7 @@ export default function TradingRoom() {
       try {
         const msg = JSON.parse(e.data);
         if (msg.type === "tick") {
-          // simplified for structure phase
+          // Live logic can be wired later
         }
       } catch {}
     };
@@ -116,8 +118,11 @@ export default function TradingRoom() {
     const payload = {
       symbol,
       side,
+      type: orderType,
       quantity: n(orderQty),
       price: orderPrice ? n(orderPrice) : undefined,
+      takeProfit: takeProfit ? n(takeProfit) : undefined,
+      stopLoss: stopLoss ? n(stopLoss) : undefined,
       mode: "paper",
     };
 
@@ -128,14 +133,15 @@ export default function TradingRoom() {
   /* ===== RENDER ===== */
   return (
     <div style={{
-      height: "calc(100vh - 60px)",
+      height: "100%",
+      width: "100%",
       background: "#0b0f19",
       position: "relative",
       overflow: "hidden",
       color: "#fff"
     }}>
 
-      {/* ===== TOP TOOLBAR ===== */}
+      {/* ===== TOP TOOLBAR (48px) ===== */}
       <div style={{
         position: "absolute",
         top: 0,
@@ -146,24 +152,37 @@ export default function TradingRoom() {
         display: "flex",
         alignItems: "center",
         padding: "0 12px",
+        borderBottom: "1px solid rgba(255,255,255,.08)",
         zIndex: 20
       }}>
-        <select value={symbol} onChange={(e)=>setSymbol(e.target.value)}>
+        <select value={symbol} onChange={(e)=>setSymbol(e.target.value)}
+          style={{ background:"#0b0f19", color:"#fff", border:"1px solid #222", padding:"4px 8px" }}>
           <option>EURUSD</option>
           <option>BTCUSDT</option>
         </select>
 
-        <select value={timeframe} onChange={(e)=>setTimeframe(e.target.value)} style={{ marginLeft:8 }}>
+        <select value={timeframe} onChange={(e)=>setTimeframe(e.target.value)}
+          style={{ marginLeft:8, background:"#0b0f19", color:"#fff", border:"1px solid #222", padding:"4px 8px" }}>
           <option>1D</option>
           <option>4H</option>
         </select>
 
-        <button style={{ marginLeft:"auto" }} onClick={()=>setExecOpen(true)}>
+        <button
+          style={{
+            marginLeft:"auto",
+            background:"#1f2937",
+            color:"#fff",
+            border:"1px solid rgba(255,255,255,.15)",
+            padding:"6px 12px",
+            cursor:"pointer"
+          }}
+          onClick={()=>setExecOpen(true)}
+        >
           Execute Order
         </button>
       </div>
 
-      {/* ===== LEFT TOOL RAIL ===== */}
+      {/* ===== LEFT TOOL RAIL (50px) ===== */}
       <div style={{
         position:"absolute",
         top:48,
@@ -171,19 +190,20 @@ export default function TradingRoom() {
         left:0,
         width:50,
         background:"#111827",
+        borderRight:"1px solid rgba(255,255,255,.08)",
         display:"flex",
         flexDirection:"column",
         alignItems:"center",
         paddingTop:10,
-        gap:10,
+        gap:14,
         zIndex:10
       }}>
         {["↖","✎","╱","T","⌁","⎘","⊕","⚲","⌂","👁"].map((i,idx)=>(
-          <div key={idx}>{i}</div>
+          <div key={idx} style={{ cursor:"pointer", opacity:.8 }}>{i}</div>
         ))}
       </div>
 
-      {/* ===== CHART ===== */}
+      {/* ===== CHART AREA ===== */}
       <div
         ref={containerRef}
         style={{
@@ -195,7 +215,7 @@ export default function TradingRoom() {
         }}
       />
 
-      {/* ===== BOTTOM TERMINAL ===== */}
+      {/* ===== BOTTOM TERMINAL (160px) ===== */}
       <div style={{
         position:"absolute",
         bottom:0,
@@ -205,9 +225,16 @@ export default function TradingRoom() {
         background:"#111827",
         borderTop:"1px solid rgba(255,255,255,.1)",
         zIndex:15,
-        padding:12
+        padding:"10px 16px",
+        display:"flex",
+        alignItems:"flex-start"
       }}>
-        Positions | Orders | History | Account
+        <div style={{ display:"flex", gap:18, fontSize:13 }}>
+          <div style={{ fontWeight:700 }}>Positions</div>
+          <div>Orders</div>
+          <div>History</div>
+          <div>Account</div>
+        </div>
       </div>
 
       {/* ===== FLOATING EXEC PANEL ===== */}
@@ -216,40 +243,156 @@ export default function TradingRoom() {
           position:"absolute",
           top:80,
           right:40,
-          width:320,
+          width:340,
           background:"#111827",
-          padding:14,
+          padding:16,
           border:"1px solid rgba(255,255,255,.1)",
           zIndex:30
         }}>
-          <div style={{ fontWeight:900 }}>Execute Order</div>
 
-          <div style={{ display:"flex", gap:6, marginTop:8 }}>
-            <button onClick={()=>setSide("BUY")}>BUY</button>
-            <button onClick={()=>setSide("SELL")}>SELL</button>
+          <div style={{ fontWeight:900 }}>{symbol} • Paper Trading</div>
+
+          <div style={{ display:"flex", marginTop:12 }}>
+            <button
+              onClick={()=>setSide("BUY")}
+              style={{
+                flex:1,
+                background: side==="BUY" ? "#16a34a" : "#1f2937",
+                color:"#fff",
+                border:"none",
+                padding:"8px",
+                fontWeight:600
+              }}
+            >
+              Buy
+            </button>
+            <button
+              onClick={()=>setSide("SELL")}
+              style={{
+                flex:1,
+                background: side==="SELL" ? "#dc2626" : "#1f2937",
+                color:"#fff",
+                border:"none",
+                padding:"8px",
+                fontWeight:600
+              }}
+            >
+              Sell
+            </button>
           </div>
 
-          <input
-            placeholder="Order Price"
-            value={orderPrice}
-            onChange={(e)=>setOrderPrice(e.target.value)}
-            style={{ width:"100%", marginTop:8 }}
-          />
+          <div style={{ display:"flex", gap:6, marginTop:12 }}>
+            {["LIMIT","MARKET","STOP"].map(type=>(
+              <div key={type}
+                onClick={()=>setOrderType(type)}
+                style={{
+                  flex:1,
+                  textAlign:"center",
+                  padding:"6px",
+                  background: orderType===type ? "#1f2937" : "#0b0f19",
+                  border:"1px solid rgba(255,255,255,.08)",
+                  fontSize:12,
+                  cursor:"pointer"
+                }}>
+                {type}
+              </div>
+            ))}
+          </div>
 
-          <input
-            placeholder="Quantity"
-            value={orderQty}
-            onChange={(e)=>setOrderQty(e.target.value)}
-            style={{ width:"100%", marginTop:8 }}
-          />
+          <div style={{ marginTop:14 }}>
+            <div style={{ fontSize:12, opacity:.6 }}>Order Price</div>
+            <input
+              value={orderPrice}
+              onChange={(e)=>setOrderPrice(e.target.value)}
+              style={{
+                width:"100%",
+                marginTop:4,
+                padding:"8px",
+                background:"#0b0f19",
+                border:"1px solid rgba(255,255,255,.08)",
+                color:"#fff"
+              }}
+            />
+          </div>
 
-          <button onClick={placeOrder} style={{ width:"100%", marginTop:10 }}>
-            Confirm {side}
+          <div style={{ marginTop:12 }}>
+            <div style={{ fontSize:12, opacity:.6 }}>Quantity</div>
+            <input
+              value={orderQty}
+              onChange={(e)=>setOrderQty(e.target.value)}
+              style={{
+                width:"100%",
+                marginTop:4,
+                padding:"8px",
+                background:"#0b0f19",
+                border:"1px solid rgba(255,255,255,.08)",
+                color:"#fff"
+              }}
+            />
+          </div>
+
+          <div style={{ display:"flex", gap:8, marginTop:12 }}>
+            <div style={{ flex:1 }}>
+              <div style={{ fontSize:12, opacity:.6 }}>Take Profit</div>
+              <input
+                value={takeProfit}
+                onChange={(e)=>setTakeProfit(e.target.value)}
+                style={{
+                  width:"100%",
+                  marginTop:4,
+                  padding:"8px",
+                  background:"#0b0f19",
+                  border:"1px solid rgba(255,255,255,.08)",
+                  color:"#fff"
+                }}
+              />
+            </div>
+            <div style={{ flex:1 }}>
+              <div style={{ fontSize:12, opacity:.6 }}>Stop Loss</div>
+              <input
+                value={stopLoss}
+                onChange={(e)=>setStopLoss(e.target.value)}
+                style={{
+                  width:"100%",
+                  marginTop:4,
+                  padding:"8px",
+                  background:"#0b0f19",
+                  border:"1px solid rgba(255,255,255,.08)",
+                  color:"#fff"
+                }}
+              />
+            </div>
+          </div>
+
+          <button
+            onClick={placeOrder}
+            style={{
+              width:"100%",
+              marginTop:16,
+              padding:"10px",
+              background: side==="BUY" ? "#16a34a" : "#dc2626",
+              border:"none",
+              color:"#fff",
+              fontWeight:700
+            }}
+          >
+            Place {side} Order
           </button>
 
-          <button onClick={()=>setExecOpen(false)} style={{ marginTop:8 }}>
+          <button
+            onClick={()=>setExecOpen(false)}
+            style={{
+              width:"100%",
+              marginTop:8,
+              padding:"6px",
+              background:"#1f2937",
+              border:"none",
+              color:"#fff"
+            }}
+          >
             Close
           </button>
+
         </div>
       )}
     </div>
