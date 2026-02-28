@@ -1,326 +1,301 @@
-// frontend/src/layouts/AdminLayout.jsx
-// Enterprise Admin Layout — Hardened v3
-// Status Aware • WS Indicator • Role Badge • Scope Visible • Blueprint Aligned
+// frontend/src/pages/TradingRoom.jsx
+// ============================================================
+// TRADING ROOM — CLEAN BASE + PROFESSIONAL TOOLS
+// SAME STRUCTURE • NO SIZE CHANGES
+// ============================================================
 
-import React, { useEffect, useState } from "react";
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import { clearToken, clearUser, getSavedUser } from "../lib/api.js";
-import { useCompany } from "../context/CompanyContext";
-import { useSecurity } from "../context/SecurityContext.jsx";
-import AuthoDevPanel from "../components/AuthoDevPanel.jsx";
-import Logo from "../components/Logo.jsx";
-import "../styles/layout.css";
+import React, { useEffect, useRef, useState } from "react";
+import { createChart } from "lightweight-charts";
+import { getSavedUser, getToken } from "../lib/api.js";
+import { Navigate } from "react-router-dom";
 
-export default function AdminLayout() {
-  const navigate = useNavigate();
-  const { activeCompanyId } = useCompany();
-  const { wsStatus, systemStatus } = useSecurity();
+function buildWsUrl() {
+  const token = getToken();
+  if (!token) return null;
+  const protocol = window.location.protocol === "https:" ? "wss://" : "ws://";
+  return `${protocol}${window.location.host}/ws/market?token=${encodeURIComponent(token)}`;
+}
+
+function n(v) {
+  const x = Number(v);
+  return Number.isFinite(x) ? x : 0;
+}
+
+export default function TradingRoom() {
 
   const user = getSavedUser();
+  const role = String(user?.role || "").toLowerCase();
+  if (!user || (role !== "admin" && role !== "manager")) {
+    return <Navigate to="/admin" replace />;
+  }
 
-  const [advisorOpen, setAdvisorOpen] = useState(() => {
-    const saved = localStorage.getItem("admin.advisor.open");
-    return saved !== "false";
-  });
+  const chartRef = useRef(null);
+  const seriesRef = useRef(null);
+  const containerRef = useRef(null);
+  const candleDataRef = useRef([]);
+  const wsRef = useRef(null);
 
-  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 900);
+  const [panelOpen, setPanelOpen] = useState(true);
+  const [activeTab, setActiveTab] = useState("positions");
+  const [timeframe, setTimeframe] = useState("1D");
+  const [candleType, setCandleType] = useState("candles");
 
-  const DRAWER_OPEN_W = 360;
-  const DRAWER_CLOSED_W = 26;
-  const drawerWidth = advisorOpen ? DRAWER_OPEN_W : DRAWER_CLOSED_W;
+  /* ================= CHART INIT ================= */
 
   useEffect(() => {
-    localStorage.setItem("admin.advisor.open", advisorOpen);
-  }, [advisorOpen]);
+    if (!containerRef.current) return;
 
-  useEffect(() => {
-    const onResize = () => setIsMobile(window.innerWidth < 900);
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
+    chartRef.current = createChart(containerRef.current, {
+      layout: {
+        background: { color: "#0f1626" },
+        textColor: "#d1d5db",
+      },
+      grid: {
+        vertLines: { color: "rgba(255,255,255,.04)" },
+        horzLines: { color: "rgba(255,255,255,.04)" },
+      },
+      rightPriceScale: {
+        borderColor: "rgba(255,255,255,.1)",
+      },
+      timeScale: {
+        borderColor: "rgba(255,255,255,.1)",
+        timeVisible: true,
+      },
+      width: containerRef.current.clientWidth,
+      height: containerRef.current.clientHeight,
+    });
+
+    seriesRef.current = chartRef.current.addCandlestickSeries({
+      upColor: "#16a34a",
+      downColor: "#dc2626",
+      wickUpColor: "#16a34a",
+      wickDownColor: "#dc2626",
+      borderUpColor: "#16a34a",
+      borderDownColor: "#dc2626",
+      borderVisible: true,
+      wickVisible: true,
+      priceLineVisible: true,
+      lastValueVisible: true,
+      priceFormat: {
+        type: "price",
+        precision: 5,
+        minMove: 0.00001,
+      }
+    });
+
+    chartRef.current.timeScale().applyOptions({
+      barSpacing: 6,
+      rightBarStaysOnScroll: true,
+    });
+
+    seedCandles();
+    chartRef.current.timeScale().fitContent();
+
+    const resizeObserver = new ResizeObserver(entries => {
+      const { width, height } = entries[0].contentRect;
+      chartRef.current.applyOptions({ width, height });
+    });
+
+    resizeObserver.observe(containerRef.current);
+
+    return () => {
+      resizeObserver.disconnect();
+      chartRef.current?.remove();
+    };
   }, []);
 
-  function logout() {
-    clearToken();
-    clearUser();
-    navigate("/login");
+  function seedCandles() {
+    const now = Math.floor(Date.now() / 1000);
+    const candles = [];
+    let base = 1.1000;
+
+    for (let i = 200; i > 0; i--) {
+      const time = now - i * 3600;
+      const open = base;
+      const close = open + (Math.random() - 0.5) * 0.01;
+      const high = Math.max(open, close) + Math.random() * 0.003;
+      const low = Math.min(open, close) - Math.random() * 0.003;
+
+      candles.push({ time, open, high, low, close });
+      base = close;
+    }
+
+    candleDataRef.current = candles;
+    seriesRef.current.setData(candles);
   }
 
-  const navClass = ({ isActive }) =>
-    isActive ? "nav-link active" : "nav-link";
-
-  /* ================= STATUS COLORS ================= */
-
-  function wsColor() {
-    if (wsStatus === "connected") return "#22c55e";
-    if (wsStatus === "reconnecting") return "#f59e0b";
-    return "#ef4444";
-  }
-
-  function systemColor() {
-    return systemStatus === "compromised" ? "#ef4444" : "#22c55e";
-  }
-
-  const subscriptionStatus = user?.subscriptionStatus || "Unknown";
+  /* ================= UI ================= */
 
   return (
-    <div className="layout-root enterprise">
-      {/* ================= SIDEBAR ================= */}
-      <aside className="layout-sidebar admin">
-        <div className="layout-brand">
-          <Logo size="md" />
-          <span className="muted" style={{ fontSize: 12 }}>
-            Enterprise Administration
-          </span>
-        </div>
+    <div style={{
+      display: "flex",
+      height: "100vh",
+      background: "#0a0f1c",
+      color: "#fff"
+    }}>
 
-        <nav className="layout-nav">
-          <NavLink to="." end className={navClass}>
-            Dashboard
-          </NavLink>
+      {/* LEFT RAIL (UNCHANGED SIZE) */}
+      <div style={{
+        width: 60,
+        background: "#111827",
+        borderRight: "1px solid rgba(255,255,255,.08)",
+      }} />
 
-          <hr />
+      {/* CENTER */}
+      <div style={{
+        flex: 1,
+        display: "flex",
+        flexDirection: "column",
+        padding: 20,
+      }}>
 
-          <div className="nav-section-label">Security Command</div>
-
-          <NavLink to="security" className={navClass}>
-            Security Overview
-          </NavLink>
-
-          <NavLink to="risk" className={navClass}>
-            Risk Monitor
-          </NavLink>
-
-          <NavLink to="sessions" className={navClass}>
-            Session Monitor
-          </NavLink>
-
-          <NavLink to="device-integrity" className={navClass}>
-            Device Integrity
-          </NavLink>
-
-          <NavLink to="trading" className={navClass}>
-            Internal Trading
-          </NavLink>
-
-          <hr />
-
-          <div className="nav-section-label">Security Modules</div>
-
-          <NavLink to="assets" className={navClass}>
-            Assets
-          </NavLink>
-
-          <NavLink to="incidents" className={navClass}>
-            Incident Management
-          </NavLink>
-
-          <NavLink to="vulnerabilities" className={navClass}>
-            Vulnerability Oversight
-          </NavLink>
-
-          <NavLink to="compliance" className={navClass}>
-            Regulatory Compliance
-          </NavLink>
-
-          <NavLink to="reports" className={navClass}>
-            Executive Reporting
-          </NavLink>
-
-          <hr />
-
-          <div className="nav-section-label">Platform Intelligence</div>
-
-          <NavLink to="audit" className={navClass}>
-            Audit Explorer
-          </NavLink>
-
-          <NavLink to="global" className={navClass}>
-            Global Control
-          </NavLink>
-
-          <NavLink to="notifications" className={navClass}>
-            System Notifications
-          </NavLink>
-
-          <hr />
-
-          <div className="nav-section-label">Operational Oversight</div>
-
-          <NavLink to="companies" className={navClass}>
-            Company Oversight
-          </NavLink>
-
-          <NavLink to="/manager" className={navClass}>
-            Manager Command
-          </NavLink>
-
-          <NavLink to="/company" className={navClass}>
-            Corporate Entities
-          </NavLink>
-
-          <NavLink to="/user" className={navClass}>
-            User Governance
-          </NavLink>
-        </nav>
-
-        <button className="btn logout-btn" onClick={logout}>
-          Secure Log Out
-        </button>
-      </aside>
-
-      {/* ================= MAIN ================= */}
-      <div
-        className="enterprise-main"
-        style={{
-          marginRight: isMobile ? 0 : drawerWidth,
-          transition: "margin-right .22s ease",
+        {/* TOP BAR */}
+        <div style={{
           display: "flex",
           flexDirection: "column",
-        }}
-      >
-        {/* ===== ENTERPRISE STATUS BAR ===== */}
-        <div
-          style={{
-            height: 28,
+          gap: 6
+        }}>
+
+          {/* ROW 1 */}
+          <div style={{
             display: "flex",
-            alignItems: "center",
             justifyContent: "space-between",
-            padding: "0 18px",
-            borderBottom: "1px solid rgba(255,255,255,.05)",
-            background: "rgba(255,255,255,.015)",
-            fontSize: 11,
-            letterSpacing: ".05em",
-          }}
-        >
-          {/* LEFT */}
-          <div style={{ display: "flex", gap: 18, alignItems: "center" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <div
-                style={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: "50%",
-                  background: wsColor(),
-                }}
-              />
-              <span style={{ opacity: 0.7 }}>
-                WS: {wsStatus.toUpperCase()}
-              </span>
+            alignItems: "center",
+            height: 28
+          }}>
+            <div style={{fontWeight:700}}>
+              EURUSD • {timeframe} • PAPER
             </div>
 
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <div
-                style={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: "50%",
-                  background: systemColor(),
-                }}
-              />
-              <span style={{ opacity: 0.7 }}>
-                SYSTEM: {systemStatus.toUpperCase()}
-              </span>
-            </div>
-
-            <div style={{ opacity: 0.6 }}>
-              SCOPE: {activeCompanyId ? "ENTITY" : "GLOBAL"}
-            </div>
-          </div>
-
-          {/* RIGHT */}
-          <div style={{ display: "flex", gap: 14, alignItems: "center" }}>
-            <div style={{ opacity: 0.7 }}>
-              ROLE: {user?.role?.toUpperCase()}
-            </div>
-
-            <div
+            <button
+              onClick={() => setPanelOpen(!panelOpen)}
               style={{
-                padding: "2px 8px",
-                borderRadius: 20,
-                fontSize: 10,
-                background:
-                  subscriptionStatus === "Active"
-                    ? "rgba(34,197,94,.15)"
-                    : "rgba(239,68,68,.15)",
-                color:
-                  subscriptionStatus === "Active"
-                    ? "#22c55e"
-                    : "#ef4444",
+                padding: "6px 14px",
+                background: "#1e2536",
+                border: "1px solid rgba(255,255,255,.1)",
+                cursor: "pointer"
               }}
             >
-              {subscriptionStatus.toUpperCase()}
-            </div>
+              Execute Order
+            </button>
+          </div>
+
+          {/* ROW 2 — TOOLS */}
+          <div style={{
+            display: "flex",
+            gap: 12,
+            alignItems: "center",
+            borderTop: "1px solid rgba(255,255,255,.05)",
+            paddingTop: 6,
+            fontSize: 13
+          }}>
+
+            {["1M","5M","15M","30M","1H","4H","1D"].map(tf => (
+              <div
+                key={tf}
+                onClick={() => setTimeframe(tf)}
+                style={{
+                  cursor: "pointer",
+                  opacity: timeframe === tf ? 1 : 0.6,
+                  fontWeight: timeframe === tf ? 700 : 400
+                }}
+              >
+                {tf}
+              </div>
+            ))}
+
+            <div style={{
+              width: 1,
+              height: 16,
+              background: "rgba(255,255,255,.15)",
+              marginLeft: 8,
+              marginRight: 8
+            }} />
+
+            {["candles","line","area"].map(type => (
+              <div
+                key={type}
+                onClick={() => setCandleType(type)}
+                style={{
+                  cursor: "pointer",
+                  opacity: candleType === type ? 1 : 0.6,
+                  textTransform: "capitalize"
+                }}
+              >
+                {type}
+              </div>
+            ))}
+
           </div>
         </div>
 
-        <main className="layout-main">
-          <section className="layout-content">
-            <Outlet />
-          </section>
-        </main>
+        {/* CHART */}
+        <div style={{
+          flex: 1,
+          background: "#111827",
+          borderRadius: 12,
+          overflow: "hidden",
+          border: "1px solid rgba(255,255,255,.08)"
+        }}>
+          <div ref={containerRef} style={{ width: "100%", height: "100%" }} />
+        </div>
+
+        {/* BOTTOM PANEL (UNCHANGED) */}
+        <div style={{
+          height: 220,
+          marginTop: 20,
+          background: "#111827",
+          borderRadius: 12,
+          border: "1px solid rgba(255,255,255,.08)",
+          display: "flex",
+          flexDirection: "column"
+        }}>
+
+          <div style={{
+            display: "flex",
+            borderBottom: "1px solid rgba(255,255,255,.08)"
+          }}>
+            {["positions","orders","news","signals"].map(tab => (
+              <div
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                style={{
+                  padding: "12px 18px",
+                  cursor: "pointer",
+                  background: activeTab === tab ? "#1e2536" : "transparent",
+                  fontWeight: activeTab === tab ? 700 : 400
+                }}
+              >
+                {tab.toUpperCase()}
+              </div>
+            ))}
+          </div>
+
+          <div style={{ flex: 1, padding: 16 }}>
+            {activeTab === "positions" && <div>No open positions</div>}
+            {activeTab === "orders" && <div>No pending orders</div>}
+            {activeTab === "news" && <div>News feed active</div>}
+            {activeTab === "signals" && <div>AI Signal: BUY • Confidence: 82%</div>}
+          </div>
+
+        </div>
       </div>
 
-      {/* ================= ADVISOR ================= */}
-      {!isMobile && (
-        <div
-          style={{
-            position: "fixed",
-            top: 0,
-            right: 0,
-            height: "100vh",
-            width: drawerWidth,
-            transition: "width .22s ease",
-            display: "flex",
-            borderLeft: "1px solid rgba(255,255,255,0.10)",
-            background:
-              "linear-gradient(180deg, rgba(255,255,255,.04), rgba(0,0,0,.55))",
-            backdropFilter: "blur(10px)",
-            overflow: "hidden",
-            zIndex: 2000,
-          }}
-        >
-          <button
-            onClick={() => setAdvisorOpen((v) => !v)}
-            style={{
-              width: DRAWER_CLOSED_W,
-              minWidth: DRAWER_CLOSED_W,
-              height: "100%",
-              border: "none",
-              background: "rgba(0,0,0,.22)",
-              color: "#ffffff",
-              cursor: "pointer",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <div
-              style={{
-                transform: "rotate(-90deg)",
-                fontSize: 11,
-                letterSpacing: ".18em",
-                fontWeight: 900,
-              }}
-            >
-              ADVISOR
-            </div>
-          </button>
-
-          {advisorOpen && (
-            <div style={{ flex: 1 }}>
-              <AuthoDevPanel
-                title="Advisor"
-                getContext={() => ({
-                  role: "admin",
-                  scope: activeCompanyId ? "entity" : "global",
-                  systemStatus,
-                })}
-              />
-            </div>
-          )}
+      {/* RIGHT PANEL (UNCHANGED SIZE) */}
+      {panelOpen && (
+        <div style={{
+          width: 360,
+          background: "#111827",
+          borderLeft: "1px solid rgba(255,255,255,.08)",
+          padding: 20
+        }}>
+          <div style={{fontWeight:700, marginBottom:20}}>
+            Execute Order
+          </div>
+          Trading controls ready for backend connection.
         </div>
       )}
+
     </div>
   );
 }
