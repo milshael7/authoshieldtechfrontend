@@ -28,13 +28,14 @@ export default function Reports() {
   async function load() {
     setLoading(true);
     try {
-      const [s, i] = await Promise.all([
-        api.reportSummary().catch(() => ({})),
-        api.incidents().catch(() => ({})),
+      // ✅ Use EXISTING API methods only
+      const [posture, events] = await Promise.all([
+        api.postureSummary().catch(() => ({})),
+        api.securityEvents().catch(() => ({})),
       ]);
 
-      setSummary(s || {});
-      setIncidents(safeArray(i?.incidents));
+      setSummary(posture || {});
+      setIncidents(safeArray(events?.events));
     } finally {
       setLoading(false);
     }
@@ -50,15 +51,12 @@ export default function Reports() {
     return { open, resolved };
   }, [incidents]);
 
-  const riskScore = pct(summary?.riskScore ?? 0);
+  const riskScore = pct(summary?.riskScore ?? summary?.overallRisk ?? 0);
   const complianceScore = pct(summary?.complianceScore ?? 0);
-
-  /* ================= UI ================= */
 
   return (
     <div style={{ padding: 32, display: "flex", flexDirection: "column", gap: 28 }}>
 
-      {/* HEADER */}
       <div>
         <h2 style={{ margin: 0 }}>Executive Analytics & Reporting</h2>
         <div style={{ fontSize: 13, opacity: 0.6 }}>
@@ -66,7 +64,6 @@ export default function Reports() {
         </div>
       </div>
 
-      {/* SUMMARY STRIP */}
       <div
         style={{
           display: "grid",
@@ -94,7 +91,7 @@ export default function Reports() {
 
         <div className="card">
           <div style={{ fontSize: 12, opacity: 0.6 }}>
-            Total Incidents
+            Total Security Events
           </div>
           <div style={{ fontSize: 28, fontWeight: 800 }}>
             {incidents.length}
@@ -111,7 +108,6 @@ export default function Reports() {
         </div>
       </div>
 
-      {/* MAIN GRID */}
       <div
         style={{
           display: "grid",
@@ -119,68 +115,56 @@ export default function Reports() {
           gap: 24
         }}
       >
-
-        {/* ================= INCIDENT TREND ================= */}
         <div className="card">
-          <h3>Incident Distribution</h3>
+          <h3>Event Distribution</h3>
 
           <div style={{ marginTop: 20 }}>
 
             <div style={{ marginBottom: 14 }}>
-              <strong>Open Incidents</strong>
-              <div
-                style={{
-                  marginTop: 6,
-                  height: 8,
-                  background: "rgba(255,255,255,.08)",
-                  borderRadius: 999,
-                  overflow: "hidden"
-                }}
-              >
-                <div
-                  style={{
-                    width: `${pct(
-                      (incidentTrend.open / (incidents.length || 1)) * 100
-                    )}%`,
-                    height: "100%",
-                    background: "linear-gradient(90deg,#ff5a5f,#ffd166)"
-                  }}
-                />
+              <strong>Open</strong>
+              <div style={{
+                marginTop: 6,
+                height: 8,
+                background: "rgba(255,255,255,.08)",
+                borderRadius: 999,
+                overflow: "hidden"
+              }}>
+                <div style={{
+                  width: `${pct(
+                    (incidentTrend.open / (incidents.length || 1)) * 100
+                  )}%`,
+                  height: "100%",
+                  background: "linear-gradient(90deg,#ff5a5f,#ffd166)"
+                }} />
               </div>
             </div>
 
             <div>
-              <strong>Resolved Incidents</strong>
-              <div
-                style={{
-                  marginTop: 6,
-                  height: 8,
-                  background: "rgba(255,255,255,.08)",
-                  borderRadius: 999,
-                  overflow: "hidden"
-                }}
-              >
-                <div
-                  style={{
-                    width: `${pct(
-                      (incidentTrend.resolved / (incidents.length || 1)) * 100
-                    )}%`,
-                    height: "100%",
-                    background: "linear-gradient(90deg,#2bd576,#5EC6FF)"
-                  }}
-                />
+              <strong>Resolved</strong>
+              <div style={{
+                marginTop: 6,
+                height: 8,
+                background: "rgba(255,255,255,.08)",
+                borderRadius: 999,
+                overflow: "hidden"
+              }}>
+                <div style={{
+                  width: `${pct(
+                    (incidentTrend.resolved / (incidents.length || 1)) * 100
+                  )}%`,
+                  height: "100%",
+                  background: "linear-gradient(90deg,#2bd576,#5EC6FF)"
+                }} />
               </div>
             </div>
 
           </div>
         </div>
 
-        {/* ================= STRATEGIC NOTES ================= */}
         <div className="card">
           <h3>Strategic Insights</h3>
 
           <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 14 }}>
-
             <div>
               <strong>Risk Trajectory</strong>
               <div style={{ fontSize: 13, opacity: 0.7 }}>
@@ -205,10 +189,8 @@ export default function Reports() {
             <button className="btn" onClick={load} disabled={loading}>
               {loading ? "Refreshing…" : "Refresh Report"}
             </button>
-
           </div>
         </div>
-
       </div>
 
     </div>
