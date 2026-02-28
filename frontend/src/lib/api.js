@@ -1,6 +1,5 @@
 /* =========================================================
-   AUTOSHIELD FRONTEND API LAYER — ENTERPRISE v5 (STABLE)
-   Graceful 404 Handling • No Cascade Collapse • Safe Fail
+   AUTOSHIELD FRONTEND API LAYER — ENTERPRISE v6 (SYNCED)
 ========================================================= */
 
 const API_BASE = import.meta.env.VITE_API_BASE?.trim();
@@ -62,51 +61,9 @@ async function fetchWithTimeout(url, options = {}, ms = REQUEST_TIMEOUT) {
   }
 }
 
-/* =========================================================
-   CORE REQUEST (SAFE MODE)
-========================================================= */
+/* ================= CORE REQUEST ================= */
 
-let refreshInProgress = false;
-
-async function attemptRefresh() {
-  if (refreshInProgress) return false;
-  refreshInProgress = true;
-
-  try {
-    const token = getToken();
-    if (!token) return false;
-
-    const res = await fetch(joinUrl(API_BASE, "/api/auth/refresh"), {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-    });
-
-    if (!res.ok) return false;
-
-    const data = await res.json();
-
-    if (data?.token && data?.user) {
-      setToken(data.token);
-      saveUser(data.user);
-      return true;
-    }
-
-    return false;
-  } catch {
-    return false;
-  } finally {
-    refreshInProgress = false;
-  }
-}
-
-async function req(
-  path,
-  { method = "GET", body, auth = true } = {},
-  retry = true
-) {
+async function req(path, { method = "GET", body, auth = true } = {}) {
   if (!API_BASE) throw new Error("API base URL not configured");
 
   const headers = { "Content-Type": "application/json" };
@@ -132,27 +89,12 @@ async function req(
     data = await res.json();
   } catch {}
 
-  /* ================= 401 ================= */
-  if (res.status === 401 && auth) {
-    if (retry) {
-      const refreshed = await attemptRefresh();
-      if (refreshed) {
-        return req(path, { method, body, auth }, false);
-      }
-    }
-
+  if (res.status === 401) {
     clearToken();
     clearUser();
     return {};
   }
 
-  /* ================= GRACEFUL 404 ================= */
-  if (res.status === 404) {
-    console.warn("⚠️ Missing backend route:", path);
-    return {};
-  }
-
-  /* ================= OTHER FAILURES ================= */
   if (!res.ok) {
     console.warn("API warning:", path, res.status);
     return {};
@@ -161,11 +103,10 @@ async function req(
   return data;
 }
 
-/* =========================================================
-   API OBJECT
-========================================================= */
+/* ================= API OBJECT ================= */
 
 const api = {
+  /* AUTH */
   login: (email, password) =>
     req("/api/auth/login", {
       method: "POST",
@@ -181,6 +122,9 @@ const api = {
     }),
 
   refresh: () => req("/api/auth/refresh", { method: "POST" }),
+
+  /* INCIDENTS */
+  incidents: () => req("/api/incidents"),
 
   /* SECURITY */
   postureSummary: () => req("/api/security/posture-summary"),
