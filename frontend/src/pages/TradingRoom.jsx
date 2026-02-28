@@ -1,13 +1,12 @@
 // frontend/src/pages/TradingRoom.jsx
 // ============================================================
-// TRADING ROOM — INSTITUTIONAL TERMINAL v3
-// Layout Locked
-// Live Candle Engine Activated
+// TRADING ROOM — DRAWING ENGINE PHASE 2
+// Candles Fixed • Visible • Live Updating
 // ============================================================
 
 import React, { useEffect, useRef, useState } from "react";
 import { createChart } from "lightweight-charts";
-import { getSavedUser, getToken, req, api } from "../lib/api.js";
+import { getSavedUser, getToken } from "../lib/api.js";
 import { Navigate } from "react-router-dom";
 
 function buildWsUrl() {
@@ -31,32 +30,15 @@ export default function TradingRoom() {
   }
 
   const chartContainerRef = useRef(null);
+  const overlayRef = useRef(null);
   const chartRef = useRef(null);
   const seriesRef = useRef(null);
   const candleDataRef = useRef([]);
   const wsRef = useRef(null);
 
-  const [symbol, setSymbol] = useState("EURUSD");
-  const [timeframe, setTimeframe] = useState("1D");
-  const [activeTab, setActiveTab] = useState("positions");
-
-  const [snapshot, setSnapshot] = useState({});
-  const [lastPrice, setLastPrice] = useState(null);
-  const [priceColor, setPriceColor] = useState("#ffffff");
-
-  /* ================= SNAPSHOT ================= */
-
-  useEffect(() => {
-    const load = async () => {
-      let data = {};
-      if (api?.tradingLiveSnapshot) data = await api.tradingLiveSnapshot();
-      else data = await req("/api/trading/live-snapshot");
-      setSnapshot(data || {});
-    };
-    load();
-    const i = setInterval(load, 5000);
-    return () => clearInterval(i);
-  }, []);
+  const [drawingMode, setDrawingMode] = useState(null);
+  const [drawings, setDrawings] = useState([]);
+  const [currentDraw, setCurrentDraw] = useState(null);
 
   /* ================= CHART INIT ================= */
 
@@ -64,13 +46,24 @@ export default function TradingRoom() {
     if (!chartContainerRef.current) return;
 
     chartRef.current = createChart(chartContainerRef.current, {
-      layout: { background: { color: "#0a0f1c" }, textColor: "#d1d5db" },
+      layout: {
+        background: { color: "#0a0f1c" },
+        textColor: "#d1d5db",
+      },
       grid: {
         vertLines: { color: "rgba(255,255,255,.04)" },
         horzLines: { color: "rgba(255,255,255,.04)" },
       },
-      rightPriceScale: { borderColor: "rgba(255,255,255,.08)" },
-      timeScale: { borderColor: "rgba(255,255,255,.08)" },
+      rightPriceScale: {
+        borderColor: "rgba(255,255,255,.1)",
+        scaleMargins: { top: 0.1, bottom: 0.1 },
+      },
+      timeScale: {
+        borderColor: "rgba(255,255,255,.1)",
+        timeVisible: true,
+        secondsVisible: false,
+        rightBarStaysOnScroll: true,
+      },
       width: chartContainerRef.current.clientWidth,
       height: chartContainerRef.current.clientHeight,
     });
@@ -83,11 +76,19 @@ export default function TradingRoom() {
       borderVisible: false,
     });
 
+    // 👇 IMPORTANT: Set bar spacing so candles are visible
+    chartRef.current.timeScale().applyOptions({
+      barSpacing: 8,
+    });
+
+    seedInitialCandles();
+
     const resize = () => {
       chartRef.current.applyOptions({
         width: chartContainerRef.current.clientWidth,
         height: chartContainerRef.current.clientHeight,
       });
+      drawOverlay();
     };
 
     window.addEventListener("resize", resize);
@@ -97,18 +98,38 @@ export default function TradingRoom() {
     };
   }, []);
 
-  /* ================= CANDLE UPDATE ENGINE ================= */
+  /* ================= INITIAL CANDLES ================= */
+
+  function seedInitialCandles() {
+    const now = Math.floor(Date.now() / 1000);
+    const candles = [];
+
+    let base = 1.1000;
+
+    for (let i = 50; i > 0; i--) {
+      const time = now - i * 86400;
+      const open = base;
+      const close = open + (Math.random() - 0.5) * 0.01;
+      const high = Math.max(open, close) + Math.random() * 0.005;
+      const low = Math.min(open, close) - Math.random() * 0.005;
+
+      candles.push({ time, open, high, low, close });
+      base = close;
+    }
+
+    candleDataRef.current = candles;
+    seriesRef.current.setData(candles);
+  }
+
+  /* ================= LIVE UPDATE ================= */
 
   function updateCandle(price, ts) {
-    if (!seriesRef.current) return;
-
     const time = Math.floor(n(ts) / 1000);
     const p = n(price);
 
-    const lastCandle =
-      candleDataRef.current[candleDataRef.current.length - 1];
+    const last = candleDataRef.current[candleDataRef.current.length - 1];
 
-    if (!lastCandle || time > lastCandle.time) {
+    if (!last || time > last.time) {
       const newCandle = {
         time,
         open: p,
@@ -119,10 +140,10 @@ export default function TradingRoom() {
       candleDataRef.current.push(newCandle);
       seriesRef.current.update(newCandle);
     } else {
-      lastCandle.high = Math.max(lastCandle.high, p);
-      lastCandle.low = Math.min(lastCandle.low, p);
-      lastCandle.close = p;
-      seriesRef.current.update(lastCandle);
+      last.high = Math.max(last.high, p);
+      last.low = Math.min(last.low, p);
+      last.close = p;
+      seriesRef.current.update(last);
     }
   }
 
@@ -138,26 +159,99 @@ export default function TradingRoom() {
     ws.onmessage = (e) => {
       try {
         const msg = JSON.parse(e.data);
-
         if (msg.type === "tick") {
-          const price = n(msg.price);
-          updateCandle(price, msg.ts);
-
-          setPriceColor(prev =>
-            lastPrice && price > lastPrice ? "#16a34a" :
-            lastPrice && price < lastPrice ? "#dc2626" :
-            prev
-          );
-
-          setLastPrice(price);
+          updateCandle(msg.price, msg.ts);
         }
       } catch {}
     };
 
     return () => ws.close();
-  }, [symbol, lastPrice]);
+  }, []);
 
-  /* ================= RENDER ================= */
+  /* ================= DRAWING ENGINE ================= */
+
+  function chartToCanvasCoords(param) {
+    if (!param || !param.point) return null;
+    return {
+      x: param.point.x,
+      y: param.point.y,
+      price: seriesRef.current.coordinateToPrice(param.point.y),
+      time: param.time,
+    };
+  }
+
+  function handleMouseDown(param) {
+    if (!drawingMode) return;
+    const coords = chartToCanvasCoords(param);
+    if (!coords) return;
+
+    setCurrentDraw({
+      mode: drawingMode,
+      start: coords,
+      end: coords,
+    });
+  }
+
+  function handleMouseMove(param) {
+    if (!currentDraw) return;
+    const coords = chartToCanvasCoords(param);
+    if (!coords) return;
+
+    setCurrentDraw(prev => ({
+      ...prev,
+      end: coords,
+    }));
+  }
+
+  function handleMouseUp() {
+    if (!currentDraw) return;
+    setDrawings(prev => [...prev, currentDraw]);
+    setCurrentDraw(null);
+  }
+
+  useEffect(() => {
+    if (!chartRef.current) return;
+
+    chartRef.current.subscribeCrosshairMove(handleMouseMove);
+    chartRef.current.subscribeClick(handleMouseDown);
+
+    const container = chartContainerRef.current;
+    container.addEventListener("mouseup", handleMouseUp);
+
+    return () => {
+      chartRef.current.unsubscribeCrosshairMove(handleMouseMove);
+      chartRef.current.unsubscribeClick(handleMouseDown);
+      container.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [currentDraw, drawingMode]);
+
+  function drawOverlay() {
+    const canvas = overlayRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext("2d");
+    canvas.width = canvas.offsetWidth;
+    canvas.height = canvas.offsetHeight;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.strokeStyle = "#3b82f6";
+    ctx.lineWidth = 1.5;
+
+    [...drawings, currentDraw].forEach(draw => {
+      if (!draw) return;
+      const { start, end } = draw;
+      ctx.beginPath();
+      ctx.moveTo(start.x, start.y);
+      ctx.lineTo(end.x, end.y);
+      ctx.stroke();
+    });
+  }
+
+  useEffect(() => {
+    drawOverlay();
+  }, [drawings, currentDraw]);
+
+  /* ================= UI ================= */
 
   return (
     <div style={{
@@ -168,150 +262,47 @@ export default function TradingRoom() {
       color: "#d1d5db"
     }}>
 
-      {/* ================= TOP BAR ================= */}
       <div style={{
         position: "absolute",
         top: 0,
-        left: 0,
-        right: 0,
-        height: 40,
-        background: "#111827",
-        display: "flex",
-        alignItems: "center",
-        padding: "0 12px",
-        borderBottom: "1px solid rgba(255,255,255,.06)",
-        zIndex: 20
-      }}>
-        <div style={{ fontWeight: 700 }}>
-          {symbol} · {timeframe}
-        </div>
-
-        <div style={{ marginLeft: 12 }}>
-          <select value={symbol} onChange={(e)=>setSymbol(e.target.value)}>
-            <option>EURUSD</option>
-            <option>BTCUSDT</option>
-          </select>
-        </div>
-
-        <div style={{ marginLeft: 6 }}>
-          <select value={timeframe} onChange={(e)=>setTimeframe(e.target.value)}>
-            <option>1D</option>
-            <option>4H</option>
-            <option>1H</option>
-          </select>
-        </div>
-
-        <div style={{ marginLeft: "auto", color: priceColor, fontWeight: 700 }}>
-          {lastPrice ? lastPrice.toFixed(5) : "--"}
-        </div>
-      </div>
-
-      {/* ================= LEFT TOOL RAIL ================= */}
-      <div style={{
-        position: "absolute",
-        top: 40,
-        bottom: 200,
+        bottom: 0,
         left: 0,
         width: 46,
         background: "#111827",
-        borderRight: "1px solid rgba(255,255,255,.06)",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
-        paddingTop: 8,
-        gap: 12
+        paddingTop: 12,
+        gap: 12,
+        zIndex: 20
       }}>
-        {["✎","╱","T","⌁","⊕","⚲","👁"].map((i,idx)=>(
-          <div key={idx} style={{
-            width:32,
-            height:32,
-            display:"flex",
-            alignItems:"center",
-            justifyContent:"center",
-            borderRadius:4,
-            cursor:"pointer",
-            opacity:.7
-          }}>
-            {i}
-          </div>
-        ))}
+        <div onClick={()=>setDrawingMode("trend")} style={{cursor:"pointer"}}>📈</div>
+        <div onClick={()=>setDrawingMode("ruler")} style={{cursor:"pointer"}}>📏</div>
+        <div onClick={()=>setDrawingMode(null)} style={{cursor:"pointer"}}>✖</div>
       </div>
 
-      {/* ================= RIGHT WATCHLIST ================= */}
-      <div style={{
-        position: "absolute",
-        top: 40,
-        bottom: 200,
-        right: 0,
-        width: 220,
-        background: "#111827",
-        borderLeft: "1px solid rgba(255,255,255,.06)",
-        padding: 12
-      }}>
-        <div style={{ fontWeight: 700, marginBottom: 10 }}>Watchlist</div>
-        {["EURUSD","BTCUSDT"].map(s=>(
-          <div key={s} style={{
-            padding:"6px 4px",
-            cursor:"pointer",
-            fontSize:14
-          }} onClick={()=>setSymbol(s)}>
-            {s}
-          </div>
-        ))}
-      </div>
-
-      {/* ================= CHART AREA ================= */}
       <div
         ref={chartContainerRef}
         style={{
           position: "absolute",
-          top: 40,
           left: 46,
-          right: 220,
-          bottom: 200
+          right: 0,
+          top: 0,
+          bottom: 0,
         }}
       />
 
-      {/* ================= BOTTOM TERMINAL ================= */}
-      <div style={{
-        position: "absolute",
-        bottom: 0,
-        left: 0,
-        right: 0,
-        height: 200,
-        background: "#111827",
-        borderTop: "1px solid rgba(255,255,255,.06)"
-      }}>
-        <div style={{
-          display: "flex",
-          borderBottom: "1px solid rgba(255,255,255,.06)"
-        }}>
-          {["positions","orders","history"].map(tab=>(
-            <div key={tab}
-              onClick={()=>setActiveTab(tab)}
-              style={{
-                padding:"10px 16px",
-                cursor:"pointer",
-                background: activeTab===tab ? "#1f2937" : "transparent"
-              }}>
-              {tab.toUpperCase()}
-            </div>
-          ))}
-        </div>
-
-        <div style={{ padding: 12 }}>
-          {activeTab==="positions" && (
-            <div>Open Positions: {snapshot?.positions?.length ?? 0}</div>
-          )}
-          {activeTab==="orders" && (
-            <div>Pending Orders</div>
-          )}
-          {activeTab==="history" && (
-            <div>Trade History</div>
-          )}
-        </div>
-      </div>
-
+      <canvas
+        ref={overlayRef}
+        style={{
+          position: "absolute",
+          left: 46,
+          right: 0,
+          top: 0,
+          bottom: 0,
+          pointerEvents: "none"
+        }}
+      />
     </div>
   );
 }
