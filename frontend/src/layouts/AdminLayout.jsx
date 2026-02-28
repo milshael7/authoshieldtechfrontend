@@ -1,6 +1,5 @@
 // frontend/src/layouts/AdminLayout.jsx
-// Enterprise Admin Layout — Hardened v3
-// Status Aware • WS Indicator • Role Badge • Scope Visible • Blueprint Aligned
+// Enterprise Admin Layout — Hierarchy Stabilized
 
 import React, { useEffect, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
@@ -15,7 +14,6 @@ export default function AdminLayout() {
   const navigate = useNavigate();
   const { activeCompanyId } = useCompany();
   const { wsStatus, systemStatus } = useSecurity();
-
   const user = getSavedUser();
 
   const [advisorOpen, setAdvisorOpen] = useState(() => {
@@ -48,8 +46,6 @@ export default function AdminLayout() {
   const navClass = ({ isActive }) =>
     isActive ? "nav-link active" : "nav-link";
 
-  /* ================= STATUS COLORS ================= */
-
   function wsColor() {
     if (wsStatus === "connected") return "#22c55e";
     if (wsStatus === "reconnecting") return "#f59e0b";
@@ -64,7 +60,6 @@ export default function AdminLayout() {
 
   return (
     <div className="layout-root enterprise">
-      {/* ================= SIDEBAR ================= */}
       <aside className="layout-sidebar admin">
         <div className="layout-brand">
           <Logo size="md" />
@@ -74,7 +69,7 @@ export default function AdminLayout() {
         </div>
 
         <nav className="layout-nav">
-          <NavLink to="." end className={navClass}>
+          <NavLink to="/admin" end className={navClass}>
             Dashboard
           </NavLink>
 
@@ -82,23 +77,23 @@ export default function AdminLayout() {
 
           <div className="nav-section-label">Security Command</div>
 
-          <NavLink to="security" className={navClass}>
+          <NavLink to="/admin/security" className={navClass}>
             Security Overview
           </NavLink>
 
-          <NavLink to="risk" className={navClass}>
+          <NavLink to="/admin/risk" className={navClass}>
             Risk Monitor
           </NavLink>
 
-          <NavLink to="sessions" className={navClass}>
+          <NavLink to="/admin/sessions" className={navClass}>
             Session Monitor
           </NavLink>
 
-          <NavLink to="device-integrity" className={navClass}>
+          <NavLink to="/admin/device-integrity" className={navClass}>
             Device Integrity
           </NavLink>
 
-          <NavLink to="trading" className={navClass}>
+          <NavLink to="/admin/trading" className={navClass}>
             Internal Trading
           </NavLink>
 
@@ -106,23 +101,19 @@ export default function AdminLayout() {
 
           <div className="nav-section-label">Security Modules</div>
 
-          <NavLink to="assets" className={navClass}>
+          <NavLink to="/admin/assets" className={navClass}>
             Assets
           </NavLink>
 
-          <NavLink to="incidents" className={navClass}>
+          <NavLink to="/admin/incidents" className={navClass}>
             Incident Management
           </NavLink>
 
-          <NavLink to="vulnerabilities" className={navClass}>
+          <NavLink to="/admin/vulnerabilities" className={navClass}>
             Vulnerability Oversight
           </NavLink>
 
-          <NavLink to="compliance" className={navClass}>
-            Regulatory Compliance
-          </NavLink>
-
-          <NavLink to="reports" className={navClass}>
+          <NavLink to="/admin/reports" className={navClass}>
             Executive Reporting
           </NavLink>
 
@@ -130,15 +121,15 @@ export default function AdminLayout() {
 
           <div className="nav-section-label">Platform Intelligence</div>
 
-          <NavLink to="audit" className={navClass}>
+          <NavLink to="/admin/audit" className={navClass}>
             Audit Explorer
           </NavLink>
 
-          <NavLink to="global" className={navClass}>
+          <NavLink to="/admin/global" className={navClass}>
             Global Control
           </NavLink>
 
-          <NavLink to="notifications" className={navClass}>
+          <NavLink to="/admin/notifications" className={navClass}>
             System Notifications
           </NavLink>
 
@@ -146,7 +137,7 @@ export default function AdminLayout() {
 
           <div className="nav-section-label">Operational Oversight</div>
 
-          <NavLink to="companies" className={navClass}>
+          <NavLink to="/admin/companies" className={navClass}>
             Company Oversight
           </NavLink>
 
@@ -168,7 +159,6 @@ export default function AdminLayout() {
         </button>
       </aside>
 
-      {/* ================= MAIN ================= */}
       <div
         className="enterprise-main"
         style={{
@@ -178,7 +168,6 @@ export default function AdminLayout() {
           flexDirection: "column",
         }}
       >
-        {/* ===== ENTERPRISE STATUS BAR ===== */}
         <div
           style={{
             height: 28,
@@ -189,34 +178,18 @@ export default function AdminLayout() {
             borderBottom: "1px solid rgba(255,255,255,.05)",
             background: "rgba(255,255,255,.015)",
             fontSize: 11,
-            letterSpacing: ".05em",
           }}
         >
-          {/* LEFT */}
           <div style={{ display: "flex", gap: 18, alignItems: "center" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <div
-                style={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: "50%",
-                  background: wsColor(),
-                }}
-              />
+              <div style={{ width: 8, height: 8, borderRadius: "50%", background: wsColor() }} />
               <span style={{ opacity: 0.7 }}>
                 WS: {wsStatus.toUpperCase()}
               </span>
             </div>
 
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <div
-                style={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: "50%",
-                  background: systemColor(),
-                }}
-              />
+              <div style={{ width: 8, height: 8, borderRadius: "50%", background: systemColor() }} />
               <span style={{ opacity: 0.7 }}>
                 SYSTEM: {systemStatus.toUpperCase()}
               </span>
@@ -227,7 +200,6 @@ export default function AdminLayout() {
             </div>
           </div>
 
-          {/* RIGHT */}
           <div style={{ display: "flex", gap: 14, alignItems: "center" }}>
             <div style={{ opacity: 0.7 }}>
               ROLE: {user?.role?.toUpperCase()}
@@ -259,68 +231,6 @@ export default function AdminLayout() {
           </section>
         </main>
       </div>
-
-      {/* ================= ADVISOR ================= */}
-      {!isMobile && (
-        <div
-          style={{
-            position: "fixed",
-            top: 0,
-            right: 0,
-            height: "100vh",
-            width: drawerWidth,
-            transition: "width .22s ease",
-            display: "flex",
-            borderLeft: "1px solid rgba(255,255,255,0.10)",
-            background:
-              "linear-gradient(180deg, rgba(255,255,255,.04), rgba(0,0,0,.55))",
-            backdropFilter: "blur(10px)",
-            overflow: "hidden",
-            zIndex: 2000,
-          }}
-        >
-          <button
-            onClick={() => setAdvisorOpen((v) => !v)}
-            style={{
-              width: DRAWER_CLOSED_W,
-              minWidth: DRAWER_CLOSED_W,
-              height: "100%",
-              border: "none",
-              background: "rgba(0,0,0,.22)",
-              color: "#ffffff",
-              cursor: "pointer",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <div
-              style={{
-                transform: "rotate(-90deg)",
-                fontSize: 11,
-                letterSpacing: ".18em",
-                fontWeight: 900,
-              }}
-            >
-              ADVISOR
-            </div>
-          </button>
-
-          {advisorOpen && (
-            <div style={{ flex: 1 }}>
-              <AuthoDevPanel
-                title="Advisor"
-                getContext={() => ({
-                  role: "admin",
-                  scope: activeCompanyId ? "entity" : "global",
-                  systemStatus,
-                })}
-              />
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 }
