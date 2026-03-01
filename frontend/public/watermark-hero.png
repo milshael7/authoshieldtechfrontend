@@ -1,8 +1,4 @@
 <section class="as-trading-panel">
-  <div class="as-trading-watermark">
-    <img src="/brand/logo-square.png" alt="" />
-  </div>
-
   <div class="as-trading-content">
     <!-- ALL your charts/candles/buttons go here -->
     <h2>Trading Panel</h2>
