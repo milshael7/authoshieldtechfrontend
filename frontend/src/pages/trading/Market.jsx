@@ -1,8 +1,9 @@
+// frontend/src/pages/trading/Market.jsx
 import React, { useMemo, useRef, useState, useEffect, useCallback } from "react";
 import "../../styles/terminal.css";
 
 /**
- * Market.jsx — HARDENED PRODUCTION VERSION
+ * Market.jsx — CLEAN VERSION (NO BRAND WATERMARK)
  */
 
 const SYMBOLS = [
@@ -34,7 +35,7 @@ export default function Market({
 
   const limitReached = tradesUsed >= dailyLimit;
 
-  /* ================= TRADINGVIEW ================= */
+  /* ================= TRADINGVIEW EMBED ================= */
 
   const tvSrc = useMemo(() => {
     const params = new URLSearchParams({
@@ -47,12 +48,12 @@ export default function Market({
     return `https://s.tradingview.com/widgetembed/?${params.toString()}`;
   }, [symbol, tf]);
 
-  /* ================= SAFE DRAG ================= */
+  /* ================= DRAG LOGIC ================= */
 
   const clampToViewport = useCallback((x, y) => {
     const padding = 12;
-    const maxX = window.innerWidth - 320;  // panel width approx
-    const maxY = window.innerHeight - 420; // panel height approx
+    const maxX = window.innerWidth - 320;
+    const maxY = window.innerHeight - 420;
 
     return {
       x: Math.max(padding, Math.min(maxX, x)),
@@ -125,10 +126,6 @@ export default function Market({
 
   return (
     <div className={`terminalRoot ${mode === "live" ? "liveMode" : ""}`}>
-
-      <div className="terminalBrandMark" aria-hidden="true">
-        AUTOSHIELD
-      </div>
 
       <div className={`marketBanner ${mode === "live" ? "warn" : ""}`}>
         <b>Mode:</b> {mode.toUpperCase()} •
