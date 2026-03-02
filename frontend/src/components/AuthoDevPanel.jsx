@@ -71,7 +71,7 @@ export default function AuthoDevPanel({
     el.style.height=Math.min(el.scrollHeight,140)+"px";
   },[input]);
 
-  /* ================= REAL MIC ANALYZER ================= */
+  /* ================= AUDIO ANALYZER ================= */
 
   async function setupAudioAnalyzer(stream){
     const audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -79,25 +79,27 @@ export default function AuthoDevPanel({
     const source = audioContext.createMediaStreamSource(stream);
 
     source.connect(analyser);
-    analyser.fftSize = 256;
+    analyser.fftSize = 128;
 
     const dataArray = new Uint8Array(analyser.frequencyBinCount);
 
     function tick(){
       analyser.getByteFrequencyData(dataArray);
+
       let sum = 0;
       for(let i=0;i<dataArray.length;i++){
         sum += dataArray[i];
       }
+
       const avg = sum / dataArray.length;
-      setVolume(avg);
+      setVolume(avg); // always update — no threshold
+
       if(listening){
         requestAnimationFrame(tick);
       }
     }
 
     tick();
-
     audioRef.current = { audioContext, analyser };
   }
 
@@ -225,7 +227,7 @@ export default function AuthoDevPanel({
             className="advisor-pill-left"
             onClick={listening ? stopListening : startListening}
           >
-            🎤
+            <IconMic/>
           </button>
 
           {!listening ? (
@@ -251,7 +253,7 @@ export default function AuthoDevPanel({
             className="advisor-pill-right"
             onClick={sendMessage}
           >
-            ➤
+            <IconSend/>
           </button>
 
         </div>
@@ -264,7 +266,8 @@ export default function AuthoDevPanel({
 /* ================= VISUALIZER ================= */
 
 const LiveVisualizer = ({ volume }) => {
-  const active = volume > 15; // threshold
+
+  const intensity = Math.max(volume / 6, 6);
 
   return (
     <div style={{
@@ -274,21 +277,40 @@ const LiveVisualizer = ({ volume }) => {
       justifyContent:"center",
       gap:3
     }}>
-      {[...Array(20)].map((_,i)=>{
-        const height = active
-          ? 6 + Math.random() * (volume/4)
-          : 6;
-
-        return (
-          <div key={i} style={{
-            width:3,
-            height,
-            background:"#fff",
-            borderRadius:2,
-            transition:"height 0.1s ease"
-          }}/>
-        );
-      })}
+      {[...Array(20)].map((_,i)=>(
+        <div key={i} style={{
+          width:3,
+          height: intensity,
+          background:"#fff",
+          borderRadius:2,
+          transition:"height 0.08s linear"
+        }}/>
+      ))}
     </div>
   );
 };
+
+/* ================= ICONS ================= */
+
+const IconMic=()=>(
+<svg viewBox="0 0 24 24" width="20" height="20" stroke="#fff" fill="none" strokeWidth="1.8">
+<path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3z"/>
+<path d="M19 11a7 7 0 0 1-14 0"/>
+<path d="M12 18v4"/>
+</svg>
+);
+
+const IconSend=()=>(
+<svg viewBox="0 0 24 24"
+  width="18"
+  height="18"
+  fill="none"
+  stroke="#000"
+  strokeWidth="1.8"
+  strokeLinecap="round"
+  strokeLinejoin="round"
+>
+<path d="M22 2L11 13"/>
+<path d="M22 2L15 22l-4-9-9-4 20-7z"/>
+</svg>
+);
