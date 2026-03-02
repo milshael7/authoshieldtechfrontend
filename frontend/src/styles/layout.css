@@ -1,6 +1,6 @@
 /* =========================================================
-   AUTOSHIELD ENTERPRISE LAYOUT — STABLE VERSION
-   Scroll Zones Fixed • Headers Locked • Advisor Stable
+   AUTOSHIELD ENTERPRISE LAYOUT — WORKING MID VERSION
+   (Before Rail + Overlay Edits)
    ========================================================= */
 
 html, body {
@@ -10,24 +10,21 @@ html, body {
   background:#0b0f1a;
   color:#eaf1ff;
   font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
-  overflow:hidden; /* 🔥 Important — page does NOT scroll */
+
+  overflow-y:auto;
+  overflow-x:hidden;
 }
 
-/* =========================================================
-   ROOT
-   ========================================================= */
+/* ROOT */
 
 .layout-root{
   display:flex;
-  height:100vh;
+  min-height:100vh;
   width:100%;
   position:relative;
-  overflow:hidden;
 }
 
-/* =========================================================
-   SIDEBAR
-   ========================================================= */
+/* SIDEBAR */
 
 .layout-sidebar{
   width:260px;
@@ -40,12 +37,6 @@ html, body {
   border-right:1px solid rgba(255,255,255,.08);
   backdrop-filter:blur(10px);
   overflow-y:auto;
-}
-
-.layout-brand{
-  display:flex;
-  flex-direction:column;
-  gap:4px;
 }
 
 .layout-nav{
@@ -75,42 +66,37 @@ html, body {
   color:#fff;
 }
 
-.logout-btn{
-  margin-top:auto;
-}
+.logout-btn{ margin-top:auto; }
 
-/* =========================================================
-   MAIN CONTENT AREA (Own Scroll Zone)
-   ========================================================= */
+/* MAIN */
 
 .enterprise-main{
   flex:1;
   display:flex;
-  flex-direction:column;
-  overflow:hidden;
+  min-height:100vh;
+  position:relative;
 }
 
 .layout-content{
   flex:1;
   padding:28px;
-  overflow-y:auto;  /* 🔥 Only main content scrolls */
+  overflow-y:auto;
   overflow-x:hidden;
+  -webkit-overflow-scrolling:touch;
 }
 
-/* =========================================================
-   ADVISOR PANEL (Independent Scroll System)
-   ========================================================= */
+/* ADVISOR PANEL */
 
 .enterprise-ai-panel{
-  width:380px;
+  width:360px;
   flex-shrink:0;
   display:flex;
   flex-direction:column;
   border-left:1px solid rgba(255,255,255,.08);
   background:linear-gradient(180deg, rgba(255,255,255,.04), rgba(0,0,0,.45));
   backdrop-filter:blur(10px);
-  overflow:hidden;
   transition:width .25s ease;
+  overflow:hidden;
 }
 
 .enterprise-ai-panel.collapsed{
@@ -118,9 +104,7 @@ html, body {
   border-left:none;
 }
 
-/* =========================================================
-   ADVISOR STRUCTURE
-   ========================================================= */
+/* ADVISOR STRUCTURE */
 
 .advisor-wrap{
   display:flex;
@@ -128,7 +112,6 @@ html, body {
   height:100%;
 }
 
-/* 🔥 Header stays fixed */
 .advisor-miniTitle{
   padding:14px 18px;
   font-size:14px;
@@ -137,7 +120,6 @@ html, body {
   flex-shrink:0;
 }
 
-/* 🔥 Only messages scroll */
 .advisor-feed{
   flex:1;
   overflow-y:auto;
@@ -147,7 +129,6 @@ html, body {
   gap:22px;
 }
 
-/* 🔥 Input stays fixed */
 .advisor-inputBar{
   padding:18px;
   border-top:1px solid rgba(255,255,255,.05);
@@ -155,9 +136,7 @@ html, body {
   flex-shrink:0;
 }
 
-/* =========================================================
-   INPUT STYLING
-   ========================================================= */
+/* INPUT */
 
 .advisor-pill{
   display:flex;
@@ -179,9 +158,7 @@ html, body {
   resize:none;
 }
 
-/* =========================================================
-   MOBILE
-   ========================================================= */
+/* MOBILE */
 
 @media (max-width:900px){
   .layout-sidebar{
