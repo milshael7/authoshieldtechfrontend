@@ -190,7 +190,6 @@ export default function AuthoDevPanel({
 
       {/* INPUT (LOCKED) */}
       <div className="advisor-inputBar">
-
         <div className="advisor-pill">
 
           <button
@@ -227,7 +226,6 @@ export default function AuthoDevPanel({
           </button>
 
         </div>
-
       </div>
 
       <style>{`
@@ -263,7 +261,7 @@ const VoiceVisualizer = () => (
           background:"#fff",
           borderRadius:2,
           animation:"voiceWave 0.9s infinite ease-in-out",
-          animationDelay:\`\${i*0.05}s\`
+          animationDelay: `${i * 0.05}s`
         }}/>
       ))}
     </div>
