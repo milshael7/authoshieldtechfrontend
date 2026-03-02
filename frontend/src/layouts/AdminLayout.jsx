@@ -1,6 +1,5 @@
 // frontend/src/layouts/AdminLayout.jsx
-// FINAL CONTROLLED ENTERPRISE LAYOUT
-// Fixed Logo + True Slide Sidebar + Stable Advisor
+// MOBILE SAFE + DESKTOP STABLE VERSION
 
 import React, { useEffect, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
@@ -19,23 +18,23 @@ export default function AdminLayout() {
   const { activeCompanyId } = useCompany();
   const { systemStatus } = useSecurity();
 
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [advisorOpen, setAdvisorOpen] = useState(() => {
     const saved = localStorage.getItem("admin.advisor.open");
     return saved !== "false";
   });
 
-  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 900);
-
-  useEffect(() => {
-    localStorage.setItem("admin.advisor.open", advisorOpen);
-  }, [advisorOpen]);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 900);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 900);
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
+
+  useEffect(() => {
+    localStorage.setItem("admin.advisor.open", advisorOpen);
+  }, [advisorOpen]);
 
   function logout() {
     clearToken();
@@ -47,194 +46,124 @@ export default function AdminLayout() {
     isActive ? "nav-link active" : "nav-link";
 
   return (
-    <div className={`layout-root ${sidebarOpen ? "" : "sidebar-collapsed"}`}>
+    <div className="layout-root">
 
-      {/* ================= FIXED LOGO ================= */}
-      {!isMobile && (
-        <div
+      {/* ================= FIXED HEADER (PHONE FRIENDLY) ================= */}
+      <div
+        style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          height: 70,
+          background: "#0b0f1a",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "0 18px",
+          zIndex: 100,
+          borderBottom: "1px solid rgba(255,255,255,.05)"
+        }}
+      >
+        <Logo size="md" />
+
+        <button
+          onClick={() => setSidebarOpen(!sidebarOpen)}
           style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            width: SIDEBAR_WIDTH,
-            padding: "18px 18px 10px 18px",
-            zIndex: 50,
+            background: "transparent",
+            border: "none",
+            color: "#eaf1ff",
+            fontSize: 22,
+            cursor: "pointer"
           }}
         >
-          <Logo size="md" />
-
-          {!sidebarOpen && (
-            <button
-              onClick={() => setSidebarOpen(true)}
-              style={{
-                marginTop: 12,
-                background: "transparent",
-                border: "none",
-                color: "#eaf1ff",
-                fontSize: 20,
-                cursor: "pointer",
-              }}
-              aria-label="Open Menu"
-            >
-              ☰
-            </button>
-          )}
-        </div>
-      )}
+          ☰
+        </button>
+      </div>
 
       {/* ================= SIDEBAR ================= */}
       <aside
         style={{
-          width: sidebarOpen ? SIDEBAR_WIDTH : 0,
-          transform: sidebarOpen ? "translateX(0)" : "translateX(-100%)",
-          transition: "all .28s ease",
-          overflow: "hidden",
+          position: isMobile ? "fixed" : "relative",
+          top: isMobile ? 70 : 0,
+          left: 0,
+          height: isMobile ? "calc(100vh - 70px)" : "100vh",
+          width: SIDEBAR_WIDTH,
           background:
             "linear-gradient(180deg, rgba(255,255,255,.05), rgba(0,0,0,.55))",
-          borderRight: sidebarOpen
-            ? "1px solid rgba(255,255,255,.08)"
-            : "none",
+          borderRight: "1px solid rgba(255,255,255,.08)",
           backdropFilter: "blur(10px)",
+          transform: sidebarOpen ? "translateX(0)" : "translateX(-100%)",
+          transition: "transform .28s ease",
+          zIndex: 90,
           display: "flex",
           flexDirection: "column",
-          paddingTop: sidebarOpen ? 95 : 0,
-          zIndex: 20,
+          padding: 18,
+          overflowY: "auto"
         }}
       >
-        {sidebarOpen && (
-          <>
-            {/* HEADER */}
-            <div
-              style={{
-                padding: 18,
-                borderBottom: "1px solid rgba(255,255,255,.06)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-              }}
-            >
-              <div
-                style={{
-                  fontSize: 12,
-                  fontWeight: 800,
-                  letterSpacing: ".12em",
-                  opacity: 0.9,
-                }}
-              >
-                ADMIN
-              </div>
+        <nav className="layout-nav">
+          <NavLink to="/admin" end className={navClass}>Dashboard</NavLink>
 
-              {!isMobile && (
-                <button
-                  onClick={() => setSidebarOpen(false)}
-                  style={{
-                    background: "transparent",
-                    border: "none",
-                    color: "#eaf1ff",
-                    fontSize: 20,
-                    cursor: "pointer",
-                  }}
-                  aria-label="Close Menu"
-                >
-                  ☰
-                </button>
-              )}
-            </div>
+          <NavLink to="/admin/security" className={navClass}>Security Overview</NavLink>
+          <NavLink to="/admin/risk" className={navClass}>Risk Monitor</NavLink>
+          <NavLink to="/admin/sessions" className={navClass}>Session Monitor</NavLink>
+          <NavLink to="/admin/device-integrity" className={navClass}>Device Integrity</NavLink>
+          <NavLink to="/admin/trading" className={navClass}>Internal Trading</NavLink>
 
-            {/* NAV */}
-            <div
-              style={{
-                flex: 1,
-                overflowY: "auto",
-                padding: 18,
-              }}
-            >
-              <nav className="layout-nav">
-                <NavLink to="/admin" end className={navClass}>
-                  Dashboard
-                </NavLink>
+          <NavLink to="/admin/assets" className={navClass}>Assets</NavLink>
+          <NavLink to="/admin/incidents" className={navClass}>Incident Management</NavLink>
+          <NavLink to="/admin/vulnerabilities" className={navClass}>Vulnerability Oversight</NavLink>
+          <NavLink to="/admin/compliance" className={navClass}>Regulatory Compliance</NavLink>
+          <NavLink to="/admin/reports" className={navClass}>Executive Reporting</NavLink>
 
-                <NavLink to="/admin/security" className={navClass}>
-                  Security Overview
-                </NavLink>
+          <NavLink to="/admin/audit" className={navClass}>Audit Explorer</NavLink>
+          <NavLink to="/admin/global" className={navClass}>Global Control</NavLink>
+          <NavLink to="/admin/notifications" className={navClass}>System Notifications</NavLink>
 
-                <NavLink to="/admin/risk" className={navClass}>
-                  Risk Monitor
-                </NavLink>
+          <NavLink to="/admin/companies" className={navClass}>Company Oversight</NavLink>
+          <NavLink to="/manager" className={navClass}>Manager Command</NavLink>
+          <NavLink to="/company" className={navClass}>Corporate Entities</NavLink>
+          <NavLink to="/user" className={navClass}>User Governance</NavLink>
 
-                <NavLink to="/admin/trading" className={navClass}>
-                  Internal Trading
-                </NavLink>
-
-                <NavLink to="/admin/assets" className={navClass}>
-                  Assets
-                </NavLink>
-
-                <NavLink to="/admin/incidents" className={navClass}>
-                  Incident Management
-                </NavLink>
-
-                <NavLink to="/admin/reports" className={navClass}>
-                  Executive Reporting
-                </NavLink>
-              </nav>
-
-              <button
-                onClick={logout}
-                style={{
-                  marginTop: 20,
-                  width: "100%",
-                  padding: "10px 12px",
-                  borderRadius: 10,
-                  border: "none",
-                  cursor: "pointer",
-                }}
-              >
-                Secure Log Out
-              </button>
-            </div>
-          </>
-        )}
+          <button
+            onClick={logout}
+            style={{
+              marginTop: 20,
+              width: "100%",
+              padding: "10px 12px",
+              borderRadius: 10,
+              border: "none",
+              cursor: "pointer"
+            }}
+          >
+            Secure Log Out
+          </button>
+        </nav>
       </aside>
 
       {/* ================= MAIN ================= */}
       <div
         style={{
           flex: 1,
+          marginTop: 70,
           display: "flex",
-          overflow: "hidden",
+          overflow: "hidden"
         }}
       >
-        <div
+        <main
           style={{
             flex: 1,
-            display: "flex",
-            flexDirection: "column",
-            overflow: "hidden",
+            padding: 20,
+            overflowY: "auto"
           }}
         >
-          <main
-            style={{
-              flex: 1,
-              padding: "90px 28px 28px 28px",
-              display: "flex",
-              justifyContent: "center",
-              overflowY: "auto",
-              overflowX: "hidden",
-            }}
-          >
-            <div
-              style={{
-                width: "100%",
-                maxWidth: 1400,
-              }}
-            >
-              <Outlet />
-            </div>
-          </main>
-        </div>
+          <div style={{ maxWidth: 1400, margin: "0 auto" }}>
+            <Outlet />
+          </div>
+        </main>
 
-        {/* ================= ADVISOR ================= */}
+        {/* Advisor hidden automatically on phone */}
         {!isMobile && (
           <div
             style={{
@@ -243,8 +172,7 @@ export default function AdminLayout() {
               overflow: "hidden",
               borderLeft: "1px solid rgba(255,255,255,.05)",
               background:
-                "linear-gradient(180deg, rgba(255,255,255,.03), rgba(0,0,0,.45))",
-              backdropFilter: "blur(10px)",
+                "linear-gradient(180deg, rgba(255,255,255,.03), rgba(0,0,0,.45))"
             }}
           >
             <AuthoDevPanel
@@ -253,38 +181,12 @@ export default function AdminLayout() {
                 role: "admin",
                 scope: activeCompanyId ? "entity" : "global",
                 systemStatus,
-                location: window.location.pathname,
+                location: window.location.pathname
               })}
             />
           </div>
         )}
       </div>
-
-      {/* ================= ADVISOR TOGGLE ================= */}
-      {!isMobile && (
-        <div
-          onClick={() => setAdvisorOpen((v) => !v)}
-          style={{
-            position: "fixed",
-            top: "50%",
-            right: advisorOpen ? ADVISOR_WIDTH : 0,
-            transform: "translateY(-50%)",
-            padding: "14px 8px",
-            background: "rgba(0,0,0,.6)",
-            borderRadius: "8px 0 0 8px",
-            cursor: "pointer",
-            fontSize: 12,
-            letterSpacing: ".15em",
-            transition: "right .25s ease",
-            zIndex: 10,
-            writingMode: "vertical-rl",
-            textOrientation: "mixed",
-            userSelect: "none",
-          }}
-        >
-          {advisorOpen ? "◀ ADVISOR" : "ADVISOR ▶"}
-        </div>
-      )}
     </div>
   );
 }
