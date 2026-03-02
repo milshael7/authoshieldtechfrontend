@@ -1,15 +1,13 @@
 // frontend/src/pages/trading/TradingLayout.jsx
 // ============================================================
-// TRADING LAYOUT — ROUTED STRUCTURE
+// TRADING LAYOUT — ENTERPRISE TRADING MODULE
 // LIVE / AI CONTROL / ANALYTICS
 // ============================================================
 
 import React from "react";
 import { NavLink, Routes, Route, Navigate } from "react-router-dom";
 
-// ✅ FIXED PATH (go up one level)
 import TradingRoom from "../TradingRoom";
-
 import Market from "./Market";
 import AIControl from "./AIControl";
 import Analytics from "./Analytics";
@@ -17,37 +15,55 @@ import Analytics from "./Analytics";
 export default function TradingLayout() {
 
   const linkBase = {
-    padding: "10px 18px",
+    padding: "8px 18px",
     textDecoration: "none",
-    color: "#d1d5db",
+    color: "#9ca3af",
     borderRadius: 8,
     fontWeight: 600,
+    fontSize: 13,
+    letterSpacing: ".04em",
   };
 
   const linkActive = {
-    background: "#1e2536",
-    color: "#fff",
+    background: "rgba(37,99,235,.15)",
+    color: "#ffffff",
   };
 
   return (
-    <div
-      className="container"
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        height: "100%",
-      }}
-    >
+    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
 
-      {/* TOP NAVIGATION */}
+      {/* ================= TRADING MODULE HEADER ================= */}
       <div
-        className="tradeTabs actions"
+        style={{
+          padding: "18px 22px 14px 22px",
+          borderBottom: "1px solid rgba(255,255,255,.06)",
+          background: "linear-gradient(180deg, rgba(255,255,255,.02), transparent)"
+        }}
+      >
+        <div style={{ fontSize: 18, fontWeight: 700 }}>
+          Internal Trading Engine
+        </div>
+
+        <div
+          style={{
+            fontSize: 11,
+            opacity: 0.6,
+            letterSpacing: ".08em",
+            marginTop: 4,
+          }}
+        >
+          AI-DRIVEN EXECUTION & RISK FRAMEWORK
+        </div>
+      </div>
+
+      {/* ================= NAVIGATION BAR ================= */}
+      <div
         style={{
           display: "flex",
           gap: 10,
-          marginBottom: 12,
-          borderBottom: "1px solid rgba(255,255,255,.08)",
-          paddingBottom: 10,
+          padding: "12px 22px",
+          borderBottom: "1px solid rgba(255,255,255,.05)",
+          background: "rgba(255,255,255,.01)",
         }}
       >
         <NavLink
@@ -78,7 +94,7 @@ export default function TradingLayout() {
         </NavLink>
       </div>
 
-      {/* ROUTED CONTENT */}
+      {/* ================= ROUTED CONTENT ================= */}
       <div style={{ flex: 1 }}>
         <Routes>
           <Route path="live" element={<TradingRoom />} />
