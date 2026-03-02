@@ -1,7 +1,6 @@
 // frontend/src/pages/TradingRoom.jsx
 // ============================================================
-// TRADING ROOM — LIVE ENGINE + LIVE AI SIDEBAR
-// STRUCTURED FOR REAL BACKEND CONNECTION
+// TRADING ROOM — FULLY RESTORED VISUAL + LIVE STRUCTURE
 // ============================================================
 
 import React, { useEffect, useRef, useState } from "react";
@@ -50,40 +49,17 @@ export default function TradingRoom() {
 
   const [panelOpen, setPanelOpen] = useState(true);
   const [activeTab, setActiveTab] = useState("positions");
-  const [timeframe, setTimeframe] = useState("1M");
+  const [timeframe] = useState("1M");
 
   // ================= LIVE DATA STATES =================
 
-  const [positions, setPositions] = useState([
-    {
-      symbol: "EURUSD",
-      entry: 1.1360,
-      current: 1.1384,
-      size: 0.2,
-      pnl: 340,
-    }
-  ]);
-
-  const [orders, setOrders] = useState([
-    {
-      symbol: "GBPUSD",
-      side: "BUY",
-      entry: 1.2645,
-      size: 0.3,
-    }
-  ]);
-
-  const [news, setNews] = useState([
-    {
-      title: "US Retail Sales Rise 0.0% in March",
-      body: "Inflation easing as consumer demand stabilizes."
-    }
-  ]);
-
-  const [signal, setSignal] = useState({
+  const [positions] = useState([]);
+  const [orders] = useState([]);
+  const [news] = useState([]);
+  const [signal] = useState({
     side: "BUY",
     confidence: 92,
-    reason: "Bullish structure confirmed",
+    reason: "Bullish structure confirmed"
   });
 
   // ================= CHART INIT =================
@@ -100,15 +76,30 @@ export default function TradingRoom() {
         vertLines: { color: "rgba(255,255,255,.04)" },
         horzLines: { color: "rgba(255,255,255,.04)" },
       },
+      rightPriceScale: {
+        borderColor: "rgba(255,255,255,.1)",
+      },
+      timeScale: {
+        borderColor: "rgba(255,255,255,.1)",
+        timeVisible: true,
+        rightBarStaysOnScroll: true,
+      },
       width: containerRef.current.clientWidth,
       height: containerRef.current.clientHeight,
     });
 
+    // 🔥 FULL CANDLE STYLE RESTORED
     seriesRef.current = chartRef.current.addCandlestickSeries({
       upColor: "#16a34a",
       downColor: "#dc2626",
+      wickUpColor: "#16a34a",
+      wickDownColor: "#dc2626",
+      borderUpColor: "#16a34a",
+      borderDownColor: "#dc2626",
       borderVisible: true,
       wickVisible: true,
+      priceLineVisible: true,
+      lastValueVisible: true,
     });
 
     seedCandles();
@@ -141,6 +132,15 @@ export default function TradingRoom() {
 
   return (
     <div style={{ display: "flex", height: "100vh", background: "#0a0f1c", color: "#fff" }}>
+
+      {/* 🔥 RESTORED LEFT BAR */}
+      <div
+        style={{
+          width: 60,
+          background: "#111827",
+          borderRight: "1px solid rgba(255,255,255,.08)"
+        }}
+      />
 
       <div style={{ flex: 1, display: "flex", flexDirection: "column", padding: 20 }}>
 
@@ -215,12 +215,7 @@ export default function TradingRoom() {
               positions.length === 0
                 ? <div>No open positions</div>
                 : positions.map((p, i) => (
-                    <div key={i}>
-                      {p.symbol} | Entry: {p.entry} | Current: {p.current} | Size: {p.size} | 
-                      <span style={{ color: p.pnl >= 0 ? "#16a34a" : "#dc2626" }}>
-                        {p.pnl >= 0 ? ` +$${p.pnl}` : ` -$${Math.abs(p.pnl)}`}
-                      </span>
-                    </div>
+                    <div key={i}>{p.symbol}</div>
                   ))
             )}
 
@@ -228,19 +223,16 @@ export default function TradingRoom() {
               orders.length === 0
                 ? <div>No pending orders</div>
                 : orders.map((o, i) => (
-                    <div key={i}>
-                      {o.symbol} | {o.side} | Entry: {o.entry} | Size: {o.size}
-                    </div>
+                    <div key={i}>{o.symbol}</div>
                   ))
             )}
 
             {activeTab === "news" && (
-              news.map((n, i) => (
-                <div key={i}>
-                  <div style={{ fontWeight: 600 }}>{n.title}</div>
-                  <div style={{ opacity: 0.7 }}>{n.body}</div>
-                </div>
-              ))
+              news.length === 0
+                ? <div>No live news</div>
+                : news.map((n, i) => (
+                    <div key={i}>{n.title}</div>
+                  ))
             )}
 
             {activeTab === "signals" && (
@@ -258,6 +250,7 @@ export default function TradingRoom() {
 
       </div>
 
+      {/* RIGHT SIDEBAR */}
       {panelOpen && (
         <div style={{
           width: 360,
