@@ -1,5 +1,5 @@
 // frontend/src/layouts/AdminLayout.jsx
-// Stable Layout — Sticky Logo + Toggle Sidebar (Inside/Outside Hamburger) + Advisor Stable
+// Final Structural Sidebar System — True Space Reflow + Clean Hamburger
 
 import React, { useEffect, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
@@ -16,7 +16,6 @@ export default function AdminLayout() {
   const navigate = useNavigate();
   const { activeCompanyId } = useCompany();
   const { systemStatus } = useSecurity();
-  const user = getSavedUser();
 
   const [advisorOpen, setAdvisorOpen] = useState(() => {
     const saved = localStorage.getItem("admin.advisor.open");
@@ -42,47 +41,59 @@ export default function AdminLayout() {
     navigate("/login");
   }
 
-  const navClass = ({ isActive }) => (isActive ? "nav-link active" : "nav-link");
+  const navClass = ({ isActive }) =>
+    isActive ? "nav-link active" : "nav-link";
 
   return (
-    <div className={`layout-root enterprise ${sidebarOpen ? "" : "sidebar-collapsed"}`}>
-      {/* OUTSIDE HAMBURGER (only visible when sidebar is closed) */}
+    <div className={`layout-root ${sidebarOpen ? "" : "sidebar-collapsed"}`}>
+      
+      {/* ===== OPEN BUTTON (VISIBLE ONLY WHEN CLOSED) ===== */}
       {!sidebarOpen && !isMobile && (
         <button
-          className="sidebar-fab"
           onClick={() => setSidebarOpen(true)}
-          aria-label="Open sidebar"
-          title="Open menu"
+          style={{
+            position: "fixed",
+            top: 24,
+            left: 18,
+            background: "transparent",
+            border: "none",
+            color: "#eaf1ff",
+            fontSize: 20,
+            cursor: "pointer",
+            zIndex: 30
+          }}
         >
           ☰
         </button>
       )}
 
-      {/* SIDEBAR */}
-      <aside className="layout-sidebar admin">
-        {/* Sticky Top */}
-        <div className="sidebar-top">
-          <div className="sidebar-logo">
-            <Logo size="md" />
-          </div>
+      {/* ===== SIDEBAR ===== */}
+      <aside className="layout-sidebar">
 
-          {/* ADMIN row (hamburger lives here and never moves visually) */}
-          <div className="sidebar-adminRow">
-            <div className="sidebar-adminLabel">ADMIN</div>
+        {/* HEADER */}
+        <div className="sidebar-header">
+          <Logo size="md" />
 
+          {/* CLOSE BUTTON (ONLY WHEN OPEN) */}
+          {sidebarOpen && (
             <button
-              className="sidebar-hamburger"
               onClick={() => setSidebarOpen(false)}
-              aria-label="Close sidebar"
-              title="Close menu"
+              style={{
+                marginTop: 16,
+                background: "transparent",
+                border: "none",
+                color: "#eaf1ff",
+                fontSize: 20,
+                cursor: "pointer"
+              }}
             >
               ☰
             </button>
-          </div>
+          )}
         </div>
 
-        {/* Scrollable Nav */}
-        <nav className="layout-nav sidebar-nav">
+        {/* NAV */}
+        <div className="sidebar-body layout-nav">
           <NavLink to="/admin" end className={navClass}>Dashboard</NavLink>
 
           <hr />
@@ -113,16 +124,14 @@ export default function AdminLayout() {
           <NavLink to="/manager" className={navClass}>Manager Command</NavLink>
           <NavLink to="/company" className={navClass}>Corporate Entities</NavLink>
           <NavLink to="/user" className={navClass}>User Governance</NavLink>
-
-          <div style={{ height: 14 }} />
-        </nav>
+        </div>
 
         <button className="btn logout-btn" onClick={logout}>
           Secure Log Out
         </button>
       </aside>
 
-      {/* MAIN + ADVISOR (unchanged behavior) */}
+      {/* ===== MAIN ===== */}
       <div className="enterprise-main">
         <div className="layout-main">
           <main className="layout-content">
@@ -131,7 +140,10 @@ export default function AdminLayout() {
         </div>
 
         {!isMobile && (
-          <div className="enterprise-ai-panel" style={{ width: advisorOpen ? PANEL_WIDTH : 0 }}>
+          <div
+            className="enterprise-ai-panel"
+            style={{ width: advisorOpen ? PANEL_WIDTH : 0 }}
+          >
             <AuthoDevPanel
               title="Advisor"
               getContext={() => ({
@@ -145,9 +157,10 @@ export default function AdminLayout() {
         )}
       </div>
 
+      {/* ===== ADVISOR TOGGLE (UNCHANGED) ===== */}
       {!isMobile && (
         <div
-          onClick={() => setAdvisorOpen((v) => !v)}
+          onClick={() => setAdvisorOpen(v => !v)}
           style={{
             position: "fixed",
             top: "50%",
