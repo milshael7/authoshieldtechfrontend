@@ -1,6 +1,6 @@
 /* =========================================================
-   AUTOSHIELD ENTERPRISE LAYOUT — LOCKED VIEWPORT + RAIL
-   Stable Scroll Isolation + Restored Advisor Rail
+   AUTOSHIELD ENTERPRISE LAYOUT — STABLE VERSION
+   Locked Viewport + Proper Advisor Rail Spacing
    ========================================================= */
 
 html, body {
@@ -10,8 +10,7 @@ html, body {
   background:#0b0f1a;
   color:#eaf1ff;
   font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
-
-  overflow:hidden; /* 🔥 PAGE NEVER SCROLLS */
+  overflow:hidden;
 }
 
 /* =========================================================
@@ -43,9 +42,6 @@ html, body {
   overflow-y:auto;
   z-index:5;
 }
-
-.layout-brand{ display:flex; flex-direction:column; gap:4px; }
-.layout-nav{ display:flex; flex-direction:column; gap:6px; }
 
 .layout-nav a{
   display:block;
@@ -90,7 +86,6 @@ html, body {
   overflow:hidden;
 }
 
-/* 🔥 ONLY MAIN CONTENT SCROLLS */
 .layout-content{
   flex:1;
   padding:28px;
@@ -115,15 +110,19 @@ html, body {
   transition:width .25s ease;
   z-index:4;
   overflow:hidden;
+
+  padding-right:28px; /* 🔥 reserve space for rail */
+  box-sizing:border-box;
 }
 
 .enterprise-ai-panel.collapsed{
   width:0;
   border-left:none;
+  padding-right:0;
 }
 
 /* =========================================================
-   VERTICAL ADVISOR RAIL (RESTORED)
+   VERTICAL ADVISOR RAIL
    ========================================================= */
 
 .advisor-rail{
@@ -141,7 +140,6 @@ html, body {
   border-left:1px solid rgba(255,255,255,.08);
   cursor:pointer;
   z-index:6;
-  transition:right .25s ease;
 }
 
 .advisor-rail-text{
@@ -179,10 +177,8 @@ html, body {
   font-weight:600;
   border-bottom:1px solid rgba(255,255,255,.06);
   background:rgba(10,15,28,.95);
-  z-index:2;
 }
 
-/* 🔥 ONLY MESSAGE AREA SCROLLS */
 .advisor-feed{
   flex:1;
   overflow-y:auto;
@@ -194,35 +190,16 @@ html, body {
   -webkit-overflow-scrolling: touch;
 }
 
-.advisor-row{
-  display:flex;
-  flex-direction:column;
-  gap:6px;
-}
-
-.advisor-bubble{
-  font-size:14px;
-  line-height:1.6;
-  white-space:pre-wrap;
-}
-
-.advisor-ts{
-  font-size:10px;
-  opacity:.28;
-  margin-top:2px;
-  letter-spacing:.3px;
-}
-
-/* =========================================================
-   INPUT
-   ========================================================= */
-
 .advisor-inputBar{
   flex-shrink:0;
   padding:18px;
   border-top:1px solid rgba(255,255,255,.05);
   background:rgba(15,20,30,.98);
 }
+
+/* =========================================================
+   INPUT
+   ========================================================= */
 
 .advisor-pill{
   display:flex;
@@ -242,52 +219,6 @@ html, body {
   color:#ffffff;
   font-size:15px;
   resize:none;
-}
-
-/* =========================================================
-   BUTTONS
-   ========================================================= */
-
-.advisor-pill-left{
-  background:none;
-  border:none;
-  cursor:pointer;
-  width:42px;
-  height:42px;
-  min-width:42px;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  color:rgba(255,255,255,.75);
-  border-radius:50%;
-}
-
-.advisor-pill-left svg{
-  width:24px;
-  height:24px;
-}
-
-.advisor-pill-left:hover{
-  background:rgba(255,255,255,.08);
-  color:#ffffff;
-}
-
-.advisor-pill-right{
-  width:44px;
-  height:44px;
-  min-width:44px;
-  border-radius:50%;
-  background:#ffffff;
-  border:none;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  cursor:pointer;
-}
-
-.advisor-pill-right svg{
-  width:18px;
-  height:18px;
 }
 
 /* =========================================================
