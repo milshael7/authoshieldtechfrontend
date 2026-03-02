@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { readAloud } from "./ReadAloud";
 
 const MAX_MESSAGES = 50;
 
@@ -22,8 +21,6 @@ function getStorageKey(){
   return `authodev.panel.${tenant}.${getRoomId()}`;
 }
 
-/* ================= MAIN COMPONENT ================= */
-
 export default function AuthoDevPanel({
   title="Advisor",
   endpoint="/api/ai/chat",
@@ -36,10 +33,12 @@ export default function AuthoDevPanel({
   const [loading,setLoading]=useState(false);
   const [listening,setListening]=useState(false);
   const [transcriptBuffer,setTranscriptBuffer]=useState("");
+  const [volume,setVolume]=useState(0);
 
   const recognitionRef=useRef(null);
   const feedRef=useRef(null);
   const textareaRef=useRef(null);
+  const audioRef=useRef(null);
 
   /* ================= LOAD HISTORY ================= */
 
@@ -59,14 +58,12 @@ export default function AuthoDevPanel({
     }));
   },[messages,storageKey]);
 
-  /* Scroll ONLY feed */
   useEffect(()=>{
     if(feedRef.current){
       feedRef.current.scrollTop = feedRef.current.scrollHeight;
     }
   },[messages]);
 
-  /* Auto expand textarea */
   useEffect(()=>{
     const el=textareaRef.current;
     if(!el) return;
@@ -74,13 +71,46 @@ export default function AuthoDevPanel({
     el.style.height=Math.min(el.scrollHeight,140)+"px";
   },[input]);
 
+  /* ================= REAL MIC ANALYZER ================= */
+
+  async function setupAudioAnalyzer(stream){
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    const analyser = audioContext.createAnalyser();
+    const source = audioContext.createMediaStreamSource(stream);
+
+    source.connect(analyser);
+    analyser.fftSize = 256;
+
+    const dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+    function tick(){
+      analyser.getByteFrequencyData(dataArray);
+      let sum = 0;
+      for(let i=0;i<dataArray.length;i++){
+        sum += dataArray[i];
+      }
+      const avg = sum / dataArray.length;
+      setVolume(avg);
+      if(listening){
+        requestAnimationFrame(tick);
+      }
+    }
+
+    tick();
+
+    audioRef.current = { audioContext, analyser };
+  }
+
   /* ================= VOICE INPUT ================= */
 
-  function startListening(){
+  async function startListening(){
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if(!SR) return;
 
     try{ recognitionRef.current?.stop(); }catch{}
+
+    const stream = await navigator.mediaDevices.getUserMedia({ audio:true });
+    setupAudioAnalyzer(stream);
 
     const rec = new SR();
     rec.lang = "en-US";
@@ -93,6 +123,7 @@ export default function AuthoDevPanel({
 
     rec.onend = () => {
       setListening(false);
+      setVolume(0);
     };
 
     rec.onresult = (e) => {
@@ -110,6 +141,7 @@ export default function AuthoDevPanel({
   function stopListening(){
     try{ recognitionRef.current?.stop(); }catch{}
     setListening(false);
+    setVolume(0);
 
     if(transcriptBuffer){
       setInput(transcriptBuffer.trim());
@@ -165,12 +197,10 @@ export default function AuthoDevPanel({
   return(
     <div className="advisor-wrap">
 
-      {/* HEADER (LOCKED) */}
       <div className="advisor-miniTitle">
         {title}
       </div>
 
-      {/* FEED (ONLY THIS SCROLLS) */}
       <div className="advisor-feed" ref={feedRef}>
         {messages.map((m,i)=>(
           <div key={i} style={{
@@ -188,7 +218,6 @@ export default function AuthoDevPanel({
         ))}
       </div>
 
-      {/* INPUT (LOCKED) */}
       <div className="advisor-inputBar">
         <div className="advisor-pill">
 
@@ -196,7 +225,7 @@ export default function AuthoDevPanel({
             className="advisor-pill-left"
             onClick={listening ? stopListening : startListening}
           >
-            <IconMic/>
+            🎤
           </button>
 
           {!listening ? (
@@ -215,26 +244,18 @@ export default function AuthoDevPanel({
               }}
             />
           ) : (
-            <VoiceVisualizer/>
+            <LiveVisualizer volume={volume}/>
           )}
 
           <button
             className="advisor-pill-right"
             onClick={sendMessage}
           >
-            <IconSend/>
+            ➤
           </button>
 
         </div>
       </div>
-
-      <style>{`
-        @keyframes voiceWave {
-          0% { height: 6px; opacity:.5; }
-          50% { height: 22px; opacity:1; }
-          100% { height: 6px; opacity:.5; }
-        }
-      `}</style>
 
     </div>
   );
@@ -242,53 +263,32 @@ export default function AuthoDevPanel({
 
 /* ================= VISUALIZER ================= */
 
-const VoiceVisualizer = () => (
-  <div style={{
-    flex:1,
-    display:"flex",
-    alignItems:"center",
-    justifyContent:"center"
-  }}>
+const LiveVisualizer = ({ volume }) => {
+  const active = volume > 15; // threshold
+
+  return (
     <div style={{
+      flex:1,
       display:"flex",
       alignItems:"center",
-      gap:4
+      justifyContent:"center",
+      gap:3
     }}>
-      {[...Array(15)].map((_,i)=>(
-        <div key={i} style={{
-          width:3,
-          height:8,
-          background:"#fff",
-          borderRadius:2,
-          animation:"voiceWave 0.9s infinite ease-in-out",
-          animationDelay: `${i * 0.05}s`
-        }}/>
-      ))}
+      {[...Array(20)].map((_,i)=>{
+        const height = active
+          ? 6 + Math.random() * (volume/4)
+          : 6;
+
+        return (
+          <div key={i} style={{
+            width:3,
+            height,
+            background:"#fff",
+            borderRadius:2,
+            transition:"height 0.1s ease"
+          }}/>
+        );
+      })}
     </div>
-  </div>
-);
-
-/* ================= ICONS ================= */
-
-const IconMic=()=>(
-<svg viewBox="0 0 24 24" width="20" height="20" stroke="#fff" fill="none" strokeWidth="1.8">
-<path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3z"/>
-<path d="M19 11a7 7 0 0 1-14 0"/>
-<path d="M12 18v4"/>
-</svg>
-);
-
-const IconSend=()=>(
-<svg viewBox="0 0 24 24"
-  width="18"
-  height="18"
-  fill="none"
-  stroke="#000"
-  strokeWidth="1.8"
-  strokeLinecap="round"
-  strokeLinejoin="round"
->
-<path d="M22 2L11 13"/>
-<path d="M22 2L15 22l-4-9-9-4 20-7z"/>
-</svg>
-);
+  );
+};
