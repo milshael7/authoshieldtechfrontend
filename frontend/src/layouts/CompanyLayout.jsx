@@ -1,5 +1,5 @@
 // frontend/src/layouts/CompanyLayout.jsx
-// Company Layout — Dark Unified v2 (White Strip Removed)
+// Company Layout — Dark Unified v3 (Advisor Rail Unified)
 
 import React, { useEffect, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
@@ -16,9 +16,10 @@ import "../styles/layout.css";
 export default function CompanyLayout() {
   const navigate = useNavigate();
   const user = getSavedUser();
-  const { wsStatus, systemStatus } = useSecurity();
+  const { systemStatus } = useSecurity();
 
   const [menuOpen, setMenuOpen] = useState(false);
+
   const [advisorOpen, setAdvisorOpen] = useState(() => {
     const saved = localStorage.getItem("company.advisor.open");
     return saved !== "false";
@@ -45,12 +46,13 @@ export default function CompanyLayout() {
   const navClass = ({ isActive }) =>
     isActive ? "nav-link active" : "nav-link";
 
+  const DRAWER_OPEN_W = 360;
+  const drawerWidth = advisorOpen ? DRAWER_OPEN_W : 0;
+
   return (
     <div
       className={`layout-root enterprise ${menuOpen ? "sidebar-open" : ""}`}
       style={{
-        display: "flex",
-        minHeight: "100vh",
         background: "#0a0f1c",
         color: "#fff",
       }}
@@ -137,70 +139,56 @@ export default function CompanyLayout() {
       <div
         className="enterprise-main"
         style={{
+          marginRight: drawerWidth,
+          transition: "margin-right .25s ease",
           flex: 1,
           display: "flex",
+          flexDirection: "column",
           background: "#0a0f1c",
         }}
       >
-        <main
-          style={{
-            flex: 1,
-            padding: 20,
-            background: "#0a0f1c",
-          }}
-        >
+        <main style={{ flex: 1, padding: 20 }}>
           <Outlet />
         </main>
-
-        {/* ================= ADVISOR ================= */}
-        <aside
-          style={{
-            width: advisorOpen ? 340 : 0,
-            transition: "width .25s ease",
-            overflow: "hidden",
-            borderLeft: advisorOpen
-              ? "1px solid rgba(255,255,255,.08)"
-              : "none",
-            background:
-              "linear-gradient(180deg, rgba(255,255,255,.04), rgba(0,0,0,.55))",
-            backdropFilter: "blur(10px)",
-          }}
-        >
-          {advisorOpen && (
-            <div style={{ padding: 18 }}>
-              <AuthoDevPanel
-                title="Advisor"
-                getContext={() => ({
-                  role: "company",
-                  scope: "organization-only",
-                  tenant: companyId,
-                  subscription: subscriptionStatus,
-                  location: window.location.pathname,
-                  systemStatus,
-                })}
-              />
-            </div>
-          )}
-        </aside>
       </div>
 
-      {/* Advisor Toggle Button */}
-      <button
-        onClick={() => setAdvisorOpen(v => !v)}
-        style={{
-          position: "fixed",
-          right: advisorOpen ? 340 : 0,
-          top: "50%",
-          transform: "translateY(-50%)",
-          padding: "6px 10px",
-          background: "#111827",
-          color: "#fff",
-          border: "1px solid rgba(255,255,255,.08)",
-          cursor: "pointer",
-        }}
-      >
-        {advisorOpen ? "›" : "Advisor"}
-      </button>
+      {/* ================= ADVISOR PANEL ================= */}
+      <>
+        <div
+          className={`enterprise-ai-panel ${advisorOpen ? "" : "collapsed"}`}
+        >
+          <AuthoDevPanel
+            title="Advisor"
+            getContext={() => ({
+              role: "company",
+              scope: "organization-only",
+              tenant: companyId,
+              subscription: subscriptionStatus,
+              location: window.location.pathname,
+              systemStatus,
+            })}
+          />
+        </div>
+
+        {/* ================= VERTICAL RAIL ================= */}
+        <div
+          className="advisor-rail"
+          style={{ right: advisorOpen ? DRAWER_OPEN_W : 0 }}
+          onClick={() => setAdvisorOpen(v => !v)}
+        >
+          <div className="advisor-rail-arrow">
+            {advisorOpen ? "▶" : "◀"}
+          </div>
+
+          <div className="advisor-rail-text">
+            ADVISOR
+          </div>
+
+          <div className="advisor-rail-arrow">
+            {advisorOpen ? "▶" : "◀"}
+          </div>
+        </div>
+      </>
     </div>
   );
 }
