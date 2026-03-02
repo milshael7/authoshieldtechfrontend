@@ -1,8 +1,5 @@
 // frontend/src/layouts/SmallCompanyLayout.jsx
-// Small Company Layout — Unified Enterprise Advisor Architecture
-// Limited Tier Organization
-// Same Advisor Body • Different Brain
-// Upgrade Path → Full Company (seat-based)
+// Small Company Layout — Dark Unified v2 (White Strip Removed)
 
 import React, { useEffect, useMemo, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
@@ -17,7 +14,6 @@ export default function SmallCompanyLayout() {
 
   const [menuOpen, setMenuOpen] = useState(false);
 
-  // 🔐 Standardized advisor persistence (match other layouts)
   const [advisorOpen, setAdvisorOpen] = useState(() => {
     const saved = localStorage.getItem("small_company.advisor.open");
     return saved !== "false";
@@ -40,7 +36,15 @@ export default function SmallCompanyLayout() {
   const subscriptionStatus = user?.subscriptionStatus || "Unknown";
 
   return (
-    <div className={`layout-root enterprise ${menuOpen ? "sidebar-open" : ""}`}>
+    <div
+      className={`layout-root enterprise ${menuOpen ? "sidebar-open" : ""}`}
+      style={{
+        display: "flex",
+        minHeight: "100vh",
+        background: "#0a0f1c",
+        color: "#fff",
+      }}
+    >
       {menuOpen && <div className="sidebar-overlay" onClick={closeMenu} />}
 
       {/* ================= SIDEBAR ================= */}
@@ -75,7 +79,6 @@ export default function SmallCompanyLayout() {
 
           <hr style={{ opacity: 0.2 }} />
 
-          {/* ✅ Use /pricing so it always exists (avoid missing "upgrade" route) */}
           <div className="nav-section-label">Upgrade</div>
 
           <NavLink to="/pricing" className="upgrade-link" onClick={closeMenu}>
@@ -92,36 +95,69 @@ export default function SmallCompanyLayout() {
         </button>
       </aside>
 
-      {/* ================= MAIN + ADVISOR ================= */}
-      <div className="enterprise-main">
-        <main className="layout-main">
-          <section className="layout-content">
-            <Outlet />
-          </section>
+      {/* ================= MAIN ================= */}
+      <div
+        style={{
+          flex: 1,
+          display: "flex",
+          background: "#0a0f1c",
+        }}
+      >
+        <main
+          style={{
+            flex: 1,
+            padding: 20,
+            background: "#0a0f1c",
+          }}
+        >
+          <Outlet />
         </main>
 
-        {/* RIGHT ADVISOR DOCK */}
-        <aside className={`enterprise-ai-panel ${advisorOpen ? "" : "collapsed"}`}>
-          <div className="enterprise-ai-inner">
-            <AuthoDevPanel
-              title="Advisor"
-              getContext={() => ({
-                role: "small_company",
-                scope: "organization-only",
-                tier: "limited",
-                subscription: subscriptionStatus,
-                location: window.location.pathname,
-              })}
-            />
-          </div>
+        {/* ================= ADVISOR ================= */}
+        <aside
+          style={{
+            width: advisorOpen ? 320 : 0,
+            transition: "width .25s ease",
+            overflow: "hidden",
+            borderLeft: advisorOpen
+              ? "1px solid rgba(255,255,255,.08)"
+              : "none",
+            background:
+              "linear-gradient(180deg, rgba(255,255,255,.04), rgba(0,0,0,.55))",
+            backdropFilter: "blur(10px)",
+          }}
+        >
+          {advisorOpen && (
+            <div style={{ padding: 18 }}>
+              <AuthoDevPanel
+                title="Advisor"
+                getContext={() => ({
+                  role: "small_company",
+                  scope: "organization-only",
+                  tier: "limited",
+                  subscription: subscriptionStatus,
+                  location: window.location.pathname,
+                })}
+              />
+            </div>
+          )}
         </aside>
       </div>
 
-      {/* FLOATING TOGGLE */}
+      {/* Advisor Toggle */}
       <button
-        className="advisor-fab"
-        onClick={() => setAdvisorOpen((v) => !v)}
-        title={advisorOpen ? "Close Advisor" : "Open Advisor"}
+        onClick={() => setAdvisorOpen(v => !v)}
+        style={{
+          position: "fixed",
+          right: advisorOpen ? 320 : 0,
+          top: "50%",
+          transform: "translateY(-50%)",
+          padding: "6px 10px",
+          background: "#111827",
+          color: "#fff",
+          border: "1px solid rgba(255,255,255,.08)",
+          cursor: "pointer",
+        }}
       >
         {advisorOpen ? "›" : "Advisor"}
       </button>
