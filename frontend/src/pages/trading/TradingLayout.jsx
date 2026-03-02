@@ -6,7 +6,10 @@
 
 import React from "react";
 import { NavLink, Routes, Route, Navigate } from "react-router-dom";
-import TradingRoom from "./TradingRoom";
+
+// ✅ FIXED PATH (go up one level)
+import TradingRoom from "../TradingRoom";
+
 import Market from "./Market";
 import AIControl from "./AIControl";
 import Analytics from "./Analytics";
@@ -27,7 +30,14 @@ export default function TradingLayout() {
   };
 
   return (
-    <div className="container" style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+    <div
+      className="container"
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        height: "100%",
+      }}
+    >
 
       {/* TOP NAVIGATION */}
       <div
@@ -37,7 +47,7 @@ export default function TradingLayout() {
           gap: 10,
           marginBottom: 12,
           borderBottom: "1px solid rgba(255,255,255,.08)",
-          paddingBottom: 10
+          paddingBottom: 10,
         }}
       >
         <NavLink
