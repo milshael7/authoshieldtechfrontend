@@ -22,12 +22,6 @@ function getStorageKey(){
   return `authodev.panel.${tenant}.${getRoomId()}`;
 }
 
-function copyText(text){
-  try{ navigator.clipboard?.writeText(String(text||"")); }catch{}
-}
-
-/* ================= MAIN COMPONENT ================= */
-
 export default function AuthoDevPanel({
   title="Advisor",
   endpoint="/api/ai/chat",
@@ -42,7 +36,10 @@ export default function AuthoDevPanel({
   const [speakingIndex,setSpeakingIndex]=useState(null);
 
   const recognitionRef=useRef(null);
-  const bottomRef=useRef(null);
+  const feedRef=useRef(null);
+  const textareaRef=useRef(null);
+
+  /* ================= LOAD HISTORY ================= */
 
   useEffect(()=>{
     const raw=safeGet(storageKey);
@@ -60,35 +57,44 @@ export default function AuthoDevPanel({
     }));
   },[messages,storageKey]);
 
+  /* Auto scroll ONLY feed */
   useEffect(()=>{
-    bottomRef.current?.scrollIntoView({behavior:"smooth"});
+    if(feedRef.current){
+      feedRef.current.scrollTop = feedRef.current.scrollHeight;
+    }
   },[messages]);
 
-  /* ================= SPEECH ================= */
-
-  function handleSpeak(text,index){
-    setSpeakingIndex(index);
-    readAloud(text,()=>{
-      setSpeakingIndex(null);
-    });
-  }
+  /* Auto expand textarea */
+  useEffect(()=>{
+    const el=textareaRef.current;
+    if(!el) return;
+    el.style.height="auto";
+    el.style.height=Math.min(el.scrollHeight,140)+"px";
+  },[input]);
 
   /* ================= VOICE INPUT ================= */
 
   function startListening(){
     const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
     if(!SR) return;
+
     try{recognitionRef.current?.stop();}catch{}
+
     const rec=new SR();
     rec.lang="en-US";
     rec.interimResults=true;
+
     rec.onstart=()=>setListening(true);
     rec.onend=()=>setListening(false);
+
     rec.onresult=(e)=>{
-      const last=e.results?.[e.results.length-1];
-      const text=last?.[0]?.transcript||"";
-      if(text) setInput(text);
+      let transcript="";
+      for(let i=0;i<e.results.length;i++){
+        transcript+=e.results[i][0].transcript;
+      }
+      setInput(transcript);
     };
+
     recognitionRef.current=rec;
     rec.start();
   }
@@ -100,19 +106,16 @@ export default function AuthoDevPanel({
 
   /* ================= SEND ================= */
 
-  async function sendMessage(customText=null, replaceIndex=null){
-    const messageText=String(customText ?? input ?? "").trim();
+  async function sendMessage(){
+    const messageText=String(input||"").trim();
     if(!messageText||loading) return;
     if(listening) stopListening();
 
-    if(replaceIndex===null){
-      setMessages(m=>[
-        ...m.slice(-MAX_MESSAGES+1),
-        {role:"user",text:messageText,ts:new Date().toLocaleTimeString()}
-      ]);
-      setInput("");
-    }
-
+    setMessages(m=>[
+      ...m.slice(-MAX_MESSAGES+1),
+      {role:"user",text:messageText}
+    ]);
+    setInput("");
     setLoading(true);
 
     try{
@@ -127,301 +130,122 @@ export default function AuthoDevPanel({
       const data=await res.json().catch(()=>({}));
       const reply=data?.reply||"Assistant unavailable.";
 
-      setMessages(prev=>{
-        const newMsg = {role:"ai",text:reply,ts:new Date().toLocaleTimeString()};
-        if(replaceIndex!==null){
-          const copy=[...prev];
-          copy[replaceIndex]=newMsg;
-          return copy;
-        }
-        return [...prev.slice(-MAX_MESSAGES+1),newMsg];
-      });
+      setMessages(prev=>[
+        ...prev.slice(-MAX_MESSAGES+1),
+        {role:"ai",text:reply}
+      ]);
 
     }catch{
       setMessages(prev=>[
         ...prev.slice(-MAX_MESSAGES+1),
-        {role:"ai",text:"Assistant unavailable.",ts:new Date().toLocaleTimeString()}
+        {role:"ai",text:"Assistant unavailable."}
       ]);
     }finally{
       setLoading(false);
     }
   }
 
-  function regenerate(index){
-    const previousUser=[...messages]
-      .slice(0,index)
-      .reverse()
-      .find(m=>m.role==="user");
-
-    if(previousUser?.text){
-      sendMessage(previousUser.text,index);
-    }
-  }
-
-  function share(text){
-    if(navigator.share){
-      navigator.share({text}).catch(()=>{});
-    }else{
-      copyText(text);
-    }
-  }
-
-  function react(index,type){
-    setMessages(prev=>{
-      const copy=[...prev];
-      copy[index]={...copy[index],reaction:type};
-      return copy;
-    });
-  }
-
   /* ================= UI ================= */
 
   return(
-    <div style={{
-      display:"flex",
-      flexDirection:"column",
-      height:"100%",
-      maxWidth:880,
-      margin:"0 auto",
-      width:"100%"
-    }}>
+    <div className="advisor-wrap">
 
-      <div style={{fontSize:13,opacity:.7,marginBottom:12}}>
+      {/* HEADER (LOCKED) */}
+      <div className="advisor-miniTitle">
         {title}
       </div>
 
-      <div style={{
-        flex:1,
-        overflowY:"auto",
-        display:"flex",
-        flexDirection:"column",
-        gap:18,
-        paddingRight:4
-      }}>
+      {/* FEED (ONLY THIS SCROLLS) */}
+      <div className="advisor-feed" ref={feedRef}>
         {messages.map((m,i)=>(
           <div key={i} style={{
-            display:"flex",
-            flexDirection:"column",
-            alignItems:m.role==="user"?"flex-end":"flex-start"
+            alignSelf:m.role==="user"?"flex-end":"flex-start",
+            maxWidth:"75%",
+            padding:"12px 16px",
+            borderRadius:16,
+            lineHeight:1.4,
+            background:m.role==="user"
+              ?"linear-gradient(135deg,#5EC6FF,#7aa2ff)"
+              :"rgba(255,255,255,.06)"
           }}>
-
-            <div style={{
-              maxWidth:"75%",
-              padding:"12px 16px",
-              borderRadius:16,
-              lineHeight:1.4,
-              background:m.role==="user"
-                ?"linear-gradient(135deg,#5EC6FF,#7aa2ff)"
-                :"rgba(255,255,255,.06)",
-              color:"#fff",
-              position:"relative"
-            }}>
-              {m.text}
-
-              {speakingIndex===i && (
-                <div style={{
-                  position:"absolute",
-                  bottom:6,
-                  right:8,
-                  display:"flex",
-                  gap:2
-                }}>
-                  {[...Array(6)].map((_,n)=>(
-                    <div key={n} style={{
-                      width:2,
-                      height:6,
-                      background:"#fff",
-                      animation:"pulse 0.8s infinite ease-in-out",
-                      animationDelay:`${n*0.1}s`
-                    }}/>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {m.role==="ai" && (
-              <div style={{
-                display:"flex",
-                flexWrap:"wrap",
-                gap:10,
-                marginTop:10,
-                opacity:.85
-              }}>
-                <IconButton onClick={()=>handleSpeak(m.text,i)}><IconSpeaker/></IconButton>
-                <IconButton onClick={()=>copyText(m.text)}><IconCopy/></IconButton>
-                <IconButton onClick={()=>react(i,"up")}><IconThumbUp/></IconButton>
-                <IconButton onClick={()=>react(i,"down")}><IconThumbDown/></IconButton>
-                <IconButton onClick={()=>regenerate(i)}><IconRefresh/></IconButton>
-                <IconButton onClick={()=>share(m.text)}><IconShare/></IconButton>
-              </div>
-            )}
+            {m.text}
           </div>
         ))}
-        <div ref={bottomRef}/>
       </div>
 
-      <div style={{
-        marginTop:14,
-        padding:"8px 12px",
-        borderRadius:999,
-        background:"rgba(255,255,255,0.05)",
-        display:"flex",
-        alignItems:"center",
-        gap:10
-      }}>
+      {/* INPUT (LOCKED) */}
+      <div className="advisor-inputBar">
 
-        {!listening?
-          <CircleButton onClick={startListening}><IconMic/></CircleButton>
-          :
-          <CircleButton onClick={stopListening}><IconStop/></CircleButton>
-        }
+        <div className="advisor-pill">
 
-        <textarea
-          style={{
-            flex:1,
-            background:"transparent",
-            border:"none",
-            outline:"none",
-            color:"#fff",
-            resize:"none",
-            fontSize:14
-          }}
-          placeholder="Ask anything"
-          value={input}
-          onChange={(e)=>setInput(e.target.value)}
-          onKeyDown={(e)=>{
-            if(e.key==="Enter"&&!e.shiftKey){
-              e.preventDefault();
-              sendMessage();
-            }
-          }}
-        />
+          {!listening ? (
+            <button className="advisor-pill-left" onClick={startListening}>
+              <IconMic/>
+            </button>
+          ) : (
+            <button className="advisor-pill-left" onClick={stopListening}>
+              <Waveform/>
+            </button>
+          )}
 
-        <CircleButton onClick={()=>sendMessage()} white>
-          <IconSend/>
-        </CircleButton>
+          <textarea
+            ref={textareaRef}
+            className="advisor-pill-input"
+            placeholder="Ask anything"
+            value={input}
+            rows={1}
+            onChange={(e)=>setInput(e.target.value)}
+            onKeyDown={(e)=>{
+              if(e.key==="Enter"&&!e.shiftKey){
+                e.preventDefault();
+                sendMessage();
+              }
+            }}
+          />
+
+          <button
+            className="advisor-pill-right"
+            onClick={sendMessage}
+          >
+            <IconSend/>
+          </button>
+
+        </div>
 
       </div>
-
-      <style>{`
-        @keyframes pulse {
-          0% { height: 4px; }
-          50% { height: 14px; }
-          100% { height: 4px; }
-        }
-      `}</style>
 
     </div>
   );
 }
 
-/* ================= BUTTONS ================= */
-
-const IconButton = ({ children, onClick }) => (
-  <button onClick={onClick} style={{
-    border:"none",
-    background:"transparent",
-    cursor:"pointer",
-    display:"flex",
-    alignItems:"center",
-    padding:0,
-    color:"rgba(255,255,255,.85)"
-  }}>
-    {children}
-  </button>
-);
-
-const CircleButton = ({ children, onClick, white }) => (
-  <button onClick={onClick} style={{
-    width:40,
-    height:40,
-    minWidth:40,
-    minHeight:40,
-    borderRadius:"50%",
-    display:"flex",
-    alignItems:"center",
-    justifyContent:"center",
-    border:"none",
-    cursor:"pointer",
-    background:white ? "#fff" : "rgba(255,255,255,0.08)"
-  }}>
-    {children}
-  </button>
-);
-
 /* ================= ICONS ================= */
 
-const baseIconProps = {
-  width:22,
-  height:22,
-  fill:"none",
-  stroke:"#fff",
-  strokeWidth:1.8,
-  strokeLinecap:"round",
-  strokeLinejoin:"round"
-};
-
 const IconMic=()=>(
-<svg viewBox="0 0 24 24" {...baseIconProps}>
+<svg viewBox="0 0 24 24" width="20" height="20" stroke="#fff" fill="none" strokeWidth="1.8">
 <path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3z"/>
 <path d="M19 11a7 7 0 0 1-14 0"/>
 <path d="M12 18v4"/>
 </svg>
 );
 
-const IconStop=()=>(
-<div style={{width:18,height:18,background:"#c33",borderRadius:4}}/>
-);
-
-const IconSpeaker=()=>(
-<svg viewBox="0 0 24 24" {...baseIconProps}>
-<path d="M11 5L6 9H2v6h4l5 4V5z"/>
-<path d="M15.5 8.5a5 5 0 0 1 0 7"/>
-</svg>
-);
-
-const IconCopy=()=>(
-<svg viewBox="0 0 24 24" {...baseIconProps}>
-<rect x="9" y="9" width="13" height="13" rx="2"/>
-<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-</svg>
-);
-
-const IconThumbUp=()=>(
-<svg viewBox="0 0 24 24" {...baseIconProps}>
-<path d="M14 9V5a3 3 0 0 0-3-3l-1 7"/>
-<path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/>
-<path d="M7 11h8a2 2 0 0 1 2 2l-1 7a2 2 0 0 1-2 2H7"/>
-</svg>
-);
-
-const IconThumbDown=()=>(
-<svg viewBox="0 0 24 24" {...baseIconProps}>
-<path d="M10 15v4a3 3 0 0 0 3 3l1-7"/>
-<path d="M17 2h3a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-3"/>
-<path d="M17 13H9a2 2 0 0 1-2-2l1-7a2 2 0 0 1 2-2h7"/>
-</svg>
-);
-
-const IconRefresh=()=>(
-<svg viewBox="0 0 24 24" {...baseIconProps}>
-<polyline points="23 4 23 10 17 10"/>
-<path d="M20.49 15A9 9 0 1 1 23 10"/>
-</svg>
-);
-
-const IconShare=()=>(
-<svg viewBox="0 0 24 24" {...baseIconProps}>
-<path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/>
-<polyline points="16 6 12 2 8 6"/>
-<line x1="12" y1="2" x2="12" y2="15"/>
-</svg>
+const Waveform=()=>(
+<div style={{display:"flex",gap:2}}>
+  {[...Array(5)].map((_,i)=>(
+    <div key={i} style={{
+      width:3,
+      height:8,
+      background:"#fff",
+      animation:"pulse 0.8s infinite ease-in-out",
+      animationDelay:`${i*0.1}s`
+    }}/>
+  ))}
+</div>
 );
 
 const IconSend=()=>(
 <svg viewBox="0 0 24 24"
-  width="20"
-  height="20"
+  width="18"
+  height="18"
   fill="none"
   stroke="#000"
   strokeWidth="1.8"
