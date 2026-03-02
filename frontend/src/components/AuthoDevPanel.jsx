@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { readAloud } from "./ReadAloud";
 
 const MAX_MESSAGES = 50;
 
@@ -21,6 +22,12 @@ function getStorageKey(){
   return `authodev.panel.${tenant}.${getRoomId()}`;
 }
 
+function copyText(text){
+  try{ navigator.clipboard?.writeText(String(text||"")); }catch{}
+}
+
+/* ================= MAIN COMPONENT ================= */
+
 export default function AuthoDevPanel({
   title="Advisor",
   endpoint="/api/ai/chat",
@@ -32,15 +39,10 @@ export default function AuthoDevPanel({
   const [input,setInput]=useState("");
   const [loading,setLoading]=useState(false);
   const [listening,setListening]=useState(false);
-  const [transcriptBuffer,setTranscriptBuffer]=useState("");
-  const [speaking,setSpeaking]=useState(false);
+  const [speakingIndex,setSpeakingIndex]=useState(null);
 
   const recognitionRef=useRef(null);
-  const feedRef=useRef(null);
-  const textareaRef=useRef(null);
-  const speechTimeoutRef=useRef(null);
-
-  /* ================= LOAD HISTORY ================= */
+  const bottomRef=useRef(null);
 
   useEffect(()=>{
     const raw=safeGet(storageKey);
@@ -59,86 +61,62 @@ export default function AuthoDevPanel({
   },[messages,storageKey]);
 
   useEffect(()=>{
-    if(feedRef.current){
-      feedRef.current.scrollTop = feedRef.current.scrollHeight;
-    }
+    bottomRef.current?.scrollIntoView({behavior:"smooth"});
   },[messages]);
 
-  useEffect(()=>{
-    const el=textareaRef.current;
-    if(!el) return;
-    el.style.height="auto";
-    el.style.height=Math.min(el.scrollHeight,140)+"px";
-  },[input]);
+  /* ================= SPEECH ================= */
+
+  function handleSpeak(text,index){
+    setSpeakingIndex(index);
+    readAloud(text,()=>setSpeakingIndex(null));
+  }
 
   /* ================= VOICE INPUT ================= */
 
-  async function startListening(){
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  function startListening(){
+    const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
     if(!SR) return;
 
-    try{ recognitionRef.current?.stop(); }catch{}
+    try{recognitionRef.current?.stop();}catch{}
 
-    const rec = new SR();
-    rec.lang = "en-US";
-    rec.interimResults = true;
+    const rec=new SR();
+    rec.lang="en-US";
+    rec.interimResults=true;
 
-    rec.onstart = () => {
-      setListening(true);
-      setTranscriptBuffer("");
+    rec.onstart=()=>setListening(true);
+    rec.onend=()=>setListening(false);
+
+    rec.onresult=(e)=>{
+      const last=e.results?.[e.results.length-1];
+      const text=last?.[0]?.transcript||"";
+      if(text) setInput(text);
     };
 
-    rec.onend = () => {
-      setListening(false);
-      setSpeaking(false);
-    };
-
-    rec.onresult = (e) => {
-
-      // Trigger speaking animation
-      setSpeaking(true);
-
-      clearTimeout(speechTimeoutRef.current);
-      speechTimeoutRef.current = setTimeout(()=>{
-        setSpeaking(false);
-      }, 250);
-
-      let transcript="";
-      for(let i=0;i<e.results.length;i++){
-        transcript+=e.results[i][0].transcript;
-      }
-      setTranscriptBuffer(transcript);
-    };
-
-    recognitionRef.current = rec;
+    recognitionRef.current=rec;
     rec.start();
   }
 
   function stopListening(){
-    try{ recognitionRef.current?.stop(); }catch{}
+    try{recognitionRef.current?.stop();}catch{}
     setListening(false);
-    setSpeaking(false);
-
-    if(transcriptBuffer){
-      setInput(transcriptBuffer.trim());
-    }
   }
 
   /* ================= SEND ================= */
 
-  async function sendMessage(){
-    const messageText=String(input||transcriptBuffer||"").trim();
+  async function sendMessage(customText=null, replaceIndex=null){
+    const messageText=String(customText ?? input ?? "").trim();
     if(!messageText||loading) return;
 
     if(listening) stopListening();
 
-    setMessages(m=>[
-      ...m.slice(-MAX_MESSAGES+1),
-      {role:"user",text:messageText}
-    ]);
+    if(replaceIndex===null){
+      setMessages(m=>[
+        ...m.slice(-MAX_MESSAGES+1),
+        {role:"user",text:messageText,ts:new Date().toLocaleTimeString()}
+      ]);
+      setInput("");
+    }
 
-    setInput("");
-    setTranscriptBuffer("");
     setLoading(true);
 
     try{
@@ -153,129 +131,298 @@ export default function AuthoDevPanel({
       const data=await res.json().catch(()=>({}));
       const reply=data?.reply||"Assistant unavailable.";
 
-      setMessages(prev=>[
-        ...prev.slice(-MAX_MESSAGES+1),
-        {role:"ai",text:reply}
-      ]);
+      setMessages(prev=>{
+        const newMsg={role:"ai",text:reply,ts:new Date().toLocaleTimeString()};
+        if(replaceIndex!==null){
+          const copy=[...prev];
+          copy[replaceIndex]=newMsg;
+          return copy;
+        }
+        return [...prev.slice(-MAX_MESSAGES+1),newMsg];
+      });
 
     }catch{
       setMessages(prev=>[
         ...prev.slice(-MAX_MESSAGES+1),
-        {role:"ai",text:"Assistant unavailable."}
+        {role:"ai",text:"Assistant unavailable.",ts:new Date().toLocaleTimeString()}
       ]);
     }finally{
       setLoading(false);
     }
   }
 
+  function regenerate(index){
+    const previousUser=[...messages]
+      .slice(0,index)
+      .reverse()
+      .find(m=>m.role==="user");
+
+    if(previousUser?.text){
+      sendMessage(previousUser.text,index);
+    }
+  }
+
+  function share(text){
+    if(navigator.share){
+      navigator.share({text}).catch(()=>{});
+    }else{
+      copyText(text);
+    }
+  }
+
+  function react(index,type){
+    setMessages(prev=>{
+      const copy=[...prev];
+      copy[index]={...copy[index],reaction:type};
+      return copy;
+    });
+  }
+
   /* ================= UI ================= */
 
   return(
-    <div className="advisor-wrap">
+    <div style={{
+      display:"flex",
+      flexDirection:"column",
+      height:"100%",
+      width:"100%"
+    }}>
 
-      <div className="advisor-miniTitle">
+      {/* HEADER */}
+      <div style={{
+        flexShrink:0,
+        fontSize:13,
+        opacity:.7,
+        marginBottom:12
+      }}>
         {title}
       </div>
 
-      <div className="advisor-feed" ref={feedRef}>
+      {/* MESSAGES */}
+      <div style={{
+        flex:1,
+        overflowY:"auto",
+        display:"flex",
+        flexDirection:"column",
+        gap:26,
+        paddingRight:6
+      }}>
+
         {messages.map((m,i)=>(
           <div key={i} style={{
-            alignSelf:m.role==="user"?"flex-end":"flex-start",
-            maxWidth:"75%",
-            padding:"12px 16px",
-            borderRadius:16,
-            lineHeight:1.4,
-            background:m.role==="user"
-              ?"linear-gradient(135deg,#5EC6FF,#7aa2ff)"
-              :"rgba(255,255,255,.06)"
+            display:"flex",
+            flexDirection:"column",
+            alignItems:m.role==="user"?"flex-end":"flex-start"
           }}>
-            {m.text}
+
+            <div style={{
+              maxWidth:"75%",
+              padding:"14px 18px",
+              borderRadius:18,
+              lineHeight:1.5,
+              background:m.role==="user"
+                ?"linear-gradient(135deg,#5EC6FF,#7aa2ff)"
+                :"rgba(255,255,255,.06)",
+              color:"#fff",
+              position:"relative"
+            }}>
+              {m.text}
+            </div>
+
+            {m.role==="ai" && (
+              <div style={{
+                display:"flex",
+                flexWrap:"wrap",
+                gap:14,
+                marginTop:14,
+                paddingTop:6,
+                opacity:.85,
+                alignItems:"center"
+              }}>
+                <IconButton onClick={()=>handleSpeak(m.text,i)}>
+                  <IconSpeaker/>
+                </IconButton>
+                <IconButton onClick={()=>copyText(m.text)}>
+                  <IconCopy/>
+                </IconButton>
+                <IconButton onClick={()=>react(i,"up")}>
+                  <IconThumbUp/>
+                </IconButton>
+                <IconButton onClick={()=>react(i,"down")}>
+                  <IconThumbDown/>
+                </IconButton>
+                <IconButton onClick={()=>regenerate(i)}>
+                  <IconRefresh/>
+                </IconButton>
+                <IconButton onClick={()=>share(m.text)}>
+                  <IconShare/>
+                </IconButton>
+              </div>
+            )}
+
           </div>
         ))}
+
+        <div ref={bottomRef}/>
       </div>
 
-      <div className="advisor-inputBar">
-        <div className="advisor-pill">
+      {/* INPUT */}
+      <div style={{
+        flexShrink:0,
+        marginTop:16,
+        padding:"10px 14px",
+        borderRadius:999,
+        background:"rgba(255,255,255,0.05)",
+        display:"flex",
+        alignItems:"center",
+        gap:12
+      }}>
 
-          <button
-            className="advisor-pill-left"
-            onClick={listening ? stopListening : startListening}
-          >
-            <IconMic/>
-          </button>
+        {!listening?
+          <CircleButton onClick={startListening}><IconMic/></CircleButton>
+          :
+          <CircleButton onClick={stopListening}><IconStop/></CircleButton>
+        }
 
-          {!listening ? (
-            <textarea
-              ref={textareaRef}
-              className="advisor-pill-input"
-              placeholder="Ask anything"
-              value={input}
-              rows={1}
-              onChange={(e)=>setInput(e.target.value)}
-              onKeyDown={(e)=>{
-                if(e.key==="Enter"&&!e.shiftKey){
-                  e.preventDefault();
-                  sendMessage();
-                }
-              }}
-            />
-          ) : (
-            <SpeechBars active={speaking}/>
-          )}
+        <textarea
+          style={{
+            flex:1,
+            background:"transparent",
+            border:"none",
+            outline:"none",
+            color:"#fff",
+            resize:"none",
+            fontSize:14,
+            maxHeight:120,
+            overflowY:"auto"
+          }}
+          placeholder="Ask anything"
+          value={input}
+          onChange={(e)=>setInput(e.target.value)}
+          onKeyDown={(e)=>{
+            if(e.key==="Enter"&&!e.shiftKey){
+              e.preventDefault();
+              sendMessage();
+            }
+          }}
+        />
 
-          <button
-            className="advisor-pill-right"
-            onClick={sendMessage}
-          >
-            <IconSend/>
-          </button>
+        <CircleButton onClick={()=>sendMessage()} white>
+          <IconSend/>
+        </CircleButton>
 
-        </div>
       </div>
-
     </div>
   );
 }
 
-/* ================= BARS ================= */
+/* ================= BUTTONS ================= */
 
-const SpeechBars = ({ active }) => {
+const IconButton = ({ children, onClick }) => (
+  <button onClick={onClick} style={{
+    border:"none",
+    background:"transparent",
+    cursor:"pointer",
+    display:"flex",
+    alignItems:"center",
+    padding:0,
+    color:"rgba(255,255,255,.85)"
+  }}>
+    {children}
+  </button>
+);
 
-  return (
-    <div style={{
-      flex:1,
-      display:"flex",
-      alignItems:"center",
-      justifyContent:"center",
-      gap:3
-    }}>
-      {[...Array(20)].map((_,i)=>(
-        <div key={i} style={{
-          width:3,
-          height: active ? 6 + Math.random()*20 : 6,
-          background:"#fff",
-          borderRadius:2,
-          transition:"height 0.08s linear"
-        }}/>
-      ))}
-    </div>
-  );
-};
+const CircleButton = ({ children, onClick, white }) => (
+  <button onClick={onClick} style={{
+    width:40,
+    height:40,
+    minWidth:40,
+    minHeight:40,
+    borderRadius:"50%",
+    display:"flex",
+    alignItems:"center",
+    justifyContent:"center",
+    border:"none",
+    cursor:"pointer",
+    background:white ? "#fff" : "rgba(255,255,255,0.08)"
+  }}>
+    {children}
+  </button>
+);
 
 /* ================= ICONS ================= */
 
+const baseIconProps = {
+  width:20,
+  height:20,
+  fill:"none",
+  stroke:"#fff",
+  strokeWidth:1.8,
+  strokeLinecap:"round",
+  strokeLinejoin:"round"
+};
+
 const IconMic=()=>(
-<svg viewBox="0 0 24 24" width="20" height="20" stroke="#fff" fill="none" strokeWidth="1.8">
+<svg viewBox="0 0 24 24" {...baseIconProps}>
 <path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3z"/>
 <path d="M19 11a7 7 0 0 1-14 0"/>
 <path d="M12 18v4"/>
 </svg>
 );
 
+const IconStop=()=>(
+<div style={{width:16,height:16,background:"#c33",borderRadius:4}}/>
+);
+
+const IconSpeaker=()=>(
+<svg viewBox="0 0 24 24" {...baseIconProps}>
+<path d="M11 5L6 9H2v6h4l5 4V5z"/>
+<path d="M15.5 8.5a5 5 0 0 1 0 7"/>
+</svg>
+);
+
+const IconCopy=()=>(
+<svg viewBox="0 0 24 24" {...baseIconProps}>
+<rect x="9" y="9" width="13" height="13" rx="2"/>
+<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+</svg>
+);
+
+const IconThumbUp=()=>(
+<svg viewBox="0 0 24 24" {...baseIconProps}>
+<path d="M14 9V5a3 3 0 0 0-3-3l-1 7"/>
+<path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/>
+<path d="M7 11h8a2 2 0 0 1 2 2l-1 7a2 2 0 0 1-2 2H7"/>
+</svg>
+);
+
+const IconThumbDown=()=>(
+<svg viewBox="0 0 24 24" {...baseIconProps}>
+<path d="M10 15v4a3 3 0 0 0 3 3l1-7"/>
+<path d="M17 2h3a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-3"/>
+<path d="M17 13H9a2 2 0 0 1-2-2l1-7a2 2 0 0 1 2-2h7"/>
+</svg>
+);
+
+const IconRefresh=()=>(
+<svg viewBox="0 0 24 24" {...baseIconProps}>
+<polyline points="23 4 23 10 17 10"/>
+<path d="M20.49 15A9 9 0 1 1 23 10"/>
+</svg>
+);
+
+const IconShare=()=>(
+<svg viewBox="0 0 24 24" {...baseIconProps}>
+<path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/>
+<polyline points="16 6 12 2 8 6"/>
+<line x1="12" y1="2" x2="12" y2="15"/>
+</svg>
+);
+
 const IconSend=()=>(
 <svg viewBox="0 0 24 24"
-  width="18"
-  height="18"
+  width="20"
+  height="20"
   fill="none"
   stroke="#000"
   strokeWidth="1.8"
