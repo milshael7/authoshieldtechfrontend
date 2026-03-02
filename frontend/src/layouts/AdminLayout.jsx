@@ -1,5 +1,5 @@
 // frontend/src/layouts/AdminLayout.jsx
-// Enterprise Admin Layout — Final Push + Vertical Handle Version
+// FINAL Stable Layout — Scroll Isolated + Full Sidebar + Working Advisor
 
 import React, { useEffect, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
@@ -45,28 +45,48 @@ export default function AdminLayout() {
     isActive ? "nav-link active" : "nav-link";
 
   return (
-    <div
-      className="layout-root enterprise"
-      style={{
-        display: "flex",
-        minHeight: "100vh",
-        background: "#0a0f1c",
-        color: "#fff",
-      }}
-    >
+    <div className="layout-root enterprise">
+
       {/* ================= SIDEBAR ================= */}
       <aside className="layout-sidebar admin">
         <div className="layout-brand">
           <Logo size="md" />
-          <span style={{ fontSize: 12 }}>
+          <span className="muted" style={{ fontSize: 12 }}>
             Enterprise Administration
           </span>
         </div>
 
         <nav className="layout-nav">
-          <NavLink to="/admin" end className={navClass}>
-            Dashboard
-          </NavLink>
+          <NavLink to="/admin" end className={navClass}>Dashboard</NavLink>
+
+          <hr />
+          <div className="nav-section-label">Security Command</div>
+          <NavLink to="/admin/security" className={navClass}>Security Overview</NavLink>
+          <NavLink to="/admin/risk" className={navClass}>Risk Monitor</NavLink>
+          <NavLink to="/admin/sessions" className={navClass}>Session Monitor</NavLink>
+          <NavLink to="/admin/device-integrity" className={navClass}>Device Integrity</NavLink>
+          <NavLink to="/admin/trading" className={navClass}>Internal Trading</NavLink>
+
+          <hr />
+          <div className="nav-section-label">Security Modules</div>
+          <NavLink to="/admin/assets" className={navClass}>Assets</NavLink>
+          <NavLink to="/admin/incidents" className={navClass}>Incident Management</NavLink>
+          <NavLink to="/admin/vulnerabilities" className={navClass}>Vulnerability Oversight</NavLink>
+          <NavLink to="/admin/compliance" className={navClass}>Regulatory Compliance</NavLink>
+          <NavLink to="/admin/reports" className={navClass}>Executive Reporting</NavLink>
+
+          <hr />
+          <div className="nav-section-label">Platform Intelligence</div>
+          <NavLink to="/admin/audit" className={navClass}>Audit Explorer</NavLink>
+          <NavLink to="/admin/global" className={navClass}>Global Control</NavLink>
+          <NavLink to="/admin/notifications" className={navClass}>System Notifications</NavLink>
+
+          <hr />
+          <div className="nav-section-label">Operational Oversight</div>
+          <NavLink to="/admin/companies" className={navClass}>Company Oversight</NavLink>
+          <NavLink to="/manager" className={navClass}>Manager Command</NavLink>
+          <NavLink to="/company" className={navClass}>Corporate Entities</NavLink>
+          <NavLink to="/user" className={navClass}>User Governance</NavLink>
         </nav>
 
         <button className="btn logout-btn" onClick={logout}>
@@ -74,19 +94,11 @@ export default function AdminLayout() {
         </button>
       </aside>
 
-      {/* ================= MAIN + PANEL ================= */}
-      <div style={{ flex: 1, display: "flex", position: "relative" }}>
+      {/* ================= MAIN ================= */}
+      <div className="enterprise-main">
 
-        {/* ================= MAIN CONTENT ================= */}
-        <div
-          style={{
-            flex: 1,
-            display: "flex",
-            flexDirection: "column",
-            transition: "all .3s ease",
-          }}
-        >
-          <main style={{ flex: 1, padding: 20 }}>
+        <div className="layout-main">
+          <main className="layout-content">
             <Outlet />
           </main>
         </div>
@@ -94,17 +106,11 @@ export default function AdminLayout() {
         {/* ================= ADVISOR PANEL ================= */}
         {!isMobile && (
           <div
+            className="enterprise-ai-panel"
             style={{
               width: advisorOpen ? PANEL_WIDTH : 0,
               transition: "width .3s ease",
-              overflow: "hidden",
-              display: "flex",
-              flexDirection: "column",
-              borderLeft: advisorOpen
-                ? "1px solid rgba(255,255,255,.08)"
-                : "none",
-              background:
-                "linear-gradient(180deg, rgba(255,255,255,.04), rgba(0,0,0,.45))",
+              overflow: "hidden"
             }}
           >
             <AuthoDevPanel
@@ -118,34 +124,34 @@ export default function AdminLayout() {
             />
           </div>
         )}
-
-        {/* ================= VERTICAL STANDING HANDLE ================= */}
-        {!isMobile && (
-          <div
-            onClick={() => setAdvisorOpen(v => !v)}
-            style={{
-              position: "absolute",
-              top: "50%",
-              right: advisorOpen ? PANEL_WIDTH - 8 : -8,
-              transform: "translateY(-50%)",
-              padding: "12px 6px",
-              background: "rgba(0,0,0,.6)",
-              borderRadius: "8px 0 0 8px",
-              cursor: "pointer",
-              fontSize: 11,
-              letterSpacing: ".15em",
-              transition: "right .3s ease",
-              zIndex: 10,
-              writingMode: "vertical-rl",
-              textOrientation: "mixed",
-              userSelect: "none",
-            }}
-          >
-            {advisorOpen ? "◀ ADVISOR" : "ADVISOR ▶"}
-          </div>
-        )}
-
       </div>
+
+      {/* ================= VERTICAL HANDLE ================= */}
+      {!isMobile && (
+        <div
+          onClick={() => setAdvisorOpen(v => !v)}
+          style={{
+            position: "fixed",
+            top: "50%",
+            right: advisorOpen ? PANEL_WIDTH : 0,
+            transform: "translateY(-50%)",
+            padding: "12px 6px",
+            background: "rgba(0,0,0,.6)",
+            borderRadius: "8px 0 0 8px",
+            cursor: "pointer",
+            fontSize: 11,
+            letterSpacing: ".15em",
+            transition: "right .3s ease",
+            zIndex: 10,
+            writingMode: "vertical-rl",
+            textOrientation: "mixed",
+            userSelect: "none",
+          }}
+        >
+          {advisorOpen ? "◀ ADVISOR" : "ADVISOR ▶"}
+        </div>
+      )}
+
     </div>
   );
 }
