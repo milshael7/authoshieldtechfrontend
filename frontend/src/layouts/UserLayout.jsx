@@ -1,6 +1,5 @@
 // frontend/src/layouts/UserLayout.jsx
-// Individual User Layout — Enterprise Hardened v3
-// Single Source of Truth • Enforcement Visible • Limit Aware • ZeroTrust Aligned
+// Individual User Layout — Dark Unified v4 (White Strip Removed)
 
 import React, { useEffect, useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
@@ -12,7 +11,7 @@ import Logo from "../components/Logo.jsx";
 import "../styles/layout.css";
 
 export default function UserLayout() {
-  const { user } = useTools(); // 🔥 single source of truth
+  const { user } = useTools();
   const { wsStatus, systemStatus } = useSecurity();
 
   const [menuOpen, setMenuOpen] = useState(false);
@@ -41,8 +40,6 @@ export default function UserLayout() {
   const autoprotectEnabled = !!user?.autoprotectEnabled;
   const managedCompanies = user?.managedCompanies || [];
 
-  /* ================= STATUS COLORS ================= */
-
   function wsColor() {
     if (wsStatus === "connected") return "#22c55e";
     if (wsStatus === "reconnecting") return "#f59e0b";
@@ -55,10 +52,7 @@ export default function UserLayout() {
 
   function subscriptionColor() {
     if (subscriptionStatus === "Active") return "#22c55e";
-    if (
-      subscriptionStatus === "Locked" ||
-      subscriptionStatus === "Past Due"
-    )
+    if (subscriptionStatus === "Locked" || subscriptionStatus === "Past Due")
       return "#ef4444";
     return "#f59e0b";
   }
@@ -67,10 +61,16 @@ export default function UserLayout() {
     isActive ? "nav-link active" : "nav-link";
 
   return (
-    <div className={`layout-root enterprise ${menuOpen ? "sidebar-open" : ""}`}>
-      {menuOpen && (
-        <div className="sidebar-overlay" onClick={closeMenu} />
-      )}
+    <div
+      className={`layout-root enterprise ${menuOpen ? "sidebar-open" : ""}`}
+      style={{
+        display: "flex",
+        minHeight: "100vh",
+        background: "#0a0f1c",
+        color: "#fff",
+      }}
+    >
+      {menuOpen && <div className="sidebar-overlay" onClick={closeMenu} />}
 
       {/* ================= SIDEBAR ================= */}
       <aside className="layout-sidebar user">
@@ -136,8 +136,12 @@ export default function UserLayout() {
 
       {/* ================= MAIN ================= */}
       <div
-        className="enterprise-main"
-        style={{ display: "flex", flexDirection: "column" }}
+        style={{
+          flex: 1,
+          display: "flex",
+          flexDirection: "column",
+          background: "#0a0f1c",
+        }}
       >
         {/* ===== STATUS BAR ===== */}
         <div
@@ -148,7 +152,7 @@ export default function UserLayout() {
             justifyContent: "space-between",
             padding: "0 18px",
             borderBottom: "1px solid rgba(255,255,255,.05)",
-            background: "rgba(255,255,255,.015)",
+            background: "rgba(255,255,255,.02)",
             fontSize: 11,
             letterSpacing: ".05em",
           }}
@@ -199,19 +203,33 @@ export default function UserLayout() {
           </div>
         </div>
 
-        <main className="layout-main">
-          <section className="layout-content">
-            <Outlet />
-          </section>
-        </main>
-
-        {/* ===== ADVISOR ===== */}
-        <aside
-          className={`enterprise-ai-panel ${
-            advisorOpen ? "" : "collapsed"
-          }`}
+        <main
+          style={{
+            flex: 1,
+            padding: 20,
+            background: "#0a0f1c",
+          }}
         >
-          <div className="enterprise-ai-inner">
+          <Outlet />
+        </main>
+      </div>
+
+      {/* ================= ADVISOR ================= */}
+      <aside
+        style={{
+          width: advisorOpen ? 320 : 0,
+          transition: "width .25s ease",
+          overflow: "hidden",
+          borderLeft: advisorOpen
+            ? "1px solid rgba(255,255,255,.08)"
+            : "none",
+          background:
+            "linear-gradient(180deg, rgba(255,255,255,.04), rgba(0,0,0,.55))",
+          backdropFilter: "blur(10px)",
+        }}
+      >
+        {advisorOpen && (
+          <div style={{ padding: 18 }}>
             <AuthoDevPanel
               title="Advisor"
               getContext={() => ({
@@ -226,13 +244,23 @@ export default function UserLayout() {
               })}
             />
           </div>
-        </aside>
-      </div>
+        )}
+      </aside>
 
+      {/* Toggle */}
       <button
-        className="advisor-fab"
-        onClick={() => setAdvisorOpen((v) => !v)}
-        title={advisorOpen ? "Close Advisor" : "Open Advisor"}
+        onClick={() => setAdvisorOpen(v => !v)}
+        style={{
+          position: "fixed",
+          right: advisorOpen ? 320 : 0,
+          top: "50%",
+          transform: "translateY(-50%)",
+          padding: "6px 10px",
+          background: "#111827",
+          color: "#fff",
+          border: "1px solid rgba(255,255,255,.08)",
+          cursor: "pointer",
+        }}
       >
         {advisorOpen ? "›" : "Advisor"}
       </button>
