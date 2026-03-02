@@ -1,6 +1,6 @@
 // frontend/src/pages/TradingRoom.jsx
 // ============================================================
-// TRADING ROOM — FULLY RESTORED VISUAL + LIVE STRUCTURE
+// TRADING ROOM — WS DEBUG + CHART-READY SAFE (RENDER SAFE)
 // ============================================================
 
 import React, { useEffect, useRef, useState } from "react";
@@ -11,13 +11,16 @@ import { Navigate } from "react-router-dom";
 function buildWsUrl() {
   const token = getToken();
   if (!token) return null;
-  const protocol = window.location.protocol === "https:" ? "wss://" : "ws://";
-  return `${protocol}${window.location.host}/ws/market?token=${encodeURIComponent(token)}`;
-}
 
-function n(v) {
-  const x = Number(v);
-  return Number.isFinite(x) ? x : 0;
+  const base =
+    import.meta.env.VITE_API_BASE?.trim() || window.location.origin;
+
+  const wsBase = base
+    .replace("https://", "wss://")
+    .replace("http://", "ws://")
+    .replace(/\/+$/, "");
+
+  return `${wsBase}/ws/market?token=${encodeURIComponent(token)}`;
 }
 
 function timeframeToSeconds(tf) {
@@ -34,7 +37,6 @@ function timeframeToSeconds(tf) {
 }
 
 export default function TradingRoom() {
-
   const user = getSavedUser();
   const role = String(user?.role || "").toLowerCase();
   if (!user || (role !== "admin" && role !== "manager")) {
@@ -44,30 +46,34 @@ export default function TradingRoom() {
   const chartRef = useRef(null);
   const seriesRef = useRef(null);
   const containerRef = useRef(null);
-  const candleDataRef = useRef([]);
   const wsRef = useRef(null);
+  const candleDataRef = useRef([]);
 
-  const [panelOpen, setPanelOpen] = useState(true);
-  const [activeTab, setActiveTab] = useState("positions");
   const [timeframe] = useState("1M");
+  const [activeTab, setActiveTab] = useState("positions");
+  const [panelOpen, setPanelOpen] = useState(true);
 
-  // ================= LIVE DATA STATES =================
+  const [chartReady, setChartReady] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState("CONNECTING");
+  const [lastTickAt, setLastTickAt] = useState(null);
+  const [lastPrice, setLastPrice] = useState(null);
+  const [wsUrlPreview, setWsUrlPreview] = useState("");
 
+  // ---- demo placeholders (until backend trading endpoints exist)
   const [positions] = useState([]);
   const [orders] = useState([]);
   const [news] = useState([]);
   const [signal] = useState({
     side: "BUY",
     confidence: 92,
-    reason: "Bullish structure confirmed"
+    reason: "Bullish structure confirmed",
   });
 
   // ================= CHART INIT =================
-
   useEffect(() => {
     if (!containerRef.current) return;
 
-    chartRef.current = createChart(containerRef.current, {
+    const chart = createChart(containerRef.current, {
       layout: {
         background: { color: "#0f1626" },
         textColor: "#d1d5db",
@@ -76,9 +82,7 @@ export default function TradingRoom() {
         vertLines: { color: "rgba(255,255,255,.04)" },
         horzLines: { color: "rgba(255,255,255,.04)" },
       },
-      rightPriceScale: {
-        borderColor: "rgba(255,255,255,.1)",
-      },
+      rightPriceScale: { borderColor: "rgba(255,255,255,.1)" },
       timeScale: {
         borderColor: "rgba(255,255,255,.1)",
         timeVisible: true,
@@ -88,8 +92,7 @@ export default function TradingRoom() {
       height: containerRef.current.clientHeight,
     });
 
-    // 🔥 FULL CANDLE STYLE RESTORED
-    seriesRef.current = chartRef.current.addCandlestickSeries({
+    const series = chart.addCandlestickSeries({
       upColor: "#16a34a",
       downColor: "#dc2626",
       wickUpColor: "#16a34a",
@@ -102,22 +105,43 @@ export default function TradingRoom() {
       lastValueVisible: true,
     });
 
-    seedCandles();
-    chartRef.current.timeScale().fitContent();
+    chartRef.current = chart;
+    seriesRef.current = series;
 
-    return () => chartRef.current?.remove();
+    // seed so you see *something* while WS connects
+    seedCandles();
+    chart.timeScale().fitContent();
+
+    const ro = new ResizeObserver((entries) => {
+      const { width, height } = entries[0].contentRect;
+      chart.applyOptions({ width, height });
+    });
+    ro.observe(containerRef.current);
+
+    setChartReady(true);
+
+    return () => {
+      ro.disconnect();
+      chart.remove();
+      chartRef.current = null;
+      seriesRef.current = null;
+      setChartReady(false);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function seedCandles() {
+    if (!seriesRef.current) return;
+
     const now = Math.floor(Date.now() / 1000);
     const tf = timeframeToSeconds(timeframe);
     const candles = [];
     let base = 1.1000;
 
-    for (let i = 200; i > 0; i--) {
+    for (let i = 120; i > 0; i--) {
       const time = now - i * tf;
       const open = base;
-      const close = open + (Math.random() - 0.5) * 0.01;
+      const close = open + (Math.random() - 0.5) * 0.002;
       const high = Math.max(open, close);
       const low = Math.min(open, close);
       candles.push({ time, open, high, low, close });
@@ -128,33 +152,104 @@ export default function TradingRoom() {
     seriesRef.current.setData(candles);
   }
 
-  // ================= UI =================
+  function updateCandle(price) {
+    if (!seriesRef.current || !chartRef.current) return;
 
+    const tfSeconds = timeframeToSeconds(timeframe);
+    const now = Math.floor(Date.now() / 1000);
+    const bucket = Math.floor(now / tfSeconds) * tfSeconds;
+
+    const last = candleDataRef.current[candleDataRef.current.length - 1];
+
+    if (!last || last.time !== bucket) {
+      const open = last ? last.close : price;
+      const newCandle = { time: bucket, open, high: price, low: price, close: price };
+      candleDataRef.current.push(newCandle);
+      seriesRef.current.update(newCandle);
+    } else {
+      last.high = Math.max(last.high, price);
+      last.low = Math.min(last.low, price);
+      last.close = price;
+      seriesRef.current.update({ ...last });
+    }
+
+    chartRef.current.timeScale().scrollToRealTime();
+  }
+
+  // ================= WEBSOCKET (only after chartReady) =================
+  useEffect(() => {
+    if (!chartReady) return;
+
+    const url = buildWsUrl();
+    setWsUrlPreview(url || "");
+
+    if (!url) {
+      setConnectionStatus("NO_TOKEN_OR_API_BASE");
+      return;
+    }
+
+    let ws;
+    let stopped = false;
+
+    const connect = () => {
+      if (stopped) return;
+
+      setConnectionStatus("CONNECTING");
+      ws = new WebSocket(url);
+      wsRef.current = ws;
+
+      ws.onopen = () => setConnectionStatus("CONNECTED");
+
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data?.type === "tick" && data?.price != null) {
+            const p = Number(data.price);
+            setLastPrice(p);
+            setLastTickAt(Date.now());
+            updateCandle(p);
+          }
+        } catch {
+          // ignore bad packets
+        }
+      };
+
+      ws.onclose = () => {
+        if (stopped) return;
+        setConnectionStatus("RECONNECTING");
+        setTimeout(connect, 2500);
+      };
+
+      ws.onerror = () => {
+        try { ws.close(); } catch {}
+      };
+    };
+
+    connect();
+
+    return () => {
+      stopped = true;
+      try { ws?.close(); } catch {}
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chartReady]);
+
+  // ================= UI =================
   return (
     <div style={{ display: "flex", height: "100vh", background: "#0a0f1c", color: "#fff" }}>
-
-      {/* 🔥 RESTORED LEFT BAR */}
-      <div
-        style={{
-          width: 60,
-          background: "#111827",
-          borderRight: "1px solid rgba(255,255,255,.08)"
-        }}
-      />
+      {/* LEFT BAR */}
+      <div style={{ width: 60, background: "#111827", borderRight: "1px solid rgba(255,255,255,.08)" }} />
 
       <div style={{ flex: 1, display: "flex", flexDirection: "column", padding: 20 }}>
-
         {/* HEADER */}
-        <div style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          paddingBottom: 8,
-          marginBottom: 10,
-          borderBottom: "1px solid rgba(255,255,255,.06)"
-        }}>
-          <div style={{ fontWeight: 700, fontSize: 15 }}>
-            EURUSD • {timeframe} • LIVE
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", height: 28 }}>
+          <div>
+            <div style={{ fontWeight: 700 }}>EURUSD • {timeframe} • LIVE</div>
+            <div style={{ fontSize: 12, opacity: 0.7 }}>
+              WS: {connectionStatus}
+              {lastPrice != null ? ` • Price: ${lastPrice.toFixed(5)}` : ""}
+              {lastTickAt ? ` • Tick: ${new Date(lastTickAt).toLocaleTimeString()}` : ""}
+            </div>
           </div>
 
           <button
@@ -163,21 +258,20 @@ export default function TradingRoom() {
               padding: "6px 14px",
               background: "#1e2536",
               border: "1px solid rgba(255,255,255,.1)",
-              cursor: "pointer"
+              cursor: "pointer",
             }}
           >
             Execute Order
           </button>
         </div>
 
+        {/* (Optional) WS URL preview for debugging */}
+        <div style={{ fontSize: 11, opacity: 0.5, marginTop: 6, marginBottom: 8, wordBreak: "break-all" }}>
+          {wsUrlPreview ? `WS URL: ${wsUrlPreview}` : "WS URL: (missing token or VITE_API_BASE)"}
+        </div>
+
         {/* CHART */}
-        <div style={{
-          flex: 1,
-          background: "#111827",
-          borderRadius: 12,
-          overflow: "hidden",
-          border: "1px solid rgba(255,255,255,.08)"
-        }}>
+        <div style={{ flex: 1, background: "#111827", borderRadius: 12, overflow: "hidden", border: "1px solid rgba(255,255,255,.08)" }}>
           <div ref={containerRef} style={{ width: "100%", height: "100%" }} />
         </div>
 
@@ -189,11 +283,10 @@ export default function TradingRoom() {
           borderRadius: 12,
           border: "1px solid rgba(255,255,255,.08)",
           display: "flex",
-          flexDirection: "column"
+          flexDirection: "column",
         }}>
-
           <div style={{ display: "flex", borderBottom: "1px solid rgba(255,255,255,.08)" }}>
-            {["positions","orders","news","signals"].map(tab => (
+            {["positions", "orders", "news", "signals"].map((tab) => (
               <div
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -201,7 +294,7 @@ export default function TradingRoom() {
                   padding: "12px 18px",
                   cursor: "pointer",
                   background: activeTab === tab ? "#1e2536" : "transparent",
-                  fontWeight: activeTab === tab ? 700 : 400
+                  fontWeight: activeTab === tab ? 700 : 400,
                 }}
               >
                 {tab.toUpperCase()}
@@ -210,62 +303,30 @@ export default function TradingRoom() {
           </div>
 
           <div style={{ flex: 1, padding: 16 }}>
-
-            {activeTab === "positions" && (
-              positions.length === 0
-                ? <div>No open positions</div>
-                : positions.map((p, i) => (
-                    <div key={i}>{p.symbol}</div>
-                  ))
-            )}
-
-            {activeTab === "orders" && (
-              orders.length === 0
-                ? <div>No pending orders</div>
-                : orders.map((o, i) => (
-                    <div key={i}>{o.symbol}</div>
-                  ))
-            )}
-
-            {activeTab === "news" && (
-              news.length === 0
-                ? <div>No live news</div>
-                : news.map((n, i) => (
-                    <div key={i}>{n.title}</div>
-                  ))
-            )}
-
+            {activeTab === "positions" && (positions.length ? "..." : <div>No open positions</div>)}
+            {activeTab === "orders" && (orders.length ? "..." : <div>No pending orders</div>)}
+            {activeTab === "news" && (news.length ? "..." : <div>No live news</div>)}
             {activeTab === "signals" && (
               <div>
-                <div style={{ fontWeight: 700 }}>
-                  {signal.side} EURUSD
-                </div>
+                <div style={{ fontWeight: 700 }}>{signal.side} EURUSD</div>
                 <div>Confidence: {signal.confidence}%</div>
                 <div style={{ opacity: 0.7 }}>{signal.reason}</div>
               </div>
             )}
-
           </div>
         </div>
-
       </div>
 
       {/* RIGHT SIDEBAR */}
       {panelOpen && (
-        <div style={{
-          width: 360,
-          background: "#111827",
-          borderLeft: "1px solid rgba(255,255,255,.08)",
-          padding: 20
-        }}>
-          <div style={{ fontWeight: 700 }}>AI Engine Status</div>
-          <div style={{ marginTop: 10 }}>State: SCANNING MARKET</div>
-          <div>Bias: Bullish</div>
-          <div>Confidence: 82%</div>
-          <div>Trades Today: 3 / 5</div>
+        <div style={{ width: 360, background: "#111827", borderLeft: "1px solid rgba(255,255,255,.08)", padding: 20 }}>
+          <div style={{ fontWeight: 700, marginBottom: 12 }}>AI Engine Status</div>
+          <div>State: {connectionStatus === "CONNECTED" ? "STREAMING" : "WAITING"}</div>
+          <div style={{ marginTop: 10, opacity: 0.7 }}>
+            This sidebar stays “live status” only. Analytics/history goes in Analytics page.
+          </div>
         </div>
       )}
-
     </div>
   );
 }
