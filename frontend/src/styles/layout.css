@@ -1,6 +1,6 @@
 /* =========================================================
-   AUTOSHIELD ENTERPRISE LAYOUT — STABLE VERSION
-   Locked Viewport + Proper Advisor Rail Spacing
+   AUTOSHIELD ENTERPRISE LAYOUT — STRUCTURALLY FIXED
+   Rail Integrated (No Click Blocking)
    ========================================================= */
 
 html, body {
@@ -21,7 +21,6 @@ html, body {
   display:flex;
   height:100vh;
   width:100%;
-  position:relative;
   overflow:hidden;
 }
 
@@ -40,31 +39,7 @@ html, body {
   border-right:1px solid rgba(255,255,255,.08);
   backdrop-filter:blur(10px);
   overflow-y:auto;
-  z-index:5;
 }
-
-.layout-nav a{
-  display:block;
-  padding:10px 12px;
-  border-radius:10px;
-  text-decoration:none;
-  color:rgba(255,255,255,.85);
-  font-size:14px;
-  font-weight:600;
-  transition:.2s ease;
-}
-
-.layout-nav a:hover{
-  background:rgba(120,160,255,.15);
-  color:#fff;
-}
-
-.layout-nav a.active{
-  background:linear-gradient(180deg, rgba(120,160,255,.9), rgba(70,110,255,.8));
-  color:#fff;
-}
-
-.logout-btn{ margin-top:auto; }
 
 /* =========================================================
    MAIN
@@ -74,15 +49,6 @@ html, body {
   flex:1;
   display:flex;
   height:100vh;
-  position:relative;
-  overflow:hidden;
-}
-
-.layout-main{
-  flex:1;
-  display:flex;
-  flex-direction:column;
-  min-width:0;
   overflow:hidden;
 }
 
@@ -90,8 +56,6 @@ html, body {
   flex:1;
   padding:28px;
   overflow-y:auto;
-  overflow-x:hidden;
-  -webkit-overflow-scrolling: touch;
 }
 
 /* =========================================================
@@ -99,47 +63,37 @@ html, body {
    ========================================================= */
 
 .enterprise-ai-panel{
+  display:flex;
+  height:100vh;
   width:380px;
   flex-shrink:0;
-  height:100vh;
-  display:flex;
-  flex-direction:column;
-  border-left:1px solid rgba(255,255,255,.08);
   background:linear-gradient(180deg, rgba(255,255,255,.04), rgba(0,0,0,.45));
+  border-left:1px solid rgba(255,255,255,.08);
   backdrop-filter:blur(10px);
   transition:width .25s ease;
-  z-index:4;
   overflow:hidden;
-
-  padding-right:28px; /* 🔥 reserve space for rail */
-  box-sizing:border-box;
 }
 
+/* When collapsed */
 .enterprise-ai-panel.collapsed{
-  width:0;
-  border-left:none;
-  padding-right:0;
+  width:28px; /* 🔥 rail width only */
 }
 
 /* =========================================================
-   VERTICAL ADVISOR RAIL
+   RAIL (NOW INSIDE PANEL)
    ========================================================= */
 
 .advisor-rail{
-  position:fixed;
-  top:0;
-  right:0;
-  height:100vh;
   width:28px;
+  min-width:28px;
   display:flex;
   flex-direction:column;
   justify-content:space-between;
   align-items:center;
   padding:14px 0;
   background:rgba(0,0,0,.35);
-  border-left:1px solid rgba(255,255,255,.08);
+  border-right:1px solid rgba(255,255,255,.08);
   cursor:pointer;
-  z-index:6;
 }
 
 .advisor-rail-text{
@@ -149,24 +103,21 @@ html, body {
   letter-spacing:.2em;
   font-weight:700;
   color:#ffffff;
-  user-select:none;
 }
 
 .advisor-rail-arrow{
   font-size:14px;
   color:#ffffff;
-  opacity:.85;
-  user-select:none;
 }
 
 /* =========================================================
-   ADVISOR STRUCTURE
+   CHAT AREA
    ========================================================= */
 
 .advisor-wrap{
+  flex:1;
   display:flex;
   flex-direction:column;
-  height:100%;
   overflow:hidden;
 }
 
@@ -176,18 +127,15 @@ html, body {
   font-size:14px;
   font-weight:600;
   border-bottom:1px solid rgba(255,255,255,.06);
-  background:rgba(10,15,28,.95);
 }
 
 .advisor-feed{
   flex:1;
   overflow-y:auto;
-  overflow-x:hidden;
   padding:20px;
   display:flex;
   flex-direction:column;
   gap:22px;
-  -webkit-overflow-scrolling: touch;
 }
 
 .advisor-inputBar{
@@ -198,48 +146,11 @@ html, body {
 }
 
 /* =========================================================
-   INPUT
-   ========================================================= */
-
-.advisor-pill{
-  display:flex;
-  align-items:center;
-  background:#171b24;
-  border-radius:999px;
-  padding:10px 16px;
-  gap:16px;
-  min-height:56px;
-}
-
-.advisor-pill-input{
-  flex:1;
-  background:transparent;
-  border:none;
-  outline:none;
-  color:#ffffff;
-  font-size:15px;
-  resize:none;
-}
-
-/* =========================================================
    MOBILE
    ========================================================= */
 
 @media (max-width:900px){
-
-  .layout-sidebar{
-    width:220px;
-  }
-
   .enterprise-ai-panel{
     display:none;
-  }
-
-  .advisor-rail{
-    display:none;
-  }
-
-  .layout-content{
-    padding:18px;
   }
 }
