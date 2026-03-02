@@ -1,5 +1,5 @@
 // frontend/src/layouts/AdminLayout.jsx
-// FINAL Stable Layout — Slim Sidebar + Advisor Push + Clean Scroll
+// Stable Layout — Full Sidebar Restored + Advisor Stable
 
 import React, { useEffect, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
@@ -48,7 +48,6 @@ export default function AdminLayout() {
   return (
     <div className={`layout-root enterprise ${sidebarOpen ? "" : "sidebar-collapsed"}`}>
 
-      {/* SIDEBAR */}
       <aside className="layout-sidebar admin">
 
         <div style={{
@@ -63,7 +62,7 @@ export default function AdminLayout() {
               background:"none",
               border:"none",
               color:"#fff",
-              fontSize:16,
+              fontSize:18,
               cursor:"pointer"
             }}
           >
@@ -72,10 +71,36 @@ export default function AdminLayout() {
         </div>
 
         <nav className="layout-nav">
-          <NavLink to="/admin" end className={navClass}><span>Dashboard</span></NavLink>
-          <NavLink to="/admin/trading" className={navClass}><span>Internal Trading</span></NavLink>
-          <NavLink to="/admin/security" className={navClass}><span>Security</span></NavLink>
-          <NavLink to="/admin/reports" className={navClass}><span>Reports</span></NavLink>
+          <NavLink to="/admin" end className={navClass}>Dashboard</NavLink>
+
+          <hr />
+          <div className="nav-section-label">Security Command</div>
+          <NavLink to="/admin/security" className={navClass}>Security Overview</NavLink>
+          <NavLink to="/admin/risk" className={navClass}>Risk Monitor</NavLink>
+          <NavLink to="/admin/sessions" className={navClass}>Session Monitor</NavLink>
+          <NavLink to="/admin/device-integrity" className={navClass}>Device Integrity</NavLink>
+          <NavLink to="/admin/trading" className={navClass}>Internal Trading</NavLink>
+
+          <hr />
+          <div className="nav-section-label">Security Modules</div>
+          <NavLink to="/admin/assets" className={navClass}>Assets</NavLink>
+          <NavLink to="/admin/incidents" className={navClass}>Incident Management</NavLink>
+          <NavLink to="/admin/vulnerabilities" className={navClass}>Vulnerability Oversight</NavLink>
+          <NavLink to="/admin/compliance" className={navClass}>Regulatory Compliance</NavLink>
+          <NavLink to="/admin/reports" className={navClass}>Executive Reporting</NavLink>
+
+          <hr />
+          <div className="nav-section-label">Platform Intelligence</div>
+          <NavLink to="/admin/audit" className={navClass}>Audit Explorer</NavLink>
+          <NavLink to="/admin/global" className={navClass}>Global Control</NavLink>
+          <NavLink to="/admin/notifications" className={navClass}>System Notifications</NavLink>
+
+          <hr />
+          <div className="nav-section-label">Operational Oversight</div>
+          <NavLink to="/admin/companies" className={navClass}>Company Oversight</NavLink>
+          <NavLink to="/manager" className={navClass}>Manager Command</NavLink>
+          <NavLink to="/company" className={navClass}>Corporate Entities</NavLink>
+          <NavLink to="/user" className={navClass}>User Governance</NavLink>
         </nav>
 
         <button className="btn logout-btn" onClick={logout}>
@@ -83,7 +108,6 @@ export default function AdminLayout() {
         </button>
       </aside>
 
-      {/* MAIN + ADVISOR */}
       <div className="enterprise-main">
 
         <div className="layout-main">
@@ -95,9 +119,7 @@ export default function AdminLayout() {
         {!isMobile && (
           <div
             className="enterprise-ai-panel"
-            style={{
-              width: advisorOpen ? PANEL_WIDTH : 0
-            }}
+            style={{ width: advisorOpen ? PANEL_WIDTH : 0 }}
           >
             <AuthoDevPanel
               title="Advisor"
@@ -110,10 +132,8 @@ export default function AdminLayout() {
             />
           </div>
         )}
-
       </div>
 
-      {/* ADVISOR TOGGLE */}
       {!isMobile && (
         <div
           onClick={() => setAdvisorOpen(v => !v)}
@@ -122,17 +142,16 @@ export default function AdminLayout() {
             top:"50%",
             right:advisorOpen ? PANEL_WIDTH : 0,
             transform:"translateY(-50%)",
-            padding:"12px 6px",
+            padding:"14px 8px",
             background:"rgba(0,0,0,.6)",
             borderRadius:"8px 0 0 8px",
             cursor:"pointer",
-            fontSize:11,
+            fontSize:12,
             letterSpacing:".15em",
             transition:"right .25s ease",
             zIndex:10,
             writingMode:"vertical-rl",
-            textOrientation:"mixed",
-            userSelect:"none"
+            textOrientation:"mixed"
           }}
         >
           {advisorOpen ? "◀ ADVISOR" : "ADVISOR ▶"}
