@@ -1,9 +1,9 @@
 // frontend/src/layouts/AdminLayout.jsx
-// Final Structural Sidebar System — True Space Reflow + Clean Hamburger
+// Stable Layout — Fixed Logo (never slides) + Proper Sidebar Space + Clean Hamburger + Advisor Stable
 
 import React, { useEffect, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import { clearToken, clearUser, getSavedUser } from "../lib/api.js";
+import { clearToken, clearUser } from "../lib/api.js";
 import { useCompany } from "../context/CompanyContext";
 import { useSecurity } from "../context/SecurityContext.jsx";
 import AuthoDevPanel from "../components/AuthoDevPanel.jsx";
@@ -41,97 +41,90 @@ export default function AdminLayout() {
     navigate("/login");
   }
 
-  const navClass = ({ isActive }) =>
-    isActive ? "nav-link active" : "nav-link";
+  const navClass = ({ isActive }) => (isActive ? "nav-link active" : "nav-link");
 
   return (
     <div className={`layout-root ${sidebarOpen ? "" : "sidebar-collapsed"}`}>
-      
-      {/* ===== OPEN BUTTON (VISIBLE ONLY WHEN CLOSED) ===== */}
-      {!sidebarOpen && !isMobile && (
-        <button
-          onClick={() => setSidebarOpen(true)}
-          style={{
-            position: "fixed",
-            top: 24,
-            left: 18,
-            background: "transparent",
-            border: "none",
-            color: "#eaf1ff",
-            fontSize: 20,
-            cursor: "pointer",
-            zIndex: 30
-          }}
-        >
-          ☰
-        </button>
-      )}
-
-      {/* ===== SIDEBAR ===== */}
-      <aside className="layout-sidebar">
-
-        {/* HEADER */}
-        <div className="sidebar-header">
+      {/* ===== FIXED BRAND CORNER (LOGO NEVER SLIDES) ===== */}
+      {!isMobile && (
+        <div className="brand-corner">
           <Logo size="md" />
 
-          {/* CLOSE BUTTON (ONLY WHEN OPEN) */}
-          {sidebarOpen && (
+          {/* OPEN BUTTON (only when sidebar is closed) */}
+          {!sidebarOpen && (
             <button
-              onClick={() => setSidebarOpen(false)}
-              style={{
-                marginTop: 16,
-                background: "transparent",
-                border: "none",
-                color: "#eaf1ff",
-                fontSize: 20,
-                cursor: "pointer"
-              }}
+              className="brand-open-btn"
+              onClick={() => setSidebarOpen(true)}
+              aria-label="Open menu"
+              title="Open menu"
             >
               ☰
             </button>
           )}
         </div>
+      )}
 
-        {/* NAV */}
-        <div className="sidebar-body layout-nav">
-          <NavLink to="/admin" end className={navClass}>Dashboard</NavLink>
+      {/* ===== SIDEBAR (SLIDES, BUT LOGO DOES NOT) ===== */}
+      <aside className="layout-sidebar admin" aria-label="Sidebar navigation">
+        {/* close button INSIDE sidebar only */}
+        <div className="sidebar-header">
+          <div className="sidebar-header-row">
+            <div className="sidebar-header-title">ADMIN</div>
 
-          <hr />
-          <div className="nav-section-label">Security Command</div>
-          <NavLink to="/admin/security" className={navClass}>Security Overview</NavLink>
-          <NavLink to="/admin/risk" className={navClass}>Risk Monitor</NavLink>
-          <NavLink to="/admin/sessions" className={navClass}>Session Monitor</NavLink>
-          <NavLink to="/admin/device-integrity" className={navClass}>Device Integrity</NavLink>
-          <NavLink to="/admin/trading" className={navClass}>Internal Trading</NavLink>
-
-          <hr />
-          <div className="nav-section-label">Security Modules</div>
-          <NavLink to="/admin/assets" className={navClass}>Assets</NavLink>
-          <NavLink to="/admin/incidents" className={navClass}>Incident Management</NavLink>
-          <NavLink to="/admin/vulnerabilities" className={navClass}>Vulnerability Oversight</NavLink>
-          <NavLink to="/admin/compliance" className={navClass}>Regulatory Compliance</NavLink>
-          <NavLink to="/admin/reports" className={navClass}>Executive Reporting</NavLink>
-
-          <hr />
-          <div className="nav-section-label">Platform Intelligence</div>
-          <NavLink to="/admin/audit" className={navClass}>Audit Explorer</NavLink>
-          <NavLink to="/admin/global" className={navClass}>Global Control</NavLink>
-          <NavLink to="/admin/notifications" className={navClass}>System Notifications</NavLink>
-
-          <hr />
-          <div className="nav-section-label">Operational Oversight</div>
-          <NavLink to="/admin/companies" className={navClass}>Company Oversight</NavLink>
-          <NavLink to="/manager" className={navClass}>Manager Command</NavLink>
-          <NavLink to="/company" className={navClass}>Corporate Entities</NavLink>
-          <NavLink to="/user" className={navClass}>User Governance</NavLink>
+            {!isMobile && (
+              <button
+                className="sidebar-close-btn"
+                onClick={() => setSidebarOpen(false)}
+                aria-label="Close menu"
+                title="Close menu"
+              >
+                ☰
+              </button>
+            )}
+          </div>
         </div>
 
-        <button className="btn logout-btn" onClick={logout}>
-          Secure Log Out
-        </button>
+        <div className="sidebar-body">
+          <nav className="layout-nav">
+            <NavLink to="/admin" end className={navClass}>Dashboard</NavLink>
+
+            <hr />
+            <div className="nav-section-label">Security Command</div>
+            <NavLink to="/admin/security" className={navClass}>Security Overview</NavLink>
+            <NavLink to="/admin/risk" className={navClass}>Risk Monitor</NavLink>
+            <NavLink to="/admin/sessions" className={navClass}>Session Monitor</NavLink>
+            <NavLink to="/admin/device-integrity" className={navClass}>Device Integrity</NavLink>
+            <NavLink to="/admin/trading" className={navClass}>Internal Trading</NavLink>
+
+            <hr />
+            <div className="nav-section-label">Security Modules</div>
+            <NavLink to="/admin/assets" className={navClass}>Assets</NavLink>
+            <NavLink to="/admin/incidents" className={navClass}>Incident Management</NavLink>
+            <NavLink to="/admin/vulnerabilities" className={navClass}>Vulnerability Oversight</NavLink>
+            <NavLink to="/admin/compliance" className={navClass}>Regulatory Compliance</NavLink>
+            <NavLink to="/admin/reports" className={navClass}>Executive Reporting</NavLink>
+
+            <hr />
+            <div className="nav-section-label">Platform Intelligence</div>
+            <NavLink to="/admin/audit" className={navClass}>Audit Explorer</NavLink>
+            <NavLink to="/admin/global" className={navClass}>Global Control</NavLink>
+            <NavLink to="/admin/notifications" className={navClass}>System Notifications</NavLink>
+
+            <hr />
+            <div className="nav-section-label">Operational Oversight</div>
+            <NavLink to="/admin/companies" className={navClass}>Company Oversight</NavLink>
+            <NavLink to="/manager" className={navClass}>Manager Command</NavLink>
+            <NavLink to="/company" className={navClass}>Corporate Entities</NavLink>
+            <NavLink to="/user" className={navClass}>User Governance</NavLink>
+          </nav>
+
+          <button className="btn logout-btn" onClick={logout}>
+            Secure Log Out
+          </button>
+        </div>
       </aside>
 
-      {/* ===== MAIN ===== */}
+      {/* ===== MAIN + ADVISOR ===== */}
       <div className="enterprise-main">
         <div className="layout-main">
           <main className="layout-content">
@@ -140,10 +133,7 @@ export default function AdminLayout() {
         </div>
 
         {!isMobile && (
-          <div
-            className="enterprise-ai-panel"
-            style={{ width: advisorOpen ? PANEL_WIDTH : 0 }}
-          >
+          <div className="enterprise-ai-panel" style={{ width: advisorOpen ? PANEL_WIDTH : 0 }}>
             <AuthoDevPanel
               title="Advisor"
               getContext={() => ({
@@ -157,10 +147,10 @@ export default function AdminLayout() {
         )}
       </div>
 
-      {/* ===== ADVISOR TOGGLE (UNCHANGED) ===== */}
+      {/* ===== ADVISOR TOGGLE (unchanged) ===== */}
       {!isMobile && (
         <div
-          onClick={() => setAdvisorOpen(v => !v)}
+          onClick={() => setAdvisorOpen((v) => !v)}
           style={{
             position: "fixed",
             top: "50%",
