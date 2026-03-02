@@ -1,5 +1,5 @@
 /* =========================================================
-   AUTOSHIELD — STRUCTURAL CONTROLLED ENTERPRISE LAYOUT
+   AUTOSHIELD — CONTROLLED ENTERPRISE LAYOUT SYSTEM
    ========================================================= */
 
 html, body {
@@ -25,20 +25,19 @@ html, body {
 }
 
 /* =========================================================
-   FIXED LOGO AREA (NEVER MOVES)
+   FIXED LOGO (NEVER MOVES)
    ========================================================= */
 
 .brand-corner{
   position:fixed;
   top:0;
   left:0;
-  width:260px;              /* matches sidebar width */
+  width:260px;
   padding:18px 18px 10px 18px;
-  background:#0b0f1a;
-  z-index:40;
+  z-index:50;
 }
 
-/* Hamburger (only when sidebar closed) */
+/* Open hamburger (only when sidebar closed) */
 .brand-open-btn{
   margin-top:14px;
   background:transparent;
@@ -50,7 +49,7 @@ html, body {
 }
 
 /* =========================================================
-   SIDEBAR — TRUE SPACE CONTROL
+   SIDEBAR
    ========================================================= */
 
 .layout-sidebar{
@@ -63,13 +62,11 @@ html, body {
   backdrop-filter:blur(10px);
   overflow:hidden;
   transition:width .28s ease, transform .28s ease;
-  z-index:10;
+  z-index:20;
 
-  /* pushes below fixed logo */
   padding-top:95px;
 }
 
-/* Collapsed */
 .sidebar-collapsed .layout-sidebar{
   width:0;
   border-right:none;
@@ -77,7 +74,6 @@ html, body {
   padding-top:0;
 }
 
-/* Sidebar Header */
 .sidebar-header{
   padding:18px;
   border-bottom:1px solid rgba(255,255,255,.06);
@@ -104,7 +100,10 @@ html, body {
   cursor:pointer;
 }
 
-/* Sidebar Body */
+/* =========================================================
+   SIDEBAR BODY
+   ========================================================= */
+
 .sidebar-body{
   flex:1;
   overflow-y:auto;
@@ -114,7 +113,7 @@ html, body {
 }
 
 /* =========================================================
-   NAV LINKS (NO PURPLE EVER)
+   NAV LINKS (NO PURPLE)
    ========================================================= */
 
 .layout-nav a,
@@ -160,11 +159,6 @@ html, body {
   overflow:hidden;
 }
 
-/* =========================================================
-   DASHBOARD CONTENT CONTROL
-   (THIS STOPS WILD EXPANSION)
-   ========================================================= */
-
 .layout-main{
   flex:1;
   display:flex;
@@ -172,27 +166,27 @@ html, body {
   overflow:hidden;
 }
 
+/* =========================================================
+   DASHBOARD WIDTH CONTROL
+   ========================================================= */
+
 .layout-content{
   flex:1;
-
-  /* logo spacing */
-  padding:110px 28px 28px 28px;
-
+  padding:90px 28px 28px 28px;
   display:flex;
   justify-content:center;
-
   overflow-y:auto;
   overflow-x:hidden;
 }
 
-/* Limit dashboard growth */
 .layout-content > *{
   width:100%;
-  max-width:1400px;   /* CONTROL WIDTH */
+  max-width:1400px;
+  margin:0 auto;
 }
 
 /* =========================================================
-   ADVISOR PANEL (UNCHANGED STRUCTURE)
+   ADVISOR
    ========================================================= */
 
 .enterprise-ai-panel{
@@ -200,8 +194,8 @@ html, body {
   flex-shrink:0;
   display:flex;
   flex-direction:column;
-  border-left:1px solid rgba(255,255,255,.08);
-  background:linear-gradient(180deg, rgba(255,255,255,.04), rgba(0,0,0,.45));
+  border-left:1px solid rgba(255,255,255,.05);
+  background:linear-gradient(180deg, rgba(255,255,255,.03), rgba(0,0,0,.45));
   backdrop-filter:blur(10px);
   transition:width .25s ease;
   overflow:hidden;
