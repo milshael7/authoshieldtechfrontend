@@ -1,7 +1,7 @@
 // frontend/src/pages/TradingRoom.jsx
 // ============================================================
 // TRADING ROOM — LIVE ENGINE + LIVE AI SIDEBAR
-// HEADER ALIGNMENT FIXED + PROFESSIONAL STATUS PANEL
+// STRUCTURED FOR REAL BACKEND CONNECTION
 // ============================================================
 
 import React, { useEffect, useRef, useState } from "react";
@@ -52,32 +52,39 @@ export default function TradingRoom() {
   const [activeTab, setActiveTab] = useState("positions");
   const [timeframe, setTimeframe] = useState("1M");
 
-  // ================= TABLE STYLES =================
+  // ================= LIVE DATA STATES =================
 
-  const tableHeader = {
-    display: "grid",
-    gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr",
-    fontWeight: 600,
-    paddingBottom: 8,
-    borderBottom: "1px solid rgba(255,255,255,.1)",
-    marginBottom: 10,
-  };
+  const [positions, setPositions] = useState([
+    {
+      symbol: "EURUSD",
+      entry: 1.1360,
+      current: 1.1384,
+      size: 0.2,
+      pnl: 340,
+    }
+  ]);
 
-  const tableRow = {
-    display: "grid",
-    gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr",
-    padding: "8px 0",
-    borderBottom: "1px solid rgba(255,255,255,.05)",
-    alignItems: "center",
-  };
+  const [orders, setOrders] = useState([
+    {
+      symbol: "GBPUSD",
+      side: "BUY",
+      entry: 1.2645,
+      size: 0.3,
+    }
+  ]);
 
-  const cancelBtn = {
-    padding: "4px 10px",
-    background: "#dc2626",
-    border: "none",
-    color: "#fff",
-    cursor: "pointer",
-  };
+  const [news, setNews] = useState([
+    {
+      title: "US Retail Sales Rise 0.0% in March",
+      body: "Inflation easing as consumer demand stabilizes."
+    }
+  ]);
+
+  const [signal, setSignal] = useState({
+    side: "BUY",
+    confidence: 92,
+    reason: "Bullish structure confirmed",
+  });
 
   // ================= CHART INIT =================
 
@@ -93,14 +100,6 @@ export default function TradingRoom() {
         vertLines: { color: "rgba(255,255,255,.04)" },
         horzLines: { color: "rgba(255,255,255,.04)" },
       },
-      rightPriceScale: {
-        borderColor: "rgba(255,255,255,.1)",
-      },
-      timeScale: {
-        borderColor: "rgba(255,255,255,.1)",
-        timeVisible: true,
-        rightBarStaysOnScroll: true,
-      },
       width: containerRef.current.clientWidth,
       height: containerRef.current.clientHeight,
     });
@@ -108,30 +107,14 @@ export default function TradingRoom() {
     seriesRef.current = chartRef.current.addCandlestickSeries({
       upColor: "#16a34a",
       downColor: "#dc2626",
-      wickUpColor: "#16a34a",
-      wickDownColor: "#dc2626",
-      borderUpColor: "#16a34a",
-      borderDownColor: "#dc2626",
       borderVisible: true,
       wickVisible: true,
-      priceLineVisible: true,
-      lastValueVisible: true,
     });
 
     seedCandles();
     chartRef.current.timeScale().fitContent();
 
-    const resizeObserver = new ResizeObserver(entries => {
-      const { width, height } = entries[0].contentRect;
-      chartRef.current.applyOptions({ width, height });
-    });
-
-    resizeObserver.observe(containerRef.current);
-
-    return () => {
-      resizeObserver.disconnect();
-      chartRef.current?.remove();
-    };
+    return () => chartRef.current?.remove();
   }, []);
 
   function seedCandles() {
@@ -146,7 +129,6 @@ export default function TradingRoom() {
       const close = open + (Math.random() - 0.5) * 0.01;
       const high = Math.max(open, close);
       const low = Math.min(open, close);
-
       candles.push({ time, open, high, low, close });
       base = close;
     }
@@ -155,98 +137,14 @@ export default function TradingRoom() {
     seriesRef.current.setData(candles);
   }
 
-  useEffect(() => {
-    const url = buildWsUrl();
-    if (!url) return;
-
-    const ws = new WebSocket(url);
-    wsRef.current = ws;
-
-    ws.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        if (!data?.price) return;
-        updateCandle(n(data.price));
-      } catch {}
-    };
-
-    return () => ws.close();
-  }, [timeframe]);
-
-  function animatePrice(from, to, onUpdate) {
-    const duration = 120;
-    const start = performance.now();
-    function frame(now) {
-      const progress = Math.min((now - start) / duration, 1);
-      const value = from + (to - from) * progress;
-      onUpdate(value);
-      if (progress < 1) requestAnimationFrame(frame);
-    }
-    requestAnimationFrame(frame);
-  }
-
-  function updateCandle(price) {
-    if (!seriesRef.current) return;
-
-    const tfSeconds = timeframeToSeconds(timeframe);
-    const now = Math.floor(Date.now() / 1000);
-    const bucket = Math.floor(now / tfSeconds) * tfSeconds;
-
-    const last = candleDataRef.current[candleDataRef.current.length - 1];
-    if (!last) return;
-
-    if (last.time === bucket) {
-      animatePrice(last.close, price, (p) => {
-        last.high = Math.max(last.high, p);
-        last.low = Math.min(last.low, p);
-        last.close = p;
-        seriesRef.current.update({ ...last });
-      });
-    } else {
-      const newCandle = {
-        time: bucket,
-        open: last.close,
-        high: price,
-        low: price,
-        close: price,
-      };
-
-      candleDataRef.current.push(newCandle);
-      seriesRef.current.update(newCandle);
-    }
-
-    chartRef.current.timeScale().scrollToRealTime();
-  }
-
-  // ================= STATUS ROW COMPONENT =================
-
-  function StatusRow({ label, value, color }) {
-    return (
-      <div style={{
-        display: "flex",
-        justifyContent: "space-between",
-        fontSize: 13,
-        paddingBottom: 6,
-        borderBottom: "1px solid rgba(255,255,255,.05)"
-      }}>
-        <span style={{ opacity: 0.6 }}>{label}</span>
-        <span style={{ color: color || "#fff", fontWeight: 600 }}>
-          {value}
-        </span>
-      </div>
-    );
-  }
-
   // ================= UI =================
 
   return (
     <div style={{ display: "flex", height: "100vh", background: "#0a0f1c", color: "#fff" }}>
 
-      <div style={{ width: 60, background: "#111827", borderRight: "1px solid rgba(255,255,255,.08)" }} />
-
       <div style={{ flex: 1, display: "flex", flexDirection: "column", padding: 20 }}>
 
-        {/* ===== FIXED HEADER ===== */}
+        {/* HEADER */}
         <div style={{
           display: "flex",
           justifyContent: "space-between",
@@ -272,7 +170,7 @@ export default function TradingRoom() {
           </button>
         </div>
 
-        {/* ===== CHART ===== */}
+        {/* CHART */}
         <div style={{
           flex: 1,
           background: "#111827",
@@ -283,7 +181,7 @@ export default function TradingRoom() {
           <div ref={containerRef} style={{ width: "100%", height: "100%" }} />
         </div>
 
-        {/* ===== BOTTOM PANEL (UNCHANGED) ===== */}
+        {/* BOTTOM PANEL */}
         <div style={{
           height: 220,
           marginTop: 20,
@@ -293,6 +191,7 @@ export default function TradingRoom() {
           display: "flex",
           flexDirection: "column"
         }}>
+
           <div style={{ display: "flex", borderBottom: "1px solid rgba(255,255,255,.08)" }}>
             {["positions","orders","news","signals"].map(tab => (
               <div
@@ -311,38 +210,66 @@ export default function TradingRoom() {
           </div>
 
           <div style={{ flex: 1, padding: 16 }}>
-            {activeTab === "positions" && <div>No open positions</div>}
-            {activeTab === "orders" && <div>No pending orders</div>}
-            {activeTab === "news" && <div>News feed active</div>}
-            {activeTab === "signals" && <div>AI Signal: BUY • Confidence: 82%</div>}
+
+            {activeTab === "positions" && (
+              positions.length === 0
+                ? <div>No open positions</div>
+                : positions.map((p, i) => (
+                    <div key={i}>
+                      {p.symbol} | Entry: {p.entry} | Current: {p.current} | Size: {p.size} | 
+                      <span style={{ color: p.pnl >= 0 ? "#16a34a" : "#dc2626" }}>
+                        {p.pnl >= 0 ? ` +$${p.pnl}` : ` -$${Math.abs(p.pnl)}`}
+                      </span>
+                    </div>
+                  ))
+            )}
+
+            {activeTab === "orders" && (
+              orders.length === 0
+                ? <div>No pending orders</div>
+                : orders.map((o, i) => (
+                    <div key={i}>
+                      {o.symbol} | {o.side} | Entry: {o.entry} | Size: {o.size}
+                    </div>
+                  ))
+            )}
+
+            {activeTab === "news" && (
+              news.map((n, i) => (
+                <div key={i}>
+                  <div style={{ fontWeight: 600 }}>{n.title}</div>
+                  <div style={{ opacity: 0.7 }}>{n.body}</div>
+                </div>
+              ))
+            )}
+
+            {activeTab === "signals" && (
+              <div>
+                <div style={{ fontWeight: 700 }}>
+                  {signal.side} EURUSD
+                </div>
+                <div>Confidence: {signal.confidence}%</div>
+                <div style={{ opacity: 0.7 }}>{signal.reason}</div>
+              </div>
+            )}
+
           </div>
         </div>
 
       </div>
 
-      {/* ===== RIGHT SIDEBAR ===== */}
       {panelOpen && (
         <div style={{
           width: 360,
           background: "#111827",
           borderLeft: "1px solid rgba(255,255,255,.08)",
-          padding: 20,
-          display: "flex",
-          flexDirection: "column",
-          gap: 18
+          padding: 20
         }}>
-          <div style={{ fontWeight: 700, fontSize: 16 }}>
-            AI Engine Status
-          </div>
-
-          <StatusRow label="State" value="SCANNING MARKET" color="#22c55e" />
-          <StatusRow label="Bias" value="Bullish" />
-          <StatusRow label="Confidence" value="82%" />
-          <StatusRow label="Trades Today" value="3 / 5" />
-          <StatusRow label="Risk Mode" value="Moderate" />
-          <StatusRow label="Spread" value="0.8 pips" />
-          <StatusRow label="Latency" value="24ms" />
-          <StatusRow label="Last Action" value="02:31:08" />
+          <div style={{ fontWeight: 700 }}>AI Engine Status</div>
+          <div style={{ marginTop: 10 }}>State: SCANNING MARKET</div>
+          <div>Bias: Bullish</div>
+          <div>Confidence: 82%</div>
+          <div>Trades Today: 3 / 5</div>
         </div>
       )}
 
