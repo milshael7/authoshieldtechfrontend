@@ -1,5 +1,5 @@
 // frontend/src/layouts/AdminLayout.jsx
-// MOBILE SAFE + DESKTOP STABLE VERSION
+// RESTORED: Scroll Sidebar + Advisor Panel + Proper Shifting
 
 import React, { useEffect, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
@@ -18,7 +18,7 @@ export default function AdminLayout() {
   const { activeCompanyId } = useCompany();
   const { systemStatus } = useSecurity();
 
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [advisorOpen, setAdvisorOpen] = useState(() => {
     const saved = localStorage.getItem("admin.advisor.open");
     return saved !== "false";
@@ -46,9 +46,9 @@ export default function AdminLayout() {
     isActive ? "nav-link active" : "nav-link";
 
   return (
-    <div className="layout-root">
+    <div className={`layout-root ${sidebarOpen ? "" : "sidebar-collapsed"}`}>
 
-      {/* ================= FIXED HEADER (PHONE FRIENDLY) ================= */}
+      {/* ================= FIXED HEADER ================= */}
       <div
         style={{
           position: "fixed",
@@ -84,109 +84,151 @@ export default function AdminLayout() {
       {/* ================= SIDEBAR ================= */}
       <aside
         style={{
-          position: isMobile ? "fixed" : "relative",
-          top: isMobile ? 70 : 0,
+          position: "fixed",
+          top: 70,
           left: 0,
-          height: isMobile ? "calc(100vh - 70px)" : "100vh",
-          width: SIDEBAR_WIDTH,
+          height: "calc(100vh - 70px)",
+          width: sidebarOpen ? SIDEBAR_WIDTH : 0,
           background:
             "linear-gradient(180deg, rgba(255,255,255,.05), rgba(0,0,0,.55))",
-          borderRight: "1px solid rgba(255,255,255,.08)",
+          borderRight: sidebarOpen
+            ? "1px solid rgba(255,255,255,.08)"
+            : "none",
           backdropFilter: "blur(10px)",
-          transform: sidebarOpen ? "translateX(0)" : "translateX(-100%)",
-          transition: "transform .28s ease",
+          overflow: "hidden",
+          transition: "width .28s ease",
           zIndex: 90,
           display: "flex",
-          flexDirection: "column",
-          padding: 18,
-          overflowY: "auto"
+          flexDirection: "column"
         }}
       >
-        <nav className="layout-nav">
-          <NavLink to="/admin" end className={navClass}>Dashboard</NavLink>
-
-          <NavLink to="/admin/security" className={navClass}>Security Overview</NavLink>
-          <NavLink to="/admin/risk" className={navClass}>Risk Monitor</NavLink>
-          <NavLink to="/admin/sessions" className={navClass}>Session Monitor</NavLink>
-          <NavLink to="/admin/device-integrity" className={navClass}>Device Integrity</NavLink>
-          <NavLink to="/admin/trading" className={navClass}>Internal Trading</NavLink>
-
-          <NavLink to="/admin/assets" className={navClass}>Assets</NavLink>
-          <NavLink to="/admin/incidents" className={navClass}>Incident Management</NavLink>
-          <NavLink to="/admin/vulnerabilities" className={navClass}>Vulnerability Oversight</NavLink>
-          <NavLink to="/admin/compliance" className={navClass}>Regulatory Compliance</NavLink>
-          <NavLink to="/admin/reports" className={navClass}>Executive Reporting</NavLink>
-
-          <NavLink to="/admin/audit" className={navClass}>Audit Explorer</NavLink>
-          <NavLink to="/admin/global" className={navClass}>Global Control</NavLink>
-          <NavLink to="/admin/notifications" className={navClass}>System Notifications</NavLink>
-
-          <NavLink to="/admin/companies" className={navClass}>Company Oversight</NavLink>
-          <NavLink to="/manager" className={navClass}>Manager Command</NavLink>
-          <NavLink to="/company" className={navClass}>Corporate Entities</NavLink>
-          <NavLink to="/user" className={navClass}>User Governance</NavLink>
-
-          <button
-            onClick={logout}
+        {sidebarOpen && (
+          <div
             style={{
-              marginTop: 20,
-              width: "100%",
-              padding: "10px 12px",
-              borderRadius: 10,
-              border: "none",
-              cursor: "pointer"
+              flex: 1,
+              overflowY: "auto",
+              padding: 18
             }}
           >
-            Secure Log Out
-          </button>
-        </nav>
+            <nav className="layout-nav">
+              <NavLink to="/admin" end className={navClass}>Dashboard</NavLink>
+
+              <NavLink to="/admin/security" className={navClass}>Security Overview</NavLink>
+              <NavLink to="/admin/risk" className={navClass}>Risk Monitor</NavLink>
+              <NavLink to="/admin/sessions" className={navClass}>Session Monitor</NavLink>
+              <NavLink to="/admin/device-integrity" className={navClass}>Device Integrity</NavLink>
+              <NavLink to="/admin/trading" className={navClass}>Internal Trading</NavLink>
+
+              <NavLink to="/admin/assets" className={navClass}>Assets</NavLink>
+              <NavLink to="/admin/incidents" className={navClass}>Incident Management</NavLink>
+              <NavLink to="/admin/vulnerabilities" className={navClass}>Vulnerability Oversight</NavLink>
+              <NavLink to="/admin/compliance" className={navClass}>Regulatory Compliance</NavLink>
+              <NavLink to="/admin/reports" className={navClass}>Executive Reporting</NavLink>
+
+              <NavLink to="/admin/audit" className={navClass}>Audit Explorer</NavLink>
+              <NavLink to="/admin/global" className={navClass}>Global Control</NavLink>
+              <NavLink to="/admin/notifications" className={navClass}>System Notifications</NavLink>
+
+              <NavLink to="/admin/companies" className={navClass}>Company Oversight</NavLink>
+              <NavLink to="/manager" className={navClass}>Manager Command</NavLink>
+              <NavLink to="/company" className={navClass}>Corporate Entities</NavLink>
+              <NavLink to="/user" className={navClass}>User Governance</NavLink>
+
+              <button
+                onClick={logout}
+                style={{
+                  marginTop: 20,
+                  width: "100%",
+                  padding: "10px 12px",
+                  borderRadius: 10,
+                  border: "none",
+                  cursor: "pointer"
+                }}
+              >
+                Secure Log Out
+              </button>
+            </nav>
+          </div>
+        )}
       </aside>
 
       {/* ================= MAIN ================= */}
       <div
         style={{
-          flex: 1,
+          marginLeft: sidebarOpen ? SIDEBAR_WIDTH : 0,
           marginTop: 70,
-          display: "flex",
+          marginRight: advisorOpen ? ADVISOR_WIDTH : 0,
+          transition: "all .28s ease",
+          height: "calc(100vh - 70px)",
           overflow: "hidden"
         }}
       >
         <main
           style={{
-            flex: 1,
-            padding: 20,
-            overflowY: "auto"
+            height: "100%",
+            overflowY: "auto",
+            padding: 20
           }}
         >
           <div style={{ maxWidth: 1400, margin: "0 auto" }}>
             <Outlet />
           </div>
         </main>
+      </div>
 
-        {/* Advisor hidden automatically on phone */}
-        {!isMobile && (
-          <div
-            style={{
-              width: advisorOpen ? ADVISOR_WIDTH : 0,
-              transition: "width .25s ease",
-              overflow: "hidden",
-              borderLeft: "1px solid rgba(255,255,255,.05)",
-              background:
-                "linear-gradient(180deg, rgba(255,255,255,.03), rgba(0,0,0,.45))"
-            }}
-          >
-            <AuthoDevPanel
-              title="Advisor"
-              getContext={() => ({
-                role: "admin",
-                scope: activeCompanyId ? "entity" : "global",
-                systemStatus,
-                location: window.location.pathname
-              })}
-            />
-          </div>
+      {/* ================= ADVISOR PANEL ================= */}
+      <div
+        style={{
+          position: "fixed",
+          top: 70,
+          right: 0,
+          height: "calc(100vh - 70px)",
+          width: advisorOpen ? ADVISOR_WIDTH : 0,
+          borderLeft: "1px solid rgba(255,255,255,.05)",
+          background:
+            "linear-gradient(180deg, rgba(255,255,255,.03), rgba(0,0,0,.45))",
+          backdropFilter: "blur(10px)",
+          transition: "width .28s ease",
+          overflow: "hidden",
+          zIndex: 80
+        }}
+      >
+        {advisorOpen && (
+          <AuthoDevPanel
+            title="Advisor"
+            getContext={() => ({
+              role: "admin",
+              scope: activeCompanyId ? "entity" : "global",
+              systemStatus,
+              location: window.location.pathname
+            })}
+          />
         )}
       </div>
+
+      {/* ================= ADVISOR TOGGLE ================= */}
+      <div
+        onClick={() => setAdvisorOpen(!advisorOpen)}
+        style={{
+          position: "fixed",
+          top: "50%",
+          right: advisorOpen ? ADVISOR_WIDTH : 0,
+          transform: "translateY(-50%)",
+          padding: "14px 8px",
+          background: "rgba(0,0,0,.6)",
+          borderRadius: "8px 0 0 8px",
+          cursor: "pointer",
+          fontSize: 12,
+          letterSpacing: ".15em",
+          transition: "right .28s ease",
+          zIndex: 100,
+          writingMode: "vertical-rl",
+          textOrientation: "mixed"
+        }}
+      >
+        {advisorOpen ? "ADVISOR ▶" : "◀ ADVISOR"}
+      </div>
+
     </div>
   );
 }
