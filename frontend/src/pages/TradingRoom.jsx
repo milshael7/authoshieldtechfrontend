@@ -1,6 +1,6 @@
 // frontend/src/pages/TradingRoom.jsx
 // ============================================================
-// TRADING ROOM — WS DEBUG + CHART-READY SAFE (RENDER SAFE)
+// TRADING ROOM — PRODUCTION CLEAN (NO DEBUG OUTPUT)
 // ============================================================
 
 import React, { useEffect, useRef, useState } from "react";
@@ -57,9 +57,7 @@ export default function TradingRoom() {
   const [connectionStatus, setConnectionStatus] = useState("CONNECTING");
   const [lastTickAt, setLastTickAt] = useState(null);
   const [lastPrice, setLastPrice] = useState(null);
-  const [wsUrlPreview, setWsUrlPreview] = useState("");
 
-  // ---- demo placeholders (until backend trading endpoints exist)
   const [positions] = useState([]);
   const [orders] = useState([]);
   const [news] = useState([]);
@@ -108,7 +106,6 @@ export default function TradingRoom() {
     chartRef.current = chart;
     seriesRef.current = series;
 
-    // seed so you see *something* while WS connects
     seedCandles();
     chart.timeScale().fitContent();
 
@@ -176,13 +173,11 @@ export default function TradingRoom() {
     chartRef.current.timeScale().scrollToRealTime();
   }
 
-  // ================= WEBSOCKET (only after chartReady) =================
+  // ================= WEBSOCKET =================
   useEffect(() => {
     if (!chartReady) return;
 
     const url = buildWsUrl();
-    setWsUrlPreview(url || "");
-
     if (!url) {
       setConnectionStatus("NO_TOKEN_OR_API_BASE");
       return;
@@ -209,9 +204,7 @@ export default function TradingRoom() {
             setLastTickAt(Date.now());
             updateCandle(p);
           }
-        } catch {
-          // ignore bad packets
-        }
+        } catch {}
       };
 
       ws.onclose = () => {
@@ -231,24 +224,21 @@ export default function TradingRoom() {
       stopped = true;
       try { ws?.close(); } catch {}
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chartReady]);
 
   // ================= UI =================
   return (
     <div style={{ display: "flex", height: "100vh", background: "#0a0f1c", color: "#fff" }}>
-      {/* LEFT BAR */}
       <div style={{ width: 60, background: "#111827", borderRight: "1px solid rgba(255,255,255,.08)" }} />
 
       <div style={{ flex: 1, display: "flex", flexDirection: "column", padding: 20 }}>
-        {/* HEADER */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", height: 28 }}>
           <div>
             <div style={{ fontWeight: 700 }}>EURUSD • {timeframe} • LIVE</div>
             <div style={{ fontSize: 12, opacity: 0.7 }}>
               WS: {connectionStatus}
-              {lastPrice != null ? ` • Price: ${lastPrice.toFixed(5)}` : ""}
-              {lastTickAt ? ` • Tick: ${new Date(lastTickAt).toLocaleTimeString()}` : ""}
+              {lastPrice != null ? ` • ${lastPrice.toFixed(5)}` : ""}
+              {lastTickAt ? ` • ${new Date(lastTickAt).toLocaleTimeString()}` : ""}
             </div>
           </div>
 
@@ -265,17 +255,10 @@ export default function TradingRoom() {
           </button>
         </div>
 
-        {/* (Optional) WS URL preview for debugging */}
-        <div style={{ fontSize: 11, opacity: 0.5, marginTop: 6, marginBottom: 8, wordBreak: "break-all" }}>
-          {wsUrlPreview ? `WS URL: ${wsUrlPreview}` : "WS URL: (missing token or VITE_API_BASE)"}
-        </div>
-
-        {/* CHART */}
-        <div style={{ flex: 1, background: "#111827", borderRadius: 12, overflow: "hidden", border: "1px solid rgba(255,255,255,.08)" }}>
+        <div style={{ flex: 1, background: "#111827", borderRadius: 12, overflow: "hidden", border: "1px solid rgba(255,255,255,.08)", marginTop: 10 }}>
           <div ref={containerRef} style={{ width: "100%", height: "100%" }} />
         </div>
 
-        {/* BOTTOM PANEL */}
         <div style={{
           height: 220,
           marginTop: 20,
@@ -303,9 +286,9 @@ export default function TradingRoom() {
           </div>
 
           <div style={{ flex: 1, padding: 16 }}>
-            {activeTab === "positions" && (positions.length ? "..." : <div>No open positions</div>)}
-            {activeTab === "orders" && (orders.length ? "..." : <div>No pending orders</div>)}
-            {activeTab === "news" && (news.length ? "..." : <div>No live news</div>)}
+            {activeTab === "positions" && <div>No open positions</div>}
+            {activeTab === "orders" && <div>No pending orders</div>}
+            {activeTab === "news" && <div>No live news</div>}
             {activeTab === "signals" && (
               <div>
                 <div style={{ fontWeight: 700 }}>{signal.side} EURUSD</div>
@@ -317,13 +300,12 @@ export default function TradingRoom() {
         </div>
       </div>
 
-      {/* RIGHT SIDEBAR */}
       {panelOpen && (
         <div style={{ width: 360, background: "#111827", borderLeft: "1px solid rgba(255,255,255,.08)", padding: 20 }}>
           <div style={{ fontWeight: 700, marginBottom: 12 }}>AI Engine Status</div>
           <div>State: {connectionStatus === "CONNECTED" ? "STREAMING" : "WAITING"}</div>
           <div style={{ marginTop: 10, opacity: 0.7 }}>
-            This sidebar stays “live status” only. Analytics/history goes in Analytics page.
+            Live engine status only. Analytics/history goes in Analytics page.
           </div>
         </div>
       )}
