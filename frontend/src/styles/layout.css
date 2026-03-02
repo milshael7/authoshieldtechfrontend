@@ -1,13 +1,13 @@
 /* =========================================================
-   AUTOSHIELD ENTERPRISE — STABLE FLEX VIEWPORT SYSTEM
-   Locked Viewport + Isolated Scroll + Clean Push Panel
+   AUTOSHIELD ENTERPRISE — STABLE FLEX SYSTEM + SLIM SIDEBAR
+   Locked Viewport + Scroll Isolation + Clean Collapse
    ========================================================= */
 
 html, body {
   margin:0;
   padding:0;
   height:100%;
-  overflow:hidden; /* 🔥 no page scroll */
+  overflow:hidden;
   background:#0b0f1a;
   color:#eaf1ff;
   font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
@@ -17,7 +17,7 @@ html, body {
 
 .layout-root{
   display:flex;
-  height:100vh;      /* 🔥 fixed viewport */
+  height:100vh;
   width:100%;
   overflow:hidden;
 }
@@ -35,10 +35,35 @@ html, body {
   border-right:1px solid rgba(255,255,255,.08);
   backdrop-filter:blur(10px);
   overflow-y:auto;
+  transition:width .25s ease, padding .25s ease;
 }
 
+/* Slim collapsed version */
+
+.sidebar-collapsed .layout-sidebar{
+  width:56px;
+  padding:18px 6px;
+  align-items:center;
+}
+
+/* Hide nav text when collapsed */
+
+.sidebar-collapsed .layout-nav a{
+  font-size:0;
+  padding:12px 6px;
+  text-align:center;
+}
+
+.sidebar-collapsed .layout-nav a span{
+  display:none;
+}
+
+/* NAV */
+
 .layout-nav a{
-  display:block;
+  display:flex;
+  align-items:center;
+  gap:12px;
   padding:10px 12px;
   border-radius:10px;
   text-decoration:none;
@@ -63,7 +88,7 @@ html, body {
 .enterprise-main{
   flex:1;
   display:flex;
-  overflow:hidden;  /* 🔥 isolate */
+  overflow:hidden;
 }
 
 .layout-main{
@@ -77,13 +102,11 @@ html, body {
 .layout-content{
   flex:1;
   padding:28px;
-  overflow-y:auto;   /* 🔥 only main scrolls */
+  overflow-y:auto;
   overflow-x:hidden;
 }
 
-/* ============================= */
 /* ADVISOR PANEL */
-/* ============================= */
 
 .enterprise-ai-panel{
   width:380px;
@@ -95,14 +118,6 @@ html, body {
   backdrop-filter:blur(10px);
   transition:width .25s ease;
   overflow:hidden;
-}
-
-/* Advisor internal flex */
-
-.enterprise-ai-panel > div{
-  display:flex;
-  flex-direction:column;
-  height:100%;
 }
 
 /* MOBILE */
