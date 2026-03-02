@@ -22,6 +22,8 @@ function getStorageKey(){
   return `authodev.panel.${tenant}.${getRoomId()}`;
 }
 
+/* ================= MAIN COMPONENT ================= */
+
 export default function AuthoDevPanel({
   title="Advisor",
   endpoint="/api/ai/chat",
@@ -33,7 +35,7 @@ export default function AuthoDevPanel({
   const [input,setInput]=useState("");
   const [loading,setLoading]=useState(false);
   const [listening,setListening]=useState(false);
-  const [speakingIndex,setSpeakingIndex]=useState(null);
+  const [transcriptBuffer,setTranscriptBuffer]=useState("");
 
   const recognitionRef=useRef(null);
   const feedRef=useRef(null);
@@ -57,7 +59,7 @@ export default function AuthoDevPanel({
     }));
   },[messages,storageKey]);
 
-  /* Auto scroll ONLY feed */
+  /* Scroll ONLY feed */
   useEffect(()=>{
     if(feedRef.current){
       feedRef.current.scrollTop = feedRef.current.scrollHeight;
@@ -75,47 +77,60 @@ export default function AuthoDevPanel({
   /* ================= VOICE INPUT ================= */
 
   function startListening(){
-    const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if(!SR) return;
 
-    try{recognitionRef.current?.stop();}catch{}
+    try{ recognitionRef.current?.stop(); }catch{}
 
-    const rec=new SR();
-    rec.lang="en-US";
-    rec.interimResults=true;
+    const rec = new SR();
+    rec.lang = "en-US";
+    rec.interimResults = true;
 
-    rec.onstart=()=>setListening(true);
-    rec.onend=()=>setListening(false);
+    rec.onstart = () => {
+      setListening(true);
+      setTranscriptBuffer("");
+    };
 
-    rec.onresult=(e)=>{
+    rec.onend = () => {
+      setListening(false);
+    };
+
+    rec.onresult = (e) => {
       let transcript="";
       for(let i=0;i<e.results.length;i++){
         transcript+=e.results[i][0].transcript;
       }
-      setInput(transcript);
+      setTranscriptBuffer(transcript);
     };
 
-    recognitionRef.current=rec;
+    recognitionRef.current = rec;
     rec.start();
   }
 
   function stopListening(){
-    try{recognitionRef.current?.stop();}catch{}
+    try{ recognitionRef.current?.stop(); }catch{}
     setListening(false);
+
+    if(transcriptBuffer){
+      setInput(transcriptBuffer.trim());
+    }
   }
 
   /* ================= SEND ================= */
 
   async function sendMessage(){
-    const messageText=String(input||"").trim();
+    const messageText=String(input||transcriptBuffer||"").trim();
     if(!messageText||loading) return;
+
     if(listening) stopListening();
 
     setMessages(m=>[
       ...m.slice(-MAX_MESSAGES+1),
       {role:"user",text:messageText}
     ]);
+
     setInput("");
+    setTranscriptBuffer("");
     setLoading(true);
 
     try{
@@ -178,30 +193,31 @@ export default function AuthoDevPanel({
 
         <div className="advisor-pill">
 
-          {!listening ? (
-            <button className="advisor-pill-left" onClick={startListening}>
-              <IconMic/>
-            </button>
-          ) : (
-            <button className="advisor-pill-left" onClick={stopListening}>
-              <Waveform/>
-            </button>
-          )}
+          <button
+            className="advisor-pill-left"
+            onClick={listening ? stopListening : startListening}
+          >
+            <IconMic/>
+          </button>
 
-          <textarea
-            ref={textareaRef}
-            className="advisor-pill-input"
-            placeholder="Ask anything"
-            value={input}
-            rows={1}
-            onChange={(e)=>setInput(e.target.value)}
-            onKeyDown={(e)=>{
-              if(e.key==="Enter"&&!e.shiftKey){
-                e.preventDefault();
-                sendMessage();
-              }
-            }}
-          />
+          {!listening ? (
+            <textarea
+              ref={textareaRef}
+              className="advisor-pill-input"
+              placeholder="Ask anything"
+              value={input}
+              rows={1}
+              onChange={(e)=>setInput(e.target.value)}
+              onKeyDown={(e)=>{
+                if(e.key==="Enter"&&!e.shiftKey){
+                  e.preventDefault();
+                  sendMessage();
+                }
+              }}
+            />
+          ) : (
+            <VoiceVisualizer/>
+          )}
 
           <button
             className="advisor-pill-right"
@@ -214,9 +230,45 @@ export default function AuthoDevPanel({
 
       </div>
 
+      <style>{`
+        @keyframes voiceWave {
+          0% { height: 6px; opacity:.5; }
+          50% { height: 22px; opacity:1; }
+          100% { height: 6px; opacity:.5; }
+        }
+      `}</style>
+
     </div>
   );
 }
+
+/* ================= VISUALIZER ================= */
+
+const VoiceVisualizer = () => (
+  <div style={{
+    flex:1,
+    display:"flex",
+    alignItems:"center",
+    justifyContent:"center"
+  }}>
+    <div style={{
+      display:"flex",
+      alignItems:"center",
+      gap:4
+    }}>
+      {[...Array(15)].map((_,i)=>(
+        <div key={i} style={{
+          width:3,
+          height:8,
+          background:"#fff",
+          borderRadius:2,
+          animation:"voiceWave 0.9s infinite ease-in-out",
+          animationDelay:\`\${i*0.05}s\`
+        }}/>
+      ))}
+    </div>
+  </div>
+);
 
 /* ================= ICONS ================= */
 
@@ -226,20 +278,6 @@ const IconMic=()=>(
 <path d="M19 11a7 7 0 0 1-14 0"/>
 <path d="M12 18v4"/>
 </svg>
-);
-
-const Waveform=()=>(
-<div style={{display:"flex",gap:2}}>
-  {[...Array(5)].map((_,i)=>(
-    <div key={i} style={{
-      width:3,
-      height:8,
-      background:"#fff",
-      animation:"pulse 0.8s infinite ease-in-out",
-      animationDelay:`${i*0.1}s`
-    }}/>
-  ))}
-</div>
 );
 
 const IconSend=()=>(
