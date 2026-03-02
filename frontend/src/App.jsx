@@ -52,8 +52,8 @@ import RiskMonitor from "./pages/RiskMonitor.jsx";
 import SessionMonitor from "./pages/SessionMonitor.jsx";
 import DeviceIntegrityPanel from "./pages/DeviceIntegrityPanel.jsx";
 
-/* INTERNAL */
-import TradingRoom from "./pages/TradingRoom.jsx";
+/* TRADING */
+import TradingLayout from "./pages/trading/TradingLayout.jsx";
 
 /* ================= HELPERS ================= */
 
@@ -66,10 +66,6 @@ function isInactiveSubscription(status) {
   return s === "locked" || s === "past due" || s === "past_due";
 }
 
-/*
-  HIERARCHY ORDER
-  admin > manager > company > small_company > individual
-*/
 const ROLE_HIERARCHY = {
   admin: 5,
   manager: 4,
@@ -90,11 +86,9 @@ function hasAccess(userRole, allowedRoles) {
 function RoleGuard({ user, ready, allow, children }) {
   if (!ready) return null;
   if (!user) return <Navigate to="/login" replace />;
-
   if (!hasAccess(user.role, allow)) {
     return <Navigate to="/404" replace />;
   }
-
   return children;
 }
 
@@ -146,67 +140,9 @@ function AppRoutes({ user, ready }) {
         <Route path="risk" element={<RiskMonitor />} />
         <Route path="sessions" element={<SessionMonitor />} />
         <Route path="device-integrity" element={<DeviceIntegrityPanel />} />
-        <Route path="trading" element={<TradingRoom />} />
-      </Route>
 
-      {/* ================= MANAGER ================= */}
-      <Route
-        path="/manager/*"
-        element={
-          <RoleGuard user={user} ready={ready} allow={["manager"]}>
-            <ManagerLayout />
-          </RoleGuard>
-        }
-      >
-        <Route index element={<SecurityOverview />} />
-        <Route path="assets" element={<Assets />} />
-        <Route path="incidents" element={<Incidents />} />
-      </Route>
-
-      {/* ================= COMPANY ================= */}
-      <Route
-        path="/company/*"
-        element={
-          <RoleGuard user={user} ready={ready} allow={["company"]}>
-            <SubscriptionGuard user={user}>
-              <CompanyLayout />
-            </SubscriptionGuard>
-          </RoleGuard>
-        }
-      >
-        <Route index element={<SecurityOverview />} />
-        <Route path="assets" element={<Assets />} />
-        <Route path="incidents" element={<Incidents />} />
-        <Route path="vulnerabilities" element={<Vulnerabilities />} />
-        <Route path="reports" element={<Reports />} />
-      </Route>
-
-      {/* ================= SMALL COMPANY ================= */}
-      <Route
-        path="/small-company/*"
-        element={
-          <RoleGuard user={user} ready={ready} allow={["small_company"]}>
-            <SubscriptionGuard user={user}>
-              <SmallCompanyLayout />
-            </SubscriptionGuard>
-          </RoleGuard>
-        }
-      >
-        <Route index element={<SecurityOverview />} />
-      </Route>
-
-      {/* ================= USER ================= */}
-      <Route
-        path="/user/*"
-        element={
-          <RoleGuard user={user} ready={ready} allow={["individual"]}>
-            <SubscriptionGuard user={user}>
-              <UserLayout />
-            </SubscriptionGuard>
-          </RoleGuard>
-        }
-      >
-        <Route index element={<SecurityOverview />} />
+        {/* ✅ FIXED ROUTED TRADING */}
+        <Route path="trading/*" element={<TradingLayout />} />
       </Route>
 
       <Route path="*" element={<NotFound />} />
