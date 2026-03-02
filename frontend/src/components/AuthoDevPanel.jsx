@@ -33,12 +33,12 @@ export default function AuthoDevPanel({
   const [loading,setLoading]=useState(false);
   const [listening,setListening]=useState(false);
   const [transcriptBuffer,setTranscriptBuffer]=useState("");
-  const [volume,setVolume]=useState(0);
+  const [speaking,setSpeaking]=useState(false);
 
   const recognitionRef=useRef(null);
   const feedRef=useRef(null);
   const textareaRef=useRef(null);
-  const audioContextRef=useRef(null);
+  const speechTimeoutRef=useRef(null);
 
   /* ================= LOAD HISTORY ================= */
 
@@ -71,42 +71,6 @@ export default function AuthoDevPanel({
     el.style.height=Math.min(el.scrollHeight,140)+"px";
   },[input]);
 
-  /* ================= AUDIO ANALYZER ================= */
-
-  async function setupAudioAnalyzer(stream){
-
-    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-    const analyser = audioContext.createAnalyser();
-    const source = audioContext.createMediaStreamSource(stream);
-
-    source.connect(analyser);
-    analyser.fftSize = 2048;
-
-    const bufferLength = analyser.fftSize;
-    const dataArray = new Uint8Array(bufferLength);
-
-    function tick(){
-      analyser.getByteTimeDomainData(dataArray);
-
-      let sum = 0;
-      for(let i=0;i<bufferLength;i++){
-        const deviation = dataArray[i] - 128;
-        sum += Math.abs(deviation);
-      }
-
-      const avg = sum / bufferLength;
-
-      setVolume(avg);
-
-      if(listening){
-        requestAnimationFrame(tick);
-      }
-    }
-
-    tick();
-    audioContextRef.current = audioContext;
-  }
-
   /* ================= VOICE INPUT ================= */
 
   async function startListening(){
@@ -114,9 +78,6 @@ export default function AuthoDevPanel({
     if(!SR) return;
 
     try{ recognitionRef.current?.stop(); }catch{}
-
-    const stream = await navigator.mediaDevices.getUserMedia({ audio:true });
-    setupAudioAnalyzer(stream);
 
     const rec = new SR();
     rec.lang = "en-US";
@@ -129,10 +90,19 @@ export default function AuthoDevPanel({
 
     rec.onend = () => {
       setListening(false);
-      setVolume(0);
+      setSpeaking(false);
     };
 
     rec.onresult = (e) => {
+
+      // Trigger speaking animation
+      setSpeaking(true);
+
+      clearTimeout(speechTimeoutRef.current);
+      speechTimeoutRef.current = setTimeout(()=>{
+        setSpeaking(false);
+      }, 250);
+
       let transcript="";
       for(let i=0;i<e.results.length;i++){
         transcript+=e.results[i][0].transcript;
@@ -147,7 +117,7 @@ export default function AuthoDevPanel({
   function stopListening(){
     try{ recognitionRef.current?.stop(); }catch{}
     setListening(false);
-    setVolume(0);
+    setSpeaking(false);
 
     if(transcriptBuffer){
       setInput(transcriptBuffer.trim());
@@ -250,7 +220,7 @@ export default function AuthoDevPanel({
               }}
             />
           ) : (
-            <LiveVisualizer volume={volume}/>
+            <SpeechBars active={speaking}/>
           )}
 
           <button
@@ -267,11 +237,9 @@ export default function AuthoDevPanel({
   );
 }
 
-/* ================= VISUALIZER ================= */
+/* ================= BARS ================= */
 
-const LiveVisualizer = ({ volume }) => {
-
-  const intensity = Math.min(Math.max(volume * 1.8, 6), 40);
+const SpeechBars = ({ active }) => {
 
   return (
     <div style={{
@@ -284,10 +252,10 @@ const LiveVisualizer = ({ volume }) => {
       {[...Array(20)].map((_,i)=>(
         <div key={i} style={{
           width:3,
-          height:intensity,
+          height: active ? 6 + Math.random()*20 : 6,
           background:"#fff",
           borderRadius:2,
-          transition:"height 0.05s linear"
+          transition:"height 0.08s linear"
         }}/>
       ))}
     </div>
