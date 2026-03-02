@@ -1,6 +1,5 @@
 /* =========================================================
-   AUTOSHIELD ENTERPRISE — STABLE FLEX SYSTEM + SLIM SIDEBAR
-   Locked Viewport + Scroll Isolation + Clean Collapse
+   AUTOSHIELD — PROPER SLIDE SIDEBAR SYSTEM
    ========================================================= */
 
 html, body {
@@ -20,50 +19,50 @@ html, body {
   height:100vh;
   width:100%;
   overflow:hidden;
+  position:relative;
 }
 
 /* SIDEBAR */
 
 .layout-sidebar{
+  position:relative;
   width:260px;
   flex-shrink:0;
   display:flex;
   flex-direction:column;
-  padding:20px;
-  gap:18px;
   background:linear-gradient(180deg, rgba(255,255,255,.05), rgba(0,0,0,.55));
   border-right:1px solid rgba(255,255,255,.08);
   backdrop-filter:blur(10px);
-  overflow-y:auto;
-  transition:width .25s ease, padding .25s ease;
+  transition:transform .3s ease;
+  z-index:5;
 }
 
-/* Slim collapsed version */
-
+/* Slide fully out */
 .sidebar-collapsed .layout-sidebar{
-  width:56px;
-  padding:18px 6px;
-  align-items:center;
+  transform:translateX(-100%);
 }
 
-/* Hide nav text when collapsed */
-
-.sidebar-collapsed .layout-nav a{
-  font-size:0;
-  padding:12px 6px;
-  text-align:center;
+/* Logo fixed area */
+.sidebar-header{
+  padding:20px;
+  flex-shrink:0;
+  border-bottom:1px solid rgba(255,255,255,.06);
 }
 
-.sidebar-collapsed .layout-nav a span{
-  display:none;
+/* Scrollable nav area */
+.sidebar-body{
+  flex:1;
+  overflow-y:auto;
+  padding:20px;
+  display:flex;
+  flex-direction:column;
+  gap:14px;
 }
 
-/* NAV */
+/* NAV LINKS */
 
 .layout-nav a{
-  display:flex;
-  align-items:center;
-  gap:12px;
+  display:block;
   padding:10px 12px;
   border-radius:10px;
   text-decoration:none;
@@ -83,6 +82,29 @@ html, body {
   color:#fff;
 }
 
+/* SIDEBAR TOGGLE TAB */
+
+.sidebar-toggle{
+  position:absolute;
+  top:50%;
+  left:260px;
+  transform:translateY(-50%);
+  width:22px;
+  height:80px;
+  background:rgba(0,0,0,.6);
+  border-radius:0 8px 8px 0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  cursor:pointer;
+  transition:left .3s ease;
+  z-index:6;
+}
+
+.sidebar-collapsed .sidebar-toggle{
+  left:0;
+}
+
 /* MAIN */
 
 .enterprise-main{
@@ -95,7 +117,6 @@ html, body {
   flex:1;
   display:flex;
   flex-direction:column;
-  min-width:0;
   overflow:hidden;
 }
 
@@ -106,7 +127,7 @@ html, body {
   overflow-x:hidden;
 }
 
-/* ADVISOR PANEL */
+/* ADVISOR */
 
 .enterprise-ai-panel{
   width:380px;
@@ -118,11 +139,4 @@ html, body {
   backdrop-filter:blur(10px);
   transition:width .25s ease;
   overflow:hidden;
-}
-
-/* MOBILE */
-
-@media (max-width:900px){
-  .enterprise-ai-panel{ display:none; }
-  .layout-content{ padding:18px; }
 }
