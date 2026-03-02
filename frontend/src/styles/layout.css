@@ -1,27 +1,25 @@
 /* =========================================================
-   AUTOSHIELD ENTERPRISE — CLEAN STABLE VERSION
-   Proper Rail Containment + Clean Scroll + No Overlap
+   AUTOSHIELD ENTERPRISE — STABLE FLEX VIEWPORT SYSTEM
+   Locked Viewport + Isolated Scroll + Clean Push Panel
    ========================================================= */
 
 html, body {
   margin:0;
   padding:0;
   height:100%;
+  overflow:hidden; /* 🔥 no page scroll */
   background:#0b0f1a;
   color:#eaf1ff;
   font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
-
-  overflow-y:auto;
-  overflow-x:hidden;
 }
 
 /* ROOT */
 
 .layout-root{
   display:flex;
-  min-height:100vh;
+  height:100vh;      /* 🔥 fixed viewport */
   width:100%;
-  position:relative;
+  overflow:hidden;
 }
 
 /* SIDEBAR */
@@ -37,7 +35,6 @@ html, body {
   border-right:1px solid rgba(255,255,255,.08);
   backdrop-filter:blur(10px);
   overflow-y:auto;
-  z-index:5;
 }
 
 .layout-nav a{
@@ -66,7 +63,7 @@ html, body {
 .enterprise-main{
   flex:1;
   display:flex;
-  min-height:100vh;
+  overflow:hidden;  /* 🔥 isolate */
 }
 
 .layout-main{
@@ -74,12 +71,13 @@ html, body {
   display:flex;
   flex-direction:column;
   min-width:0;
+  overflow:hidden;
 }
 
 .layout-content{
   flex:1;
   padding:28px;
-  overflow-y:auto;
+  overflow-y:auto;   /* 🔥 only main scrolls */
   overflow-x:hidden;
 }
 
@@ -88,10 +86,8 @@ html, body {
 /* ============================= */
 
 .enterprise-ai-panel{
-  position:relative; /* 🔥 important */
   width:380px;
   flex-shrink:0;
-  min-height:100vh;
   display:flex;
   flex-direction:column;
   border-left:1px solid rgba(255,255,255,.08);
@@ -101,87 +97,17 @@ html, body {
   overflow:hidden;
 }
 
-/* 🔥 THIS FIXES THE OVERLAP */
-.enterprise-ai-panel .advisor-wrap{
-  padding-right:28px; /* same width as rail */
-  box-sizing:border-box;
-}
+/* Advisor internal flex */
 
-/* ============================= */
-/* RAIL — NOW INSIDE PANEL */
-/* ============================= */
-
-.advisor-rail{
-  position:absolute;   /* not fixed */
-  top:0;
-  right:0;
-  width:28px;
-  height:100%;
-  display:flex;
-  flex-direction:column;
-  justify-content:space-between;
-  align-items:center;
-  padding:14px 0;
-  background:rgba(0,0,0,.35);
-  border-left:1px solid rgba(255,255,255,.08);
-  cursor:pointer;
-  z-index:3;
-}
-
-.advisor-rail-text{
-  writing-mode:vertical-rl;
-  text-orientation:mixed;
-  font-size:11px;
-  letter-spacing:.2em;
-  font-weight:700;
-  color:#ffffff;
-}
-
-.advisor-rail-arrow{
-  font-size:14px;
-  color:#ffffff;
-  opacity:.85;
-}
-
-/* ============================= */
-/* ADVISOR STRUCTURE */
-/* ============================= */
-
-.advisor-wrap{
+.enterprise-ai-panel > div{
   display:flex;
   flex-direction:column;
   height:100%;
-}
-
-.advisor-miniTitle{
-  flex-shrink:0;
-  padding:14px 18px;
-  font-size:14px;
-  font-weight:600;
-  border-bottom:1px solid rgba(255,255,255,.06);
-  background:rgba(10,15,28,.95);
-}
-
-.advisor-feed{
-  flex:1;
-  overflow-y:auto;
-  padding:20px;
-  display:flex;
-  flex-direction:column;
-  gap:22px;
-}
-
-.advisor-inputBar{
-  flex-shrink:0;
-  padding:18px;
-  border-top:1px solid rgba(255,255,255,.05);
-  background:rgba(15,20,30,.98);
 }
 
 /* MOBILE */
 
 @media (max-width:900px){
   .enterprise-ai-panel{ display:none; }
-  .advisor-rail{ display:none; }
   .layout-content{ padding:18px; }
 }
