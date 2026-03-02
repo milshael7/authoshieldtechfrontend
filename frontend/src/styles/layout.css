@@ -1,6 +1,6 @@
 /* =========================================================
-   AUTOSHIELD ENTERPRISE LAYOUT — MOBILE SAFE VERSION
-   Scroll Fixed • Flex Stable • iOS Safe
+   AUTOSHIELD ENTERPRISE LAYOUT — LOCKED VIEWPORT VERSION
+   Advisor + Main Scroll Isolated
    ========================================================= */
 
 html, body {
@@ -10,8 +10,8 @@ html, body {
   background:#0b0f1a;
   color:#eaf1ff;
   font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
-  overflow-y:auto;
-  overflow-x:hidden;
+
+  overflow:hidden; /* 🔥 PAGE NEVER SCROLLS */
 }
 
 /* =========================================================
@@ -20,9 +20,10 @@ html, body {
 
 .layout-root{
   display:flex;
-  min-height:100vh;
+  height:100vh; /* 🔥 HARD LOCK */
   width:100%;
   position:relative;
+  overflow:hidden;
 }
 
 /* =========================================================
@@ -39,7 +40,7 @@ html, body {
   background:linear-gradient(180deg, rgba(255,255,255,.05), rgba(0,0,0,.55));
   border-right:1px solid rgba(255,255,255,.08);
   backdrop-filter:blur(10px);
-  overflow-y:auto;
+  overflow-y:auto; /* sidebar scroll only if needed */
   z-index:5;
 }
 
@@ -76,8 +77,9 @@ html, body {
 .enterprise-main{
   flex:1;
   display:flex;
-  min-height:100vh;
+  height:100vh; /* 🔥 HARD LOCK */
   position:relative;
+  overflow:hidden;
 }
 
 .layout-main{
@@ -85,8 +87,10 @@ html, body {
   display:flex;
   flex-direction:column;
   min-width:0;
+  overflow:hidden;
 }
 
+/* 🔥 ONLY MAIN CONTENT SCROLLS */
 .layout-content{
   flex:1;
   padding:28px;
@@ -102,84 +106,48 @@ html, body {
 .enterprise-ai-panel{
   width:380px;
   flex-shrink:0;
-  min-height:100vh;
+  height:100vh; /* 🔥 HARD LOCK */
+  display:flex;
+  flex-direction:column;
   border-left:1px solid rgba(255,255,255,.08);
   background:linear-gradient(180deg, rgba(255,255,255,.04), rgba(0,0,0,.45));
   backdrop-filter:blur(10px);
   transition:width .25s ease;
   z-index:4;
-  display:flex;
+  overflow:hidden; /* 🔥 CRITICAL */
 }
 
 .enterprise-ai-panel.collapsed{
   width:0;
   border-left:none;
-  overflow:hidden;
-}
-
-.enterprise-ai-inner{
-  display:flex;
-  flex-direction:column;
-  width:100%;
 }
 
 /* =========================================================
-   VERTICAL ADVISOR RAIL (GLOBAL)
-   ========================================================= */
-
-.advisor-rail{
-  position:fixed;
-  top:0;
-  height:100vh;
-  width:28px;
-  display:flex;
-  flex-direction:column;
-  justify-content:space-between;
-  align-items:center;
-  padding:14px 0;
-  background:rgba(0,0,0,.35);
-  border-left:1px solid rgba(255,255,255,.08);
-  cursor:pointer;
-  z-index:6;
-  transition:right .25s ease;
-}
-
-.advisor-rail-text{
-  transform:rotate(-90deg);
-  font-size:11px;
-  letter-spacing:.2em;
-  font-weight:700;
-  color:#ffffff;
-  user-select:none;
-}
-
-.advisor-rail-arrow{
-  font-size:14px;
-  color:#ffffff;
-  opacity:.85;
-  user-select:none;
-}
-
-/* =========================================================
-   ADVISOR UI
+   ADVISOR STRUCTURE
    ========================================================= */
 
 .advisor-wrap{
   display:flex;
   flex-direction:column;
   height:100%;
+  overflow:hidden; /* 🔥 CRITICAL */
 }
 
 .advisor-miniTitle{
+  flex-shrink:0; /* 🔥 LOCK HEADER */
   padding:14px 18px;
   font-size:14px;
   font-weight:600;
   border-bottom:1px solid rgba(255,255,255,.06);
+  background:rgba(10,15,28,.95);
+  z-index:2;
 }
 
+/* 🔥 ONLY MESSAGE AREA SCROLLS */
 .advisor-feed{
   flex:1;
   overflow-y:auto;
+  overflow-x:hidden;
   padding:20px;
   display:flex;
   flex-direction:column;
@@ -187,34 +155,16 @@ html, body {
   -webkit-overflow-scrolling: touch;
 }
 
-.advisor-row{
-  display:flex;
-  flex-direction:column;
-  gap:6px;
-}
-
-.advisor-bubble{
-  font-size:14px;
-  line-height:1.6;
-  white-space:pre-wrap;
-}
-
-.advisor-ts{
-  font-size:10px;
-  opacity:.28;
-  margin-top:2px;
-  letter-spacing:.3px;
+.advisor-inputBar{
+  flex-shrink:0; /* 🔥 LOCK INPUT */
+  padding:18px;
+  border-top:1px solid rgba(255,255,255,.05);
+  background:rgba(15,20,30,.98);
 }
 
 /* =========================================================
    INPUT
    ========================================================= */
-
-.advisor-inputBar{
-  padding:18px;
-  border-top:1px solid rgba(255,255,255,.05);
-  background:rgba(15,20,30,.95);
-}
 
 .advisor-pill{
   display:flex;
@@ -224,7 +174,6 @@ html, body {
   padding:10px 16px;
   gap:16px;
   min-height:56px;
-  transition:all .18s ease;
 }
 
 .advisor-pill-input{
@@ -252,18 +201,12 @@ html, body {
   align-items:center;
   justify-content:center;
   color:rgba(255,255,255,.75);
-  transition:all .18s ease;
   border-radius:50%;
 }
 
 .advisor-pill-left svg{
   width:24px;
   height:24px;
-}
-
-.advisor-pill-left:hover{
-  background:rgba(255,255,255,.08);
-  color:#ffffff;
 }
 
 .advisor-pill-right{
@@ -277,11 +220,6 @@ html, body {
   align-items:center;
   justify-content:center;
   cursor:pointer;
-  transition:.2s ease;
-}
-
-.advisor-pill-right:hover{
-  transform:scale(1.05);
 }
 
 .advisor-pill-right svg{
@@ -300,10 +238,6 @@ html, body {
   }
 
   .enterprise-ai-panel{
-    display:none;
-  }
-
-  .advisor-rail{
     display:none;
   }
 
