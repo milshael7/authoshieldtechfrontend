@@ -1,54 +1,84 @@
 // frontend/src/pages/trading/TradingLayout.jsx
-import React, { useState } from "react";
-import Market from "./Market";
+// ============================================================
+// TRADING LAYOUT — ROUTED STRUCTURE
+// LIVE / AI CONTROL / ANALYTICS
+// ============================================================
+
+import React from "react";
+import { NavLink, Routes, Route, Navigate } from "react-router-dom";
 import TradingRoom from "./TradingRoom";
+import Market from "./Market";
+import AIControl from "./AIControl";
+import Analytics from "./Analytics";
 
 export default function TradingLayout() {
-  const [tab, setTab] = useState("market"); // market | room | reports
+
+  const linkBase = {
+    padding: "10px 18px",
+    textDecoration: "none",
+    color: "#d1d5db",
+    borderRadius: 8,
+    fontWeight: 600,
+  };
+
+  const linkActive = {
+    background: "#1e2536",
+    color: "#fff",
+  };
 
   return (
-    <div className="container">
-      {/* TOP TABS (like your screenshot: Market / Trading Room / Reports) */}
-      <div className="tradeTabs actions" style={{ marginBottom: 12 }}>
-        <button
-          className={tab === "market" ? "active" : ""}
-          type="button"
-          onClick={() => setTab("market")}
-        >
-          Market (Chart)
-        </button>
+    <div className="container" style={{ display: "flex", flexDirection: "column", height: "100%" }}>
 
-        <button
-          className={tab === "room" ? "active" : ""}
-          type="button"
-          onClick={() => setTab("room")}
+      {/* TOP NAVIGATION */}
+      <div
+        className="tradeTabs actions"
+        style={{
+          display: "flex",
+          gap: 10,
+          marginBottom: 12,
+          borderBottom: "1px solid rgba(255,255,255,.08)",
+          paddingBottom: 10
+        }}
+      >
+        <NavLink
+          to="live"
+          style={({ isActive }) =>
+            isActive ? { ...linkBase, ...linkActive } : linkBase
+          }
         >
-          Trading Room
-        </button>
+          Live Trading
+        </NavLink>
 
-        <button
-          className={tab === "reports" ? "active" : ""}
-          type="button"
-          onClick={() => setTab("reports")}
+        <NavLink
+          to="control"
+          style={({ isActive }) =>
+            isActive ? { ...linkBase, ...linkActive } : linkBase
+          }
         >
-          Reports
-        </button>
+          AI Control
+        </NavLink>
+
+        <NavLink
+          to="analytics"
+          style={({ isActive }) =>
+            isActive ? { ...linkBase, ...linkActive } : linkBase
+          }
+        >
+          Analytics
+        </NavLink>
       </div>
 
-      {tab === "market" && <Market />}
-      {tab === "room" && <TradingRoom />}
+      {/* ROUTED CONTENT */}
+      <div style={{ flex: 1 }}>
+        <Routes>
+          <Route path="live" element={<TradingRoom />} />
+          <Route path="control" element={<AIControl />} />
+          <Route path="analytics" element={<Analytics />} />
+          <Route path="market" element={<Market />} />
+          <Route path="*" element={<Navigate to="live" replace />} />
+        </Routes>
+      </div>
 
-      {tab === "reports" && (
-        <div className="card">
-          <h2 style={{ marginTop: 0 }}>Reports</h2>
-          <ul style={{ opacity: 0.8 }}>
-            <li>Win / Loss</li>
-            <li>Daily P&amp;L</li>
-            <li>AI decisions (why it entered / skipped)</li>
-            <li>Export later</li>
-          </ul>
-        </div>
-      )}
     </div>
   );
 }
