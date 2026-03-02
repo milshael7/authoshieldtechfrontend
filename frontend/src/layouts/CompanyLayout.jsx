@@ -1,5 +1,5 @@
 // frontend/src/layouts/CompanyLayout.jsx
-// Company Layout — Synced With App Routing
+// Company Layout — Dark Unified v2 (White Strip Removed)
 
 import React, { useEffect, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
@@ -46,9 +46,18 @@ export default function CompanyLayout() {
     isActive ? "nav-link active" : "nav-link";
 
   return (
-    <div className={`layout-root enterprise ${menuOpen ? "sidebar-open" : ""}`}>
+    <div
+      className={`layout-root enterprise ${menuOpen ? "sidebar-open" : ""}`}
+      style={{
+        display: "flex",
+        minHeight: "100vh",
+        background: "#0a0f1c",
+        color: "#fff",
+      }}
+    >
       {menuOpen && <div className="sidebar-overlay" onClick={closeMenu} />}
 
+      {/* ================= SIDEBAR ================= */}
       <aside className="layout-sidebar company">
         <div className="layout-brand">
           <Logo size="md" />
@@ -58,7 +67,6 @@ export default function CompanyLayout() {
         </div>
 
         <nav className="layout-nav">
-
           <NavLink to="." end className={navClass} onClick={closeMenu}>
             Security Overview
           </NavLink>
@@ -125,34 +133,71 @@ export default function CompanyLayout() {
         </button>
       </aside>
 
-      <div className="enterprise-main" style={{ display: "flex", flexDirection: "column" }}>
-        <main className="layout-main">
-          <section className="layout-content">
-            <Outlet />
-          </section>
+      {/* ================= MAIN ================= */}
+      <div
+        className="enterprise-main"
+        style={{
+          flex: 1,
+          display: "flex",
+          background: "#0a0f1c",
+        }}
+      >
+        <main
+          style={{
+            flex: 1,
+            padding: 20,
+            background: "#0a0f1c",
+          }}
+        >
+          <Outlet />
         </main>
 
-        <aside className={`enterprise-ai-panel ${advisorOpen ? "" : "collapsed"}`}>
-          <div className="enterprise-ai-inner">
-            <AuthoDevPanel
-              title="Advisor"
-              getContext={() => ({
-                role: "company",
-                scope: "organization-only",
-                tenant: companyId,
-                subscription: subscriptionStatus,
-                location: window.location.pathname,
-                systemStatus,
-              })}
-            />
-          </div>
+        {/* ================= ADVISOR ================= */}
+        <aside
+          style={{
+            width: advisorOpen ? 340 : 0,
+            transition: "width .25s ease",
+            overflow: "hidden",
+            borderLeft: advisorOpen
+              ? "1px solid rgba(255,255,255,.08)"
+              : "none",
+            background:
+              "linear-gradient(180deg, rgba(255,255,255,.04), rgba(0,0,0,.55))",
+            backdropFilter: "blur(10px)",
+          }}
+        >
+          {advisorOpen && (
+            <div style={{ padding: 18 }}>
+              <AuthoDevPanel
+                title="Advisor"
+                getContext={() => ({
+                  role: "company",
+                  scope: "organization-only",
+                  tenant: companyId,
+                  subscription: subscriptionStatus,
+                  location: window.location.pathname,
+                  systemStatus,
+                })}
+              />
+            </div>
+          )}
         </aside>
       </div>
 
+      {/* Advisor Toggle Button */}
       <button
-        className="advisor-fab"
         onClick={() => setAdvisorOpen(v => !v)}
-        title={advisorOpen ? "Close Advisor" : "Open Advisor"}
+        style={{
+          position: "fixed",
+          right: advisorOpen ? 340 : 0,
+          top: "50%",
+          transform: "translateY(-50%)",
+          padding: "6px 10px",
+          background: "#111827",
+          color: "#fff",
+          border: "1px solid rgba(255,255,255,.08)",
+          cursor: "pointer",
+        }}
       >
         {advisorOpen ? "›" : "Advisor"}
       </button>
