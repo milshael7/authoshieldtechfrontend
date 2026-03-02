@@ -1,5 +1,5 @@
 // frontend/src/layouts/AdminLayout.jsx
-// Enterprise Admin Layout — Push Slide Advisor Version
+// Enterprise Admin Layout — Final Push + Vertical Handle Version
 
 import React, { useEffect, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
@@ -44,63 +44,29 @@ export default function AdminLayout() {
   const navClass = ({ isActive }) =>
     isActive ? "nav-link active" : "nav-link";
 
-  function wsColor() {
-    if (wsStatus === "connected") return "#22c55e";
-    if (wsStatus === "reconnecting") return "#f59e0b";
-    return "#ef4444";
-  }
-
-  function systemColor() {
-    return systemStatus === "compromised" ? "#ef4444" : "#22c55e";
-  }
-
-  const subscriptionStatus = user?.subscriptionStatus || "Unknown";
-
   return (
     <div
       className="layout-root enterprise"
       style={{
+        display: "flex",
+        minHeight: "100vh",
         background: "#0a0f1c",
         color: "#fff",
-        position: "relative",
       }}
     >
       {/* ================= SIDEBAR ================= */}
       <aside className="layout-sidebar admin">
         <div className="layout-brand">
           <Logo size="md" />
-          <span className="muted" style={{ fontSize: 12 }}>
+          <span style={{ fontSize: 12 }}>
             Enterprise Administration
           </span>
         </div>
 
         <nav className="layout-nav">
-          <NavLink to="/admin" end className={navClass}>Dashboard</NavLink>
-          <hr />
-          <div className="nav-section-label">Security Command</div>
-          <NavLink to="/admin/security" className={navClass}>Security Overview</NavLink>
-          <NavLink to="/admin/risk" className={navClass}>Risk Monitor</NavLink>
-          <NavLink to="/admin/sessions" className={navClass}>Session Monitor</NavLink>
-          <NavLink to="/admin/device-integrity" className={navClass}>Device Integrity</NavLink>
-          <NavLink to="/admin/trading" className={navClass}>Internal Trading</NavLink>
-          <hr />
-          <div className="nav-section-label">Security Modules</div>
-          <NavLink to="/admin/assets" className={navClass}>Assets</NavLink>
-          <NavLink to="/admin/incidents" className={navClass}>Incident Management</NavLink>
-          <NavLink to="/admin/vulnerabilities" className={navClass}>Vulnerability Oversight</NavLink>
-          <NavLink to="/admin/compliance" className={navClass}>Regulatory Compliance</NavLink>
-          <NavLink to="/admin/reports" className={navClass}>Executive Reporting</NavLink>
-          <hr />
-          <div className="nav-section-label">Platform Intelligence</div>
-          <NavLink to="/admin/audit" className={navClass}>Audit Explorer</NavLink>
-          <NavLink to="/admin/global" className={navClass}>Global Control</NavLink>
-          <NavLink to="/admin/notifications" className={navClass}>System Notifications</NavLink>
-          <hr />
-          <div className="nav-section-label">Operational Oversight</div>
-          <NavLink to="/admin/companies" className={navClass}>Company Oversight</NavLink>
-          <NavLink to="/manager" className={navClass}>Manager Command</NavLink>
-          <NavLink to="/company" className={navClass}>Corporate Entities</NavLink>
-          <NavLink to="/user" className={navClass}>User Governance</NavLink>
+          <NavLink to="/admin" end className={navClass}>
+            Dashboard
+          </NavLink>
         </nav>
 
         <button className="btn logout-btn" onClick={logout}>
@@ -108,59 +74,37 @@ export default function AdminLayout() {
         </button>
       </aside>
 
-      {/* ================= MAIN ================= */}
-      <div
-        className="enterprise-main"
-        style={{
-          flex: 1,
-          display: "flex",
-          flexDirection: "column",
-          background: "#0a0f1c",
-          paddingRight: !isMobile && advisorOpen ? PANEL_WIDTH : 0,
-          transition: "padding-right .3s ease",
-        }}
-      >
-        {/* STATUS BAR */}
-        <div style={{
-          height: 28,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "0 18px",
-          borderBottom: "1px solid rgba(255,255,255,.05)",
-          background: "rgba(255,255,255,.02)",
-          fontSize: 11,
-        }}>
-          <div style={{ display: "flex", gap: 18 }}>
-            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-              <div style={{ width: 8, height: 8, borderRadius: "50%", background: wsColor() }} />
-              WS: {wsStatus.toUpperCase()}
-            </div>
-            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-              <div style={{ width: 8, height: 8, borderRadius: "50%", background: systemColor() }} />
-              SYSTEM: {systemStatus.toUpperCase()}
-            </div>
-          </div>
-          <div>ROLE: {user?.role?.toUpperCase()}</div>
+      {/* ================= MAIN + PANEL ================= */}
+      <div style={{ flex: 1, display: "flex", position: "relative" }}>
+
+        {/* ================= MAIN CONTENT ================= */}
+        <div
+          style={{
+            flex: 1,
+            display: "flex",
+            flexDirection: "column",
+            transition: "all .3s ease",
+          }}
+        >
+          <main style={{ flex: 1, padding: 20 }}>
+            <Outlet />
+          </main>
         </div>
 
-        <main style={{ flex: 1, padding: 20 }}>
-          <Outlet />
-        </main>
-      </div>
-
-      {/* ================= ADVISOR ================= */}
-      {!isMobile && (
-        <>
+        {/* ================= ADVISOR PANEL ================= */}
+        {!isMobile && (
           <div
             style={{
-              position: "fixed",
-              top: 0,
-              right: advisorOpen ? 0 : -PANEL_WIDTH,
-              width: PANEL_WIDTH,
-              height: "100vh",
-              transition: "right .3s ease",
-              zIndex: 30,
+              width: advisorOpen ? PANEL_WIDTH : 0,
+              transition: "width .3s ease",
+              overflow: "hidden",
+              display: "flex",
+              flexDirection: "column",
+              borderLeft: advisorOpen
+                ? "1px solid rgba(255,255,255,.08)"
+                : "none",
+              background:
+                "linear-gradient(180deg, rgba(255,255,255,.04), rgba(0,0,0,.45))",
             }}
           >
             <AuthoDevPanel
@@ -173,25 +117,35 @@ export default function AdminLayout() {
               })}
             />
           </div>
+        )}
 
+        {/* ================= VERTICAL STANDING HANDLE ================= */}
+        {!isMobile && (
           <div
-            style={{
-              position: "fixed",
-              top: "50%",
-              right: advisorOpen ? PANEL_WIDTH : 0,
-              transform: "translateY(-50%)",
-              transition: "right .3s ease",
-              background: "rgba(0,0,0,.4)",
-              padding: "12px 6px",
-              cursor: "pointer",
-              zIndex: 31,
-            }}
             onClick={() => setAdvisorOpen(v => !v)}
+            style={{
+              position: "absolute",
+              top: "50%",
+              right: advisorOpen ? PANEL_WIDTH - 8 : -8,
+              transform: "translateY(-50%)",
+              padding: "12px 6px",
+              background: "rgba(0,0,0,.6)",
+              borderRadius: "8px 0 0 8px",
+              cursor: "pointer",
+              fontSize: 11,
+              letterSpacing: ".15em",
+              transition: "right .3s ease",
+              zIndex: 10,
+              writingMode: "vertical-rl",
+              textOrientation: "mixed",
+              userSelect: "none",
+            }}
           >
-            {advisorOpen ? "▶ ADVISOR ▶" : "◀ ADVISOR ◀"}
+            {advisorOpen ? "◀ ADVISOR" : "ADVISOR ▶"}
           </div>
-        </>
-      )}
+        )}
+
+      </div>
     </div>
   );
 }
