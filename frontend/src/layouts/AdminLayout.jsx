@@ -1,5 +1,5 @@
 // frontend/src/layouts/AdminLayout.jsx
-// Enterprise Admin Layout — Dark Unified v4 (White Strip Fixed)
+// Enterprise Admin Layout — Dark Unified v5 (Advisor Rail Unified)
 
 import React, { useEffect, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
@@ -24,8 +24,7 @@ export default function AdminLayout() {
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 900);
 
   const DRAWER_OPEN_W = 360;
-  const DRAWER_CLOSED_W = 26;
-  const drawerWidth = advisorOpen ? DRAWER_OPEN_W : DRAWER_CLOSED_W;
+  const drawerWidth = advisorOpen ? DRAWER_OPEN_W : 0;
 
   useEffect(() => {
     localStorage.setItem("admin.advisor.open", advisorOpen);
@@ -62,9 +61,7 @@ export default function AdminLayout() {
     <div
       className="layout-root enterprise"
       style={{
-        display: "flex",
-        minHeight: "100vh",
-        background: "#0a0f1c", // 🔥 FORCE DARK ROOT
+        background: "#0a0f1c",
         color: "#fff",
       }}
     >
@@ -78,9 +75,7 @@ export default function AdminLayout() {
         </div>
 
         <nav className="layout-nav">
-          <NavLink to="/admin" end className={navClass}>
-            Dashboard
-          </NavLink>
+          <NavLink to="/admin" end className={navClass}>Dashboard</NavLink>
 
           <hr />
 
@@ -126,11 +121,11 @@ export default function AdminLayout() {
         className="enterprise-main"
         style={{
           marginRight: isMobile ? 0 : drawerWidth,
-          transition: "margin-right .22s ease",
+          transition: "margin-right .25s ease",
           flex: 1,
           display: "flex",
           flexDirection: "column",
-          background: "#0a0f1c", // 🔥 FORCE DARK MAIN
+          background: "#0a0f1c",
         }}
       >
         {/* STATUS BAR */}
@@ -188,73 +183,47 @@ export default function AdminLayout() {
           </div>
         </div>
 
-        <main
-          style={{
-            flex: 1,
-            padding: 20,
-            background: "#0a0f1c", // 🔥 FORCE DARK CONTENT
-          }}
-        >
+        <main style={{ flex: 1, padding: 20 }}>
           <Outlet />
         </main>
       </div>
 
-      {/* ================= ADVISOR ================= */}
+      {/* ================= ADVISOR PANEL ================= */}
       {!isMobile && (
-        <div
-          style={{
-            position: "fixed",
-            top: 0,
-            right: 0,
-            height: "100vh",
-            width: drawerWidth,
-            transition: "width .22s ease",
-            display: "flex",
-            borderLeft: "1px solid rgba(255,255,255,0.10)",
-            background:
-              "linear-gradient(180deg, rgba(255,255,255,.04), rgba(0,0,0,.55))",
-            backdropFilter: "blur(10px)",
-            overflow: "hidden",
-            zIndex: 2000,
-          }}
-        >
-          <button
-            onClick={() => setAdvisorOpen((v) => !v)}
-            style={{
-              width: DRAWER_CLOSED_W,
-              minWidth: DRAWER_CLOSED_W,
-              height: "100%",
-              border: "none",
-              background: "rgba(0,0,0,.22)",
-              color: "#ffffff",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              writingMode: "vertical-rl",
-              textOrientation: "mixed",
-              fontSize: 11,
-              fontWeight: 900,
-              letterSpacing: ".2em",
-            }}
+        <>
+          <div
+            className={`enterprise-ai-panel ${advisorOpen ? "" : "collapsed"}`}
           >
-            ADVISOR
-          </button>
+            <AuthoDevPanel
+              title="Advisor"
+              getContext={() => ({
+                role: "admin",
+                scope: activeCompanyId ? "entity" : "global",
+                systemStatus,
+                location: window.location.pathname,
+              })}
+            />
+          </div>
 
-          {advisorOpen && (
-            <div style={{ flex: 1 }}>
-              <AuthoDevPanel
-                title="Advisor"
-                getContext={() => ({
-                  role: "admin",
-                  scope: activeCompanyId ? "entity" : "global",
-                  systemStatus,
-                  location: window.location.pathname,
-                })}
-              />
+          {/* ================= VERTICAL RAIL ================= */}
+          <div
+            className="advisor-rail"
+            style={{ right: advisorOpen ? DRAWER_OPEN_W : 0 }}
+            onClick={() => setAdvisorOpen(v => !v)}
+          >
+            <div className="advisor-rail-arrow">
+              {advisorOpen ? "▶" : "◀"}
             </div>
-          )}
-        </div>
+
+            <div className="advisor-rail-text">
+              ADVISOR
+            </div>
+
+            <div className="advisor-rail-arrow">
+              {advisorOpen ? "▶" : "◀"}
+            </div>
+          </div>
+        </>
       )}
     </div>
   );
