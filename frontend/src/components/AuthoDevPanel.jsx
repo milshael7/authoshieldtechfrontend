@@ -38,7 +38,7 @@ export default function AuthoDevPanel({
   const recognitionRef=useRef(null);
   const feedRef=useRef(null);
   const textareaRef=useRef(null);
-  const audioRef=useRef(null);
+  const audioContextRef=useRef(null);
 
   /* ================= LOAD HISTORY ================= */
 
@@ -74,25 +74,29 @@ export default function AuthoDevPanel({
   /* ================= AUDIO ANALYZER ================= */
 
   async function setupAudioAnalyzer(stream){
+
     const audioContext = new (window.AudioContext || window.webkitAudioContext)();
     const analyser = audioContext.createAnalyser();
     const source = audioContext.createMediaStreamSource(stream);
 
     source.connect(analyser);
-    analyser.fftSize = 128;
+    analyser.fftSize = 2048;
 
-    const dataArray = new Uint8Array(analyser.frequencyBinCount);
+    const bufferLength = analyser.fftSize;
+    const dataArray = new Uint8Array(bufferLength);
 
     function tick(){
-      analyser.getByteFrequencyData(dataArray);
+      analyser.getByteTimeDomainData(dataArray);
 
       let sum = 0;
-      for(let i=0;i<dataArray.length;i++){
-        sum += dataArray[i];
+      for(let i=0;i<bufferLength;i++){
+        const deviation = dataArray[i] - 128;
+        sum += Math.abs(deviation);
       }
 
-      const avg = sum / dataArray.length;
-      setVolume(avg); // always update — no threshold
+      const avg = sum / bufferLength;
+
+      setVolume(avg);
 
       if(listening){
         requestAnimationFrame(tick);
@@ -100,7 +104,7 @@ export default function AuthoDevPanel({
     }
 
     tick();
-    audioRef.current = { audioContext, analyser };
+    audioContextRef.current = audioContext;
   }
 
   /* ================= VOICE INPUT ================= */
@@ -267,7 +271,7 @@ export default function AuthoDevPanel({
 
 const LiveVisualizer = ({ volume }) => {
 
-  const intensity = Math.max(volume / 6, 6);
+  const intensity = Math.min(Math.max(volume * 1.8, 6), 40);
 
   return (
     <div style={{
@@ -280,10 +284,10 @@ const LiveVisualizer = ({ volume }) => {
       {[...Array(20)].map((_,i)=>(
         <div key={i} style={{
           width:3,
-          height: intensity,
+          height:intensity,
           background:"#fff",
           borderRadius:2,
-          transition:"height 0.08s linear"
+          transition:"height 0.05s linear"
         }}/>
       ))}
     </div>
