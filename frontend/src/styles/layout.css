@@ -1,40 +1,27 @@
-/* =========================================================
-   AUTOSHIELD — PROPER SLIDE SIDEBAR SYSTEM
-   ========================================================= */
-
-html, body {
-  margin:0;
-  padding:0;
-  height:100%;
-  overflow:hidden;
-  background:#0b0f1a;
-  color:#eaf1ff;
-  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
-}
-
 /* ROOT */
 
 .layout-root{
-  display:flex;
+  position:relative;
   height:100vh;
   width:100%;
   overflow:hidden;
-  position:relative;
 }
 
 /* SIDEBAR */
 
 .layout-sidebar{
-  position:relative;
+  position:fixed;
+  top:0;
+  left:0;
+  height:100vh;
   width:260px;
-  flex-shrink:0;
   display:flex;
   flex-direction:column;
   background:linear-gradient(180deg, rgba(255,255,255,.05), rgba(0,0,0,.55));
   border-right:1px solid rgba(255,255,255,.08);
   backdrop-filter:blur(10px);
   transition:transform .3s ease;
-  z-index:5;
+  z-index:20;
 }
 
 /* Slide fully out */
@@ -42,11 +29,10 @@ html, body {
   transform:translateX(-100%);
 }
 
-/* Logo fixed area */
+/* Sidebar header (logo area) */
 .sidebar-header{
   padding:20px;
   flex-shrink:0;
-  border-bottom:1px solid rgba(255,255,255,.06);
 }
 
 /* Scrollable nav area */
@@ -59,58 +45,23 @@ html, body {
   gap:14px;
 }
 
-/* NAV LINKS */
-
-.layout-nav a{
-  display:block;
-  padding:10px 12px;
-  border-radius:10px;
-  text-decoration:none;
-  color:rgba(255,255,255,.85);
-  font-size:14px;
-  font-weight:600;
-  transition:.2s ease;
-}
-
-.layout-nav a:hover{
-  background:rgba(120,160,255,.15);
-  color:#fff;
-}
-
-.layout-nav a.active{
-  background:linear-gradient(180deg, rgba(120,160,255,.9), rgba(70,110,255,.8));
-  color:#fff;
-}
-
-/* SIDEBAR TOGGLE TAB */
-
-.sidebar-toggle{
-  position:absolute;
-  top:50%;
-  left:260px;
-  transform:translateY(-50%);
-  width:22px;
-  height:80px;
-  background:rgba(0,0,0,.6);
-  border-radius:0 8px 8px 0;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  cursor:pointer;
-  transition:left .3s ease;
-  z-index:6;
-}
-
-.sidebar-collapsed .sidebar-toggle{
-  left:0;
-}
-
 /* MAIN */
 
 .enterprise-main{
-  flex:1;
+  position:relative;
   display:flex;
-  overflow:hidden;
+  height:100vh;
+  transition:margin-left .3s ease;
+}
+
+/* When sidebar is open */
+.layout-root:not(.sidebar-collapsed) .enterprise-main{
+  margin-left:260px;
+}
+
+/* When sidebar is closed */
+.layout-root.sidebar-collapsed .enterprise-main{
+  margin-left:0;
 }
 
 .layout-main{
@@ -127,16 +78,7 @@ html, body {
   overflow-x:hidden;
 }
 
-/* ADVISOR */
-
-.enterprise-ai-panel{
-  width:380px;
-  flex-shrink:0;
-  display:flex;
-  flex-direction:column;
-  border-left:1px solid rgba(255,255,255,.08);
-  background:linear-gradient(180deg, rgba(255,255,255,.04), rgba(0,0,0,.45));
-  backdrop-filter:blur(10px);
-  transition:width .25s ease;
-  overflow:hidden;
+/* REMOVE OLD TAB SYSTEM */
+.sidebar-toggle{
+  display:none !important;
 }
