@@ -1,6 +1,3 @@
-// frontend/src/layouts/AdminLayout.jsx
-// Stable Layout — Fixed Logo (never slides) + Proper Sidebar Space + Clean Hamburger + Advisor Stable
-
 import React, { useEffect, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { clearToken, clearUser } from "../lib/api.js";
@@ -45,39 +42,25 @@ export default function AdminLayout() {
 
   return (
     <div className={`layout-root ${sidebarOpen ? "" : "sidebar-collapsed"}`}>
-      {/* ===== FIXED BRAND CORNER (LOGO NEVER SLIDES) ===== */}
+      {/* FIXED LOGO + OPEN BUTTON */}
       {!isMobile && (
         <div className="brand-corner">
           <Logo size="md" />
-
-          {/* OPEN BUTTON (only when sidebar is closed) */}
           {!sidebarOpen && (
-            <button
-              className="brand-open-btn"
-              onClick={() => setSidebarOpen(true)}
-              aria-label="Open menu"
-              title="Open menu"
-            >
+            <button className="brand-open-btn" onClick={() => setSidebarOpen(true)}>
               ☰
             </button>
           )}
         </div>
       )}
 
-      {/* ===== SIDEBAR (SLIDES, BUT LOGO DOES NOT) ===== */}
-      <aside className="layout-sidebar admin" aria-label="Sidebar navigation">
-        {/* close button INSIDE sidebar only */}
+      {/* SIDEBAR */}
+      <aside className="layout-sidebar">
         <div className="sidebar-header">
           <div className="sidebar-header-row">
             <div className="sidebar-header-title">ADMIN</div>
-
             {!isMobile && (
-              <button
-                className="sidebar-close-btn"
-                onClick={() => setSidebarOpen(false)}
-                aria-label="Close menu"
-                title="Close menu"
-              >
+              <button className="sidebar-close-btn" onClick={() => setSidebarOpen(false)}>
                 ☰
               </button>
             )}
@@ -87,35 +70,12 @@ export default function AdminLayout() {
         <div className="sidebar-body">
           <nav className="layout-nav">
             <NavLink to="/admin" end className={navClass}>Dashboard</NavLink>
-
-            <hr />
-            <div className="nav-section-label">Security Command</div>
             <NavLink to="/admin/security" className={navClass}>Security Overview</NavLink>
             <NavLink to="/admin/risk" className={navClass}>Risk Monitor</NavLink>
-            <NavLink to="/admin/sessions" className={navClass}>Session Monitor</NavLink>
-            <NavLink to="/admin/device-integrity" className={navClass}>Device Integrity</NavLink>
             <NavLink to="/admin/trading" className={navClass}>Internal Trading</NavLink>
-
-            <hr />
-            <div className="nav-section-label">Security Modules</div>
             <NavLink to="/admin/assets" className={navClass}>Assets</NavLink>
             <NavLink to="/admin/incidents" className={navClass}>Incident Management</NavLink>
-            <NavLink to="/admin/vulnerabilities" className={navClass}>Vulnerability Oversight</NavLink>
-            <NavLink to="/admin/compliance" className={navClass}>Regulatory Compliance</NavLink>
             <NavLink to="/admin/reports" className={navClass}>Executive Reporting</NavLink>
-
-            <hr />
-            <div className="nav-section-label">Platform Intelligence</div>
-            <NavLink to="/admin/audit" className={navClass}>Audit Explorer</NavLink>
-            <NavLink to="/admin/global" className={navClass}>Global Control</NavLink>
-            <NavLink to="/admin/notifications" className={navClass}>System Notifications</NavLink>
-
-            <hr />
-            <div className="nav-section-label">Operational Oversight</div>
-            <NavLink to="/admin/companies" className={navClass}>Company Oversight</NavLink>
-            <NavLink to="/manager" className={navClass}>Manager Command</NavLink>
-            <NavLink to="/company" className={navClass}>Corporate Entities</NavLink>
-            <NavLink to="/user" className={navClass}>User Governance</NavLink>
           </nav>
 
           <button className="btn logout-btn" onClick={logout}>
@@ -124,7 +84,7 @@ export default function AdminLayout() {
         </div>
       </aside>
 
-      {/* ===== MAIN + ADVISOR ===== */}
+      {/* MAIN */}
       <div className="enterprise-main">
         <div className="layout-main">
           <main className="layout-content">
@@ -147,10 +107,10 @@ export default function AdminLayout() {
         )}
       </div>
 
-      {/* ===== ADVISOR TOGGLE (unchanged) ===== */}
+      {/* ADVISOR TOGGLE */}
       {!isMobile && (
         <div
-          onClick={() => setAdvisorOpen((v) => !v)}
+          onClick={() => setAdvisorOpen(v => !v)}
           style={{
             position: "fixed",
             top: "50%",
@@ -166,7 +126,6 @@ export default function AdminLayout() {
             zIndex: 10,
             writingMode: "vertical-rl",
             textOrientation: "mixed",
-            userSelect: "none",
           }}
         >
           {advisorOpen ? "◀ ADVISOR" : "ADVISOR ▶"}
