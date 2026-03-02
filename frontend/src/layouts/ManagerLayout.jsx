@@ -1,6 +1,5 @@
 // frontend/src/layouts/ManagerLayout.jsx
-// Manager Layout — Enterprise Hardened v3
-// Enforcement Visible • WS Status • System Integrity • Limit Awareness
+// Manager Layout — Dark Unified v4 (White Strip Removed)
 
 import React, { useEffect, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
@@ -40,8 +39,6 @@ export default function ManagerLayout() {
   const navClass = ({ isActive }) =>
     isActive ? "nav-link active" : "nav-link";
 
-  /* ================= STATUS COLORS ================= */
-
   function wsColor() {
     if (wsStatus === "connected") return "#22c55e";
     if (wsStatus === "reconnecting") return "#f59e0b";
@@ -58,7 +55,15 @@ export default function ManagerLayout() {
     user?.role?.toLowerCase() === "manager";
 
   return (
-    <div className={`layout-root enterprise ${menuOpen ? "sidebar-open" : ""}`}>
+    <div
+      className={`layout-root enterprise ${menuOpen ? "sidebar-open" : ""}`}
+      style={{
+        display: "flex",
+        minHeight: "100vh",
+        background: "#0a0f1c",
+        color: "#fff",
+      }}
+    >
       {menuOpen && <div className="sidebar-overlay" onClick={closeMenu} />}
 
       {/* ================= SIDEBAR ================= */}
@@ -71,7 +76,6 @@ export default function ManagerLayout() {
         </div>
 
         <nav className="layout-nav">
-
           <div className="nav-section-label">
             Global Monitoring
           </div>
@@ -140,7 +144,6 @@ export default function ManagerLayout() {
           <NavLink to="notifications" className={navClass} onClick={closeMenu}>
             System Notifications
           </NavLink>
-
         </nav>
 
         <button className="btn logout-btn" onClick={logout}>
@@ -149,8 +152,14 @@ export default function ManagerLayout() {
       </aside>
 
       {/* ================= MAIN ================= */}
-      <div className="enterprise-main" style={{ display: "flex", flexDirection: "column" }}>
-
+      <div
+        style={{
+          flex: 1,
+          display: "flex",
+          flexDirection: "column",
+          background: "#0a0f1c",
+        }}
+      >
         {/* ===== STATUS BAR ===== */}
         <div
           style={{
@@ -160,36 +169,21 @@ export default function ManagerLayout() {
             justifyContent: "space-between",
             padding: "0 18px",
             borderBottom: "1px solid rgba(255,255,255,.05)",
-            background: "rgba(255,255,255,.015)",
+            background: "rgba(255,255,255,.02)",
             fontSize: 11,
             letterSpacing: ".05em",
           }}
         >
-          {/* LEFT */}
-          <div style={{ display: "flex", gap: 18, alignItems: "center" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <div
-                style={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: "50%",
-                  background: wsColor(),
-                }}
-              />
+          <div style={{ display: "flex", gap: 18 }}>
+            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+              <div style={{ width: 8, height: 8, borderRadius: "50%", background: wsColor() }} />
               <span style={{ opacity: 0.7 }}>
                 WS: {wsStatus.toUpperCase()}
               </span>
             </div>
 
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <div
-                style={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: "50%",
-                  background: systemColor(),
-                }}
-              />
+            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+              <div style={{ width: 8, height: 8, borderRadius: "50%", background: systemColor() }} />
               <span style={{ opacity: 0.7 }}>
                 SYSTEM: {systemStatus.toUpperCase()}
               </span>
@@ -200,8 +194,7 @@ export default function ManagerLayout() {
             </div>
           </div>
 
-          {/* RIGHT */}
-          <div style={{ display: "flex", gap: 14, alignItems: "center" }}>
+          <div style={{ display: "flex", gap: 14 }}>
             <div style={{ opacity: 0.7 }}>
               ROLE: {user?.role?.toUpperCase()}
             </div>
@@ -230,19 +223,33 @@ export default function ManagerLayout() {
           </div>
         </div>
 
-        <main className="layout-main">
-          <section className="layout-content">
-            <Outlet />
-          </section>
-        </main>
-
-        {/* ===== ADVISOR ===== */}
-        <aside
-          className={`enterprise-ai-panel ${
-            advisorOpen ? "" : "collapsed"
-          }`}
+        <main
+          style={{
+            flex: 1,
+            padding: 20,
+            background: "#0a0f1c",
+          }}
         >
-          <div className="enterprise-ai-inner">
+          <Outlet />
+        </main>
+      </div>
+
+      {/* ================= ADVISOR ================= */}
+      <aside
+        style={{
+          width: advisorOpen ? 340 : 0,
+          transition: "width .25s ease",
+          overflow: "hidden",
+          borderLeft: advisorOpen
+            ? "1px solid rgba(255,255,255,.08)"
+            : "none",
+          background:
+            "linear-gradient(180deg, rgba(255,255,255,.04), rgba(0,0,0,.55))",
+          backdropFilter: "blur(10px)",
+        }}
+      >
+        {advisorOpen && (
+          <div style={{ padding: 18 }}>
             <AuthoDevPanel
               title="Advisor"
               getContext={() => ({
@@ -254,14 +261,23 @@ export default function ManagerLayout() {
               })}
             />
           </div>
-        </aside>
-      </div>
+        )}
+      </aside>
 
-      {/* ===== FLOATING TOGGLE ===== */}
+      {/* Toggle */}
       <button
-        className="advisor-fab"
         onClick={() => setAdvisorOpen(v => !v)}
-        title={advisorOpen ? "Close Advisor" : "Open Advisor"}
+        style={{
+          position: "fixed",
+          right: advisorOpen ? 340 : 0,
+          top: "50%",
+          transform: "translateY(-50%)",
+          padding: "6px 10px",
+          background: "#111827",
+          color: "#fff",
+          border: "1px solid rgba(255,255,255,.08)",
+          cursor: "pointer",
+        }}
       >
         {advisorOpen ? "›" : "Advisor"}
       </button>
