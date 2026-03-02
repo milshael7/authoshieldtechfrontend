@@ -1,5 +1,5 @@
 // frontend/src/layouts/AdminLayout.jsx
-// Enterprise Admin Layout — Dark Unified v5 (Advisor Rail Unified)
+// Enterprise Admin Layout — Stable Panel Collapse Version
 
 import React, { useEffect, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
@@ -22,9 +22,6 @@ export default function AdminLayout() {
   });
 
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 900);
-
-  const DRAWER_OPEN_W = 360;
-  const drawerWidth = advisorOpen ? DRAWER_OPEN_W : 0;
 
   useEffect(() => {
     localStorage.setItem("admin.advisor.open", advisorOpen);
@@ -120,8 +117,6 @@ export default function AdminLayout() {
       <div
         className="enterprise-main"
         style={{
-          marginRight: isMobile ? 0 : drawerWidth,
-          transition: "margin-right .25s ease",
           flex: 1,
           display: "flex",
           flexDirection: "column",
@@ -205,10 +200,8 @@ export default function AdminLayout() {
             />
           </div>
 
-          {/* ================= VERTICAL RAIL ================= */}
           <div
             className="advisor-rail"
-            style={{ right: advisorOpen ? DRAWER_OPEN_W : 0 }}
             onClick={() => setAdvisorOpen(v => !v)}
           >
             <div className="advisor-rail-arrow">
