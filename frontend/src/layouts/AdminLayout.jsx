@@ -1,5 +1,5 @@
 // frontend/src/layouts/AdminLayout.jsx
-// Enterprise Admin Layout — Stable Panel Collapse Version
+// Enterprise Admin Layout — Stable Overlay Advisor Version
 
 import React, { useEffect, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
@@ -60,6 +60,7 @@ export default function AdminLayout() {
       style={{
         background: "#0a0f1c",
         color: "#fff",
+        position: "relative",
       }}
     >
       {/* ================= SIDEBAR ================= */}
@@ -183,11 +184,19 @@ export default function AdminLayout() {
         </main>
       </div>
 
-      {/* ================= ADVISOR PANEL ================= */}
+      {/* ================= ADVISOR OVERLAY ================= */}
       {!isMobile && (
         <>
           <div
-            className={`enterprise-ai-panel ${advisorOpen ? "" : "collapsed"}`}
+            style={{
+              position: "fixed",
+              top: 0,
+              right: advisorOpen ? 0 : -380,
+              width: 380,
+              height: "100vh",
+              transition: "right .3s ease",
+              zIndex: 30,
+            }}
           >
             <AuthoDevPanel
               title="Advisor"
@@ -201,18 +210,26 @@ export default function AdminLayout() {
           </div>
 
           <div
-            className="advisor-rail"
+            style={{
+              position: "fixed",
+              top: "50%",
+              right: advisorOpen ? 380 : 0,
+              transform: "translateY(-50%)",
+              transition: "right .3s ease",
+              background: "rgba(0,0,0,.4)",
+              padding: "12px 6px",
+              cursor: "pointer",
+              zIndex: 31,
+            }}
             onClick={() => setAdvisorOpen(v => !v)}
           >
-            <div className="advisor-rail-arrow">
+            <div style={{ fontSize: 14 }}>
               {advisorOpen ? "▶" : "◀"}
             </div>
-
-            <div className="advisor-rail-text">
+            <div style={{ writingMode: "vertical-rl", fontSize: 11, margin: "6px 0" }}>
               ADVISOR
             </div>
-
-            <div className="advisor-rail-arrow">
+            <div style={{ fontSize: 14 }}>
               {advisorOpen ? "▶" : "◀"}
             </div>
           </div>
