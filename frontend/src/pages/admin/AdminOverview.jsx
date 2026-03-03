@@ -1,5 +1,5 @@
 // frontend/src/pages/admin/AdminOverview.jsx
-// Executive Command Center — Platform + Operator Mode
+// Executive Command Center — Platform + Operator Mode (Layer 1 Upgraded)
 
 import React, { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { api } from "../../lib/api";
@@ -43,7 +43,7 @@ export default function AdminOverview() {
   const [metrics, setMetrics] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const [mode, setMode] = useState("platform"); // "platform" | "operator"
+  const [mode, setMode] = useState("platform");
   const [selectedCompany, setSelectedCompany] = useState(null);
 
   const canvasRef = useRef(null);
@@ -100,14 +100,21 @@ export default function AdminOverview() {
 
   const healthBadge = riskLevel(healthIndex);
 
-  /* ================= MOCK COMPANIES (replace with API later) ================= */
+  /* ================= MOCK COMPANY DATA ================= */
 
   const mockCompanies = [
-    { id: "c1", name: "Alpha Systems", risk: 22 },
-    { id: "c2", name: "Beta Holdings", risk: 61 },
-    { id: "c3", name: "Gamma Logistics", risk: 38 },
-    { id: "c4", name: "Delta Finance", risk: 12 }
+    { id: "c1", name: "Alpha Systems", risk: 22, alerts: 3 },
+    { id: "c2", name: "Beta Holdings", risk: 61, alerts: 9 },
+    { id: "c3", name: "Gamma Logistics", risk: 38, alerts: 4 },
+    { id: "c4", name: "Delta Finance", risk: 12, alerts: 1 }
   ];
+
+  const fleetRiskAverage = useMemo(() => {
+    const total = mockCompanies.reduce((sum, c) => sum + c.risk, 0);
+    return Math.round(total / mockCompanies.length);
+  }, []);
+
+  const fleetBadge = riskLevel(fleetRiskAverage);
 
   if (loading) {
     return <div className="dashboard-loading">Loading Executive Center…</div>;
@@ -129,7 +136,7 @@ export default function AdminOverview() {
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div className="sectionTitle">
-          {mode === "platform" ? "Platform Command Center" : "Operator Command Center"}
+          {mode === "platform" ? "Platform Command Center" : "Operator Fleet Command"}
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
@@ -137,7 +144,6 @@ export default function AdminOverview() {
             HEALTH {healthIndex.toFixed(0)}
           </span>
 
-          {/* MODE SWITCH */}
           <select
             value={mode}
             onChange={(e) => {
@@ -158,24 +164,44 @@ export default function AdminOverview() {
         </div>
       </div>
 
-      {/* ================= OPERATOR MODE ================= */}
+      {/* ========================================================= */}
+      {/* ================= OPERATOR MODE ========================= */}
+      {/* ========================================================= */}
 
       {mode === "operator" && (
-        <div className="postureCard">
-          <h3 style={{ marginBottom: 20 }}>
-            {selectedCompany ? `Viewing: ${selectedCompany.name}` : "Protected Companies"}
-          </h3>
 
+        <>
+          {/* Fleet Summary Strip */}
+          <div className="postureCard executivePanel">
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div>
+                <h3>Fleet Overview</h3>
+                <div className="muted">
+                  {mockCompanies.length} Protected Companies
+                </div>
+              </div>
+
+              <div>
+                Fleet Risk:{" "}
+                <span className={`badge ${fleetBadge.cls}`}>
+                  {fleetRiskAverage}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Company Grid */}
           {!selectedCompany && (
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-                gap: 20
+                gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+                gap: 24
               }}
             >
               {mockCompanies.map((c) => {
                 const badge = riskLevel(c.risk);
+
                 return (
                   <div
                     key={c.id}
@@ -184,8 +210,16 @@ export default function AdminOverview() {
                     onClick={() => setSelectedCompany(c)}
                   >
                     <h4>{c.name}</h4>
+
+                    <div style={{ marginTop: 14 }}>
+                      Risk:{" "}
+                      <span className={`badge ${badge.cls}`}>
+                        {c.risk}
+                      </span>
+                    </div>
+
                     <div style={{ marginTop: 10 }}>
-                      Risk: <span className={`badge ${badge.cls}`}>{c.risk}</span>
+                      Active Alerts: <b>{c.alerts}</b>
                     </div>
                   </div>
                 );
@@ -193,25 +227,42 @@ export default function AdminOverview() {
             </div>
           )}
 
+          {/* Selected Company Deep View */}
           {selectedCompany && (
-            <div>
+            <>
               <button
                 className="btn"
-                style={{ marginBottom: 20 }}
                 onClick={() => setSelectedCompany(null)}
               >
-                ← Back to All Companies
+                ← Back to Fleet
               </button>
 
-              <div className="muted">
-                Company-specific operational view would render here.
+              <div className="postureCard executivePanel">
+                <h3>{selectedCompany.name} — Operational View</h3>
+
+                <div style={{ marginTop: 12 }}>
+                  Risk Score:{" "}
+                  <span className={`badge ${riskLevel(selectedCompany.risk).cls}`}>
+                    {selectedCompany.risk}
+                  </span>
+                </div>
+
+                <div style={{ marginTop: 8 }}>
+                  Active Alerts: <b>{selectedCompany.alerts}</b>
+                </div>
+
+                <div style={{ marginTop: 20 }} className="muted">
+                  Company-specific SOC modules will render here in next layer.
+                </div>
               </div>
-            </div>
+            </>
           )}
-        </div>
+        </>
       )}
 
-      {/* ================= PLATFORM MODE CONTENT ================= */}
+      {/* ========================================================= */}
+      {/* ================= PLATFORM MODE ========================= */}
+      {/* ========================================================= */}
 
       {mode === "platform" && (
         <>
@@ -222,8 +273,6 @@ export default function AdminOverview() {
           )}
 
           <ExecutiveRiskBanner />
-
-          {/* ================= TOP ROW ================= */}
 
           <div
             style={{
@@ -250,38 +299,6 @@ export default function AdminOverview() {
             </div>
           </div>
 
-          {/* ================= KPI ROW ================= */}
-
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(4, 1fr)",
-              gap: 20
-            }}
-          >
-            <div className="kpiCard executive">
-              <small>Total Revenue</small>
-              <b>${fmtMoney(metrics?.totalRevenue)}</b>
-            </div>
-
-            <div className="kpiCard executive">
-              <small>Active Subscribers</small>
-              <b>{metrics?.activeSubscribers || 0}</b>
-            </div>
-
-            <div className="kpiCard executive">
-              <small>MRR</small>
-              <b>${fmtMoney(metrics?.MRR)}</b>
-            </div>
-
-            <div className="kpiCard executive">
-              <small>Churn Rate</small>
-              <b>{metrics?.churnRate ?? 0}</b>
-            </div>
-          </div>
-
-          {/* ================= SECURITY OPS ================= */}
-
           <div className="sectionTitle">Security Operations</div>
 
           <div
@@ -298,8 +315,6 @@ export default function AdminOverview() {
           <SecurityPipeline />
           <SecurityRadar />
           <SecurityFeedPanel />
-
-          {/* ================= AUDIT ================= */}
 
           <div className="postureCard">
             <h3>Recent Audit Events</h3>
