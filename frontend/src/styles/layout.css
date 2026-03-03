@@ -1,5 +1,5 @@
 /* =========================================================
-   AUTOSHIELD — CONTROLLED ENTERPRISE LAYOUT SYSTEM
+   AUTOSHIELD — CONTROLLED ENTERPRISE LAYOUT SYSTEM (SOLID VERSION)
    ========================================================= */
 
 html, body {
@@ -37,7 +37,6 @@ html, body {
   z-index:50;
 }
 
-/* Open hamburger (only when sidebar closed) */
 .brand-open-btn{
   margin-top:14px;
   background:transparent;
@@ -49,7 +48,7 @@ html, body {
 }
 
 /* =========================================================
-   SIDEBAR
+   SIDEBAR (NOW SOLID)
    ========================================================= */
 
 .layout-sidebar{
@@ -57,13 +56,12 @@ html, body {
   flex-shrink:0;
   display:flex;
   flex-direction:column;
-  background:linear-gradient(180deg, rgba(255,255,255,.05), rgba(0,0,0,.55));
+  background:#111827;              /* SOLID COLOR */
   border-right:1px solid rgba(255,255,255,.08);
-  backdrop-filter:blur(10px);
+  backdrop-filter:none;            /* REMOVED GLASS */
   overflow:hidden;
   transition:width .28s ease, transform .28s ease;
   z-index:20;
-
   padding-top:95px;
 }
 
@@ -186,7 +184,7 @@ html, body {
 }
 
 /* =========================================================
-   ADVISOR
+   ADVISOR (NOW SOLID)
    ========================================================= */
 
 .enterprise-ai-panel{
@@ -195,8 +193,8 @@ html, body {
   display:flex;
   flex-direction:column;
   border-left:1px solid rgba(255,255,255,.05);
-  background:linear-gradient(180deg, rgba(255,255,255,.03), rgba(0,0,0,.45));
-  backdrop-filter:blur(10px);
+  background:#0f172a;            /* SOLID COLOR */
+  backdrop-filter:none;          /* REMOVED GLASS */
   transition:width .25s ease;
   overflow:hidden;
 }
