@@ -1,8 +1,16 @@
 // frontend/src/pages/admin/AdminOverview.jsx
-// Executive Command Center — FULL MERGED MASTER (Menu + Automatic/Manual + Company Plug + Drill + Archive)
-// + Work Policy Gating (Hours/Days/Vacation) Integrated
+// Executive Command Center — SAFE REBUILD
+// Includes:
+// - Platform View + Operator View
+// - Operator Panels (Queue/Fleet/Notifications/Email/Archive)
+// - Work Policy Gating (Option B: NO auto alerts outside hours)
+// - Company signals (Green/Yellow/Red) + overload ring
+// - Notifications board + Email cabinet (per company)
+// - Archive + Incident registry
+//
+// NOTE: This is self-contained in this file (no new pages needed).
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useSecurity } from "../../context/SecurityContext.jsx";
 
 import ExecutiveRiskBanner from "../../components/ExecutiveRiskBanner";
@@ -66,38 +74,44 @@ function safeStr(v) {
   return String(v ?? "").trim();
 }
 
-/* ================= WORK POLICY =================
-   Option B:
-   - Alerts do NOT generate outside work hours.
-   - Per company policy (workDays + start/end + vacation).
-*/
+function makeId(prefix = "id") {
+  return `${prefix}-${Math.random().toString(16).slice(2)}-${nowTs()}`;
+}
+
+function dayLabel(d) {
+  return ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][d] || String(d);
+}
+
+/* ================= WORK POLICY (Option B) ================= */
 
 const DEFAULT_POLICY = {
-  timezone: "Local", // placeholder; later backend can store IANA tz (America/New_York etc)
-  workDays: [1, 2, 3, 4, 5], // Mon-Fri
-  startHour: 9, // 0-23
-  endHour: 17, // 0-23, end is exclusive
+  timezone: "Local",
+  workDays: [1, 2, 3, 4, 5],
+  startHour: 9,
+  endHour: 17, // exclusive
   vacationMode: false,
 };
 
 function normalizePolicy(policy) {
   const p = policy || {};
+  const startHour = Number.isFinite(Number(p.startHour)) ? Number(p.startHour) : 9;
+  const endHour = Number.isFinite(Number(p.endHour)) ? Number(p.endHour) : 17;
+
   return {
     timezone: safeStr(p.timezone) || "Local",
-    workDays: Array.isArray(p.workDays) && p.workDays.length ? p.workDays : [1,2,3,4,5],
-    startHour: Number.isFinite(Number(p.startHour)) ? Number(p.startHour) : 9,
-    endHour: Number.isFinite(Number(p.endHour)) ? Number(p.endHour) : 17,
+    workDays: Array.isArray(p.workDays) && p.workDays.length ? p.workDays : [1, 2, 3, 4, 5],
+    startHour,
+    endHour,
     vacationMode: Boolean(p.vacationMode),
   };
 }
 
 function isWithinWorkWindow(company) {
   const policy = normalizePolicy(company?.policy);
-
   if (policy.vacationMode) return false;
 
   const now = new Date();
-  const day = now.getDay(); // 0-6
+  const day = now.getDay();
   const hour = now.getHours();
 
   if (!policy.workDays.includes(day)) return false;
@@ -114,8 +128,25 @@ function policyBadge(company) {
     : { label: "OUTSIDE HOURS", tone: "muted" };
 }
 
-function dayLabel(d) {
-  return ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][d] || String(d);
+/* ================= SIGNALS (Green/Yellow/Red) =================
+   - Red: overload (too many threats)
+   - Yellow: pending email draft exists
+   - Green: controlled
+*/
+
+function dotStyle(level) {
+  const base = {
+    width: 10,
+    height: 10,
+    borderRadius: 999,
+    display: "inline-block",
+    marginRight: 8,
+    border: "1px solid rgba(255,255,255,.25)",
+    background: "rgba(255,255,255,.18)",
+  };
+  if (level === "GREEN") return { ...base, background: "rgba(60,255,150,.65)" };
+  if (level === "YELLOW") return { ...base, background: "rgba(255,210,60,.75)" };
+  return { ...base, background: "rgba(255,70,70,.75)" };
 }
 
 /* ================= COMPONENT ================= */
@@ -123,34 +154,60 @@ function dayLabel(d) {
 export default function AdminOverview() {
   const { integrityAlert } = useSecurity();
 
-  // Top-level view mode
-  const [mode, setMode] = useState("platform"); // platform | operator
+  // platform | operator
+  const [mode, setMode] = useState("platform");
 
-  // Operator split: automatic vs manual
-  const [operatorMode, setOperatorMode] = useState("automatic"); // automatic | manual
+  // operator panels
+  const [operatorPanel, setOperatorPanel] = useState("queue"); // queue | fleet | notifications | email | archive
 
-  // Operator controls
+  // automatic | manual
+  const [operatorMode, setOperatorMode] = useState("automatic");
+
+  // controls
   const [tick, setTick] = useState(Date.now());
   const [enginePaused, setEnginePaused] = useState(false);
   const [engineSpeed, setEngineSpeed] = useState("normal"); // slow | normal | aggressive
   const [filter, setFilter] = useState("ALL"); // ALL | OPEN | BREACHED | P1
-  const [workspace, setWorkspace] = useState("ALL"); // ALL or companyId
+  const [workspace, setWorkspace] = useState("ALL");
   const [role, setRole] = useState("Supervisor"); // Tier1 | Tier2 | Supervisor
 
-  // UI drawers/panels
+  // UI
   const [selectedAlertId, setSelectedAlertId] = useState(null);
-  const [showArchive, setShowArchive] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
 
-  // ---- CLIENTS (mock for now; later replace with API) ----
+  // comms selection
+  const [selectedCompanyForComms, setSelectedCompanyForComms] = useState("ALL");
+  const [selectedEmailId, setSelectedEmailId] = useState(null);
+
+  // companies
   const [companies, setCompanies] = useState([
-    { id: "c1", name: "Alpha Systems", policy: { ...DEFAULT_POLICY, startHour: 9, endHour: 17 } },
-    { id: "c2", name: "Beta Holdings", policy: { ...DEFAULT_POLICY, startHour: 8, endHour: 16 } },
-    { id: "c3", name: "Gamma Logistics", policy: { ...DEFAULT_POLICY, startHour: 9, endHour: 18 } },
-    { id: "c4", name: "Delta Finance", policy: { ...DEFAULT_POLICY, startHour: 9, endHour: 17 } },
+    {
+      id: "c1",
+      name: "Alpha Systems",
+      policy: { ...DEFAULT_POLICY, startHour: 9, endHour: 17 },
+      meta: { contactEmail: "security@alpha.com", companyNumber: 100001 },
+    },
+    {
+      id: "c2",
+      name: "Beta Holdings",
+      policy: { ...DEFAULT_POLICY, startHour: 8, endHour: 16 },
+      meta: { contactEmail: "security@beta.com", companyNumber: 100002 },
+    },
+    {
+      id: "c3",
+      name: "Gamma Logistics",
+      policy: { ...DEFAULT_POLICY, startHour: 9, endHour: 18 },
+      meta: { contactEmail: "security@gamma.com", companyNumber: 100003 },
+    },
+    {
+      id: "c4",
+      name: "Delta Finance",
+      policy: { ...DEFAULT_POLICY, startHour: 9, endHour: 17 },
+      meta: { contactEmail: "security@delta.com", companyNumber: 100004 },
+    },
   ]);
 
-  // Onboarding form (Plug Company)
+  // onboarding form
   const [plug, setPlug] = useState({
     name: "",
     domain: "",
@@ -159,11 +216,10 @@ export default function AdminOverview() {
     seats: 5,
     notes: "",
 
-    // NEW: work policy
     timezone: "Local",
     startHour: 9,
     endHour: 17,
-    workDays: [1,2,3,4,5],
+    workDays: [1, 2, 3, 4, 5],
     vacationMode: false,
   });
 
@@ -176,22 +232,39 @@ export default function AdminOverview() {
     []
   );
 
-  // Company live posture (fleet overview)
+  // posture per company
   const [companyState, setCompanyState] = useState(() => {
     const initial = {};
     (companies || []).forEach((c) => {
-      initial[c.id] = {
-        risk: Math.floor(Math.random() * 40),
-        containment: "STABLE",
-      };
+      initial[c.id] = { risk: Math.floor(Math.random() * 40), containment: "STABLE" };
     });
     return initial;
   });
 
-  // Operator alert systems
+  // queues + records
   const [globalQueue, setGlobalQueue] = useState([]);
   const [incidentRegistry, setIncidentRegistry] = useState([]);
-  const [archive, setArchive] = useState([]); // resolved/closed alerts moved here
+  const [archive, setArchive] = useState([]);
+
+  // comms storage (per company)
+  // { [companyId]: { notifications: [], emails: [] } }
+  const [companyComms, setCompanyComms] = useState({});
+
+  // overload edge memory
+  const overloadRef = useRef({}); // { [companyId]: boolean }
+
+  /* ================= INIT COMM STORAGE ================= */
+
+  useEffect(() => {
+    setCompanyComms((prev) => {
+      const next = { ...prev };
+      (companies || []).forEach((c) => {
+        if (!next[c.id]) next[c.id] = { notifications: [], emails: [] };
+      });
+      return next;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // only once
 
   /* ================= GLOBAL CLOCK ================= */
 
@@ -201,15 +274,12 @@ export default function AdminOverview() {
   }, []);
 
   /* ================= THREAT ENGINE =================
-     - Runs ONLY in operator view AND automatic mode
-     - Pauses if enginePaused OR operatorMode === manual
-     - NEW: Per-company gating (hours/days/vacation)
+     - Operator view + automatic mode only
+     - Option B: per-company gating (hours/days/vacation)
   */
 
   useEffect(() => {
-    const active =
-      mode === "operator" && !enginePaused && operatorMode === "automatic";
-
+    const active = mode === "operator" && !enginePaused && operatorMode === "automatic";
     if (!active) return;
 
     const interval = setInterval(() => {
@@ -217,14 +287,12 @@ export default function AdminOverview() {
         const updated = { ...prev };
         const newAlerts = [];
 
-        // iterate companies (policy gating)
         (companies || []).forEach((company) => {
           const id = company.id;
 
           // Option B: do NOT generate outside window
           if (!isWithinWorkWindow(company)) return;
 
-          // 40% chance spike
           if (Math.random() < 0.4) {
             const spike = Math.floor(Math.random() * 15);
             const newRisk = Math.min(100, (updated[id]?.risk || 0) + spike);
@@ -244,7 +312,7 @@ export default function AdminOverview() {
               priority,
               createdAt,
               deadline,
-              status: "NEW", // NEW -> ACKNOWLEDGED -> INVESTIGATING -> RESOLVED
+              status: "NEW",
               assignedTo: null,
               locked: false,
               autoEscalated: false,
@@ -254,7 +322,7 @@ export default function AdminOverview() {
           }
         });
 
-        if (newAlerts.length > 0) {
+        if (newAlerts.length) {
           setGlobalQueue((prevQ) => [...newAlerts, ...prevQ].slice(0, 200));
         }
 
@@ -265,10 +333,7 @@ export default function AdminOverview() {
     return () => clearInterval(interval);
   }, [mode, enginePaused, operatorMode, engineSpeed, speedMap, companies]);
 
-  /* ================= SLA AUTO ESCALATION =================
-     - Runs in operator view for automatic mode (but can still display in manual)
-     - Only auto-escalates once per alert
-  */
+  /* ================= SLA AUTO ESCALATION ================= */
 
   useEffect(() => {
     if (mode !== "operator") return;
@@ -289,18 +354,11 @@ export default function AdminOverview() {
             priority: newPriority,
             deadline: newDeadline,
             autoEscalated: true,
-            locked: true, // locked once breached/escalated
-            activity: [
-              { time: new Date(), action: "AUTO_ESCALATED_LOCKED" },
-              ...(alert.activity || []),
-            ],
+            locked: true,
+            activity: [{ time: new Date(), action: "AUTO_ESCALATED_LOCKED" }, ...(alert.activity || [])],
           };
 
-          setIncidentRegistry((prevInc) => [
-            { ...escalated, escalatedAt: new Date() },
-            ...prevInc,
-          ]);
-
+          setIncidentRegistry((prevInc) => [{ ...escalated, escalatedAt: new Date() }, ...prevInc]);
           return escalated;
         }
 
@@ -309,10 +367,11 @@ export default function AdminOverview() {
     );
   }, [tick, mode, operatorMode]);
 
-  /* ================= ACTION HELPERS ================= */
+  /* ================= HELPERS ================= */
 
-  const getCompanyName = (companyId) =>
-    companies.find((c) => c.id === companyId)?.name || companyId;
+  const getCompany = (companyId) => companies.find((c) => c.id === companyId) || null;
+
+  const getCompanyName = (companyId) => getCompany(companyId)?.name || companyId;
 
   const logActivity = (alert, action) => ({
     ...alert,
@@ -321,19 +380,13 @@ export default function AdminOverview() {
 
   const updateStatus = (id, status) => {
     setGlobalQueue((prev) =>
-      prev.map((a) => {
-        if (a.id !== id) return a;
-        return logActivity({ ...a, status }, `STATUS_${status}`);
-      })
+      prev.map((a) => (a.id !== id ? a : logActivity({ ...a, status }, `STATUS_${status}`)))
     );
   };
 
   const assignAlert = (id, who) => {
     setGlobalQueue((prev) =>
-      prev.map((a) => {
-        if (a.id !== id) return a;
-        return logActivity({ ...a, assignedTo: who }, `ASSIGNED_${who}`);
-      })
+      prev.map((a) => (a.id !== id ? a : logActivity({ ...a, assignedTo: who }, `ASSIGNED_${who}`)))
     );
   };
 
@@ -341,7 +394,7 @@ export default function AdminOverview() {
     setGlobalQueue((prev) =>
       prev.map((a) => {
         if (a.id !== id) return a;
-        if (a.locked) return a; // locked means no manual bump
+        if (a.locked) return a;
         const newPriority = bumpPriority(a.priority);
         return logActivity({ ...a, priority: newPriority }, "MANUAL_ESCALATE");
       })
@@ -350,49 +403,112 @@ export default function AdminOverview() {
 
   const buildResolution = (alert, payload) => {
     setGlobalQueue((prev) =>
-      prev.map((a) => {
-        if (a.id !== alert.id) return a;
-        return logActivity({ ...a, resolution: payload }, "RESOLUTION_BUILT");
-      })
+      prev.map((a) => (a.id !== alert.id ? a : logActivity({ ...a, resolution: payload }, "RESOLUTION_BUILT")))
     );
   };
 
   const resolveAndArchive = (alert) => {
-    // mark resolved
     setGlobalQueue((prev) =>
       prev.map((a) =>
-        a.id === alert.id
-          ? logActivity(
-              { ...a, status: "RESOLVED", resolvedAt: new Date() },
-              "RESOLVED"
-            )
-          : a
+        a.id === alert.id ? logActivity({ ...a, status: "RESOLVED", resolvedAt: new Date() }, "RESOLVED") : a
       )
     );
 
-    // move to archive
-    setArchive((prev) => {
-      const snap = {
-        ...alert,
-        status: "RESOLVED",
-        resolvedAt: new Date(),
-      };
-      return [snap, ...prev].slice(0, 300);
+    setArchive((prev) => [{ ...alert, status: "RESOLVED", resolvedAt: new Date() }, ...prev].slice(0, 300));
+  };
+
+  const ensureComms = (companyId) => {
+    setCompanyComms((prev) => {
+      if (prev[companyId]) return prev;
+      return { ...prev, [companyId]: { notifications: [], emails: [] } };
     });
   };
 
-  /* ================= FILTERS / DERIVED ================= */
+  const addNotification = (companyId, note) => {
+    ensureComms(companyId);
+    setCompanyComms((prev) => {
+      const cur = prev[companyId] || { notifications: [], emails: [] };
+      return {
+        ...prev,
+        [companyId]: { ...cur, notifications: [note, ...(cur.notifications || [])].slice(0, 300) },
+      };
+    });
+  };
+
+  const addEmail = (companyId, email) => {
+    ensureComms(companyId);
+    setCompanyComms((prev) => {
+      const cur = prev[companyId] || { notifications: [], emails: [] };
+      return {
+        ...prev,
+        [companyId]: { ...cur, emails: [email, ...(cur.emails || [])].slice(0, 300) },
+      };
+    });
+  };
+
+  const updateEmail = (companyId, emailId, patch) => {
+    setCompanyComms((prev) => {
+      const cur = prev[companyId];
+      if (!cur) return prev;
+      return {
+        ...prev,
+        [companyId]: {
+          ...cur,
+          emails: (cur.emails || []).map((e) => (e.id === emailId ? { ...e, ...patch } : e)),
+        },
+      };
+    });
+  };
+
+  const markNotificationRead = (companyId, noteId) => {
+    setCompanyComms((prev) => {
+      const cur = prev[companyId];
+      if (!cur) return prev;
+      return {
+        ...prev,
+        [companyId]: {
+          ...cur,
+          notifications: (cur.notifications || []).map((n) => (n.id === noteId ? { ...n, read: true } : n)),
+        },
+      };
+    });
+  };
+
+  const sendEmail = (companyId, emailId) => {
+    updateEmail(companyId, emailId, { status: "SENT", sentAt: nowTs() });
+    addNotification(companyId, {
+      id: makeId("note"),
+      createdAt: nowTs(),
+      severity: "GREEN",
+      title: "Email sent",
+      message: `Email ${emailId} marked as SENT.`,
+      linkedEmailId: emailId,
+      read: false,
+    });
+  };
+
+  const cancelEmail = (companyId, emailId) => {
+    updateEmail(companyId, emailId, { status: "CANCELLED", cancelledAt: nowTs() });
+    addNotification(companyId, {
+      id: makeId("note"),
+      createdAt: nowTs(),
+      severity: "YELLOW",
+      title: "Email cancelled",
+      message: `Draft ${emailId} cancelled.`,
+      linkedEmailId: emailId,
+      read: false,
+    });
+  };
+
+  /* ================= DERIVED FILTERS ================= */
 
   const baseQueue = useMemo(() => {
     let q = globalQueue;
 
-    if (workspace !== "ALL") {
-      q = q.filter((a) => a.companyId === workspace);
-    }
+    if (workspace !== "ALL") q = q.filter((a) => a.companyId === workspace);
 
     if (filter === "OPEN") q = q.filter((a) => a.status !== "RESOLVED");
-    if (filter === "BREACHED")
-      q = q.filter((a) => (a.deadline || 0) - tick <= 0);
+    if (filter === "BREACHED") q = q.filter((a) => (a.deadline || 0) - tick <= 0);
     if (filter === "P1") q = q.filter((a) => a.priority === "P1");
 
     return q;
@@ -410,19 +526,134 @@ export default function AdminOverview() {
     return globalQueue.find((a) => a.id === selectedAlertId) || null;
   }, [selectedAlertId, globalQueue]);
 
+  /* ================= COMPANY METRICS + SIGNALS ================= */
+
+  const companyMetrics = useMemo(() => {
+    const map = {};
+    (companies || []).forEach((c) => {
+      map[c.id] = { open: 0, p1: 0, breached: 0 };
+    });
+
+    (globalQueue || []).forEach((a) => {
+      if (!a?.companyId) return;
+      if (!map[a.companyId]) map[a.companyId] = { open: 0, p1: 0, breached: 0 };
+
+      if (a.status !== "RESOLVED") map[a.companyId].open += 1;
+      if (a.priority === "P1") map[a.companyId].p1 += 1;
+      if ((a.deadline || 0) - tick <= 0) map[a.companyId].breached += 1;
+    });
+
+    return map;
+  }, [companies, globalQueue, tick]);
+
+  const companySignals = useMemo(() => {
+    const sig = {};
+    (companies || []).forEach((c) => {
+      const m = companyMetrics[c.id] || { open: 0, p1: 0, breached: 0 };
+
+      // overload rule (tweakable)
+      const overload = m.p1 >= 2 || m.open >= 10;
+
+      const comms = companyComms[c.id] || { notifications: [], emails: [] };
+      const hasDraft = (comms.emails || []).some((e) => e.status === "DRAFT");
+
+      let level = "GREEN";
+      if (overload) level = "RED";
+      else if (hasDraft) level = "YELLOW";
+
+      sig[c.id] = { level, overload, metrics: m, hasDraft };
+    });
+
+    return sig;
+  }, [companies, companyMetrics, companyComms]);
+
+  /* ================= OVERLOAD AUTO DRAFT (SAFE EDGE TRIGGER) ================= */
+
+  useEffect(() => {
+    (companies || []).forEach((c) => {
+      const cs = companySignals[c.id];
+      if (!cs) return;
+
+      const prevOver = Boolean(overloadRef.current[c.id]);
+      const nowOver = Boolean(cs.overload);
+
+      if (!prevOver && nowOver) {
+        const companyId = c.id;
+        const companyName = getCompanyName(companyId);
+
+        const comms = companyComms[companyId] || { emails: [], notifications: [] };
+        const alreadyDraft = (comms.emails || []).some((e) => e.status === "DRAFT" && e.kind === "OVERLOAD");
+
+        if (!alreadyDraft) {
+          const emailId = makeId("email");
+          addEmail(companyId, {
+            id: emailId,
+            kind: "OVERLOAD",
+            status: "DRAFT",
+            createdAt: nowTs(),
+            to: safeStr(c?.meta?.contactEmail),
+            subject: `[URGENT] Elevated Threat Volume Detected — ${companyName}`,
+            body: [
+              `Hello ${companyName} Security Team,`,
+              ``,
+              `AutoProtect detected elevated threat volume for your environment.`,
+              ``,
+              `Snapshot:`,
+              `- Open items: ${cs.metrics.open}`,
+              `- P1 items: ${cs.metrics.p1}`,
+              `- SLA breached: ${cs.metrics.breached}`,
+              ``,
+              `Recommended immediate actions:`,
+              `1) Review recent authentication + privilege changes`,
+              `2) Validate suspicious IPs / geos and block where appropriate`,
+              `3) Rotate credentials if any compromise suspected`,
+              `4) Confirm MFA enforcement and monitor admin endpoints`,
+              ``,
+              `This message is drafted by AutoProtect and awaiting approval.`,
+              ``,
+              `— Admin Operator Console`,
+            ].join("\n"),
+          });
+
+          addNotification(companyId, {
+            id: makeId("note"),
+            createdAt: nowTs(),
+            severity: "RED",
+            title: "Overload detected",
+            message: `High threat volume detected. AutoProtect drafted an urgent email (approval required).`,
+            linkedEmailId: emailId,
+            read: false,
+          });
+        }
+      }
+
+      overloadRef.current[c.id] = nowOver;
+    });
+  }, [companies, companySignals, companyComms]); // SAFE deps
+
   /* ================= ROLE RULES ================= */
 
   const canResolve = role !== "Tier1";
   const canAssignAuto = role === "Supervisor";
   const canManualEscalate = role !== "Tier1";
 
-  /* ================= COMPANY PLUG (ONBOARDING) ================= */
+  /* ================= ONBOARDING ================= */
+
+  const toggleWorkDay = (day) => {
+    setPlug((p) => {
+      const set = new Set(p.workDays || []);
+      if (set.has(day)) set.delete(day);
+      else set.add(day);
+      return { ...p, workDays: Array.from(set).sort((a, b) => a - b) };
+    });
+  };
 
   const plugCompany = () => {
     const name = safeStr(plug.name);
     if (!name) return;
 
     const id = `c${Math.floor(Math.random() * 99999)}`;
+    const companyNumber = Math.floor(Math.random() * 900000 + 100000);
 
     const newCompany = {
       id,
@@ -434,19 +665,29 @@ export default function AdminOverview() {
         workDays: plug.workDays,
         vacationMode: plug.vacationMode,
       }),
+      meta: {
+        contactEmail: safeStr(plug.contactEmail),
+        domain: safeStr(plug.domain),
+        plan: safeStr(plug.plan) || "Standard",
+        seats: Number(plug.seats || 0),
+        notes: safeStr(plug.notes),
+        companyNumber,
+      },
     };
 
     setCompanies((prev) => [newCompany, ...prev]);
 
     setCompanyState((prev) => ({
       ...prev,
-      [id]: {
-        risk: Math.floor(Math.random() * 20),
-        containment: "STABLE",
-      },
+      [id]: { risk: Math.floor(Math.random() * 20), containment: "STABLE" },
     }));
 
-    // audit-style record into archive (example)
+    setCompanyComms((prev) => ({
+      ...prev,
+      [id]: { notifications: [], emails: [] },
+    }));
+
+    // audit record into archive
     setArchive((prev) => [
       {
         id: `onboard-${id}-${nowTs()}`,
@@ -481,7 +722,7 @@ export default function AdminOverview() {
       ...prev,
     ]);
 
-    // reset form
+    // reset
     setPlug({
       name: "",
       domain: "",
@@ -492,21 +733,15 @@ export default function AdminOverview() {
       timezone: "Local",
       startHour: 9,
       endHour: 17,
-      workDays: [1,2,3,4,5],
+      workDays: [1, 2, 3, 4, 5],
       vacationMode: false,
     });
 
     setShowOnboarding(false);
-  };
 
-  const toggleWorkDay = (day) => {
-    setPlug((p) => {
-      const set = new Set(p.workDays || []);
-      if (set.has(day)) set.delete(day);
-      else set.add(day);
-      const next = Array.from(set).sort((a,b) => a-b);
-      return { ...p, workDays: next };
-    });
+    // jump user to fleet to see it
+    setMode("operator");
+    setOperatorPanel("fleet");
   };
 
   /* ================= RENDER ================= */
@@ -518,16 +753,16 @@ export default function AdminOverview() {
         margin: "0 auto",
         display: "flex",
         flexDirection: "column",
-        gap: 40,
+        gap: 24,
       }}
     >
       {/* HEADER */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
         <div className="sectionTitle">
           {mode === "platform" ? "Platform Command Center" : "Operator Console (Side Hustle)"}
         </div>
 
-        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
           <select value={mode} onChange={(e) => setMode(e.target.value)}>
             <option value="platform">Platform View</option>
             <option value="operator">Operator View</option>
@@ -539,25 +774,27 @@ export default function AdminOverview() {
                 + Plug Company
               </button>
 
-              <button className="btn" onClick={() => setShowArchive((v) => !v)}>
-                {showArchive ? "Hide Archive" : "View Archive"}
-              </button>
+              <select value={operatorPanel} onChange={(e) => setOperatorPanel(e.target.value)}>
+                <option value="queue">Panel: Queue</option>
+                <option value="fleet">Panel: Fleet</option>
+                <option value="notifications">Panel: Notifications</option>
+                <option value="email">Panel: Email Cabinet</option>
+                <option value="archive">Panel: Archive</option>
+              </select>
             </>
           )}
         </div>
       </div>
 
       {/* ================= OPERATOR VIEW ================= */}
-
       {mode === "operator" && (
         <>
-          {/* SUMMARY STRIP */}
+          {/* Summary Strip */}
           <div className="postureCard">
-            <b>P1:</b> {fleetStats.p1} | <b>Open:</b> {fleetStats.open} |{" "}
-            <b>Breached:</b> {fleetStats.breached}
+            <b>P1:</b> {fleetStats.p1} | <b>Open:</b> {fleetStats.open} | <b>Breached:</b> {fleetStats.breached}
           </div>
 
-          {/* CONTROLS */}
+          {/* Controls */}
           <div className="postureCard" style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center" }}>
             <select value={operatorMode} onChange={(e) => setOperatorMode(e.target.value)}>
               <option value="automatic">Automatic Mode</option>
@@ -602,200 +839,202 @@ export default function AdminOverview() {
             </div>
           </div>
 
-          {/* OPERATOR LAYOUT: queue + drill */}
-          <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 24 }}>
-            {/* QUEUE */}
-            <div className="postureCard executivePanel">
-              <h3>🔴 Global Threat Queue</h3>
+          {/* ===== QUEUE PANEL ===== */}
+          {operatorPanel === "queue" && (
+            <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 24 }}>
+              {/* Queue */}
+              <div className="postureCard executivePanel">
+                <h3>🔴 Global Threat Queue</h3>
 
-              <div style={{ height: 520, overflowY: "auto", marginTop: 10 }}>
-                {baseQueue.length === 0 && (
-                  <div className="muted">No alerts match this filter.</div>
+                <div style={{ height: 520, overflowY: "auto", marginTop: 10 }}>
+                  {baseQueue.length === 0 && <div className="muted">No alerts match this filter.</div>}
+
+                  {baseQueue.map((alert) => {
+                    const remaining = (alert.deadline || 0) - tick;
+                    const breached = remaining <= 0;
+                    const selected = alert.id === selectedAlertId;
+                    const sig = companySignals[alert.companyId]?.level || "GREEN";
+
+                    return (
+                      <div
+                        key={alert.id}
+                        onClick={() => setSelectedAlertId(alert.id)}
+                        style={{
+                          padding: 12,
+                          borderBottom: "1px solid rgba(255,255,255,.06)",
+                          cursor: "pointer",
+                          background: selected
+                            ? "rgba(120,160,255,.10)"
+                            : breached
+                              ? "rgba(255,0,0,.08)"
+                              : "transparent",
+                        }}
+                      >
+                        <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
+                          <div>
+                            <div style={{ display: "flex", alignItems: "center" }}>
+                              <span style={dotStyle(sig)} />
+                              <b>{getCompanyName(alert.companyId)}</b>
+                            </div>
+
+                            <div style={{ fontSize: 12, opacity: 0.8 }}>
+                              Priority: <b>{alert.priority}</b> • SLA:{" "}
+                              <b style={{ color: breached ? "#ff4d4f" : "#eaf1ff" }}>
+                                {formatCountdown(remaining)}
+                              </b>{" "}
+                              • Status: <b>{alert.status}</b>
+                              {alert.locked && <span style={{ marginLeft: 8, color: "#ffb020" }}>LOCKED</span>}
+                            </div>
+
+                            <div style={{ fontSize: 12, opacity: 0.7 }}>
+                              Assigned: <b>{alert.assignedTo || "Unassigned"}</b> • Risk {alert.risk} • {alert.containment}
+                            </div>
+                          </div>
+
+                          <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                            <button
+                              className="btn"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                updateStatus(alert.id, "ACKNOWLEDGED");
+                              }}
+                            >
+                              Ack
+                            </button>
+
+                            <button
+                              className="btn"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                updateStatus(alert.id, "INVESTIGATING");
+                              }}
+                            >
+                              Investigate
+                            </button>
+
+                            <button
+                              className={`btn ${canResolve ? "primary" : ""}`}
+                              disabled={!canResolve}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (!canResolve) return;
+                                resolveAndArchive(alert);
+                              }}
+                            >
+                              Resolve
+                            </button>
+                          </div>
+                        </div>
+
+                        <div style={{ marginTop: 10, display: "flex", gap: 6, flexWrap: "wrap" }}>
+                          <button
+                            className="btn"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              assignAlert(alert.id, "You");
+                            }}
+                          >
+                            Assign Me
+                          </button>
+
+                          <button
+                            className="btn"
+                            disabled={!canAssignAuto}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (!canAssignAuto) return;
+                              assignAlert(alert.id, "Auto");
+                            }}
+                          >
+                            Assign Auto
+                          </button>
+
+                          <button
+                            className="btn warn"
+                            disabled={!canManualEscalate || alert.locked}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (!canManualEscalate) return;
+                              manualEscalate(alert.id);
+                            }}
+                          >
+                            Escalate
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Drill */}
+              <div className="postureCard">
+                <h3>🧠 Investigation</h3>
+
+                {!selectedAlert && (
+                  <div className="muted" style={{ marginTop: 10 }}>
+                    Click an alert to open the drill-down.
+                  </div>
                 )}
 
-                {baseQueue.map((alert) => {
-                  const remaining = (alert.deadline || 0) - tick;
-                  const breached = remaining <= 0;
-                  const selected = alert.id === selectedAlertId;
+                {selectedAlert && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 10 }}>
+                    <div>
+                      <div style={{ opacity: 0.8, fontSize: 12 }}>Company</div>
+                      <b>{getCompanyName(selectedAlert.companyId)}</b>
+                    </div>
 
-                  return (
-                    <div
-                      key={alert.id}
-                      onClick={() => setSelectedAlertId(alert.id)}
-                      style={{
-                        padding: 12,
-                        borderBottom: "1px solid rgba(255,255,255,.06)",
-                        cursor: "pointer",
-                        background: selected
-                          ? "rgba(120,160,255,.10)"
-                          : breached
-                            ? "rgba(255,0,0,.08)"
-                            : "transparent",
-                      }}
-                    >
-                      <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
-                        <div>
-                          <div><b>{getCompanyName(alert.companyId)}</b></div>
-                          <div style={{ fontSize: 12, opacity: 0.8 }}>
-                            Priority: <b>{alert.priority}</b> • SLA:{" "}
-                            <b style={{ color: breached ? "#ff4d4f" : "#eaf1ff" }}>
-                              {formatCountdown(remaining)}
-                            </b>{" "}
-                            • Status: <b>{alert.status}</b>
-                            {alert.locked && <span style={{ marginLeft: 8, color: "#ffb020" }}>LOCKED</span>}
-                          </div>
-                          <div style={{ fontSize: 12, opacity: 0.7 }}>
-                            Assigned: <b>{alert.assignedTo || "Unassigned"}</b> • Risk {alert.risk} • {alert.containment}
-                          </div>
-                        </div>
-
-                        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                          <button
-                            className="btn"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              updateStatus(alert.id, "ACKNOWLEDGED");
-                            }}
-                          >
-                            Ack
-                          </button>
-
-                          <button
-                            className="btn"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              updateStatus(alert.id, "INVESTIGATING");
-                            }}
-                          >
-                            Investigate
-                          </button>
-
-                          <button
-                            className={`btn ${canResolve ? "primary" : ""}`}
-                            disabled={!canResolve}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (!canResolve) return;
-                              resolveAndArchive(alert);
-                            }}
-                          >
-                            Resolve
-                          </button>
-                        </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                      <div className="postureCard">
+                        <small>Priority</small>
+                        <b>{selectedAlert.priority}</b>
                       </div>
-
-                      <div style={{ marginTop: 10, display: "flex", gap: 6, flexWrap: "wrap" }}>
-                        <button
-                          className="btn"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            assignAlert(alert.id, "You");
-                          }}
-                        >
-                          Assign Me
-                        </button>
-
-                        <button
-                          className="btn"
-                          disabled={!canAssignAuto}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (!canAssignAuto) return;
-                            assignAlert(alert.id, "Auto");
-                          }}
-                        >
-                          Assign Auto
-                        </button>
-
-                        <button
-                          className="btn warn"
-                          disabled={!canManualEscalate || alert.locked}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (!canManualEscalate) return;
-                            manualEscalate(alert.id);
-                          }}
-                        >
-                          Escalate
-                        </button>
+                      <div className="postureCard">
+                        <small>Status</small>
+                        <b>{selectedAlert.status}</b>
+                      </div>
+                      <div className="postureCard">
+                        <small>Risk</small>
+                        <b>{selectedAlert.risk}</b>
+                      </div>
+                      <div className="postureCard">
+                        <small>Containment</small>
+                        <b>{selectedAlert.containment}</b>
                       </div>
                     </div>
-                  );
-                })}
+
+                    <div className="postureCard">
+                      <small>Recent Activity</small>
+                      <div style={{ maxHeight: 180, overflowY: "auto", marginTop: 8 }}>
+                        {(selectedAlert.activity || []).slice(0, 10).map((a, idx) => (
+                          <div key={idx} style={{ padding: "6px 0", borderBottom: "1px solid rgba(255,255,255,.06)" }}>
+                            <small style={{ opacity: 0.7 }}>{new Date(a.time).toLocaleTimeString()}</small>
+                            <div><b>{a.action}</b></div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="postureCard">
+                      <small>Resolution Builder</small>
+
+                      <ResolutionBuilder
+                        disabled={!canResolve}
+                        existing={selectedAlert.resolution}
+                        onSave={(payload) => buildResolution(selectedAlert, payload)}
+                      />
+
+                      <div style={{ marginTop: 10, opacity: 0.8, fontSize: 12 }}>
+                        {canResolve ? "Supervisor/Tier2 can save resolutions." : "Tier1 cannot save resolutions."}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
+          )}
 
-            {/* DRILL PANEL */}
-            <div className="postureCard">
-              <h3>🧠 Investigation</h3>
-
-              {!selectedAlert && (
-                <div className="muted" style={{ marginTop: 10 }}>
-                  Click an alert to open the drill-down.
-                </div>
-              )}
-
-              {selectedAlert && (
-                <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 10 }}>
-                  <div>
-                    <div style={{ opacity: 0.8, fontSize: 12 }}>Company</div>
-                    <b>{getCompanyName(selectedAlert.companyId)}</b>
-                  </div>
-
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                    <div className="postureCard">
-                      <small>Priority</small>
-                      <b>{selectedAlert.priority}</b>
-                    </div>
-                    <div className="postureCard">
-                      <small>Status</small>
-                      <b>{selectedAlert.status}</b>
-                    </div>
-                    <div className="postureCard">
-                      <small>Risk</small>
-                      <b>{selectedAlert.risk}</b>
-                    </div>
-                    <div className="postureCard">
-                      <small>Containment</small>
-                      <b>{selectedAlert.containment}</b>
-                    </div>
-                  </div>
-
-                  <div className="postureCard">
-                    <small>Recent Activity</small>
-                    <div style={{ maxHeight: 180, overflowY: "auto", marginTop: 8 }}>
-                      {(selectedAlert.activity || []).slice(0, 10).map((a, idx) => (
-                        <div key={idx} style={{ padding: "6px 0", borderBottom: "1px solid rgba(255,255,255,.06)" }}>
-                          <small style={{ opacity: 0.7 }}>
-                            {new Date(a.time).toLocaleTimeString()}
-                          </small>
-                          <div><b>{a.action}</b></div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="postureCard">
-                    <small>Resolution Builder</small>
-
-                    <ResolutionBuilder
-                      disabled={!canResolve}
-                      existing={selectedAlert.resolution}
-                      onSave={(payload) => buildResolution(selectedAlert, payload)}
-                    />
-
-                    <div style={{ marginTop: 10, opacity: 0.8, fontSize: 12 }}>
-                      {canResolve
-                        ? "Supervisor/Tier2 can save resolutions."
-                        : "Tier1 cannot save resolutions."}
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* INCIDENT REGISTRY */}
+          {/* ===== INCIDENT REGISTRY (always useful) ===== */}
           <div className="postureCard">
             <h3>🚨 Escalated Incidents</h3>
             <div style={{ maxHeight: 220, overflowY: "auto", marginTop: 10 }}>
@@ -815,97 +1054,215 @@ export default function AdminOverview() {
             </div>
           </div>
 
-          {/* FLEET OVERVIEW (with Work Policy badge) */}
-          <div className="postureCard">
-            <h3>🏢 Fleet Overview</h3>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-                gap: 16,
-                marginTop: 14,
-              }}
-            >
-              {companies.map((c) => {
-                const badge = policyBadge(c);
-                const pol = normalizePolicy(c.policy);
+          {/* ===== FLEET PANEL ===== */}
+          {operatorPanel === "fleet" && (
+            <div className="postureCard">
+              <h3>🏢 Fleet Overview</h3>
 
-                return (
-                  <div key={c.id} className="postureCard">
-                    <b>{c.name}</b>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+                  gap: 16,
+                  marginTop: 14,
+                }}
+              >
+                {companies.map((c) => {
+                  const badge = policyBadge(c);
+                  const pol = normalizePolicy(c.policy);
 
-                    <div style={{ marginTop: 8 }}>
-                      Risk: <b>{companyState[c.id]?.risk ?? 0}</b>
+                  const sig = companySignals[c.id] || {
+                    level: "GREEN",
+                    overload: false,
+                    metrics: { open: 0, p1: 0, breached: 0 },
+                  };
+
+                  return (
+                    <div
+                      key={c.id}
+                      className="postureCard"
+                      style={{
+                        outline: sig.overload ? "2px solid rgba(255,70,70,.75)" : "none",
+                        boxShadow: sig.overload ? "0 0 0 4px rgba(255,70,70,.10)" : "none",
+                      }}
+                    >
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+                        <div style={{ display: "flex", alignItems: "center" }}>
+                          <span style={dotStyle(sig.level)} />
+                          <b>{c.name}</b>
+                        </div>
+                        <div style={{ fontSize: 12, opacity: 0.75 }}>
+                          #{safeStr(c?.meta?.companyNumber || "—")}
+                        </div>
+                      </div>
+
+                      <div style={{ marginTop: 8 }}>
+                        Risk: <b>{companyState[c.id]?.risk ?? 0}</b>
+                      </div>
+                      <div>Status: {companyState[c.id]?.containment ?? "STABLE"}</div>
+
+                      <div style={{ marginTop: 8, fontSize: 12, opacity: 0.9 }}>
+                        Policy:{" "}
+                        <b className={badge.tone === "warn" ? "badge warn" : badge.tone === "ok" ? "badge ok" : "muted"}>
+                          {badge.label}
+                        </b>
+                      </div>
+
+                      <div style={{ marginTop: 6, fontSize: 12, opacity: 0.75 }}>
+                        Hours: {pol.startHour}:00–{pol.endHour}:00 • Days: {pol.workDays.map(dayLabel).join(", ")}
+                      </div>
+
+                      <div style={{ marginTop: 10, fontSize: 12, opacity: 0.85 }}>
+                        Threat Snapshot: <b>Open</b> {sig.metrics.open} • <b>P1</b> {sig.metrics.p1} •{" "}
+                        <b>Breached</b> {sig.metrics.breached}
+                      </div>
+
+                      <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                        <button
+                          className="btn"
+                          onClick={() => {
+                            setWorkspace(c.id);
+                            setOperatorPanel("queue");
+                          }}
+                        >
+                          Focus Workspace
+                        </button>
+
+                        <button
+                          className="btn"
+                          onClick={() => {
+                            // manual inject alert (allowed even outside hours)
+                            const createdAt = nowTs();
+                            const priority = "P3";
+                            const deadline = createdAt + slaDuration(priority);
+
+                            const alert = {
+                              id: `${c.id}-${createdAt}`,
+                              companyId: c.id,
+                              risk: companyState[c.id]?.risk ?? 0,
+                              containment: companyState[c.id]?.containment ?? "STABLE",
+                              priority,
+                              createdAt,
+                              deadline,
+                              status: "NEW",
+                              assignedTo: null,
+                              locked: false,
+                              autoEscalated: false,
+                              activity: [{ time: new Date(), action: "MANUAL_CREATED" }],
+                              resolution: null,
+                            };
+
+                            setGlobalQueue((prev) => [alert, ...prev].slice(0, 200));
+                            setOperatorMode("manual");
+                            setOperatorPanel("queue");
+                          }}
+                        >
+                          Manual Inject Alert
+                        </button>
+
+                        <button
+                          className="btn"
+                          onClick={() => {
+                            setSelectedCompanyForComms(c.id);
+                            setOperatorPanel("notifications");
+                          }}
+                        >
+                          Notifications
+                        </button>
+
+                        <button
+                          className="btn"
+                          onClick={() => {
+                            setSelectedCompanyForComms(c.id);
+                            setOperatorPanel("email");
+                          }}
+                        >
+                          Email Cabinet
+                        </button>
+                      </div>
                     </div>
-                    <div>Status: {companyState[c.id]?.containment ?? "STABLE"}</div>
-
-                    <div style={{ marginTop: 8, fontSize: 12, opacity: 0.9 }}>
-                      Policy:{" "}
-                      <b className={badge.tone === "warn" ? "badge warn" : badge.tone === "ok" ? "badge ok" : "muted"}>
-                        {badge.label}
-                      </b>
-                    </div>
-
-                    <div style={{ marginTop: 6, fontSize: 12, opacity: 0.75 }}>
-                      Hours: {pol.startHour}:00–{pol.endHour}:00 • Days: {pol.workDays.map(dayLabel).join(", ")}
-                    </div>
-
-                    <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
-                      <button
-                        className="btn"
-                        onClick={() => {
-                          setWorkspace(c.id);
-                          setMode("operator");
-                        }}
-                      >
-                        Focus Workspace
-                      </button>
-
-                      <button
-                        className="btn"
-                        onClick={() => {
-                          // manual inject alert (allowed even outside hours, because YOU are choosing to work)
-                          const createdAt = nowTs();
-                          const priority = "P3";
-                          const deadline = createdAt + slaDuration(priority);
-                          const alert = {
-                            id: `${c.id}-${createdAt}`,
-                            companyId: c.id,
-                            risk: companyState[c.id]?.risk ?? 0,
-                            containment: companyState[c.id]?.containment ?? "STABLE",
-                            priority,
-                            createdAt,
-                            deadline,
-                            status: "NEW",
-                            assignedTo: null,
-                            locked: false,
-                            autoEscalated: false,
-                            activity: [{ time: new Date(), action: "MANUAL_CREATED" }],
-                            resolution: null,
-                          };
-                          setGlobalQueue((prev) => [alert, ...prev].slice(0, 200));
-                          setMode("operator");
-                          setOperatorMode("manual");
-                        }}
-                      >
-                        Manual Inject Alert
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
-          </div>
+          )}
 
-          {/* ARCHIVE DRAWER */}
-          {showArchive && (
+          {/* ===== NOTIFICATIONS PANEL ===== */}
+          {operatorPanel === "notifications" && (
+            <NotificationBoard
+              companies={companies}
+              comms={companyComms}
+              selectedCompany={selectedCompanyForComms}
+              setSelectedCompany={setSelectedCompanyForComms}
+              getCompanyName={getCompanyName}
+              signals={companySignals}
+              onOpenEmail={(companyId, emailId) => {
+                setSelectedCompanyForComms(companyId);
+                setSelectedEmailId(emailId);
+                setOperatorPanel("email");
+              }}
+              onMarkRead={markNotificationRead}
+            />
+          )}
+
+          {/* ===== EMAIL PANEL ===== */}
+          {operatorPanel === "email" && (
+            <EmailCabinet
+              companies={companies}
+              comms={companyComms}
+              selectedCompany={selectedCompanyForComms}
+              setSelectedCompany={setSelectedCompanyForComms}
+              selectedEmailId={selectedEmailId}
+              setSelectedEmailId={setSelectedEmailId}
+              getCompanyName={getCompanyName}
+              onUpdateEmail={updateEmail}
+              onSend={sendEmail}
+              onCancel={cancelEmail}
+              onNewDraft={(companyId) => {
+                const c = getCompany(companyId);
+                if (!c) return;
+
+                const emailId = makeId("email");
+                addEmail(companyId, {
+                  id: emailId,
+                  kind: "MANUAL",
+                  status: "DRAFT",
+                  createdAt: nowTs(),
+                  to: safeStr(c?.meta?.contactEmail),
+                  subject: `Update from AutoProtect — ${c.name}`,
+                  body:
+                    `Hello ${c.name} Security Team,\n\n` +
+                    `AutoProtect drafted an update for your review.\n\n` +
+                    `Summary:\n- \n\n` +
+                    `Actions recommended:\n- \n\n` +
+                    `— Admin Operator Console`,
+                });
+
+                addNotification(companyId, {
+                  id: makeId("note"),
+                  createdAt: nowTs(),
+                  severity: "YELLOW",
+                  title: "Manual draft created",
+                  message: `A manual email draft was created.`,
+                  linkedEmailId: emailId,
+                  read: false,
+                });
+
+                setSelectedCompanyForComms(companyId);
+                setSelectedEmailId(emailId);
+              }}
+            />
+          )}
+
+          {/* ===== ARCHIVE PANEL ===== */}
+          {operatorPanel === "archive" && (
             <div className="postureCard executivePanel">
               <h3>🗄️ Archive</h3>
-              <div style={{ height: 320, overflowY: "auto", marginTop: 10 }}>
+              <div style={{ height: 420, overflowY: "auto", marginTop: 10 }}>
                 {archive.length === 0 ? (
                   <div className="muted">Archive is empty.</div>
                 ) : (
-                  archive.slice(0, 120).map((a) => (
+                  archive.slice(0, 200).map((a) => (
                     <div key={a.id} style={{ padding: 10, borderBottom: "1px solid rgba(255,255,255,.06)" }}>
                       <b>{getCompanyName(a.companyId)}</b>{" "}
                       <span style={{ opacity: 0.7 }}>
@@ -916,8 +1273,7 @@ export default function AdminOverview() {
                       </div>
                       {a.resolution?.summary && (
                         <div style={{ marginTop: 6, opacity: 0.9 }}>
-                          <small style={{ opacity: 0.7 }}>Summary:</small>{" "}
-                          <b>{a.resolution.summary}</b>
+                          <small style={{ opacity: 0.7 }}>Summary:</small> <b>{a.resolution.summary}</b>
                         </div>
                       )}
                     </div>
@@ -997,7 +1353,7 @@ export default function AdminOverview() {
                   />
                 </div>
 
-                {/* NEW POLICY FIELDS */}
+                {/* POLICY */}
                 <div>
                   <small>Timezone</small>
                   <input
@@ -1021,7 +1377,7 @@ export default function AdminOverview() {
                     />
                   </div>
                   <div>
-                    <small>End Hour (0-23)</small>
+                    <small>End Hour (1-24)</small>
                     <input
                       type="number"
                       min={1}
@@ -1036,7 +1392,7 @@ export default function AdminOverview() {
                 <div style={{ gridColumn: "1 / -1" }}>
                   <small>Work Days</small>
                   <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 8 }}>
-                    {[0,1,2,3,4,5,6].map((d) => {
+                    {[0, 1, 2, 3, 4, 5, 6].map((d) => {
                       const active = (plug.workDays || []).includes(d);
                       return (
                         <button
@@ -1072,7 +1428,7 @@ export default function AdminOverview() {
               </div>
 
               <div style={{ marginTop: 10, opacity: 0.75, fontSize: 12 }}>
-                Work Policy is enforced in Automatic Mode: alerts only generate during the company’s active work window.
+                Policy is enforced in Automatic Mode: alerts only generate during the company’s active work window.
               </div>
             </div>
           )}
@@ -1080,14 +1436,9 @@ export default function AdminOverview() {
       )}
 
       {/* ================= PLATFORM VIEW ================= */}
-
       {mode === "platform" && (
         <>
-          {integrityAlert && (
-            <div className="dashboard-warning">
-              Integrity Alert Detected — Elevated State
-            </div>
-          )}
+          {integrityAlert && <div className="dashboard-warning">Integrity Alert Detected — Elevated State</div>}
 
           <ExecutiveRiskBanner />
           <SecurityPostureDashboard />
@@ -1101,7 +1452,7 @@ export default function AdminOverview() {
   );
 }
 
-/* ================= SMALL INTERNAL COMPONENTS ================= */
+/* ================= STYLES ================= */
 
 const inputStyle = {
   width: "100%",
@@ -1114,6 +1465,8 @@ const inputStyle = {
   marginTop: 6,
 };
 
+/* ================= RESOLUTION BUILDER ================= */
+
 function ResolutionBuilder({ disabled, existing, onSave }) {
   const [summary, setSummary] = useState(existing?.summary || "");
   const [rootCause, setRootCause] = useState(existing?.rootCause || "");
@@ -1125,7 +1478,7 @@ function ResolutionBuilder({ disabled, existing, onSave }) {
     setRootCause(existing?.rootCause || "");
     setActions((existing?.actions || []).join("\n"));
     setLessons((existing?.lessons || []).join("\n"));
-  }, [existing?.summary]); // light reset when new alert selected
+  }, [existing?.summary, existing?.rootCause]);
 
   return (
     <div style={{ marginTop: 8 }}>
@@ -1183,19 +1536,270 @@ function ResolutionBuilder({ disabled, existing, onSave }) {
           onSave({
             summary: summary.trim(),
             rootCause: rootCause.trim(),
-            actions: actions
-              .split("\n")
-              .map((s) => s.trim())
-              .filter(Boolean),
-            lessons: lessons
-              .split("\n")
-              .map((s) => s.trim())
-              .filter(Boolean),
+            actions: actions.split("\n").map((s) => s.trim()).filter(Boolean),
+            lessons: lessons.split("\n").map((s) => s.trim()).filter(Boolean),
           })
         }
       >
         Save Resolution
       </button>
+    </div>
+  );
+}
+
+/* ================= NOTIFICATION BOARD ================= */
+
+function NotificationBoard({
+  companies,
+  comms,
+  selectedCompany,
+  setSelectedCompany,
+  getCompanyName,
+  signals,
+  onOpenEmail,
+  onMarkRead,
+}) {
+  const companyIds = (companies || []).map((c) => c.id);
+  const scopeIds = selectedCompany === "ALL" ? companyIds : [selectedCompany];
+
+  const rows = useMemo(() => {
+    const out = [];
+    scopeIds.forEach((cid) => {
+      const notes = comms[cid]?.notifications || [];
+      notes.forEach((n) => out.push({ companyId: cid, ...n }));
+    });
+    out.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    return out.slice(0, 400);
+  }, [scopeIds, comms]);
+
+  return (
+    <div className="postureCard executivePanel">
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+        <h3 style={{ margin: 0 }}>🔔 Notifications</h3>
+
+        <select value={selectedCompany} onChange={(e) => setSelectedCompany(e.target.value)}>
+          <option value="ALL">All Companies</option>
+          {(companies || []).map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div style={{ marginTop: 12, height: 520, overflowY: "auto" }}>
+        {rows.length === 0 ? (
+          <div className="muted">No notifications.</div>
+        ) : (
+          rows.map((n) => {
+            const sig = signals?.[n.companyId]?.level || "GREEN";
+            return (
+              <div key={n.id} style={{ padding: 12, borderBottom: "1px solid rgba(255,255,255,.06)" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+                  <div>
+                    <div style={{ fontSize: 12, opacity: 0.7 }}>{new Date(n.createdAt || Date.now()).toLocaleString()}</div>
+                    <div style={{ display: "flex", alignItems: "center" }}>
+                      <span style={dotStyle(sig)} />
+                      <b>{getCompanyName(n.companyId)}</b>
+                      {!n.read && <span style={{ marginLeft: 8 }}><b>NEW</b></span>}
+                    </div>
+                    <div style={{ marginTop: 6 }}><b>{n.title}</b></div>
+                    <div style={{ opacity: 0.85, marginTop: 4 }}>{n.message}</div>
+                  </div>
+
+                  <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                    {n.linkedEmailId && (
+                      <button className="btn" onClick={() => onOpenEmail(n.companyId, n.linkedEmailId)}>
+                        Open Draft
+                      </button>
+                    )}
+                    <button className="btn" onClick={() => onMarkRead(n.companyId, n.id)} disabled={Boolean(n.read)}>
+                      {n.read ? "Read" : "Mark Read"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ================= EMAIL CABINET ================= */
+
+function EmailCabinet({
+  companies,
+  comms,
+  selectedCompany,
+  setSelectedCompany,
+  selectedEmailId,
+  setSelectedEmailId,
+  getCompanyName,
+  onUpdateEmail,
+  onSend,
+  onCancel,
+  onNewDraft,
+}) {
+  const companyId = selectedCompany !== "ALL" ? selectedCompany : "";
+
+  const emails = useMemo(() => {
+    if (!companyId) return [];
+    return comms[companyId]?.emails || [];
+  }, [companyId, comms]);
+
+  const selectedEmail = useMemo(() => {
+    if (!companyId) return null;
+    return emails.find((e) => e.id === selectedEmailId) || null;
+  }, [emails, selectedEmailId, companyId]);
+
+  return (
+    <div className="postureCard executivePanel">
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+        <h3 style={{ margin: 0 }}>📬 Email Cabinet</h3>
+
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+          <select
+            value={selectedCompany}
+            onChange={(e) => {
+              setSelectedCompany(e.target.value);
+              setSelectedEmailId(null);
+            }}
+          >
+            <option value="ALL">Select Company…</option>
+            {(companies || []).map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+
+          {companyId && (
+            <button className="btn" onClick={() => onNewDraft(companyId)}>
+              + New Draft
+            </button>
+          )}
+        </div>
+      </div>
+
+      {!companyId ? (
+        <div className="muted" style={{ marginTop: 14 }}>
+          Pick a company to open its cabinet.
+        </div>
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1.2fr", gap: 18, marginTop: 14 }}>
+          {/* List */}
+          <div className="postureCard" style={{ maxHeight: 560, overflowY: "auto" }}>
+            {emails.length === 0 ? (
+              <div className="muted">No emails yet for this company.</div>
+            ) : (
+              emails.map((e) => {
+                const active = e.id === selectedEmailId;
+                return (
+                  <div
+                    key={e.id}
+                    onClick={() => setSelectedEmailId(e.id)}
+                    style={{
+                      padding: 10,
+                      borderRadius: 10,
+                      cursor: "pointer",
+                      border: "1px solid rgba(255,255,255,.08)",
+                      background: active ? "rgba(120,160,255,.10)" : "rgba(255,255,255,.02)",
+                      marginBottom: 8,
+                    }}
+                  >
+                    <div style={{ fontSize: 12, opacity: 0.75 }}>
+                      {new Date(e.createdAt || Date.now()).toLocaleString()}
+                    </div>
+                    <div style={{ marginTop: 4 }}>
+                      <b>{safeStr(e.subject) || "(no subject)"}</b>
+                    </div>
+                    <div style={{ fontSize: 12, opacity: 0.7, marginTop: 4 }}>
+                      Status: <b>{e.status}</b> • Kind: <b>{e.kind || "—"}</b>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          {/* Editor */}
+          <div className="postureCard">
+            {!selectedEmail ? (
+              <div className="muted">Select an email on the left to view/edit.</div>
+            ) : (
+              <>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+                  <div>
+                    <div style={{ opacity: 0.7, fontSize: 12 }}>Company</div>
+                    <b>{getCompanyName(companyId)}</b>
+                    <div style={{ opacity: 0.75, fontSize: 12, marginTop: 4 }}>
+                      Status: <b>{selectedEmail.status}</b> • Kind: <b>{selectedEmail.kind || "—"}</b>
+                    </div>
+                  </div>
+
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                    <button
+                      className="btn primary"
+                      disabled={selectedEmail.status !== "DRAFT"}
+                      onClick={() => onSend(companyId, selectedEmail.id)}
+                    >
+                      Send
+                    </button>
+                    <button
+                      className="btn"
+                      disabled={selectedEmail.status !== "DRAFT"}
+                      onClick={() => onCancel(companyId, selectedEmail.id)}
+                    >
+                      Cancel Draft
+                    </button>
+                  </div>
+                </div>
+
+                <div style={{ marginTop: 14, display: "grid", gap: 12 }}>
+                  <div>
+                    <small>To</small>
+                    <input
+                      value={safeStr(selectedEmail.to)}
+                      disabled={selectedEmail.status !== "DRAFT"}
+                      onChange={(e) => onUpdateEmail(companyId, selectedEmail.id, { to: e.target.value })}
+                      style={inputStyle}
+                      placeholder="security@company.com"
+                    />
+                  </div>
+
+                  <div>
+                    <small>Subject</small>
+                    <input
+                      value={safeStr(selectedEmail.subject)}
+                      disabled={selectedEmail.status !== "DRAFT"}
+                      onChange={(e) => onUpdateEmail(companyId, selectedEmail.id, { subject: e.target.value })}
+                      style={inputStyle}
+                      placeholder="Subject…"
+                    />
+                  </div>
+
+                  <div>
+                    <small>Body</small>
+                    <textarea
+                      value={safeStr(selectedEmail.body)}
+                      disabled={selectedEmail.status !== "DRAFT"}
+                      onChange={(e) => onUpdateEmail(companyId, selectedEmail.id, { body: e.target.value })}
+                      style={{ ...inputStyle, minHeight: 260 }}
+                      placeholder="Email body…"
+                    />
+                  </div>
+
+                  <div style={{ opacity: 0.75, fontSize: 12 }}>
+                    Drafts are prepared by AutoProtect (or you). Approval = press <b>Send</b>.
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
