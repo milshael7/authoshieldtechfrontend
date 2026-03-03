@@ -1,7 +1,7 @@
 // frontend/src/pages/admin/AdminOverview.jsx
-// Executive Command Center — Platform + Operator Stateful Engine (Layer 3)
+// Executive Command Center — Operator Autonomous Threat Engine (Layer 4)
 
-import React, { useEffect, useMemo, useState, useCallback, useRef } from "react";
+import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { api } from "../../lib/api";
 import { useSecurity } from "../../context/SecurityContext.jsx";
 
@@ -16,12 +16,6 @@ import "../../styles/platform.css";
 
 /* ========================================================= */
 
-function fmtMoney(n) {
-  const x = Number(n);
-  if (!Number.isFinite(x)) return "0.00";
-  return x.toFixed(2);
-}
-
 function riskLevel(score) {
   const s = Number(score || 0);
   if (s >= 75) return { label: "CRITICAL", cls: "warn" };
@@ -30,98 +24,108 @@ function riskLevel(score) {
   return { label: "STABLE", cls: "ok" };
 }
 
-function containmentBadge(status) {
-  switch (status) {
-    case "LOCKDOWN": return { label: "LOCKDOWN", cls: "warn" };
-    case "CONTAINED": return { label: "CONTAINED", cls: "ok" };
-    case "MONITORING": return { label: "MONITORING", cls: "warn" };
-    default: return { label: "STABLE", cls: "ok" };
-  }
+function containmentFromRisk(risk) {
+  if (risk >= 75) return "LOCKDOWN";
+  if (risk >= 50) return "MONITORING";
+  if (risk >= 25) return "CONTAINED";
+  return "STABLE";
 }
 
 /* ========================================================= */
 
 export default function AdminOverview() {
 
-  const { riskScore, integrityAlert, auditFeed } = useSecurity();
-
-  const [metrics, setMetrics] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const { integrityAlert } = useSecurity();
 
   const [mode, setMode] = useState("platform");
   const [selectedCompanyId, setSelectedCompanyId] = useState(null);
 
-  const [companyState, setCompanyState] = useState({});
-
-  const canvasRef = useRef(null);
-  const [riskHistory, setRiskHistory] = useState([]);
-
-  /* ================= LOAD ================= */
-
-  const load = useCallback(async () => {
-    const res = await api.adminMetrics().catch(() => null);
-    setMetrics(res?.metrics || null);
-    setLoading(false);
-  }, []);
-
-  useEffect(() => { load(); }, [load]);
-
-  /* ================= MOCK COMPANIES ================= */
-
   const mockCompanies = [
-    { id: "c1", name: "Alpha Systems", risk: 22 },
-    { id: "c2", name: "Beta Holdings", risk: 61 },
-    { id: "c3", name: "Gamma Logistics", risk: 38 },
-    { id: "c4", name: "Delta Finance", risk: 12 }
+    { id: "c1", name: "Alpha Systems" },
+    { id: "c2", name: "Beta Holdings" },
+    { id: "c3", name: "Gamma Logistics" },
+    { id: "c4", name: "Delta Finance" }
   ];
 
-  /* ================= INIT STATE ================= */
+  /* ================= STATE ================= */
 
-  useEffect(() => {
+  const [companyState, setCompanyState] = useState(() => {
     const initial = {};
     mockCompanies.forEach(c => {
       initial[c.id] = {
-        containmentStatus: "STABLE",
-        isolatedEndpoints: 0,
-        lockedAccounts: 0,
-        escalated: false,
-        activityLog: []
+        risk: Math.floor(Math.random() * 40),
+        isolated: 0,
+        locked: 0,
+        log: []
       };
     });
-    setCompanyState(initial);
-  }, []);
+    return initial;
+  });
 
   const selectedCompany = mockCompanies.find(c => c.id === selectedCompanyId);
-  const currentState = selectedCompany ? companyState[selectedCompany.id] : null;
+  const current = selectedCompany ? companyState[selectedCompany.id] : null;
 
-  /* ================= ACTION ENGINE ================= */
+  /* ========================================================= */
+  /* ================= THREAT ENGINE ========================= */
+  /* ========================================================= */
 
-  const logAction = (companyId, message) => {
+  useEffect(() => {
+
+    const interval = setInterval(() => {
+
+      setCompanyState(prev => {
+        const updated = { ...prev };
+
+        Object.keys(updated).forEach(id => {
+
+          // 40% chance of threat injection
+          if (Math.random() < 0.4) {
+            const spike = Math.floor(Math.random() * 15);
+            const newRisk = Math.min(100, updated[id].risk + spike);
+
+            updated[id] = {
+              ...updated[id],
+              risk: newRisk,
+              log: [
+                { time: new Date(), msg: `Threat spike detected (+${spike})` },
+                ...updated[id].log
+              ]
+            };
+          }
+
+          // Auto containment adjustment
+          updated[id].containment = containmentFromRisk(updated[id].risk);
+
+        });
+
+        return updated;
+      });
+
+    }, 12000); // 12 seconds enterprise pacing
+
+    return () => clearInterval(interval);
+
+  }, []);
+
+  /* ========================================================= */
+  /* ================= ACTION ENGINE ========================= */
+  /* ========================================================= */
+
+  const reduceRisk = (companyId, amount, msg) => {
     setCompanyState(prev => ({
       ...prev,
       [companyId]: {
         ...prev[companyId],
-        activityLog: [
-          { time: new Date(), message },
-          ...prev[companyId].activityLog
+        risk: Math.max(0, prev[companyId].risk - amount),
+        log: [
+          { time: new Date(), msg },
+          ...prev[companyId].log
         ]
       }
     }));
   };
 
-  const updateState = (companyId, updates) => {
-    setCompanyState(prev => ({
-      ...prev,
-      [companyId]: {
-        ...prev[companyId],
-        ...updates
-      }
-    }));
-  };
-
-  if (loading) {
-    return <div className="dashboard-loading">Loading Executive Center…</div>;
-  }
+  /* ========================================================= */
 
   return (
     <div style={{ maxWidth: 1400, margin: "0 auto", display: "flex", flexDirection: "column", gap: 40 }}>
@@ -154,94 +158,90 @@ export default function AdminOverview() {
         <>
           {!selectedCompany && (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 24 }}>
-              {mockCompanies.map(c => (
-                <div
-                  key={c.id}
-                  className="postureCard"
-                  style={{ cursor: "pointer" }}
-                  onClick={() => setSelectedCompanyId(c.id)}
-                >
-                  <h4>{c.name}</h4>
-                  <div>Risk: {c.risk}</div>
-                  <div>Status: {containmentBadge(companyState[c.id]?.containmentStatus).label}</div>
-                </div>
-              ))}
+              {mockCompanies.map(c => {
+                const state = companyState[c.id];
+                const badge = riskLevel(state.risk);
+                return (
+                  <div key={c.id} className="postureCard" style={{ cursor: "pointer" }}
+                       onClick={() => setSelectedCompanyId(c.id)}>
+                    <h4>{c.name}</h4>
+                    <div>Risk: <span className={`badge ${badge.cls}`}>{state.risk}</span></div>
+                    <div>Status: {containmentFromRisk(state.risk)}</div>
+                  </div>
+                );
+              })}
             </div>
           )}
 
-          {selectedCompany && currentState && (
+          {selectedCompany && current && (
             <>
               <button className="btn" onClick={() => setSelectedCompanyId(null)}>
                 ← Exit Console
               </button>
 
-              {/* Snapshot */}
               <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 20 }}>
-                <div className="kpiCard"><small>Status</small>
-                  <b className={`badge ${containmentBadge(currentState.containmentStatus).cls}`}>
-                    {containmentBadge(currentState.containmentStatus).label}
+                <div className="kpiCard">
+                  <small>Risk</small>
+                  <b className={`badge ${riskLevel(current.risk).cls}`}>
+                    {current.risk}
                   </b>
                 </div>
-                <div className="kpiCard"><small>Isolated</small><b>{currentState.isolatedEndpoints}</b></div>
-                <div className="kpiCard"><small>Locked</small><b>{currentState.lockedAccounts}</b></div>
-                <div className="kpiCard"><small>Escalated</small><b>{currentState.escalated ? "YES" : "NO"}</b></div>
+
+                <div className="kpiCard">
+                  <small>Status</small>
+                  <b>{containmentFromRisk(current.risk)}</b>
+                </div>
+
+                <div className="kpiCard">
+                  <small>Isolated</small>
+                  <b>{current.isolated}</b>
+                </div>
+
+                <div className="kpiCard">
+                  <small>Locked</small>
+                  <b>{current.locked}</b>
+                </div>
               </div>
 
-              {/* Actions */}
+              {/* ACTIONS */}
               <div className="postureCard executivePanel">
                 <h3>Operator Actions</h3>
 
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 14 }}>
-                  <button className="btn warn" onClick={() => {
-                    updateState(selectedCompany.id, {
-                      containmentStatus: "CONTAINED",
-                      isolatedEndpoints: currentState.isolatedEndpoints + 1
-                    });
-                    logAction(selectedCompany.id, "Endpoint isolated");
-                  }}>
+                  <button className="btn warn"
+                    onClick={() => reduceRisk(selectedCompany.id, 15, "Endpoint isolated")}>
                     Force Endpoint Isolation
                   </button>
 
-                  <button className="btn warn" onClick={() => {
-                    updateState(selectedCompany.id, {
-                      lockedAccounts: currentState.lockedAccounts + 1
-                    });
-                    logAction(selectedCompany.id, "Suspicious account locked");
-                  }}>
+                  <button className="btn warn"
+                    onClick={() => reduceRisk(selectedCompany.id, 10, "Suspicious account locked")}>
                     Lock Suspicious Account
                   </button>
 
-                  <button className="btn primary" onClick={() => {
-                    updateState(selectedCompany.id, {
-                      escalated: true,
-                      containmentStatus: "LOCKDOWN"
-                    });
-                    logAction(selectedCompany.id, "Incident escalated to LOCKDOWN");
-                  }}>
+                  <button className="btn primary"
+                    onClick={() => reduceRisk(selectedCompany.id, 20, "Incident escalated and contained")}>
                     Escalate Incident
                   </button>
 
-                  <button className="btn" onClick={() => {
-                    updateState(selectedCompany.id, {
-                      containmentStatus: "MONITORING"
-                    });
-                    logAction(selectedCompany.id, "Deep scan initiated");
-                  }}>
+                  <button className="btn"
+                    onClick={() => reduceRisk(selectedCompany.id, 8, "Deep scan completed")}>
                     Trigger Deep Scan
                   </button>
                 </div>
               </div>
 
-              {/* Activity Log */}
+              {/* LOG */}
               <div className="postureCard">
-                <h3>Operator Activity Log</h3>
-                {currentState.activityLog.length === 0 && (
-                  <div className="muted">No actions performed yet.</div>
+                <h3>Live Threat Log</h3>
+
+                {current.log.length === 0 && (
+                  <div className="muted">No recent activity.</div>
                 )}
-                {currentState.activityLog.map((entry, i) => (
+
+                {current.log.map((entry, i) => (
                   <div key={i} style={{ padding: "6px 0", borderBottom: "1px solid rgba(255,255,255,.06)" }}>
                     <small>{entry.time.toLocaleTimeString()}</small>
-                    <div><b>{entry.message}</b></div>
+                    <div><b>{entry.msg}</b></div>
                   </div>
                 ))}
               </div>
