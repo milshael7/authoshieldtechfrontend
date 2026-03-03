@@ -1,5 +1,5 @@
 // frontend/src/pages/admin/AdminOverview.jsx
-// Executive Command Center — Platform + Operator Deep Console (Layer 2)
+// Executive Command Center — Platform + Operator Stateful Engine (Layer 3)
 
 import React, { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { api } from "../../lib/api";
@@ -30,21 +30,28 @@ function riskLevel(score) {
   return { label: "STABLE", cls: "ok" };
 }
 
+function containmentBadge(status) {
+  switch (status) {
+    case "LOCKDOWN": return { label: "LOCKDOWN", cls: "warn" };
+    case "CONTAINED": return { label: "CONTAINED", cls: "ok" };
+    case "MONITORING": return { label: "MONITORING", cls: "warn" };
+    default: return { label: "STABLE", cls: "ok" };
+  }
+}
+
 /* ========================================================= */
 
 export default function AdminOverview() {
 
-  const {
-    riskScore,
-    integrityAlert,
-    auditFeed,
-  } = useSecurity();
+  const { riskScore, integrityAlert, auditFeed } = useSecurity();
 
   const [metrics, setMetrics] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const [mode, setMode] = useState("platform");
-  const [selectedCompany, setSelectedCompany] = useState(null);
+  const [selectedCompanyId, setSelectedCompanyId] = useState(null);
+
+  const [companyState, setCompanyState] = useState({});
 
   const canvasRef = useRef(null);
   const [riskHistory, setRiskHistory] = useState([]);
@@ -57,222 +64,184 @@ export default function AdminOverview() {
     setLoading(false);
   }, []);
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  useEffect(() => { load(); }, [load]);
 
-  /* ================= RISK HISTORY ================= */
-
-  useEffect(() => {
-    if (typeof riskScore !== "number") return;
-    setRiskHistory((prev) => {
-      const updated = [...prev, riskScore];
-      if (updated.length > 60) updated.shift();
-      return updated;
-    });
-  }, [riskScore]);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || riskHistory.length < 2) return;
-
-    const ctx = canvas.getContext("2d");
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    ctx.beginPath();
-    ctx.strokeStyle = "#4f8cff";
-    ctx.lineWidth = 2;
-
-    riskHistory.forEach((value, index) => {
-      const x = (index / (riskHistory.length - 1)) * canvas.width;
-      const y = canvas.height - (value / 100) * canvas.height;
-      if (index === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-    });
-
-    ctx.stroke();
-  }, [riskHistory]);
-
-  const healthIndex = useMemo(() => {
-    const penalty = integrityAlert ? 20 : 0;
-    return Math.max(0, 100 - (riskScore || 0) - penalty);
-  }, [riskScore, integrityAlert]);
-
-  const healthBadge = riskLevel(healthIndex);
-
-  /* ================= MOCK COMPANY DATA ================= */
+  /* ================= MOCK COMPANIES ================= */
 
   const mockCompanies = [
-    { id: "c1", name: "Alpha Systems", risk: 22, alerts: 3 },
-    { id: "c2", name: "Beta Holdings", risk: 61, alerts: 9 },
-    { id: "c3", name: "Gamma Logistics", risk: 38, alerts: 4 },
-    { id: "c4", name: "Delta Finance", risk: 12, alerts: 1 }
+    { id: "c1", name: "Alpha Systems", risk: 22 },
+    { id: "c2", name: "Beta Holdings", risk: 61 },
+    { id: "c3", name: "Gamma Logistics", risk: 38 },
+    { id: "c4", name: "Delta Finance", risk: 12 }
   ];
+
+  /* ================= INIT STATE ================= */
+
+  useEffect(() => {
+    const initial = {};
+    mockCompanies.forEach(c => {
+      initial[c.id] = {
+        containmentStatus: "STABLE",
+        isolatedEndpoints: 0,
+        lockedAccounts: 0,
+        escalated: false,
+        activityLog: []
+      };
+    });
+    setCompanyState(initial);
+  }, []);
+
+  const selectedCompany = mockCompanies.find(c => c.id === selectedCompanyId);
+  const currentState = selectedCompany ? companyState[selectedCompany.id] : null;
+
+  /* ================= ACTION ENGINE ================= */
+
+  const logAction = (companyId, message) => {
+    setCompanyState(prev => ({
+      ...prev,
+      [companyId]: {
+        ...prev[companyId],
+        activityLog: [
+          { time: new Date(), message },
+          ...prev[companyId].activityLog
+        ]
+      }
+    }));
+  };
+
+  const updateState = (companyId, updates) => {
+    setCompanyState(prev => ({
+      ...prev,
+      [companyId]: {
+        ...prev[companyId],
+        ...updates
+      }
+    }));
+  };
 
   if (loading) {
     return <div className="dashboard-loading">Loading Executive Center…</div>;
   }
 
   return (
-    <div
-      style={{
-        width: "100%",
-        maxWidth: 1400,
-        margin: "0 auto",
-        display: "flex",
-        flexDirection: "column",
-        gap: 40
-      }}
-    >
+    <div style={{ maxWidth: 1400, margin: "0 auto", display: "flex", flexDirection: "column", gap: 40 }}>
 
-      {/* ================= HEADER ================= */}
-
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      {/* HEADER */}
+      <div style={{ display: "flex", justifyContent: "space-between" }}>
         <div className="sectionTitle">
           {mode === "platform"
             ? "Platform Command Center"
             : selectedCompany
-              ? `${selectedCompany.name} — Operator Command Console`
-              : "Operator Fleet Command"}
+              ? `${selectedCompany.name} — Operator Console`
+              : "Operator Fleet"}
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-          <span className={`badge ${healthBadge.cls}`}>
-            HEALTH {healthIndex.toFixed(0)}
-          </span>
-
-          <select
-            value={mode}
-            onChange={(e) => {
-              setSelectedCompany(null);
-              setMode(e.target.value);
-            }}
-            style={{
-              background: "rgba(255,255,255,.05)",
-              color: "#eaf1ff",
-              border: "1px solid rgba(255,255,255,.15)",
-              padding: "6px 10px",
-              borderRadius: 6
-            }}
-          >
-            <option value="platform">Platform View</option>
-            <option value="operator">Operator View</option>
-          </select>
-        </div>
+        <select
+          value={mode}
+          onChange={(e) => {
+            setSelectedCompanyId(null);
+            setMode(e.target.value);
+          }}
+        >
+          <option value="platform">Platform View</option>
+          <option value="operator">Operator View</option>
+        </select>
       </div>
 
-      {/* ========================================================= */}
-      {/* ================= OPERATOR MODE ========================= */}
-      {/* ========================================================= */}
+      {/* ================= OPERATOR MODE ================= */}
 
       {mode === "operator" && (
-
         <>
           {!selectedCompany && (
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
-                gap: 24
-              }}
-            >
-              {mockCompanies.map((c) => (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 24 }}>
+              {mockCompanies.map(c => (
                 <div
                   key={c.id}
                   className="postureCard"
                   style={{ cursor: "pointer" }}
-                  onClick={() => setSelectedCompany(c)}
+                  onClick={() => setSelectedCompanyId(c.id)}
                 >
                   <h4>{c.name}</h4>
-                  <div style={{ marginTop: 14 }}>
-                    Risk: <span className={`badge ${riskLevel(c.risk).cls}`}>{c.risk}</span>
-                  </div>
-                  <div style={{ marginTop: 10 }}>
-                    Active Alerts: <b>{c.alerts}</b>
-                  </div>
+                  <div>Risk: {c.risk}</div>
+                  <div>Status: {containmentBadge(companyState[c.id]?.containmentStatus).label}</div>
                 </div>
               ))}
             </div>
           )}
 
-          {selectedCompany && (
+          {selectedCompany && currentState && (
             <>
-              <button
-                className="btn"
-                onClick={() => setSelectedCompany(null)}
-              >
-                ← Exit Company Console
+              <button className="btn" onClick={() => setSelectedCompanyId(null)}>
+                ← Exit Console
               </button>
 
-              {/* === Threat Snapshot Row === */}
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(4, 1fr)",
-                  gap: 20
-                }}
-              >
-                <div className="kpiCard executive">
-                  <small>Risk Score</small>
-                  <b>{selectedCompany.risk}</b>
+              {/* Snapshot */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 20 }}>
+                <div className="kpiCard"><small>Status</small>
+                  <b className={`badge ${containmentBadge(currentState.containmentStatus).cls}`}>
+                    {containmentBadge(currentState.containmentStatus).label}
+                  </b>
                 </div>
-
-                <div className="kpiCard executive">
-                  <small>Active Alerts</small>
-                  <b>{selectedCompany.alerts}</b>
-                </div>
-
-                <div className="kpiCard executive">
-                  <small>Endpoints</small>
-                  <b>{Math.floor(Math.random() * 120)}</b>
-                </div>
-
-                <div className="kpiCard executive">
-                  <small>Containment Status</small>
-                  <b className="badge ok">STABLE</b>
-                </div>
+                <div className="kpiCard"><small>Isolated</small><b>{currentState.isolatedEndpoints}</b></div>
+                <div className="kpiCard"><small>Locked</small><b>{currentState.lockedAccounts}</b></div>
+                <div className="kpiCard"><small>Escalated</small><b>{currentState.escalated ? "YES" : "NO"}</b></div>
               </div>
 
-              {/* === Action Console === */}
+              {/* Actions */}
               <div className="postureCard executivePanel">
                 <h3>Operator Actions</h3>
 
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-                    gap: 14,
-                    marginTop: 16
-                  }}
-                >
-                  <button className="btn warn">Force Endpoint Isolation</button>
-                  <button className="btn warn">Lock Suspicious Account</button>
-                  <button className="btn primary">Escalate to Incident Board</button>
-                  <button className="btn">Trigger Deep Scan</button>
-                  <button className="btn">Notify Company Admin</button>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 14 }}>
+                  <button className="btn warn" onClick={() => {
+                    updateState(selectedCompany.id, {
+                      containmentStatus: "CONTAINED",
+                      isolatedEndpoints: currentState.isolatedEndpoints + 1
+                    });
+                    logAction(selectedCompany.id, "Endpoint isolated");
+                  }}>
+                    Force Endpoint Isolation
+                  </button>
+
+                  <button className="btn warn" onClick={() => {
+                    updateState(selectedCompany.id, {
+                      lockedAccounts: currentState.lockedAccounts + 1
+                    });
+                    logAction(selectedCompany.id, "Suspicious account locked");
+                  }}>
+                    Lock Suspicious Account
+                  </button>
+
+                  <button className="btn primary" onClick={() => {
+                    updateState(selectedCompany.id, {
+                      escalated: true,
+                      containmentStatus: "LOCKDOWN"
+                    });
+                    logAction(selectedCompany.id, "Incident escalated to LOCKDOWN");
+                  }}>
+                    Escalate Incident
+                  </button>
+
+                  <button className="btn" onClick={() => {
+                    updateState(selectedCompany.id, {
+                      containmentStatus: "MONITORING"
+                    });
+                    logAction(selectedCompany.id, "Deep scan initiated");
+                  }}>
+                    Trigger Deep Scan
+                  </button>
                 </div>
               </div>
 
-              {/* === Company Activity Feed === */}
+              {/* Activity Log */}
               <div className="postureCard">
-                <h3>Live Company Activity Feed</h3>
-
-                {[...Array(6)].map((_, i) => (
-                  <div
-                    key={i}
-                    style={{
-                      padding: "8px 0",
-                      borderBottom: "1px solid rgba(255,255,255,.06)",
-                      display: "flex",
-                      justifyContent: "space-between"
-                    }}
-                  >
-                    <small style={{ opacity: 0.7 }}>
-                      {new Date().toLocaleTimeString()}
-                    </small>
-                    <div>
-                      <b>Threat event detected on endpoint-{i + 1}</b>
-                    </div>
+                <h3>Operator Activity Log</h3>
+                {currentState.activityLog.length === 0 && (
+                  <div className="muted">No actions performed yet.</div>
+                )}
+                {currentState.activityLog.map((entry, i) => (
+                  <div key={i} style={{ padding: "6px 0", borderBottom: "1px solid rgba(255,255,255,.06)" }}>
+                    <small>{entry.time.toLocaleTimeString()}</small>
+                    <div><b>{entry.message}</b></div>
                   </div>
                 ))}
               </div>
@@ -281,9 +250,7 @@ export default function AdminOverview() {
         </>
       )}
 
-      {/* ========================================================= */}
-      {/* ================= PLATFORM MODE ========================= */}
-      {/* ========================================================= */}
+      {/* ================= PLATFORM MODE ================= */}
 
       {mode === "platform" && (
         <>
@@ -294,68 +261,11 @@ export default function AdminOverview() {
           )}
 
           <ExecutiveRiskBanner />
-
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: 28
-            }}
-          >
-            <div className="postureCard executivePanel">
-              <h3>Platform Health</h3>
-              <p style={{ fontSize: 32, fontWeight: 700 }}>
-                {healthIndex.toFixed(0)}
-              </p>
-            </div>
-
-            <div className="postureCard">
-              <h3>Live Risk Drift</h3>
-              <canvas
-                ref={canvasRef}
-                width={800}
-                height={200}
-                style={{ width: "100%", height: 200 }}
-              />
-            </div>
-          </div>
-
-          <div className="sectionTitle">Security Operations</div>
-
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: 28
-            }}
-          >
-            <SecurityPostureDashboard />
-            <IncidentBoard />
-          </div>
-
+          <SecurityPostureDashboard />
+          <IncidentBoard />
           <SecurityPipeline />
           <SecurityRadar />
           <SecurityFeedPanel />
-
-          <div className="postureCard">
-            <h3>Recent Audit Events</h3>
-            {(auditFeed || []).slice(0, 8).map((e, i) => (
-              <div
-                key={i}
-                style={{
-                  padding: "8px 0",
-                  borderBottom: "1px solid rgba(255,255,255,.06)",
-                  display: "flex",
-                  justifyContent: "space-between"
-                }}
-              >
-                <small style={{ opacity: 0.7 }}>
-                  {new Date(e?.ts || Date.now()).toLocaleTimeString()}
-                </small>
-                <div><b>{e?.action || "UNKNOWN"}</b></div>
-              </div>
-            ))}
-          </div>
         </>
       )}
 
