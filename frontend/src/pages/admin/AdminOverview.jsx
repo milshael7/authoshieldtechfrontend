@@ -1,5 +1,5 @@
 // frontend/src/pages/admin/AdminOverview.jsx
-// Executive Command Center — Platform + Operator (Layer 6 Alert Lifecycle Engine)
+// Executive Command Center — Layer 7 (Escalation + Priority Engine)
 
 import React, { useEffect, useState } from "react";
 import { useSecurity } from "../../context/SecurityContext.jsx";
@@ -27,6 +27,13 @@ function containmentFromRisk(risk) {
   if (risk >= 50) return "MONITORING";
   if (risk >= 25) return "CONTAINED";
   return "STABLE";
+}
+
+function priorityFromRisk(risk) {
+  if (risk >= 75) return "P1";
+  if (risk >= 60) return "P2";
+  if (risk >= 40) return "P3";
+  return "P4";
 }
 
 /* ========================================================= */
@@ -59,9 +66,8 @@ export default function AdminOverview() {
     return initial;
   });
 
-  /* ================= GLOBAL ALERT QUEUE ================= */
-
   const [globalQueue, setGlobalQueue] = useState([]);
+  const [incidentRegistry, setIncidentRegistry] = useState([]);
 
   /* ================= THREAT ENGINE ================= */
 
@@ -80,6 +86,7 @@ export default function AdminOverview() {
             const spike = Math.floor(Math.random() * 15);
             const newRisk = Math.min(100, updated[id].risk + spike);
             const containment = containmentFromRisk(newRisk);
+            const priority = priorityFromRisk(newRisk);
 
             updated[id] = {
               ...updated[id],
@@ -91,14 +98,25 @@ export default function AdminOverview() {
               ]
             };
 
-            newAlerts.push({
+            const alert = {
               id: `${id}-${Date.now()}`,
               companyId: id,
               risk: newRisk,
               containment,
+              priority,
               time: new Date(),
-              status: "NEW"
-            });
+              status: "NEW",
+              escalated: priority === "P1"
+            };
+
+            newAlerts.push(alert);
+
+            // Auto-escalate P1
+            if (priority === "P1") {
+              setIncidentRegistry(prevInc =>
+                [{ ...alert, escalatedAt: new Date() }, ...prevInc]
+              );
+            }
           }
         });
 
@@ -118,7 +136,7 @@ export default function AdminOverview() {
 
   }, []);
 
-  /* ================= ALERT ACTION ENGINE ================= */
+  /* ================= ALERT ACTIONS ================= */
 
   const updateAlertStatus = (alertId, newStatus) => {
     setGlobalQueue(prev =>
@@ -130,10 +148,26 @@ export default function AdminOverview() {
     );
   };
 
+  const escalateAlert = (alert) => {
+    if (alert.escalated) return;
+
+    setGlobalQueue(prev =>
+      prev.map(a =>
+        a.id === alert.id
+          ? { ...a, escalated: true }
+          : a
+      )
+    );
+
+    setIncidentRegistry(prev =>
+      [{ ...alert, escalatedAt: new Date() }, ...prev]
+    );
+  };
+
   const resolveAlert = (alert) => {
+
     updateAlertStatus(alert.id, "RESOLVED");
 
-    // reduce company risk when resolved
     setCompanyState(prev => ({
       ...prev,
       [alert.companyId]: {
@@ -221,8 +255,8 @@ export default function AdminOverview() {
                       <div style={{ fontSize: 12, opacity: 0.6 }}>
                         {alert.containment} — Risk {alert.risk}
                       </div>
-                      <div style={{ fontSize: 11, marginTop: 4 }}>
-                        Status: <b>{alert.status}</b>
+                      <div style={{ fontSize: 11 }}>
+                        Priority: <b>{alert.priority}</b> | Status: <b>{alert.status}</b>
                       </div>
                     </div>
 
@@ -230,21 +264,14 @@ export default function AdminOverview() {
 
                       {!isResolved && (
                         <>
-                          {alert.status === "NEW" && (
-                            <button className="btn"
-                              onClick={() => updateAlertStatus(alert.id, "ACKNOWLEDGED")}>
-                              Ack
+                          {!alert.escalated && (
+                            <button className="btn warn"
+                              onClick={() => escalateAlert(alert)}>
+                              Escalate
                             </button>
                           )}
 
-                          {alert.status === "ACKNOWLEDGED" && (
-                            <button className="btn"
-                              onClick={() => updateAlertStatus(alert.id, "INVESTIGATING")}>
-                              Investigate
-                            </button>
-                          )}
-
-                          {(alert.status === "INVESTIGATING" || alert.status === "ACKNOWLEDGED") && (
+                          {alert.status !== "RESOLVED" && (
                             <button className="btn primary"
                               onClick={() => resolveAlert(alert)}>
                               Resolve
@@ -264,6 +291,36 @@ export default function AdminOverview() {
                   </div>
                 );
               })}
+            </div>
+          </div>
+
+          {/* INCIDENT REGISTRY */}
+          <div className="postureCard">
+            <h3>🚨 ACTIVE ESCALATED INCIDENTS</h3>
+
+            <div style={{
+              height: 220,
+              overflowY: "auto",
+              marginTop: 10
+            }}>
+              {incidentRegistry.length === 0 && (
+                <div className="muted">No escalated incidents.</div>
+              )}
+
+              {incidentRegistry.map(incident => (
+                <div
+                  key={incident.id}
+                  style={{
+                    padding: "8px 0",
+                    borderBottom: "1px solid rgba(255,255,255,.06)"
+                  }}
+                >
+                  <b>{companies.find(c => c.id === incident.companyId)?.name}</b>
+                  <div style={{ fontSize: 12 }}>
+                    Priority: {incident.priority} | Risk: {incident.risk}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
 
@@ -288,21 +345,6 @@ export default function AdminOverview() {
                 );
               })}
             </div>
-          )}
-
-          {/* COMPANY CONSOLE */}
-          {selectedCompany && current && (
-            <>
-              <button className="btn" onClick={() => setSelectedCompanyId(null)}>
-                ← Back to Fleet
-              </button>
-
-              <div className="postureCard executivePanel">
-                <h3>{selectedCompany.name}</h3>
-                <div>Risk: {current.risk}</div>
-                <div>Status: {current.containment}</div>
-              </div>
-            </>
           )}
 
         </>
