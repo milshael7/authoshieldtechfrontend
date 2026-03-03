@@ -1,38 +1,4 @@
-<div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
 
-  {mode === "operator" && (
-    <GlobalAdminEarth
-      companyComms={companyComms}
-      getCompanyName={getCompanyName}
-      setMode={setMode}
-      setWorkspace={setWorkspace}
-      setOperatorPanel={setOperatorPanel}
-      setSelectedCompanyForComms={setSelectedCompanyForComms}
-      setSelectedEmailId={setSelectedEmailId}
-    />
-  )}
-
-  <select value={mode} onChange={(e) => setMode(e.target.value)}>
-    <option value="platform">Platform View</option>
-    <option value="operator">Operator View</option>
-  </select>
-
-  {mode === "operator" && (
-    <>
-      <button className="btn" onClick={() => setShowOnboarding(true)}>
-        + Plug Company
-      </button>
-
-      <select value={operatorPanel} onChange={(e) => setOperatorPanel(e.target.value)}>
-        <option value="queue">Panel: Queue</option>
-        <option value="fleet">Panel: Fleet</option>
-        <option value="notifications">Panel: Notifications</option>
-        <option value="email">Panel: Email Cabinet</option>
-        <option value="archive">Panel: Archive</option>
-      </select>
-    </>
-  )}
-</div>
 // frontend/src/pages/admin/AdminOverview.jsx
 // Executive Command Center — SAFE REBUILD (FIXED + ENHANCED)
 //
