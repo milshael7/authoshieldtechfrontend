@@ -12,17 +12,6 @@
 // - Auto-hide temporary tools (Plug Company auto-closes when leaving Operator View)
 // NOTE: Self-contained in this file (no new pages)
 
-{mode === "operator" && (
-  <GlobalAdminEarth
-    companyComms={companyComms}
-    getCompanyName={getCompanyName}
-    setMode={setMode}
-    setWorkspace={setWorkspace}
-    setOperatorPanel={setOperatorPanel}
-    setSelectedCompanyForComms={setSelectedCompanyForComms}
-    setSelectedEmailId={setSelectedEmailId}
-  />
-)}
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useSecurity } from "../../context/SecurityContext.jsx";
 
@@ -1793,6 +1782,24 @@ function NotificationBoard({
   );
 }
 /* ================= GLOBAL ADMIN EARTH ================= */
+
+<div className="sectionTitle">
+  {mode === "platform"
+    ? "Platform Command Center"
+    : "Operator Console (Side Hustle)"}
+</div>
+
+{mode === "operator" && (
+  <GlobalAdminEarth
+    companyComms={companyComms}
+    getCompanyName={getCompanyName}
+    setMode={setMode}
+    setWorkspace={setWorkspace}
+    setOperatorPanel={setOperatorPanel}
+    setSelectedCompanyForComms={setSelectedCompanyForComms}
+    setSelectedEmailId={setSelectedEmailId}
+  />
+)}
 function formatCompactCount(n) {
   if (!n || n <= 0) return "";
   if (n < 1000) return String(n);
