@@ -1,5 +1,5 @@
 // frontend/src/layouts/AdminLayout.jsx
-// RESTORED: Scroll Sidebar + Advisor Panel + Proper Shifting
+// FINAL BALANCED CENTER VERSION
 
 import React, { useEffect, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
@@ -46,7 +46,7 @@ export default function AdminLayout() {
     isActive ? "nav-link active" : "nav-link";
 
   return (
-    <div className={`layout-root ${sidebarOpen ? "" : "sidebar-collapsed"}`}>
+    <div className="layout-root">
 
       {/* ================= FIXED HEADER ================= */}
       <div
@@ -66,7 +66,6 @@ export default function AdminLayout() {
         }}
       >
         <Logo size="md" />
-
         <button
           onClick={() => setSidebarOpen(!sidebarOpen)}
           style={{
@@ -112,23 +111,19 @@ export default function AdminLayout() {
           >
             <nav className="layout-nav">
               <NavLink to="/admin" end className={navClass}>Dashboard</NavLink>
-
               <NavLink to="/admin/security" className={navClass}>Security Overview</NavLink>
               <NavLink to="/admin/risk" className={navClass}>Risk Monitor</NavLink>
               <NavLink to="/admin/sessions" className={navClass}>Session Monitor</NavLink>
               <NavLink to="/admin/device-integrity" className={navClass}>Device Integrity</NavLink>
               <NavLink to="/admin/trading" className={navClass}>Internal Trading</NavLink>
-
               <NavLink to="/admin/assets" className={navClass}>Assets</NavLink>
               <NavLink to="/admin/incidents" className={navClass}>Incident Management</NavLink>
               <NavLink to="/admin/vulnerabilities" className={navClass}>Vulnerability Oversight</NavLink>
               <NavLink to="/admin/compliance" className={navClass}>Regulatory Compliance</NavLink>
               <NavLink to="/admin/reports" className={navClass}>Executive Reporting</NavLink>
-
               <NavLink to="/admin/audit" className={navClass}>Audit Explorer</NavLink>
               <NavLink to="/admin/global" className={navClass}>Global Control</NavLink>
               <NavLink to="/admin/notifications" className={navClass}>System Notifications</NavLink>
-
               <NavLink to="/admin/companies" className={navClass}>Company Oversight</NavLink>
               <NavLink to="/manager" className={navClass}>Manager Command</NavLink>
               <NavLink to="/company" className={navClass}>Corporate Entities</NavLink>
@@ -152,28 +147,39 @@ export default function AdminLayout() {
         )}
       </aside>
 
-      {/* ================= MAIN ================= */}
+      {/* ================= CENTER BALANCED MAIN ================= */}
       <div
         style={{
-          marginLeft: sidebarOpen ? SIDEBAR_WIDTH : 0,
           marginTop: 70,
-          marginRight: advisorOpen ? ADVISOR_WIDTH : 0,
-          transition: "all .28s ease",
           height: "calc(100vh - 70px)",
-          overflow: "hidden"
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "stretch",
+          transition: "all .28s ease"
         }}
       >
-        <main
+        <div
           style={{
-            height: "100%",
-            overflowY: "auto",
-            padding: 20
+            width: "100%",
+            maxWidth: 1400,
+            paddingLeft: sidebarOpen ? SIDEBAR_WIDTH / 2 : 0,
+            paddingRight: advisorOpen ? ADVISOR_WIDTH / 2 : 0,
+            transition: "all .28s ease",
+            display: "flex",
+            flexDirection: "column",
+            overflow: "hidden"
           }}
         >
-          <div style={{ maxWidth: 1400, margin: "0 auto" }}>
+          <main
+            style={{
+              flex: 1,
+              overflowY: "auto",
+              padding: 20
+            }}
+          >
             <Outlet />
-          </div>
-        </main>
+          </main>
+        </div>
       </div>
 
       {/* ================= ADVISOR PANEL ================= */}
