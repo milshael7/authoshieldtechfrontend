@@ -1,5 +1,5 @@
 // frontend/src/pages/admin/AdminOverview.jsx
-// Executive Command Center — Platform + Operator (Restored Separation + Fixed Global Queue)
+// Executive Command Center — Platform + Operator (Layer 6 Alert Lifecycle Engine)
 
 import React, { useEffect, useState } from "react";
 import { useSecurity } from "../../context/SecurityContext.jsx";
@@ -59,6 +59,8 @@ export default function AdminOverview() {
     return initial;
   });
 
+  /* ================= GLOBAL ALERT QUEUE ================= */
+
   const [globalQueue, setGlobalQueue] = useState([]);
 
   /* ================= THREAT ENGINE ================= */
@@ -94,14 +96,15 @@ export default function AdminOverview() {
               companyId: id,
               risk: newRisk,
               containment,
-              time: new Date()
+              time: new Date(),
+              status: "NEW"
             });
           }
         });
 
         if (newAlerts.length > 0) {
           setGlobalQueue(prevQueue =>
-            [...newAlerts, ...prevQueue].slice(0, 50)
+            [...newAlerts, ...prevQueue].slice(0, 100)
           );
         }
 
@@ -114,6 +117,38 @@ export default function AdminOverview() {
     return () => clearInterval(interval);
 
   }, []);
+
+  /* ================= ALERT ACTION ENGINE ================= */
+
+  const updateAlertStatus = (alertId, newStatus) => {
+    setGlobalQueue(prev =>
+      prev.map(alert =>
+        alert.id === alertId
+          ? { ...alert, status: newStatus }
+          : alert
+      )
+    );
+  };
+
+  const resolveAlert = (alert) => {
+    updateAlertStatus(alert.id, "RESOLVED");
+
+    // reduce company risk when resolved
+    setCompanyState(prev => ({
+      ...prev,
+      [alert.companyId]: {
+        ...prev[alert.companyId],
+        risk: Math.max(0, prev[alert.companyId].risk - 10),
+        containment: containmentFromRisk(
+          Math.max(0, prev[alert.companyId].risk - 10)
+        ),
+        log: [
+          { time: new Date(), msg: "Threat resolved by operator" },
+          ...prev[alert.companyId].log
+        ]
+      }
+    }));
+  };
 
   const selectedCompany = companies.find(c => c.id === selectedCompanyId);
   const current = selectedCompany ? companyState[selectedCompany.id] : null;
@@ -150,45 +185,85 @@ export default function AdminOverview() {
       {mode === "operator" && (
         <>
 
-          {/* GLOBAL QUEUE — FIXED HEIGHT */}
+          {/* GLOBAL QUEUE */}
           <div className="postureCard executivePanel">
             <h3>🔴 ACTIVE GLOBAL THREAT QUEUE</h3>
 
             <div style={{
-              height: 320,
+              height: 350,
               overflowY: "auto",
               marginTop: 15,
               borderTop: "1px solid rgba(255,255,255,.05)"
             }}>
+
               {globalQueue.length === 0 && (
                 <div className="muted">No active threats.</div>
               )}
 
-              {globalQueue.map(alert => (
-                <div
-                  key={alert.id}
-                  style={{
-                    padding: "8px 0",
-                    borderBottom: "1px solid rgba(255,255,255,.06)",
-                    display: "flex",
-                    justifyContent: "space-between"
-                  }}
-                >
-                  <div>
-                    <b>{companies.find(c => c.id === alert.companyId)?.name}</b>
-                    <div style={{ fontSize: 12, opacity: 0.6 }}>
-                      {alert.containment} — Risk {alert.risk}
+              {globalQueue.map(alert => {
+
+                const companyName = companies.find(c => c.id === alert.companyId)?.name;
+                const isResolved = alert.status === "RESOLVED";
+
+                return (
+                  <div
+                    key={alert.id}
+                    style={{
+                      padding: "10px 0",
+                      borderBottom: "1px solid rgba(255,255,255,.06)",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      opacity: isResolved ? 0.4 : 1
+                    }}
+                  >
+                    <div>
+                      <b>{companyName}</b>
+                      <div style={{ fontSize: 12, opacity: 0.6 }}>
+                        {alert.containment} — Risk {alert.risk}
+                      </div>
+                      <div style={{ fontSize: 11, marginTop: 4 }}>
+                        Status: <b>{alert.status}</b>
+                      </div>
+                    </div>
+
+                    <div style={{ display: "flex", gap: 6 }}>
+
+                      {!isResolved && (
+                        <>
+                          {alert.status === "NEW" && (
+                            <button className="btn"
+                              onClick={() => updateAlertStatus(alert.id, "ACKNOWLEDGED")}>
+                              Ack
+                            </button>
+                          )}
+
+                          {alert.status === "ACKNOWLEDGED" && (
+                            <button className="btn"
+                              onClick={() => updateAlertStatus(alert.id, "INVESTIGATING")}>
+                              Investigate
+                            </button>
+                          )}
+
+                          {(alert.status === "INVESTIGATING" || alert.status === "ACKNOWLEDGED") && (
+                            <button className="btn primary"
+                              onClick={() => resolveAlert(alert)}>
+                              Resolve
+                            </button>
+                          )}
+                        </>
+                      )}
+
+                      <button
+                        className="btn"
+                        onClick={() => setSelectedCompanyId(alert.companyId)}
+                      >
+                        Enter
+                      </button>
+
                     </div>
                   </div>
-
-                  <button
-                    className="btn"
-                    onClick={() => setSelectedCompanyId(alert.companyId)}
-                  >
-                    Enter
-                  </button>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 
