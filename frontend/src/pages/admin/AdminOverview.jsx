@@ -1,5 +1,5 @@
 // frontend/src/pages/admin/AdminOverview.jsx
-// Executive Command Center — Platform + Operator Mode (Layer 1 Upgraded)
+// Executive Command Center — Platform + Operator Deep Console (Layer 2)
 
 import React, { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { api } from "../../lib/api";
@@ -109,13 +109,6 @@ export default function AdminOverview() {
     { id: "c4", name: "Delta Finance", risk: 12, alerts: 1 }
   ];
 
-  const fleetRiskAverage = useMemo(() => {
-    const total = mockCompanies.reduce((sum, c) => sum + c.risk, 0);
-    return Math.round(total / mockCompanies.length);
-  }, []);
-
-  const fleetBadge = riskLevel(fleetRiskAverage);
-
   if (loading) {
     return <div className="dashboard-loading">Loading Executive Center…</div>;
   }
@@ -136,7 +129,11 @@ export default function AdminOverview() {
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div className="sectionTitle">
-          {mode === "platform" ? "Platform Command Center" : "Operator Fleet Command"}
+          {mode === "platform"
+            ? "Platform Command Center"
+            : selectedCompany
+              ? `${selectedCompany.name} — Operator Command Console`
+              : "Operator Fleet Command"}
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
@@ -171,26 +168,6 @@ export default function AdminOverview() {
       {mode === "operator" && (
 
         <>
-          {/* Fleet Summary Strip */}
-          <div className="postureCard executivePanel">
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div>
-                <h3>Fleet Overview</h3>
-                <div className="muted">
-                  {mockCompanies.length} Protected Companies
-                </div>
-              </div>
-
-              <div>
-                Fleet Risk:{" "}
-                <span className={`badge ${fleetBadge.cls}`}>
-                  {fleetRiskAverage}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Company Grid */}
           {!selectedCompany && (
             <div
               style={{
@@ -199,61 +176,105 @@ export default function AdminOverview() {
                 gap: 24
               }}
             >
-              {mockCompanies.map((c) => {
-                const badge = riskLevel(c.risk);
-
-                return (
-                  <div
-                    key={c.id}
-                    className="postureCard"
-                    style={{ cursor: "pointer" }}
-                    onClick={() => setSelectedCompany(c)}
-                  >
-                    <h4>{c.name}</h4>
-
-                    <div style={{ marginTop: 14 }}>
-                      Risk:{" "}
-                      <span className={`badge ${badge.cls}`}>
-                        {c.risk}
-                      </span>
-                    </div>
-
-                    <div style={{ marginTop: 10 }}>
-                      Active Alerts: <b>{c.alerts}</b>
-                    </div>
+              {mockCompanies.map((c) => (
+                <div
+                  key={c.id}
+                  className="postureCard"
+                  style={{ cursor: "pointer" }}
+                  onClick={() => setSelectedCompany(c)}
+                >
+                  <h4>{c.name}</h4>
+                  <div style={{ marginTop: 14 }}>
+                    Risk: <span className={`badge ${riskLevel(c.risk).cls}`}>{c.risk}</span>
                   </div>
-                );
-              })}
+                  <div style={{ marginTop: 10 }}>
+                    Active Alerts: <b>{c.alerts}</b>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
 
-          {/* Selected Company Deep View */}
           {selectedCompany && (
             <>
               <button
                 className="btn"
                 onClick={() => setSelectedCompany(null)}
               >
-                ← Back to Fleet
+                ← Exit Company Console
               </button>
 
+              {/* === Threat Snapshot Row === */}
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(4, 1fr)",
+                  gap: 20
+                }}
+              >
+                <div className="kpiCard executive">
+                  <small>Risk Score</small>
+                  <b>{selectedCompany.risk}</b>
+                </div>
+
+                <div className="kpiCard executive">
+                  <small>Active Alerts</small>
+                  <b>{selectedCompany.alerts}</b>
+                </div>
+
+                <div className="kpiCard executive">
+                  <small>Endpoints</small>
+                  <b>{Math.floor(Math.random() * 120)}</b>
+                </div>
+
+                <div className="kpiCard executive">
+                  <small>Containment Status</small>
+                  <b className="badge ok">STABLE</b>
+                </div>
+              </div>
+
+              {/* === Action Console === */}
               <div className="postureCard executivePanel">
-                <h3>{selectedCompany.name} — Operational View</h3>
+                <h3>Operator Actions</h3>
 
-                <div style={{ marginTop: 12 }}>
-                  Risk Score:{" "}
-                  <span className={`badge ${riskLevel(selectedCompany.risk).cls}`}>
-                    {selectedCompany.risk}
-                  </span>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+                    gap: 14,
+                    marginTop: 16
+                  }}
+                >
+                  <button className="btn warn">Force Endpoint Isolation</button>
+                  <button className="btn warn">Lock Suspicious Account</button>
+                  <button className="btn primary">Escalate to Incident Board</button>
+                  <button className="btn">Trigger Deep Scan</button>
+                  <button className="btn">Notify Company Admin</button>
                 </div>
+              </div>
 
-                <div style={{ marginTop: 8 }}>
-                  Active Alerts: <b>{selectedCompany.alerts}</b>
-                </div>
+              {/* === Company Activity Feed === */}
+              <div className="postureCard">
+                <h3>Live Company Activity Feed</h3>
 
-                <div style={{ marginTop: 20 }} className="muted">
-                  Company-specific SOC modules will render here in next layer.
-                </div>
+                {[...Array(6)].map((_, i) => (
+                  <div
+                    key={i}
+                    style={{
+                      padding: "8px 0",
+                      borderBottom: "1px solid rgba(255,255,255,.06)",
+                      display: "flex",
+                      justifyContent: "space-between"
+                    }}
+                  >
+                    <small style={{ opacity: 0.7 }}>
+                      {new Date().toLocaleTimeString()}
+                    </small>
+                    <div>
+                      <b>Threat event detected on endpoint-{i + 1}</b>
+                    </div>
+                  </div>
+                ))}
               </div>
             </>
           )}
