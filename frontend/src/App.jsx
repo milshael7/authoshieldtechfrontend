@@ -109,6 +109,8 @@ function AppRoutes({ user, ready }) {
 
   return (
     <Routes>
+
+      {/* PUBLIC */}
       <Route path="/" element={<Landing />} />
       <Route path="/pricing" element={<Pricing />} />
       <Route path="/signup" element={<Signup />} />
@@ -141,11 +143,74 @@ function AppRoutes({ user, ready }) {
         <Route path="sessions" element={<SessionMonitor />} />
         <Route path="device-integrity" element={<DeviceIntegrityPanel />} />
 
-        {/* ✅ FIXED ROUTED TRADING */}
         <Route path="trading/*" element={<TradingLayout />} />
       </Route>
 
+      {/* ================= MANAGER ================= */}
+      <Route
+        path="/manager/*"
+        element={
+          <RoleGuard user={user} ready={ready} allow={["manager", "admin"]}>
+            <ManagerLayout />
+          </RoleGuard>
+        }
+      >
+        <Route index element={<SOC />} />
+        <Route path="intelligence" element={<Intelligence />} />
+        <Route path="assets" element={<Assets />} />
+        <Route path="incidents" element={<Incidents />} />
+        <Route path="vulnerabilities" element={<Vulnerabilities />} />
+        <Route path="reports" element={<Reports />} />
+        <Route path="notifications" element={<Notifications />} />
+      </Route>
+
+      {/* ================= COMPANY ================= */}
+      <Route
+        path="/company/*"
+        element={
+          <RoleGuard user={user} ready={ready} allow={["company", "admin", "manager"]}>
+            <CompanyLayout />
+          </RoleGuard>
+        }
+      >
+        <Route index element={<SecurityOverview />} />
+        <Route path="assets" element={<Assets />} />
+        <Route path="incidents" element={<Incidents />} />
+        <Route path="vulnerabilities" element={<Vulnerabilities />} />
+        <Route path="reports" element={<Reports />} />
+        <Route path="notifications" element={<Notifications />} />
+      </Route>
+
+      {/* ================= SMALL COMPANY ================= */}
+      <Route
+        path="/small-company/*"
+        element={
+          <RoleGuard user={user} ready={ready} allow={["small_company"]}>
+            <SmallCompanyLayout />
+          </RoleGuard>
+        }
+      >
+        <Route index element={<SecurityOverview />} />
+        <Route path="assets" element={<Assets />} />
+        <Route path="incidents" element={<Incidents />} />
+      </Route>
+
+      {/* ================= USER ================= */}
+      <Route
+        path="/user/*"
+        element={
+          <RoleGuard user={user} ready={ready} allow={["individual"]}>
+            <UserLayout />
+          </RoleGuard>
+        }
+      >
+        <Route index element={<SecurityOverview />} />
+        <Route path="notifications" element={<Notifications />} />
+      </Route>
+
+      {/* ================= 404 ================= */}
       <Route path="*" element={<NotFound />} />
+
     </Routes>
   );
 }
@@ -153,13 +218,18 @@ function AppRoutes({ user, ready }) {
 /* ================= MAIN APP ================= */
 
 export default function App() {
+
   const [user, setUser] = useState(null);
   const [ready, setReady] = useState(false);
+
   const base = import.meta.env.VITE_API_BASE?.replace(/\/+$/, "");
 
   useEffect(() => {
+
     async function bootAuth() {
+
       try {
+
         const token = getToken();
         const storedUser = getSavedUser();
 
@@ -182,22 +252,30 @@ export default function App() {
         const data = await res.json();
 
         if (data?.token && data?.user) {
+
           setToken(data.token);
           saveUser(data.user);
+
           setUser(data.user);
+
         } else {
           throw new Error("Bad refresh payload");
         }
+
       } catch {
+
         clearToken();
         clearUser();
         setUser(null);
+
       } finally {
         setReady(true);
       }
+
     }
 
     bootAuth();
+
   }, [base]);
 
   return (
@@ -211,4 +289,5 @@ export default function App() {
       </ToolProvider>
     </CompanyProvider>
   );
+
 }
