@@ -1,7 +1,7 @@
 /* =========================================================
    AUTOSHIELD FRONTEND API LAYER — ENTERPRISE v11
    SOC READY • ZERO TRUST SAFE • TENANT AWARE
-   FULL BACKEND ALIGNMENT
+   LOGIN RESPONSE FIX • ERROR SAFE
 ========================================================= */
 
 const API_BASE = import.meta.env.VITE_API_BASE?.trim();
@@ -53,6 +53,7 @@ function joinUrl(base, path) {
 }
 
 async function fetchWithTimeout(url, options = {}, ms = REQUEST_TIMEOUT) {
+
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), ms);
 
@@ -61,11 +62,13 @@ async function fetchWithTimeout(url, options = {}, ms = REQUEST_TIMEOUT) {
   } finally {
     clearTimeout(id);
   }
+
 }
 
 /* ================= TENANT SUPPORT ================= */
 
 function attachTenantHeader(headers) {
+
   const user = getSavedUser();
 
   if (user?.companyId) {
@@ -73,6 +76,7 @@ function attachTenantHeader(headers) {
   }
 
   return headers;
+
 }
 
 /* ================= CORE REQUEST ================= */
@@ -93,14 +97,18 @@ export async function req(path, { method = "GET", body, auth = true } = {}) {
   let res;
 
   try {
+
     res = await fetchWithTimeout(joinUrl(API_BASE, path), {
       method,
       headers,
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });
+
   } catch (err) {
+
     console.warn("API network error:", path);
-    return {};
+    return { error: "Server unreachable" };
+
   }
 
   let data = {};
@@ -112,36 +120,36 @@ export async function req(path, { method = "GET", body, auth = true } = {}) {
   /* ================= SESSION RECOVERY ================= */
 
   if (res.status === 401) {
-    console.warn("Session expired");
 
     clearToken();
     clearUser();
 
     window.location.href = "/login";
 
-    return {};
+    return { error: "Session expired" };
+
   }
 
-  /* ================= SAFE 404 ================= */
-
-  if (res.status === 404) {
-    console.warn("Endpoint not found:", path);
-    return {};
-  }
+  /* ================= SAFE ERRORS ================= */
 
   if (!res.ok) {
-    console.warn("API warning:", path, res.status);
-    return {};
+
+    return {
+      error: data?.error || `Request failed (${res.status})`,
+      status: res.status,
+    };
+
   }
 
   return data;
+
 }
 
 /* ================= API OBJECT ================= */
 
 const api = {
 
-  /* GENERIC HELPERS */
+  /* GENERIC */
 
   get: (path) => req(path, { method: "GET" }),
   post: (path, body) => req(path, { method: "POST", body }),
@@ -150,12 +158,23 @@ const api = {
 
   /* ================= AUTH ================= */
 
-  login: (email, password) =>
-    req("/api/auth/login", {
+  login: async (email, password) => {
+
+    const result = await req("/api/auth/login", {
       method: "POST",
       body: { email, password },
       auth: false,
-    }),
+    });
+
+    if (result?.token && result?.user) {
+      return result;
+    }
+
+    return {
+      error: result?.error || "Invalid login response",
+    };
+
+  },
 
   signup: (payload) =>
     req("/api/auth/signup", {
@@ -267,28 +286,6 @@ const api = {
 
   billingStatus: () =>
     req("/api/billing/status"),
-
-  /* ================= SOC ALERTS ================= */
-
-  socAlerts: () =>
-    req("/api/soc/alerts"),
-
-  createSocAlert: (payload) =>
-    req("/api/soc/alerts", {
-      method: "POST",
-      body: payload,
-    }),
-
-  updateSocAlert: (id, payload) =>
-    req(`/api/soc/alerts/${id}`, {
-      method: "PATCH",
-      body: payload,
-    }),
-
-  deleteSocAlert: (id) =>
-    req(`/api/soc/alerts/${id}`, {
-      method: "DELETE",
-    }),
 
 };
 
