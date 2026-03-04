@@ -1,6 +1,6 @@
 // frontend/src/context/SecurityContext.jsx
-// Security Context — Enterprise Hardened v6
-// LIVE TELEMETRY • TENANT AWARE • WS SAFE • EVENT BUS ENABLED
+// Security Context — Enterprise Hardened v7
+// STABLE WS • SAFE RECONNECT • LOGIN LOOP FIX
 
 import React,{
 createContext,
@@ -16,10 +16,6 @@ import { getToken, api } from "../lib/api.js";
 import { useEventBus } from "../core/EventBus.jsx";
 
 const SecurityContext = createContext(null);
-
-function now(){
-return Date.now();
-}
 
 function safeJsonParse(v){
 try{
@@ -51,16 +47,7 @@ const [wsStatus,setWsStatus] = useState("disconnected");
 
 const socketRef = useRef(null);
 const reconnectTimer = useRef(null);
-const heartbeatRef = useRef(null);
-
 const tokenRef = useRef(getToken() || null);
-
-const backoffRef = useRef({
-attempt:0,
-delay:1200
-});
-
-const forceStopRef = useRef(false);
 
 /* ================= WS URL ================= */
 
@@ -83,28 +70,9 @@ return null;
 
 }
 
-/* ================= CLEANUP ================= */
-
-const clearReconnect = ()=>{
-if(reconnectTimer.current){
-clearTimeout(reconnectTimer.current);
-reconnectTimer.current=null;
-}
-};
-
-const clearHeartbeat = ()=>{
-if(heartbeatRef.current){
-clearInterval(heartbeatRef.current);
-heartbeatRef.current=null;
-}
-};
+/* ================= SOCKET CLEANUP ================= */
 
 const closeSocket = useCallback(()=>{
-
-forceStopRef.current=true;
-
-clearReconnect();
-clearHeartbeat();
 
 if(socketRef.current){
 
@@ -120,145 +88,6 @@ setWsStatus("disconnected");
 
 },[]);
 
-/* ================= BACKOFF ================= */
-
-const scheduleReconnect = useCallback(()=>{
-
-if(forceStopRef.current) return;
-
-clearReconnect();
-
-backoffRef.current.attempt+=1;
-
-const base = Math.min(15000,backoffRef.current.delay);
-const jitter = Math.floor(Math.random()*400);
-
-const delay = base + jitter;
-
-backoffRef.current.delay = Math.min(
-20000,
-base*1.4 + 300
-);
-
-setWsStatus("reconnecting");
-
-reconnectTimer.current=setTimeout(()=>{
-connectSocket();
-},delay);
-
-},[]);
-
-/* ================= MESSAGE ================= */
-
-const handleMessage = useCallback((raw)=>{
-
-const data = safeJsonParse(raw);
-
-if(!data || !data.type) return;
-
-const companyId = String(data.companyId || "global");
-
-switch(data.type){
-
-case "risk_update":
-
-setRiskByCompany(prev=>({
-
-...prev,
-
-[companyId]:{
-riskScore:Number(data.riskScore||0),
-signals:data.signals||[],
-updatedAt:now()
-}
-
-}));
-
-bus.emit("risk_update",{
-companyId,
-riskScore:data.riskScore,
-signals:data.signals||[]
-});
-
-break;
-
-case "asset_exposure_update":
-
-setExposureByCompany(prev=>({
-
-...prev,
-
-[companyId]:{
-exposure:
-data.exposure && typeof data.exposure==="object"
-? data.exposure
-: {},
-updatedAt:now()
-}
-
-}));
-
-bus.emit("asset_exposure_update",{
-companyId,
-exposure:data.exposure||{}
-});
-
-break;
-
-case "integrity_alert":
-
-setIntegrityAlert(data);
-setSystemStatus("compromised");
-
-setAuditFeed(prev=>[
-
-{
-id:`integrity_${Date.now()}`,
-ts:new Date().toISOString(),
-action:"INTEGRITY_ALERT",
-detail:data
-},
-
-...prev
-
-].slice(0,150));
-
-bus.emit("integrity_alert",data);
-
-break;
-
-default:
-break;
-
-}
-
-},[bus]);
-
-/* ================= HEARTBEAT ================= */
-
-function startHeartbeat(){
-
-clearHeartbeat();
-
-heartbeatRef.current=setInterval(()=>{
-
-if(!socketRef.current) return;
-
-if(socketRef.current.readyState!==1) return;
-
-try{
-
-socketRef.current.send(JSON.stringify({
-type:"heartbeat",
-ts:Date.now()
-}));
-
-}catch{}
-
-},15000);
-
-}
-
 /* ================= CONNECT ================= */
 
 const connectSocket = useCallback(()=>{
@@ -267,24 +96,17 @@ const token = getToken();
 
 tokenRef.current = token || null;
 
-if(!token){
+if(!token) return;
 
-closeSocket();
-return;
+/* prevent duplicate connections */
 
+if(socketRef.current){
+if(socketRef.current.readyState===1) return;
 }
-
-if(socketRef.current && socketRef.current.readyState===1){
-return;
-}
-
-forceStopRef.current=false;
 
 const wsUrl = buildWsUrl(token);
 
 if(!wsUrl) return;
-
-setWsStatus("connecting");
 
 let socket;
 
@@ -294,8 +116,6 @@ socket = new WebSocket(wsUrl);
 
 }catch{
 
-setWsStatus("disconnected");
-scheduleReconnect();
 return;
 
 }
@@ -304,17 +124,59 @@ socket.onopen=()=>{
 
 setWsStatus("connected");
 
-backoffRef.current.attempt=0;
-backoffRef.current.delay=1200;
-
-startHeartbeat();
-
 bus.emit("security_ws_connected");
 
 };
 
 socket.onmessage=(event)=>{
-handleMessage(event.data);
+
+const data = safeJsonParse(event.data);
+
+if(!data || !data.type) return;
+
+switch(data.type){
+
+case "risk_update":
+
+setRiskByCompany(prev=>({
+
+...prev,
+
+[String(data.companyId||"global")]:{
+riskScore:Number(data.riskScore||0),
+signals:data.signals||[]
+}
+
+}));
+
+break;
+
+case "asset_exposure_update":
+
+setExposureByCompany(prev=>({
+
+...prev,
+
+[String(data.companyId||"global")]:{
+exposure:data.exposure||{}
+}
+
+}));
+
+break;
+
+case "integrity_alert":
+
+setIntegrityAlert(data);
+setSystemStatus("compromised");
+
+break;
+
+default:
+break;
+
+}
+
 };
 
 socket.onerror=()=>{
@@ -325,29 +187,26 @@ socket.close();
 
 };
 
-socket.onclose=(event)=>{
+socket.onclose=()=>{
 
 socketRef.current=null;
 
-clearHeartbeat();
-
-if(event.code===1008){
-forceStopRef.current=true;
-setWsStatus("disconnected");
-return;
-}
-
 setWsStatus("disconnected");
 
-bus.emit("security_ws_disconnected");
+/* reconnect slowly to prevent loop */
 
-scheduleReconnect();
+if(reconnectTimer.current)
+clearTimeout(reconnectTimer.current);
+
+reconnectTimer.current=setTimeout(()=>{
+connectSocket();
+},5000);
 
 };
 
 socketRef.current = socket;
 
-},[closeSocket,handleMessage,scheduleReconnect,bus]);
+},[bus]);
 
 /* ================= BOOT ================= */
 
@@ -421,12 +280,7 @@ const pushDeviceAlert = useCallback((alert)=>{
 setDeviceAlerts(prev=>[alert,...prev].slice(0,75));
 },[]);
 
-/* ================= GLOBAL STATE ================= */
-
-const globalRiskScore = riskByCompany?.global?.riskScore ?? 0;
-const globalExposure = exposureByCompany?.global?.exposure ?? {};
-
-/* ================= CONTEXT VALUE ================= */
+/* ================= CONTEXT ================= */
 
 const value = useMemo(()=>({
 
@@ -439,9 +293,6 @@ integrityAlert,
 
 riskByCompany,
 exposureByCompany,
-
-riskScore:globalRiskScore,
-assetExposure:globalExposure,
 
 auditFeed,
 deviceAlerts,
@@ -457,8 +308,6 @@ systemStatus,
 integrityAlert,
 riskByCompany,
 exposureByCompany,
-globalRiskScore,
-globalExposure,
 auditFeed,
 deviceAlerts,
 pushAudit,
