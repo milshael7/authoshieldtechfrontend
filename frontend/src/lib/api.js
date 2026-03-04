@@ -1,7 +1,6 @@
 /* =========================================================
-   AUTOSHIELD FRONTEND API LAYER — ENTERPRISE v13
-   SOC READY • ZERO TRUST SAFE • TENANT AWARE
-   RENDER WAKE SAFE • LOGIN STABLE • SESSION SAFE
+   AUTOSHIELD FRONTEND API LAYER — ENTERPRISE v13 (FIXED)
+   NO FLASH • NO HARD REDIRECT • SESSION SAFE
 ========================================================= */
 
 const API_BASE = import.meta.env.VITE_API_BASE?.trim();
@@ -12,7 +11,6 @@ if (!API_BASE) {
 
 const TOKEN_KEY = "as_token";
 const USER_KEY = "as_user";
-
 const REQUEST_TIMEOUT = 60000;
 
 /* ================= STORAGE ================= */
@@ -22,8 +20,7 @@ export function getToken() {
 }
 
 export function setToken(token) {
-  if (token) localStorage.setItem(TOKEN_KEY, token);
-  else localStorage.removeItem(TOKEN_KEY);
+  token ? localStorage.setItem(TOKEN_KEY, token) : localStorage.removeItem(TOKEN_KEY);
 }
 
 export function clearToken() {
@@ -39,8 +36,7 @@ export function getSavedUser() {
 }
 
 export function saveUser(user) {
-  if (user) localStorage.setItem(USER_KEY, JSON.stringify(user));
-  else localStorage.removeItem(USER_KEY);
+  user ? localStorage.setItem(USER_KEY, JSON.stringify(user)) : localStorage.removeItem(USER_KEY);
 }
 
 export function clearUser() {
@@ -54,7 +50,6 @@ function joinUrl(base, path) {
 }
 
 async function fetchWithTimeout(url, options = {}, ms = REQUEST_TIMEOUT) {
-
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), ms);
 
@@ -63,21 +58,14 @@ async function fetchWithTimeout(url, options = {}, ms = REQUEST_TIMEOUT) {
   } finally {
     clearTimeout(id);
   }
-
 }
 
-/* ================= TENANT SUPPORT ================= */
+/* ================= TENANT ================= */
 
 function attachTenantHeader(headers) {
-
   const user = getSavedUser();
-
-  if (user?.companyId) {
-    headers["x-company-id"] = user.companyId;
-  }
-
+  if (user?.companyId) headers["x-company-id"] = user.companyId;
   return headers;
-
 }
 
 /* ================= CORE REQUEST ================= */
@@ -96,210 +84,76 @@ export async function req(path, { method = "GET", body, auth = true } = {}) {
   }
 
   let res;
-
   try {
-
     res = await fetchWithTimeout(joinUrl(API_BASE, path), {
       method,
       headers,
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });
-
   } catch {
-
-    return {
-      error: "Server unreachable or waking up"
-    };
-
+    return { error: "Network unreachable" };
   }
 
   let data = {};
-
   try {
     data = await res.json();
   } catch {}
 
-  /* ================= SESSION HANDLING ================= */
+  /* ================= FIXED SESSION HANDLING ================= */
 
   if (res.status === 401 && auth) {
-
     clearToken();
     clearUser();
-
-    window.location.href = "/login";
-
-    return { error: "Session expired" };
-
+    return { error: "Session expired", unauthorized: true };
   }
 
   if (!res.ok) {
-
     return {
       error: data?.error || `Request failed (${res.status})`,
       status: res.status,
     };
-
   }
 
   return data;
-
 }
 
 /* ================= API OBJECT ================= */
 
-const api = {
+export const api = {
 
-  /* GENERIC */
-
-  get: (path) => req(path, { method: "GET" }),
-  post: (path, body) => req(path, { method: "POST", body }),
-  patch: (path, body) => req(path, { method: "PATCH", body }),
-  del: (path) => req(path, { method: "DELETE" }),
-
-  /* ================= AUTH ================= */
-
+  /* AUTH */
   login: async (email, password) => {
-
-    const response = await fetch(`${API_BASE}/api/auth/login`, {
+    const res = await fetch(`${API_BASE}/api/auth/login`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({ email, password })
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
     });
 
-    let data = null;
+    const data = await res.json().catch(() => null);
 
-    try {
-      data = await response.json();
-    } catch {
-      throw new Error("Server returned invalid response");
-    }
-
-    if (!response.ok) {
-      throw new Error(data?.error || "Login failed");
-    }
-
-    if (!data?.token || !data?.user) {
-      console.error("Login response:", data);
-      throw new Error("Invalid login response from server");
-    }
+    if (!res.ok) throw new Error(data?.error || "Login failed");
+    if (!data?.token || !data?.user) throw new Error("Invalid login response");
 
     return data;
-
   },
 
-  signup: (payload) =>
-    req("/api/auth/signup", {
-      method: "POST",
-      body: payload,
-      auth: false,
-    }),
+  signup: (payload) => req("/api/auth/signup", { method: "POST", body: payload, auth: false }),
+  refresh: () => req("/api/auth/refresh", { method: "POST" }),
 
-  refresh: () =>
-    req("/api/auth/refresh", {
-      method: "POST",
-    }),
+  /* USERS */
+  listUsers: () => req("/api/users"),
+  getUser: (id) => req(`/api/users/${id}`),
 
-  /* ================= USERS ================= */
+  /* SECURITY */
+  postureSummary: () => req("/api/security/posture-summary"),
+  securityEvents: () => req("/api/security/events"),
+  vulnerabilities: () => req("/api/security/vulnerabilities"),
 
-  listUsers: () =>
-    req("/api/users"),
+  /* ADMIN */
+  adminPlatformHealth: () => req("/api/admin/platform-health"),
 
-  getUser: (id) =>
-    req(`/api/users/${id}`),
-
-  createUser: (payload) =>
-    req("/api/users", {
-      method: "POST",
-      body: payload,
-    }),
-
-  updateUser: (id, payload) =>
-    req(`/api/users/${id}`, {
-      method: "PATCH",
-      body: payload,
-    }),
-
-  /* ================= COMPANIES ================= */
-
-  listCompanies: () =>
-    req("/api/company"),
-
-  getCompany: (id) =>
-    req(`/api/company/${id}`),
-
-  createCompany: (payload) =>
-    req("/api/company", {
-      method: "POST",
-      body: payload,
-    }),
-
-  updateCompany: (id, payload) =>
-    req(`/api/company/${id}`, {
-      method: "PATCH",
-      body: payload,
-    }),
-
-  /* ================= INCIDENTS ================= */
-
-  incidents: () =>
-    req("/api/incidents"),
-
-  createIncident: (payload) =>
-    req("/api/incidents", {
-      method: "POST",
-      body: payload,
-    }),
-
-  /* ================= SECURITY ================= */
-
-  postureSummary: () =>
-    req("/api/security/posture-summary"),
-
-  securityEvents: () =>
-    req("/api/security/events"),
-
-  vulnerabilities: () =>
-    req("/api/security/vulnerabilities"),
-
-  /* ================= ADMIN ================= */
-
-  adminPlatformHealth: () =>
-    req("/api/admin/platform-health"),
-
-  adminAuditLogs: () =>
-    req("/api/admin/audit"),
-
-  adminThreatFeed: () =>
-    req("/api/admin/threat-feed"),
-
-  /* ================= AUTOPROTECT ================= */
-
-  autoProtectStatus: () =>
-    req("/api/autoprotect/status"),
-
-  autoProtectScan: () =>
-    req("/api/autoprotect/scan"),
-
-  /* ================= TOOLS ================= */
-
-  toolCatalog: () =>
-    req("/api/tools/catalog"),
-
-  requestTool: (toolId) =>
-    req(`/api/tools/request/${toolId}`, {
-      method: "POST",
-    }),
-
-  /* ================= ENTITLEMENTS ================= */
-
-  myEntitlements: () =>
-    req("/api/entitlements/me"),
-
-  billingStatus: () =>
-    req("/api/billing/status"),
+  /* TOOLS */
+  toolCatalog: () => req("/api/tools/catalog"),
+  requestTool: (toolId) => req(`/api/tools/request/${toolId}`, { method: "POST" }),
 
 };
-
-export { api };
