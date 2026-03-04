@@ -16,6 +16,7 @@ import { ToolProvider } from "./pages/tools/ToolContext.jsx";
 import { SecurityProvider } from "./context/SecurityContext.jsx";
 import { EventBusProvider } from "./core/EventBus.jsx";
 import { AIDecisionProvider } from "./core/AIDecisionBus.jsx";
+import BrainAdapter from "./core/BrainAdapter.jsx";
 
 import PlatformGate from "./components/PlatformGate.jsx";
 
@@ -240,6 +241,7 @@ export default function App() {
   return (
     <EventBusProvider>
       <AIDecisionProvider>
+        <BrainAdapter />
         <CompanyProvider>
           <ToolProvider user={ready ? user : null}>
             <SecurityProvider>
