@@ -1,10 +1,14 @@
 /* =========================================================
-   AUTOSHIELD FRONTEND API LAYER — ENTERPRISE v9
-   404 SAFE • SOC READY • NO MORE "ADD ENDPOINT ONE-BY-ONE"
+   AUTOSHIELD FRONTEND API LAYER — ENTERPRISE v10
+   SOC READY • ZERO TRUST SAFE • TENANT AWARE
+   FULL BACKEND ALIGNMENT
 ========================================================= */
 
 const API_BASE = import.meta.env.VITE_API_BASE?.trim();
-if (!API_BASE) console.error("❌ VITE_API_BASE is missing");
+
+if (!API_BASE) {
+  console.error("❌ VITE_API_BASE is missing");
+}
 
 const TOKEN_KEY = "as_token";
 const USER_KEY = "as_user";
@@ -17,7 +21,8 @@ export function getToken() {
 }
 
 export function setToken(token) {
-  token ? localStorage.setItem(TOKEN_KEY, token) : localStorage.removeItem(TOKEN_KEY);
+  if (token) localStorage.setItem(TOKEN_KEY, token);
+  else localStorage.removeItem(TOKEN_KEY);
 }
 
 export function clearToken() {
@@ -33,7 +38,8 @@ export function getSavedUser() {
 }
 
 export function saveUser(user) {
-  user ? localStorage.setItem(USER_KEY, JSON.stringify(user)) : localStorage.removeItem(USER_KEY);
+  if (user) localStorage.setItem(USER_KEY, JSON.stringify(user));
+  else localStorage.removeItem(USER_KEY);
 }
 
 export function clearUser() {
@@ -49,6 +55,7 @@ function joinUrl(base, path) {
 async function fetchWithTimeout(url, options = {}, ms = REQUEST_TIMEOUT) {
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), ms);
+
   try {
     return await fetch(url, { ...options, signal: controller.signal });
   } finally {
@@ -56,12 +63,26 @@ async function fetchWithTimeout(url, options = {}, ms = REQUEST_TIMEOUT) {
   }
 }
 
+/* ================= TENANT SUPPORT ================= */
+
+function attachTenantHeader(headers) {
+  const user = getSavedUser();
+
+  if (user?.companyId) {
+    headers["x-company-id"] = user.companyId;
+  }
+
+  return headers;
+}
+
 /* ================= CORE REQUEST ================= */
 
 export async function req(path, { method = "GET", body, auth = true } = {}) {
   if (!API_BASE) throw new Error("API base URL not configured");
 
-  const headers = { "Content-Type": "application/json" };
+  const headers = attachTenantHeader({
+    "Content-Type": "application/json",
+  });
 
   if (auth) {
     const token = getToken();
@@ -76,18 +97,34 @@ export async function req(path, { method = "GET", body, auth = true } = {}) {
       headers,
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });
-  } catch {
+  } catch (err) {
+    console.warn("API network error:", path);
     return {};
   }
 
   let data = {};
+
   try {
     data = await res.json();
   } catch {}
 
+  /* ================= SESSION RECOVERY ================= */
+
   if (res.status === 401) {
+    console.warn("Session expired");
+
     clearToken();
     clearUser();
+
+    window.location.href = "/login";
+
+    return {};
+  }
+
+  /* ================= SAFE 404 ================= */
+
+  if (res.status === 404) {
+    console.warn("Endpoint not found:", path);
     return {};
   }
 
@@ -102,13 +139,16 @@ export async function req(path, { method = "GET", body, auth = true } = {}) {
 /* ================= API OBJECT ================= */
 
 const api = {
-  // 🔥 Generic helpers (NO MORE adding endpoints one by one)
+
+  /* GENERIC HELPERS */
+
   get: (path) => req(path, { method: "GET" }),
   post: (path, body) => req(path, { method: "POST", body }),
   patch: (path, body) => req(path, { method: "PATCH", body }),
   del: (path) => req(path, { method: "DELETE" }),
 
-  /* AUTH */
+  /* ================= AUTH ================= */
+
   login: (email, password) =>
     req("/api/auth/login", {
       method: "POST",
@@ -123,29 +163,110 @@ const api = {
       auth: false,
     }),
 
-  refresh: () => req("/api/auth/refresh", { method: "POST" }),
+  refresh: () =>
+    req("/api/auth/refresh", {
+      method: "POST",
+    }),
 
-  /* INCIDENTS */
-  incidents: () => req("/api/incidents"),
+  /* ================= USERS ================= */
 
-  /* SECURITY (restore what UI expects) */
-  postureSummary: () => req("/api/security/posture-summary"),
-  securityEvents: () => req("/api/security/events"),
-  vulnerabilities: () => req("/api/security/vulnerabilities"),
+  listUsers: () =>
+    req("/api/users"),
 
-  /* TOOLS */
-  toolCatalog: () => req("/api/tools/catalog"),
-  requestTool: (toolId) => req(`/api/tools/request/${toolId}`, { method: "POST" }),
+  getUser: (id) =>
+    req(`/api/users/${id}`),
 
-  /* ENTITLEMENTS */
-  myEntitlements: () => req("/api/entitlements/me"),
+  createUser: (payload) =>
+    req("/api/users", {
+      method: "POST",
+      body: payload,
+    }),
 
-  /* ADMIN */
-  adminPlatformHealth: () => req("/api/admin/platform-health"),
+  updateUser: (id, payload) =>
+    req(`/api/users/${id}`, {
+      method: "PATCH",
+      body: payload,
+    }),
 
-  /* USERS */
-  listUsers: () => req("/api/users"),
-  getUser: (id) => req(`/api/users/${id}`),
+  /* ================= COMPANIES ================= */
+
+  listCompanies: () =>
+    req("/api/company"),
+
+  getCompany: (id) =>
+    req(`/api/company/${id}`),
+
+  createCompany: (payload) =>
+    req("/api/company", {
+      method: "POST",
+      body: payload,
+    }),
+
+  updateCompany: (id, payload) =>
+    req(`/api/company/${id}`, {
+      method: "PATCH",
+      body: payload,
+    }),
+
+  /* ================= INCIDENTS ================= */
+
+  incidents: () =>
+    req("/api/incidents"),
+
+  createIncident: (payload) =>
+    req("/api/incidents", {
+      method: "POST",
+      body: payload,
+    }),
+
+  /* ================= SECURITY ================= */
+
+  postureSummary: () =>
+    req("/api/security/posture-summary"),
+
+  securityEvents: () =>
+    req("/api/security/events"),
+
+  vulnerabilities: () =>
+    req("/api/security/vulnerabilities"),
+
+  /* ================= ADMIN ================= */
+
+  adminPlatformHealth: () =>
+    req("/api/admin/platform-health"),
+
+  adminAuditLogs: () =>
+    req("/api/admin/audit"),
+
+  adminThreatFeed: () =>
+    req("/api/admin/threat-feed"),
+
+  /* ================= AUTOPROTECT ================= */
+
+  autoProtectStatus: () =>
+    req("/api/autoprotect/status"),
+
+  autoProtectScan: () =>
+    req("/api/autoprotect/scan"),
+
+  /* ================= TOOLS ================= */
+
+  toolCatalog: () =>
+    req("/api/tools/catalog"),
+
+  requestTool: (toolId) =>
+    req(`/api/tools/request/${toolId}`, {
+      method: "POST",
+    }),
+
+  /* ================= ENTITLEMENTS ================= */
+
+  myEntitlements: () =>
+    req("/api/entitlements/me"),
+
+  billingStatus: () =>
+    req("/api/billing/status"),
+
 };
 
 export { api };
