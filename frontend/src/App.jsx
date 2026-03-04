@@ -1,6 +1,6 @@
 // frontend/src/App.jsx
 import React, { useEffect, useState } from "react";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 
 import {
   getSavedUser,
@@ -14,6 +14,8 @@ import {
 import { CompanyProvider } from "./context/CompanyContext";
 import { ToolProvider } from "./pages/tools/ToolContext.jsx";
 import { SecurityProvider } from "./context/SecurityContext.jsx";
+
+import PlatformGate from "./components/PlatformGate.jsx";
 
 /* LAYOUTS */
 import AdminLayout from "./layouts/AdminLayout.jsx";
@@ -55,57 +57,9 @@ import DeviceIntegrityPanel from "./pages/DeviceIntegrityPanel.jsx";
 /* TRADING */
 import TradingLayout from "./pages/trading/TradingLayout.jsx";
 
-/* ================= HELPERS ================= */
-
-function normalize(v) {
-  return String(v || "").trim().toLowerCase();
-}
-
-function isInactiveSubscription(status) {
-  const s = normalize(status);
-  return s === "locked" || s === "past due" || s === "past_due";
-}
-
-const ROLE_HIERARCHY = {
-  admin: 5,
-  manager: 4,
-  company: 3,
-  small_company: 2,
-  individual: 1,
-};
-
-function hasAccess(userRole, allowedRoles) {
-  const userLevel = ROLE_HIERARCHY[normalize(userRole)] || 0;
-
-  return allowedRoles.some((role) => {
-    const requiredLevel = ROLE_HIERARCHY[normalize(role)] || 0;
-    return userLevel >= requiredLevel;
-  });
-}
-
-function RoleGuard({ user, ready, allow, children }) {
-  if (!ready) return null;
-  if (!user) return <Navigate to="/login" replace />;
-  if (!hasAccess(user.role, allow)) {
-    return <Navigate to="/404" replace />;
-  }
-  return children;
-}
-
-function SubscriptionGuard({ user, children }) {
-  if (!user) return <Navigate to="/login" replace />;
-  if (isInactiveSubscription(user.subscriptionStatus)) {
-    return <Navigate to="/pricing" replace />;
-  }
-  return children;
-}
-
 /* ================= ROUTES ================= */
 
 function AppRoutes({ user, ready }) {
-  if (!ready) {
-    return <div style={{ padding: 40 }}>Initializing platform…</div>;
-  }
 
   return (
     <Routes>
@@ -120,9 +74,9 @@ function AppRoutes({ user, ready }) {
       <Route
         path="/admin/*"
         element={
-          <RoleGuard user={user} ready={ready} allow={["admin"]}>
+          <PlatformGate user={user} ready={ready} allow={["admin"]}>
             <AdminLayout />
-          </RoleGuard>
+          </PlatformGate>
         }
       >
         <Route index element={<AdminOverview />} />
@@ -142,7 +96,6 @@ function AppRoutes({ user, ready }) {
         <Route path="risk" element={<RiskMonitor />} />
         <Route path="sessions" element={<SessionMonitor />} />
         <Route path="device-integrity" element={<DeviceIntegrityPanel />} />
-
         <Route path="trading/*" element={<TradingLayout />} />
       </Route>
 
@@ -150,9 +103,9 @@ function AppRoutes({ user, ready }) {
       <Route
         path="/manager/*"
         element={
-          <RoleGuard user={user} ready={ready} allow={["manager", "admin"]}>
+          <PlatformGate user={user} ready={ready} allow={["manager", "admin"]}>
             <ManagerLayout />
-          </RoleGuard>
+          </PlatformGate>
         }
       >
         <Route index element={<SOC />} />
@@ -168,9 +121,14 @@ function AppRoutes({ user, ready }) {
       <Route
         path="/company/*"
         element={
-          <RoleGuard user={user} ready={ready} allow={["company", "admin", "manager"]}>
+          <PlatformGate
+            user={user}
+            ready={ready}
+            allow={["company", "manager", "admin"]}
+            requireSubscription
+          >
             <CompanyLayout />
-          </RoleGuard>
+          </PlatformGate>
         }
       >
         <Route index element={<SecurityOverview />} />
@@ -185,9 +143,9 @@ function AppRoutes({ user, ready }) {
       <Route
         path="/small-company/*"
         element={
-          <RoleGuard user={user} ready={ready} allow={["small_company"]}>
+          <PlatformGate user={user} ready={ready} allow={["small_company"]}>
             <SmallCompanyLayout />
-          </RoleGuard>
+          </PlatformGate>
         }
       >
         <Route index element={<SecurityOverview />} />
@@ -199,9 +157,9 @@ function AppRoutes({ user, ready }) {
       <Route
         path="/user/*"
         element={
-          <RoleGuard user={user} ready={ready} allow={["individual"]}>
+          <PlatformGate user={user} ready={ready} allow={["individual"]}>
             <UserLayout />
-          </RoleGuard>
+          </PlatformGate>
         }
       >
         <Route index element={<SecurityOverview />} />
@@ -252,12 +210,9 @@ export default function App() {
         const data = await res.json();
 
         if (data?.token && data?.user) {
-
           setToken(data.token);
           saveUser(data.user);
-
           setUser(data.user);
-
         } else {
           throw new Error("Bad refresh payload");
         }
@@ -269,7 +224,9 @@ export default function App() {
         setUser(null);
 
       } finally {
+
         setReady(true);
+
       }
 
     }
