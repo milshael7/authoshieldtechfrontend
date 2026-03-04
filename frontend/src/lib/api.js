@@ -1,6 +1,6 @@
 /* =========================================================
-   AUTOSHIELD FRONTEND API LAYER — ENTERPRISE v10
-   SELF-HEALING API • 404 SAFE • SOC READY
+   AUTOSHIELD FRONTEND API LAYER — ENTERPRISE v9
+   404 SAFE • SOC READY • NO MORE "ADD ENDPOINT ONE-BY-ONE"
 ========================================================= */
 
 const API_BASE = import.meta.env.VITE_API_BASE?.trim();
@@ -17,9 +17,7 @@ export function getToken() {
 }
 
 export function setToken(token) {
-  token
-    ? localStorage.setItem(TOKEN_KEY, token)
-    : localStorage.removeItem(TOKEN_KEY);
+  token ? localStorage.setItem(TOKEN_KEY, token) : localStorage.removeItem(TOKEN_KEY);
 }
 
 export function clearToken() {
@@ -35,9 +33,7 @@ export function getSavedUser() {
 }
 
 export function saveUser(user) {
-  user
-    ? localStorage.setItem(USER_KEY, JSON.stringify(user))
-    : localStorage.removeItem(USER_KEY);
+  user ? localStorage.setItem(USER_KEY, JSON.stringify(user)) : localStorage.removeItem(USER_KEY);
 }
 
 export function clearUser() {
@@ -47,15 +43,12 @@ export function clearUser() {
 /* ================= UTIL ================= */
 
 function joinUrl(base, path) {
-  return `${String(base).replace(/\/+$/, "")}${
-    path.startsWith("/") ? path : `/${path}`
-  }`;
+  return `${String(base).replace(/\/+$/, "")}${path.startsWith("/") ? path : `/${path}`}`;
 }
 
 async function fetchWithTimeout(url, options = {}, ms = REQUEST_TIMEOUT) {
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), ms);
-
   try {
     return await fetch(url, { ...options, signal: controller.signal });
   } finally {
@@ -65,7 +58,7 @@ async function fetchWithTimeout(url, options = {}, ms = REQUEST_TIMEOUT) {
 
 /* ================= CORE REQUEST ================= */
 
-async function req(path, { method = "GET", body, auth = true } = {}) {
+export async function req(path, { method = "GET", body, auth = true } = {}) {
   if (!API_BASE) throw new Error("API base URL not configured");
 
   const headers = { "Content-Type": "application/json" };
@@ -106,14 +99,16 @@ async function req(path, { method = "GET", body, auth = true } = {}) {
   return data;
 }
 
-/* =========================================================
-   ENTERPRISE API OBJECT
-========================================================= */
+/* ================= API OBJECT ================= */
 
-const staticApi = {
+const api = {
+  // 🔥 Generic helpers (NO MORE adding endpoints one by one)
+  get: (path) => req(path, { method: "GET" }),
+  post: (path, body) => req(path, { method: "POST", body }),
+  patch: (path, body) => req(path, { method: "PATCH", body }),
+  del: (path) => req(path, { method: "DELETE" }),
 
   /* AUTH */
-
   login: (email, password) =>
     req("/api/auth/login", {
       method: "POST",
@@ -128,54 +123,29 @@ const staticApi = {
       auth: false,
     }),
 
-  refresh: () =>
-    req("/api/auth/refresh", { method: "POST" }),
-
-  /* USERS */
-
-  listUsers: () =>
-    req("/api/users"),
-
-  getUser: (id) =>
-    req(`/api/users/${id}`),
+  refresh: () => req("/api/auth/refresh", { method: "POST" }),
 
   /* INCIDENTS */
+  incidents: () => req("/api/incidents"),
 
-  incidents: () =>
-    req("/api/incidents"),
+  /* SECURITY (restore what UI expects) */
+  postureSummary: () => req("/api/security/posture-summary"),
+  securityEvents: () => req("/api/security/events"),
+  vulnerabilities: () => req("/api/security/vulnerabilities"),
 
+  /* TOOLS */
+  toolCatalog: () => req("/api/tools/catalog"),
+  requestTool: (toolId) => req(`/api/tools/request/${toolId}`, { method: "POST" }),
+
+  /* ENTITLEMENTS */
+  myEntitlements: () => req("/api/entitlements/me"),
+
+  /* ADMIN */
+  adminPlatformHealth: () => req("/api/admin/platform-health"),
+
+  /* USERS */
+  listUsers: () => req("/api/users"),
+  getUser: (id) => req(`/api/users/${id}`),
 };
 
-/* =========================================================
-   AUTO API MAPPING (SELF-HEALING)
-========================================================= */
-
-export const api = new Proxy(staticApi, {
-
-  get(target, prop) {
-
-    if (prop in target) return target[prop];
-
-    /* automatically generate endpoint */
-
-    return (...args) => {
-
-      const path =
-        "/api/" +
-        String(prop)
-          .replace(/[A-Z]/g, m => "-" + m.toLowerCase());
-
-      console.warn("Auto API endpoint used:", path);
-
-      return req(path, {
-        method: args.length ? "POST" : "GET",
-        body: args[0]
-      });
-
-    };
-
-  }
-
-});
-
-export { req };
+export { api };
