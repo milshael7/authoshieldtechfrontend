@@ -1,5 +1,5 @@
 /* =========================================================
-   AUTOSHIELD FRONTEND API LAYER — ENTERPRISE v10
+   AUTOSHIELD FRONTEND API LAYER — ENTERPRISE v11
    SOC READY • ZERO TRUST SAFE • TENANT AWARE
    FULL BACKEND ALIGNMENT
 ========================================================= */
@@ -78,6 +78,7 @@ function attachTenantHeader(headers) {
 /* ================= CORE REQUEST ================= */
 
 export async function req(path, { method = "GET", body, auth = true } = {}) {
+
   if (!API_BASE) throw new Error("API base URL not configured");
 
   const headers = attachTenantHeader({
@@ -266,6 +267,28 @@ const api = {
 
   billingStatus: () =>
     req("/api/billing/status"),
+
+  /* ================= SOC ALERTS ================= */
+
+  socAlerts: () =>
+    req("/api/soc/alerts"),
+
+  createSocAlert: (payload) =>
+    req("/api/soc/alerts", {
+      method: "POST",
+      body: payload,
+    }),
+
+  updateSocAlert: (id, payload) =>
+    req(`/api/soc/alerts/${id}`, {
+      method: "PATCH",
+      body: payload,
+    }),
+
+  deleteSocAlert: (id) =>
+    req(`/api/soc/alerts/${id}`, {
+      method: "DELETE",
+    }),
 
 };
 
