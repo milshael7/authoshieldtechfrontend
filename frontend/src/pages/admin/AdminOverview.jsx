@@ -86,18 +86,59 @@ function dayLabel(d) {
 
 /* ================= BRANCHES (Job/Seat types) ================= */
 
+/*
+Master Cybersecurity Branch List
+This list can expand over time without breaking the system.
+Each company selects which branches they hired you for.
+*/
+
 const BRANCHES = [
+
   "Threat Response",
   "Security Analysis",
   "SOC Operator",
   "Incident Management",
   "Client Communications",
+
+  /* Expanded SOC Roles */
+
+  "Threat Intelligence",
+  "Digital Forensics",
+  "Malware Analysis",
+  "Vulnerability Management",
+  "Penetration Testing",
+
+  "Compliance Monitoring",
+  "Security Engineering",
+  "Identity and Access Management",
+  "Cloud Security",
+  "Network Defense",
+
+  "Security Automation",
+  "Endpoint Detection",
+  "Risk Management"
+
 ];
 
+
+/*
+Normalize branches so every company always
+has at least one active branch.
+*/
+
 function normalizeBranches(arr) {
-  const a = Array.isArray(arr) ? arr.map(safeStr).filter(Boolean) : [];
+
+  const a = Array.isArray(arr)
+    ? arr.map(safeStr).filter(Boolean)
+    : [];
+
   const uniq = Array.from(new Set(a));
-  return uniq.length ? uniq : ["Threat Response"];
+
+  if (uniq.length === 0) {
+    return ["Threat Response"];
+  }
+
+  return uniq;
 }
 
 /* ================= WORK POLICY (Option B) ================= */
@@ -587,35 +628,67 @@ export default function AdminOverview() {
 
   /* ================= COMPANY METRICS + SIGNALS ================= */
 
-  const companyMetrics = useMemo(() => {
-    const map = {};
-    (companies || []).forEach((c) => (map[c.id] = { open: 0, p1: 0, breached: 0 }));
-    (globalQueue || []).forEach((a) => {
-      if (!a?.companyId) return;
-      if (!map[a.companyId]) map[a.companyId] = { open: 0, p1: 0, breached: 0 };
-      if (a.status !== "RESOLVED") map[a.companyId].open += 1;
-      if (a.priority === "P1") map[a.companyId].p1 += 1;
-      if ((a.deadline || 0) - tick <= 0) map[a.companyId].breached += 1;
-    });
-    return map;
-  }, [companies, globalQueue, tick]);
+const companyMetrics = useMemo(() => {
+  const map = {};
 
-  const companySignals = useMemo(() => {
-    const sig = {};
-    (companies || []).forEach((c) => {
-      const m = companyMetrics[c.id] || { open: 0, p1: 0, breached: 0 };
-      const overload = m.p1 >= 2 || m.open >= 10;
-      const comms = companyComms[c.id] || { notifications: [], emails: [] };
-      const hasDraft = (comms.emails || []).some((e) => e.status === "DRAFT");
+  (companies || []).forEach((c) => {
+    map[c.id] = { open: 0, p1: 0, breached: 0 };
+  });
 
-      let level = "GREEN";
-      if (overload) level = "RED";
-      else if (hasDraft) level = "YELLOW";
+  (globalQueue || []).forEach((a) => {
+    if (!a?.companyId) return;
 
-      sig[c.id] = { level, overload, metrics: m, hasDraft };
-    });
-    return sig;
-  }, [companies, companyMetrics, companyComms]);
+    if (!map[a.companyId]) {
+      map[a.companyId] = { open: 0, p1: 0, breached: 0 };
+    }
+
+    if (a.status !== "RESOLVED") map[a.companyId].open += 1;
+    if (a.priority === "P1") map[a.companyId].p1 += 1;
+    if ((a.deadline || 0) - tick <= 0) map[a.companyId].breached += 1;
+  });
+
+  return map;
+}, [companies, globalQueue, tick]);
+
+const companySignals = useMemo(() => {
+  const sig = {};
+
+  (companies || []).forEach((c) => {
+    const metrics = companyMetrics[c.id] || {
+      open: 0,
+      p1: 0,
+      breached: 0,
+    };
+
+    const comms = companyComms[c.id] || {
+      notifications: [],
+      emails: [],
+    };
+
+    const overload = metrics.p1 >= 2 || metrics.open >= 10;
+
+    const unreadNotes =
+      (comms.notifications || []).filter((n) => !n.read).length;
+
+    const hasDraft =
+      (comms.emails || []).some((e) => e.status === "DRAFT");
+
+    let level = "GREEN";
+
+    if (overload) level = "RED";
+    else if (hasDraft || unreadNotes > 0) level = "YELLOW";
+
+    sig[c.id] = {
+      level,
+      overload,
+      metrics,
+      hasDraft,
+      unreadNotes,
+    };
+  });
+
+  return sig;
+}, [companies, companyMetrics, companyComms]);
 
  /* ================= OVERLOAD AUTO DRAFT ================= */
 
@@ -692,214 +765,530 @@ useEffect(() => {
 
   /* ================= ROLE RULES ================= */
 
-  const canResolve = role !== "Tier1";
-  const canAssignAuto = role === "Supervisor";
-  const canManualEscalate = role !== "Tier1";
+const canResolve = role !== "Tier1";
+const canAssignAuto = role === "Supervisor";
+const canManualEscalate = role !== "Tier1";
+
+/* ================= GLOBAL SIGNAL + UNREAD COUNTER + THREAT TICKER ================= */
+
+const globalUnreadCount = useMemo(() => {
+
+  let count = 0;
+
+  Object.values(companyComms || {}).forEach((c) => {
+
+    (c.notifications || []).forEach((n) => {
+      if (!n.read) count += 1;
+    });
+
+  });
+
+  return count;
+
+}, [companyComms]);
+
+const globalSignalLevel = useMemo(() => {
+
+  let level = "GREEN";
+
+  (companies || []).forEach((c) => {
+
+    const sig = companySignals?.[c.id];
+
+    if (!sig) return;
+
+    if (sig.level === "RED") level = "RED";
+    else if (sig.level === "YELLOW" && level !== "RED") level = "YELLOW";
+
+  });
+
+  return level;
+
+}, [companies, companySignals]);
+
+/* ================= CRISIS MODE DETECTION ================= */
+
+const crisisMode = useMemo(() => {
+
+  let redCount = 0;
+
+  (companies || []).forEach((c) => {
+
+    const sig = companySignals?.[c.id];
+
+    if (sig?.level === "RED") redCount += 1;
+
+  });
+
+  return redCount >= 3;
+
+}, [companies, companySignals]);
+
+/* ================= LIVE THREAT TICKER ================= */
+
+const threatTicker = useMemo(() => {
+
+  const rows = [];
+
+  (globalQueue || []).slice(0, 12).forEach((a) => {
+
+    rows.push({
+      id: a.id,
+      text:
+        `⚠️ ${a.priority} incident — ${getCompanyName(a.companyId)} (risk ${a.risk})`
+    });
+
+  });
+
+  return rows;
+
+}, [globalQueue]);
+
+const tickerText = useMemo(() => {
+
+  if (!threatTicker.length) return "System stable — no active threat spikes";
+
+  return threatTicker.map((t) => t.text).join("   •   ");
+
+}, [threatTicker]);
 
   /* ================= ONBOARDING ================= */
 
-  const toggleWorkDay = (day) => {
-    setPlug((p) => {
-      const set = new Set(p.workDays || []);
-      if (set.has(day)) set.delete(day);
-      else set.add(day);
-      return { ...p, workDays: Array.from(set).sort((a, b) => a - b) };
-    });
-  };
+const toggleWorkDay = (day) => {
 
-  const toggleBranch = (branchName) => {
-    setPlug((p) => {
-      const set = new Set(normalizeBranches(p.branches));
-      if (set.has(branchName)) set.delete(branchName);
-      else set.add(branchName);
-      const next = normalizeBranches(Array.from(set));
-      return { ...p, branches: next };
-    });
-  };
+  setPlug((p) => {
 
-  const plugCompany = () => {
-    const name = safeStr(plug.name);
-    if (!name) return;
+    const set = new Set(p.workDays || []);
 
-    const id = `c${Math.floor(Math.random() * 99999)}`;
-    const companyNumber = Math.floor(Math.random() * 900000 + 100000);
+    if (set.has(day)) set.delete(day);
+    else set.add(day);
 
-    const branches = normalizeBranches(plug.branches);
-
-    const newCompany = {
-      id,
-      name,
-      policy: normalizePolicy({
-        timezone: plug.timezone,
-        startHour: Number(plug.startHour),
-        endHour: Number(plug.endHour),
-        workDays: plug.workDays,
-        vacationMode: plug.vacationMode,
-      }),
-      meta: {
-        contactEmail: safeStr(plug.contactEmail),
-        domain: safeStr(plug.domain),
-        engagement: safeStr(plug.engagement) || "Standard",
-        seats: Number(plug.seats || 1),
-        notes: safeStr(plug.notes),
-        companyNumber,
-        branches,
-      },
+    return {
+      ...p,
+      workDays: Array.from(set).sort((a, b) => a - b)
     };
 
-    setCompanies((prev) => [newCompany, ...prev]);
+  });
 
-    setCompanyState((prev) => ({
-      ...prev,
-      [id]: { risk: Math.floor(Math.random() * 20), containment: "STABLE" },
-    }));
+};
 
-    setCompanyComms((prev) => ({
-      ...prev,
-      [id]: { notifications: [], emails: [] },
-    }));
+const toggleBranch = (branchName) => {
+
+  setPlug((p) => {
+
+    const set = new Set(normalizeBranches(p.branches));
+
+    if (set.has(branchName)) set.delete(branchName);
+    else set.add(branchName);
+
+    const next = normalizeBranches(Array.from(set));
+
+    return {
+      ...p,
+      branches: next
+    };
+
+  });
+
+};
+
+/* ================= COMPANY PLUG ENGINE ================= */
+
+const plugCompany = () => {
+
+  const name = safeStr(plug.name);
+
+  if (!name) return;
+
+  const id = `c${Math.floor(Math.random() * 99999)}`;
+
+  const companyNumber = Math.floor(
+    Math.random() * 900000 + 100000
+  );
+
+  const branches = normalizeBranches(
+    plug.branches
+  );
+
+  const newCompany = {
+
+    id,
+
+    name,
+
+    policy: normalizePolicy({
+      timezone: plug.timezone,
+      startHour: Number(plug.startHour),
+      endHour: Number(plug.endHour),
+      workDays: plug.workDays,
+      vacationMode: plug.vacationMode,
+    }),
+
+    meta: {
+
+      contactEmail: safeStr(plug.contactEmail),
+      domain: safeStr(plug.domain),
+
+      engagement:
+        safeStr(plug.engagement) || "Standard",
+
+      seats: Number(plug.seats || 1),
+
+      notes: safeStr(plug.notes),
+
+      companyNumber,
+
+      branches
+
+    }
+
+  };
+
+  setCompanies((prev) => [
+    newCompany,
+    ...prev
+  ]);
+
+  setCompanyState((prev) => ({
+
+    ...prev,
+
+    [id]: {
+      risk: Math.floor(Math.random() * 20),
+      containment: "STABLE"
+    }
+
+  }));
+
+  setCompanyComms((prev) => ({
+
+    ...prev,
+
+    [id]: {
+      notifications: [],
+      emails: []
+    }
+
+  }));
+
+  setActiveBranchByCompany((prev) => ({
+
+    ...prev,
+
+    [id]: branches[0]
+
+  }));
+
+  setArchive((prev) => [
+
+    {
+
+      id: `onboard-${id}-${nowTs()}`,
+
+      companyId: id,
+
+      risk: 0,
+
+      containment: "STABLE",
+
+      priority: "P4",
+
+      createdAt: nowTs(),
+
+      deadline: nowTs() + slaDuration("P4"),
+
+      status: "RESOLVED",
+
+      assignedTo: "System",
+
+      locked: false,
+
+      autoEscalated: false,
+
+      activity: [
+
+        { time: new Date(), action: "COMPANY_PLUGGED" },
+
+        {
+          time: new Date(),
+          action: `DOMAIN_${safeStr(plug.domain) || "N/A"}`
+        },
+
+        {
+          time: new Date(),
+          action: `CONTACT_${safeStr(plug.contactEmail) || "N/A"}`
+        },
+
+        {
+          time: new Date(),
+          action: `ENGAGEMENT_${safeStr(plug.engagement) || "Standard"}`
+        },
+
+        {
+          time: new Date(),
+          action: `SEATS_${Number(plug.seats || 1)}`
+        },
+
+        {
+          time: new Date(),
+          action: `BRANCHES_${branches.join("_")}`
+        },
+
+        {
+          time: new Date(),
+          action: `WORKDAYS_${(plug.workDays || [])
+            .map(dayLabel)
+            .join("_")}`
+        },
+
+        {
+          time: new Date(),
+          action: `WORKHOURS_${Number(
+            plug.startHour
+          )}-${Number(plug.endHour)}`
+        },
+
+        {
+          time: new Date(),
+          action: plug.vacationMode
+            ? "VACATION_ON"
+            : "VACATION_OFF"
+        }
+
+      ],
+
+      resolution: {
+
+        summary:
+          "Client onboarded into Operator Console.",
+
+        rootCause: "N/A",
+
+        actions: [
+          "Provisioned tenant shell",
+          "Initialized baseline telemetry"
+        ],
+
+        lessons: [
+          "Validate DNS + contact email before activation."
+        ]
+
+      },
+
+      resolvedAt: new Date()
+
+    },
+
+    ...prev
+
+  ]);
+
+  setPlug({
+
+    name: "",
+    domain: "",
+    contactEmail: "",
+    engagement: "Standard",
+    seats: 1,
+    notes: "",
+
+    branches: ["Threat Response"],
+
+    timezone: "Local",
+    startHour: 9,
+    endHour: 17,
+    workDays: [1,2,3,4,5],
+    vacationMode: false
+
+  });
+
+  setShowOnboarding(false);
+
+  setMode("operator");
+
+  setOperatorPanel("fleet");
+
+};
+
+/* ================= BRANCH SELECTOR (Operator) ================= */
+
+const activeCompany =
+  workspace !== "ALL"
+    ? getCompany(workspace)
+    : null;
+
+const activeCompanyBranches =
+  normalizeBranches(activeCompany?.meta?.branches);
+
+const activeBranch =
+  activeCompany
+    ? (
+        activeBranchByCompany[activeCompany.id]
+        || activeCompanyBranches[0]
+      )
+    : "";
+
+const setActiveBranch = (companyId, branchName) => {
+
+  const b = safeStr(branchName);
+
+  if (!b) return;
+
+  setActiveBranchByCompany((prev) => ({
+    ...prev,
+    [companyId]: b
+  }));
+
+};
+
+useEffect(() => {
+
+  if (!activeCompany) return;
+
+  const branches =
+    normalizeBranches(activeCompany?.meta?.branches);
+
+  const current =
+    activeBranchByCompany?.[activeCompany.id];
+
+  if (!current || !branches.includes(current)) {
 
     setActiveBranchByCompany((prev) => ({
       ...prev,
-      [id]: branches[0],
+      [activeCompany.id]: branches[0]
     }));
 
-    // audit record into archive
-    setArchive((prev) => [
-      {
-        id: `onboard-${id}-${nowTs()}`,
-        companyId: id,
-        risk: 0,
-        containment: "STABLE",
-        priority: "P4",
-        createdAt: nowTs(),
-        deadline: nowTs() + slaDuration("P4"),
-        status: "RESOLVED",
-        assignedTo: "System",
-        locked: false,
-        autoEscalated: false,
-        activity: [
-          { time: new Date(), action: "COMPANY_PLUGGED" },
-          { time: new Date(), action: `DOMAIN_${safeStr(plug.domain) || "N/A"}` },
-          { time: new Date(), action: `CONTACT_${safeStr(plug.contactEmail) || "N/A"}` },
-          { time: new Date(), action: `ENGAGEMENT_${safeStr(plug.engagement) || "Standard"}` },
-          { time: new Date(), action: `SEATS_${Number(plug.seats || 1)}` },
-          { time: new Date(), action: `BRANCHES_${branches.join("_")}` },
-          { time: new Date(), action: `WORKDAYS_${(plug.workDays || []).map(dayLabel).join("_")}` },
-          { time: new Date(), action: `WORKHOURS_${Number(plug.startHour)}-${Number(plug.endHour)}` },
-          { time: new Date(), action: plug.vacationMode ? "VACATION_ON" : "VACATION_OFF" },
-        ],
-        resolution: {
-          summary: "Client onboarded into Operator Console.",
-          rootCause: "N/A",
-          actions: ["Provisioned tenant shell", "Initialized baseline telemetry"],
-          lessons: ["Validate DNS + contact email before activation."],
-        },
-        resolvedAt: new Date(),
-      },
-      ...prev,
-    ]);
+  }
 
-    // reset
-    setPlug({
-      name: "",
-      domain: "",
-      contactEmail: "",
-      engagement: "Standard",
-      seats: 1,
-      notes: "",
-      branches: ["Threat Response"],
-      timezone: "Local",
-      startHour: 9,
-      endHour: 17,
-      workDays: [1, 2, 3, 4, 5],
-      vacationMode: false,
-    });
-
-    setShowOnboarding(false);
-
-    // jump to fleet so you see the new card
-    setMode("operator");
-    setOperatorPanel("fleet");
-  };
-
-  /* ================= BRANCH SELECTOR (Operator) ================= */
-  const activeCompany = workspace !== "ALL" ? getCompany(workspace) : null;
-  const activeCompanyBranches = normalizeBranches(activeCompany?.meta?.branches);
-  const activeBranch = activeCompany ? (activeBranchByCompany[activeCompany.id] || activeCompanyBranches[0]) : "";
-
-  const setActiveBranch = (companyId, branchName) => {
-    const b = safeStr(branchName);
-    if (!b) return;
-    setActiveBranchByCompany((prev) => ({ ...prev, [companyId]: b }));
-  };
+}, [activeCompany, activeBranchByCompany]);
 
   /* ================= RENDER ================= */
 
-  return (
+return (
+  <div
+    style={{
+      maxWidth: 1500,
+      margin: "0 auto",
+      display: "flex",
+      flexDirection: "column",
+      gap: 24,
+    }}
+  >
+
+    {/* HEADER */}
     <div
       style={{
-        maxWidth: 1500,
-        margin: "0 auto",
         display: "flex",
-        flexDirection: "column",
-        gap: 24,
+        justifyContent: "space-between",
+        alignItems: "center",
+        flexWrap: "wrap",
+        gap: 10,
       }}
     >
-      {/* HEADER */}
+
+      <div className="sectionTitle">
+        {mode === "platform"
+          ? "Platform Command Center"
+          : "Operator Console (Side Hustle)"}
+      </div>
+
       <div
         style={{
           display: "flex",
-          justifyContent: "space-between",
+          gap: 10,
           alignItems: "center",
           flexWrap: "wrap",
-          gap: 10,
         }}
       >
-        <div className="sectionTitle">
-          {mode === "platform" ? "Platform Command Center" : "Operator Console (Side Hustle)"}
+
+        <select value={mode} onChange={(e) => setMode(e.target.value)}>
+          <option value="platform">Platform View</option>
+          <option value="operator">Operator View</option>
+        </select>
+
+        {/* GLOBAL NOTIFICATION SIGNAL */}
+
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            fontSize: 13,
+            padding: "4px 10px",
+            borderRadius: 20,
+            background:
+              globalSignalLevel === "RED"
+                ? "rgba(255,70,70,.15)"
+                : globalSignalLevel === "YELLOW"
+                ? "rgba(255,210,60,.15)"
+                : "rgba(60,255,150,.15)",
+          }}
+        >
+          🌍 Notifications: <b>{globalUnreadCount}</b>
         </div>
 
-        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-          <select value={mode} onChange={(e) => setMode(e.target.value)}>
-            <option value="platform">Platform View</option>
-            <option value="operator">Operator View</option>
-          </select>
+        {mode === "operator" && (
+          <>
+            <button
+              className="btn"
+              onClick={() => setShowOnboarding(true)}
+            >
+              + Plug Company
+            </button>
 
-          {mode === "operator" && (
-            <>
-              <button className="btn" onClick={() => setShowOnboarding(true)}>
-                + Plug Company
-              </button>
+            <select
+              value={operatorPanel}
+              onChange={(e) => setOperatorPanel(e.target.value)}
+            >
+              <option value="queue">Panel: Queue</option>
+              <option value="fleet">Panel: Fleet</option>
+              <option value="notifications">Panel: Notifications</option>
+              <option value="email">Panel: Email Cabinet</option>
+              <option value="archive">Panel: Archive</option>
+            </select>
 
-              <select value={operatorPanel} onChange={(e) => setOperatorPanel(e.target.value)}>
-                <option value="queue">Panel: Queue</option>
-                <option value="fleet">Panel: Fleet</option>
-                <option value="notifications">Panel: Notifications</option>
-                <option value="email">Panel: Email Cabinet</option>
-                <option value="archive">Panel: Archive</option>
+            {activeCompany && (
+              <select
+                value={activeBranch}
+                onChange={(e) =>
+                  setActiveBranch(activeCompany.id, e.target.value)
+                }
+                title="Which job/branch you are working for this company"
+              >
+                {activeCompanyBranches.map((b) => (
+                  <option key={b} value={b}>
+                    Branch: {b}
+                  </option>
+                ))}
               </select>
+            )}
+          </>
+        )}
 
-              {/* Branch selector appears when you focus a company */}
-              {activeCompany && (
-                <select
-                  value={activeBranch}
-                  onChange={(e) => setActiveBranch(activeCompany.id, e.target.value)}
-                  title="Which job/branch you are working for this company"
-                >
-                  {activeCompanyBranches.map((b) => (
-                    <option key={b} value={b}>
-                      Branch: {b}
-                    </option>
-                  ))}
-                </select>
-              )}
-            </>
-          )}
-        </div>
       </div>
+    </div>
 
-      {/* ================= OPERATOR VIEW ================= */}
+      <div
+  className="postureCard"
+  style={{
+    overflow: "hidden",
+    whiteSpace: "nowrap",
+    position: "relative"
+  }}
+>
+  <div
+    style={{
+      display: "inline-block",
+      paddingLeft: "100%",
+      animation: "tickerMove 40s linear infinite",
+      opacity: 0.85
+    }}
+  >
+    {tickerText}
+  </div>
+</div>
+
+{/* ================= OPERATOR VIEW ================= */}
       {mode === "operator" && (
         <>
           {/* Summary Strip */}
@@ -1338,54 +1727,92 @@ useEffect(() => {
             />
           )}
 
-          {/* ===== EMAIL PANEL ===== */}
-          {operatorPanel === "email" && (
-            <EmailCabinet
-              companies={companies}
-              comms={companyComms}
-              selectedCompany={selectedCompanyForComms}
-              setSelectedCompany={setSelectedCompanyForComms}
-              selectedEmailId={selectedEmailId}
-              setSelectedEmailId={setSelectedEmailId}
-              getCompanyName={getCompanyName}
-              onUpdateEmail={updateEmail}
-              onSend={sendEmail}
-              onCancel={cancelEmail}
-              onNewDraft={(companyId) => {
-                const c = getCompany(companyId);
-                if (!c) return;
+          {/* ================= EMAIL PANEL ================= */}
 
-                const emailId = makeId("email");
-                addEmail(companyId, {
-                  id: emailId,
-                  kind: "MANUAL",
-                  status: "DRAFT",
-                  createdAt: nowTs(),
-                  to: safeStr(c?.meta?.contactEmail),
-                  subject: `Update from AutoProtect — ${c.name}`,
-                  body:
-                    `Hello ${c.name} Security Team,\n\n` +
-                    `AutoProtect drafted an update for your review.\n\n` +
-                    `Summary:\n- \n\n` +
-                    `Actions recommended:\n- \n\n` +
-                    `— Admin Operator Console`,
-                });
+{operatorPanel === "email" && (
 
-                addNotification(companyId, {
-                  id: makeId("note"),
-                  createdAt: nowTs(),
-                  severity: "YELLOW",
-                  title: "Manual draft created",
-                  message: `A manual email draft was created.`,
-                  linkedEmailId: emailId,
-                  read: false,
-                });
+  <EmailCabinet
 
-                setSelectedCompanyForComms(companyId);
-                setSelectedEmailId(emailId);
-              }}
-            />
-          )}
+    companies={companies}
+
+    comms={companyComms}
+
+    selectedCompany={selectedCompanyForComms}
+
+    setSelectedCompany={setSelectedCompanyForComms}
+
+    selectedEmailId={selectedEmailId}
+
+    setSelectedEmailId={setSelectedEmailId}
+
+    getCompanyName={getCompanyName}
+
+    signals={companySignals}
+
+    onUpdateEmail={updateEmail}
+
+    onSend={sendEmail}
+
+    onCancel={cancelEmail}
+
+    onNewDraft={(companyId) => {
+
+      const c = getCompany(companyId);
+
+      if (!c) return;
+
+      const emailId = makeId("email");
+
+      addEmail(companyId, {
+
+        id: emailId,
+
+        kind: "MANUAL",
+
+        status: "DRAFT",
+
+        createdAt: nowTs(),
+
+        to: safeStr(c?.meta?.contactEmail),
+
+        subject: `Update from AutoProtect — ${c.name}`,
+
+        body:
+          `Hello ${c.name} Security Team,\n\n` +
+          `AutoProtect drafted an update for your review.\n\n` +
+          `Summary:\n- \n\n` +
+          `Actions recommended:\n- \n\n` +
+          `— Admin Operator Console`
+
+      });
+
+      addNotification(companyId, {
+
+        id: makeId("note"),
+
+        createdAt: nowTs(),
+
+        severity: "YELLOW",
+
+        title: "Manual draft created",
+
+        message: `A manual email draft was created.`,
+
+        linkedEmailId: emailId,
+
+        read: false
+
+      });
+
+      setSelectedCompanyForComms(companyId);
+
+      setSelectedEmailId(emailId);
+
+    }}
+
+  />
+
+)}
 
           {/* ===== ARCHIVE PANEL ===== */}
           {operatorPanel === "archive" && (
@@ -1611,14 +2038,89 @@ useEffect(() => {
 /* ================= STYLES ================= */
 
 const inputStyle = {
+
   width: "100%",
+
   padding: "10px 12px",
+
   borderRadius: 10,
+
   border: "1px solid rgba(255,255,255,.12)",
+
   background: "rgba(255,255,255,.04)",
+
   color: "#eaf1ff",
+
   outline: "none",
+
   marginTop: 6,
+
+};
+
+const badgeStyle = {
+
+  display: "inline-flex",
+
+  alignItems: "center",
+
+  padding: "2px 8px",
+
+  borderRadius: 12,
+
+  fontSize: 11,
+
+  fontWeight: 600,
+
+  letterSpacing: ".3px",
+
+};
+
+const badgeOK = {
+
+  ...badgeStyle,
+
+  background: "rgba(60,255,150,.18)",
+
+  color: "#7CFFB2",
+
+};
+
+const badgeWarn = {
+
+  ...badgeStyle,
+
+  background: "rgba(255,210,60,.18)",
+
+  color: "#FFD84A",
+
+};
+
+const badgeDanger = {
+
+  ...badgeStyle,
+
+  background: "rgba(255,70,70,.18)",
+
+  color: "#FF6B6B",
+
+};
+
+const mutedText = {
+
+  opacity: .65,
+
+  fontSize: 12,
+
+};
+
+const panelGrid = {
+
+  display: "grid",
+
+  gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+
+  gap: 16,
+
 };
 
 /* ================= RESOLUTION BUILDER ================= */
@@ -1703,6 +2205,286 @@ function ResolutionBuilder({ disabled, existing, onSave }) {
   );
 }
 
+/* ================= EMAIL CABINET ================= */
+
+function EmailCabinet({
+  companies,
+  comms,
+  selectedCompany,
+  setSelectedCompany,
+  selectedEmailId,
+  setSelectedEmailId,
+  getCompanyName,
+  signals,
+  onUpdateEmail,
+  onSend,
+  onCancel,
+  onNewDraft
+}) {
+
+  const companyIds = (companies || []).map(c => c.id);
+
+  const scopeIds =
+    selectedCompany === "ALL"
+      ? companyIds
+      : [selectedCompany];
+
+  const emails = [];
+
+  scopeIds.forEach((cid) => {
+
+    const list = comms?.[cid]?.emails || [];
+
+    list.forEach((e) => {
+      emails.push({
+        companyId: cid,
+        ...e
+      });
+    });
+
+  });
+
+  emails.sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+
+  const selected =
+    emails.find(e => e.id === selectedEmailId) || null;
+
+  return (
+
+    <div className="postureCard executivePanel">
+
+      <div
+        style={{
+          display:"flex",
+          justifyContent:"space-between",
+          gap:10,
+          flexWrap:"wrap",
+          alignItems:"center"
+        }}
+      >
+
+        <h3 style={{margin:0}}>
+          📧 Email Cabinet
+        </h3>
+
+        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+
+          <select
+            value={selectedCompany}
+            onChange={(e)=>setSelectedCompany(e.target.value)}
+          >
+
+            <option value="ALL">All Companies</option>
+
+            {(companies||[]).map(c=>{
+
+              const sig = signals?.[c.id]?.level || "GREEN";
+
+              return (
+                <option key={c.id} value={c.id}>
+                  {sig==="RED"?"🔴":sig==="YELLOW"?"🟡":"🟢"} {c.name}
+                </option>
+              );
+
+            })}
+
+          </select>
+
+          {selectedCompany !== "ALL" && (
+
+            <button
+              className="btn primary"
+              onClick={()=>onNewDraft(selectedCompany)}
+            >
+              New Draft
+            </button>
+
+          )}
+
+        </div>
+
+      </div>
+
+      <div
+        style={{
+          display:"grid",
+          gridTemplateColumns:"1fr 1.2fr",
+          gap:18,
+          marginTop:14
+        }}
+      >
+
+        {/* EMAIL LIST */}
+
+        <div
+          style={{
+            height:500,
+            overflowY:"auto",
+            borderRight:"1px solid rgba(255,255,255,.08)"
+          }}
+        >
+
+          {emails.length === 0 && (
+            <div className="muted">No email drafts.</div>
+          )}
+
+          {emails.map(e=>{
+
+            const sig =
+              signals?.[e.companyId]?.level || "GREEN";
+
+            const selectedRow =
+              e.id === selectedEmailId;
+
+            return (
+
+              <div
+                key={e.id}
+                onClick={()=>setSelectedEmailId(e.id)}
+                style={{
+                  padding:12,
+                  cursor:"pointer",
+                  borderBottom:"1px solid rgba(255,255,255,.06)",
+                  background:
+                    selectedRow
+                      ?"rgba(120,160,255,.12)"
+                      :"transparent"
+                }}
+              >
+
+                <div style={{display:"flex",alignItems:"center"}}>
+
+                  <span style={dotStyle(sig)} />
+
+                  <b>{getCompanyName(e.companyId)}</b>
+
+                </div>
+
+                <div style={{fontSize:12,opacity:.75}}>
+                  {new Date(e.createdAt||Date.now()).toLocaleString()}
+                </div>
+
+                <div style={{marginTop:4}}>
+                  <b>{e.subject}</b>
+                </div>
+
+                <div style={{fontSize:12,opacity:.75}}>
+                  Status: {e.status}
+                </div>
+
+              </div>
+
+            );
+
+          })}
+
+        </div>
+
+        {/* EMAIL VIEWER */}
+
+        <div>
+
+          {!selected && (
+            <div className="muted">
+              Select an email draft to open it.
+            </div>
+          )}
+
+          {selected && (
+
+            <div style={{display:"flex",flexDirection:"column",gap:10}}>
+
+              <div>
+                <small>To</small>
+                <input
+                  value={selected.to || ""}
+                  onChange={(e)=>
+                    onUpdateEmail(
+                      selected.companyId,
+                      selected.id,
+                      {to:e.target.value}
+                    )
+                  }
+                  style={inputStyle}
+                />
+              </div>
+
+              <div>
+                <small>Subject</small>
+                <input
+                  value={selected.subject || ""}
+                  onChange={(e)=>
+                    onUpdateEmail(
+                      selected.companyId,
+                      selected.id,
+                      {subject:e.target.value}
+                    )
+                  }
+                  style={inputStyle}
+                />
+              </div>
+
+              <div>
+                <small>Body</small>
+                <textarea
+                  value={selected.body || ""}
+                  onChange={(e)=>
+                    onUpdateEmail(
+                      selected.companyId,
+                      selected.id,
+                      {body:e.target.value}
+                    )
+                  }
+                  style={{...inputStyle,minHeight:200}}
+                />
+              </div>
+
+              <div style={{display:"flex",gap:10}}>
+
+                {selected.status === "DRAFT" && (
+
+                  <button
+                    className="btn primary"
+                    onClick={()=>onSend(
+                      selected.companyId,
+                      selected.id
+                    )}
+                  >
+                    Send Email
+                  </button>
+
+                )}
+
+                {selected.status === "DRAFT" && (
+
+                  <button
+                    className="btn warn"
+                    onClick={()=>onCancel(
+                      selected.companyId,
+                      selected.id
+                    )}
+                  >
+                    Cancel Draft
+                  </button>
+
+                )}
+
+              </div>
+
+            </div>
+
+          )}
+
+        </div>
+
+      </div>
+
+    </div>
+
+  );
+
+}
+
 /* ================= NOTIFICATION BOARD ================= */
 
 function NotificationBoard({
@@ -1717,29 +2499,41 @@ function NotificationBoard({
 }) {
 
   const companyIds = (companies || []).map((c) => c.id);
-  const scopeIds = selectedCompany === "ALL" ? companyIds : [selectedCompany];
+
+  const scopeIds =
+    selectedCompany === "ALL"
+      ? companyIds
+      : [selectedCompany];
 
   const rows = useMemo(() => {
+
     const out = [];
 
     scopeIds.forEach((cid) => {
-      const notes = comms[cid]?.notifications || [];
+
+      const notes = comms?.[cid]?.notifications || [];
 
       notes.forEach((n) => {
+
         out.push({
           companyId: cid,
-          ...n,
+          ...n
         });
+
       });
+
     });
 
-    out.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    out.sort((a, b) =>
+      (b.createdAt || 0) - (a.createdAt || 0)
+    );
 
     return out.slice(0, 400);
 
   }, [scopeIds, comms]);
 
   return (
+
     <div className="postureCard executivePanel">
 
       <div
@@ -1751,20 +2545,39 @@ function NotificationBoard({
           alignItems: "center",
         }}
       >
-        <h3 style={{ margin: 0 }}>🔔 Notifications</h3>
+
+        <h3 style={{ margin: 0 }}>
+          🔔 Notifications
+        </h3>
 
         <select
           value={selectedCompany}
-          onChange={(e) => setSelectedCompany(e.target.value)}
+          onChange={(e) =>
+            setSelectedCompany(e.target.value)
+          }
         >
-          <option value="ALL">All Companies</option>
 
-          {(companies || []).map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
+          <option value="ALL">
+            All Companies
+          </option>
+
+          {(companies || []).map((c) => {
+
+            const sig = signals?.[c.id]?.level || "GREEN";
+
+            return (
+
+              <option key={c.id} value={c.id}>
+                {sig === "RED" ? "🔴" : sig === "YELLOW" ? "🟡" : "🟢"} {c.name}
+
+              </option>
+
+            );
+
+          })}
+
         </select>
+
       </div>
 
       <div
@@ -1774,19 +2587,35 @@ function NotificationBoard({
           overflowY: "auto",
         }}
       >
+
         {rows.length === 0 ? (
-          <div className="muted">No notifications.</div>
+
+          <div className="muted">
+            No notifications.
+          </div>
+
         ) : (
+
           rows.map((n) => {
 
-            const sig = signals?.[n.companyId]?.level || "GREEN";
+            const sig =
+              signals?.[n.companyId]?.level
+              || "GREEN";
 
             return (
+
               <div
                 key={n.id}
                 style={{
                   padding: 12,
-                  borderBottom: "1px solid rgba(255,255,255,.06)",
+                  borderBottom:
+                    "1px solid rgba(255,255,255,.06)",
+                  background:
+                    sig === "RED"
+                      ? "rgba(255,70,70,.08)"
+                      : sig === "YELLOW"
+                      ? "rgba(255,210,60,.08)"
+                      : "transparent",
                 }}
               >
 
@@ -1807,7 +2636,9 @@ function NotificationBoard({
                         opacity: 0.7,
                       }}
                     >
-                      {new Date(n.createdAt || Date.now()).toLocaleString()}
+                      {new Date(
+                        n.createdAt || Date.now()
+                      ).toLocaleString()}
                     </div>
 
                     <div
@@ -1816,15 +2647,23 @@ function NotificationBoard({
                         alignItems: "center",
                       }}
                     >
+
                       <span style={dotStyle(sig)} />
 
-                      <b>{getCompanyName(n.companyId)}</b>
+                      <b>
+                        {getCompanyName(n.companyId)}
+                      </b>
 
                       {!n.read && (
-                        <span style={{ marginLeft: 8 }}>
+
+                        <span
+                          style={{ marginLeft: 8 }}
+                        >
                           <b>NEW</b>
                         </span>
+
                       )}
+
                     </div>
 
                     <div style={{ marginTop: 6 }}>
@@ -1852,24 +2691,34 @@ function NotificationBoard({
                   >
 
                     {n.linkedEmailId && (
+
                       <button
                         className="btn"
                         onClick={() =>
-                          onOpenEmail(n.companyId, n.linkedEmailId)
+                          onOpenEmail(
+                            n.companyId,
+                            n.linkedEmailId
+                          )
                         }
                       >
                         Open Draft
                       </button>
+
                     )}
 
                     <button
                       className="btn"
                       onClick={() =>
-                        onMarkRead(n.companyId, n.id)
+                        onMarkRead(
+                          n.companyId,
+                          n.id
+                        )
                       }
                       disabled={Boolean(n.read)}
                     >
-                      {n.read ? "Read" : "Mark Read"}
+                      {n.read
+                        ? "Read"
+                        : "Mark Read"}
                     </button>
 
                   </div>
@@ -1877,12 +2726,18 @@ function NotificationBoard({
                 </div>
 
               </div>
+
             );
+
           })
+
         )}
+
       </div>
+
     </div>
+
   );
+
 }
 
-/* ================= NOTIFICATION BOARD ================= */
