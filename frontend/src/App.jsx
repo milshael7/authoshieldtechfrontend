@@ -1,5 +1,5 @@
 // frontend/src/App.jsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 
 import {
@@ -53,12 +53,10 @@ import AdminCompanies from "./pages/admin/AdminCompanies.jsx";
 import AuditExplorer from "./pages/admin/AuditExplorer.jsx";
 import AdminToolGovernance from "./pages/admin/AdminToolGovernance.jsx";
 import AdminCompanyRoom from "./pages/admin/AdminCompanyRoom.jsx";
-
-/* NEW ADMIN MODULES */
 import CorporateEntities from "./pages/admin/CorporateEntities.jsx";
 import UserGovernance from "./pages/admin/UserGovernance.jsx";
 
-/* MANAGER MODULE */
+/* MANAGER */
 import ManagerCommand from "./pages/manager/ManagerCommand.jsx";
 
 /* SECURITY */
@@ -73,17 +71,15 @@ import TradingLayout from "./pages/trading/TradingLayout.jsx";
 /* ================= ROUTES ================= */
 
 function AppRoutes({ user, ready }) {
-
   return (
     <Routes>
-
       {/* PUBLIC */}
       <Route path="/" element={<Landing />} />
       <Route path="/pricing" element={<Pricing />} />
       <Route path="/signup" element={<Signup />} />
       <Route path="/login" element={<Login />} />
 
-      {/* ================= ADMIN ================= */}
+      {/* ADMIN */}
       <Route
         path="/admin/*"
         element={
@@ -114,7 +110,7 @@ function AppRoutes({ user, ready }) {
         <Route path="trading/*" element={<TradingLayout />} />
       </Route>
 
-      {/* ================= MANAGER ================= */}
+      {/* MANAGER */}
       <Route
         path="/manager/*"
         element={
@@ -133,7 +129,7 @@ function AppRoutes({ user, ready }) {
         <Route path="notifications" element={<Notifications />} />
       </Route>
 
-      {/* ================= COMPANY ================= */}
+      {/* COMPANY */}
       <Route
         path="/company/*"
         element={
@@ -155,7 +151,7 @@ function AppRoutes({ user, ready }) {
         <Route path="notifications" element={<Notifications />} />
       </Route>
 
-      {/* ================= SMALL COMPANY ================= */}
+      {/* SMALL COMPANY */}
       <Route
         path="/small-company/*"
         element={
@@ -169,7 +165,7 @@ function AppRoutes({ user, ready }) {
         <Route path="incidents" element={<Incidents />} />
       </Route>
 
-      {/* ================= USER ================= */}
+      {/* USER */}
       <Route
         path="/user/*"
         element={
@@ -182,9 +178,7 @@ function AppRoutes({ user, ready }) {
         <Route path="notifications" element={<Notifications />} />
       </Route>
 
-      {/* ================= 404 ================= */}
       <Route path="*" element={<NotFound />} />
-
     </Routes>
   );
 }
@@ -192,24 +186,23 @@ function AppRoutes({ user, ready }) {
 /* ================= MAIN APP ================= */
 
 export default function App() {
-
   const [user, setUser] = useState(null);
   const [ready, setReady] = useState(false);
 
+  const bootedRef = useRef(false);
   const base = import.meta.env.VITE_API_BASE?.replace(/\/+$/, "");
 
   useEffect(() => {
+    if (bootedRef.current) return;
+    bootedRef.current = true;
 
     async function bootAuth() {
-
       try {
-
         const token = getToken();
         const storedUser = getSavedUser();
 
         if (!token || !storedUser) {
           setUser(null);
-          setReady(true);
           return;
         }
 
@@ -221,7 +214,11 @@ export default function App() {
           },
         });
 
-        if (!res.ok) throw new Error("Refresh failed");
+        if (!res.ok) {
+          // DO NOT destroy session here
+          setUser(storedUser);
+          return;
+        }
 
         const data = await res.json();
 
@@ -230,31 +227,22 @@ export default function App() {
           saveUser(data.user);
           setUser(data.user);
         } else {
-          throw new Error("Bad refresh payload");
+          setUser(storedUser);
         }
-
       } catch {
-
-        clearToken();
-        clearUser();
-        setUser(null);
-
+        // keep last known user to prevent flashing
+        setUser(getSavedUser());
       } finally {
-
         setReady(true);
-
       }
-
     }
 
     bootAuth();
-
   }, [base]);
 
   return (
     <EventBusProvider>
       <AIDecisionProvider>
-
         <BrainAdapter />
         <AutoDevEngine />
 
@@ -267,9 +255,7 @@ export default function App() {
             </SecurityProvider>
           </ToolProvider>
         </CompanyProvider>
-
       </AIDecisionProvider>
     </EventBusProvider>
   );
-
 }
