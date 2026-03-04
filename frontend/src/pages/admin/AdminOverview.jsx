@@ -850,18 +850,8 @@ export default function AdminOverview() {
         <div className="sectionTitle">
           {mode === "platform" ? "Platform Command Center" : "Operator Console (Side Hustle)"}
         </div>
+
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-          {mode === "operator" && (
-  <GlobalAdminEarth
-    companyComms={companyComms}
-    getCompanyName={getCompanyName}
-    setMode={setMode}
-    setWorkspace={setWorkspace}
-    setOperatorPanel={setOperatorPanel}
-    setSelectedCompanyForComms={setSelectedCompanyForComms}
-    setSelectedEmailId={setSelectedEmailId}
-  />
-)}
           <select value={mode} onChange={(e) => setMode(e.target.value)}>
             <option value="platform">Platform View</option>
             <option value="operator">Operator View</option>
