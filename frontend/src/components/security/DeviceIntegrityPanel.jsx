@@ -1,6 +1,6 @@
 // frontend/src/components/security/DeviceIntegrityPanel.jsx
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { getToken } from "../../lib/api";
 
 function getSeverityColor(severity) {
@@ -49,6 +49,28 @@ export default function DeviceIntegrityPanel() {
     return () => clearInterval(interval);
   }, []);
 
+  /* ================= METRICS ================= */
+
+  const metrics = useMemo(() => {
+
+    const total = events.length;
+
+    const critical = events.filter(
+      e => e.severity === "critical"
+    ).length;
+
+    const high = events.filter(
+      e => e.severity === "high"
+    ).length;
+
+    return {
+      total,
+      critical,
+      high
+    };
+
+  }, [events]);
+
   /* ================= RENDER ================= */
 
   return (
@@ -58,6 +80,33 @@ export default function DeviceIntegrityPanel() {
         <h3 style={{ margin: 0 }}>Device Integrity Monitor</h3>
         {loading && <span style={styles.loading}>Refreshing...</span>}
       </div>
+
+      {/* DEVICE METRICS */}
+
+      <div style={styles.metricsGrid}>
+
+        <div style={styles.metricCard}>
+          <span>Total Anomalies</span>
+          <strong>{metrics.total}</strong>
+        </div>
+
+        <div style={styles.metricCard}>
+          <span>Critical</span>
+          <strong style={{ color: "#ff4d4f" }}>
+            {metrics.critical}
+          </strong>
+        </div>
+
+        <div style={styles.metricCard}>
+          <span>High Severity</span>
+          <strong style={{ color: "#fa8c16" }}>
+            {metrics.high}
+          </strong>
+        </div>
+
+      </div>
+
+      {/* EVENT LIST */}
 
       {events.length === 0 && (
         <div style={styles.empty}>
@@ -77,6 +126,7 @@ export default function DeviceIntegrityPanel() {
             <span style={styles.severity}>
               {event.severity?.toUpperCase() || "INFO"}
             </span>
+
             <span style={styles.timestamp}>
               {new Date(event.timestamp).toLocaleString()}
             </span>
@@ -91,6 +141,7 @@ export default function DeviceIntegrityPanel() {
               Company: {event.companyId}
             </div>
           )}
+
         </div>
       ))}
 
@@ -121,6 +172,23 @@ const styles = {
   loading: {
     fontSize: 12,
     color: "#9ca3af"
+  },
+
+  metricsGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))",
+    gap: 14,
+    marginBottom: 20
+  },
+
+  metricCard: {
+    background: "#1f2937",
+    padding: 12,
+    borderRadius: 8,
+    display: "flex",
+    flexDirection: "column",
+    gap: 4,
+    color: "#e5e7eb"
   },
 
   empty: {
