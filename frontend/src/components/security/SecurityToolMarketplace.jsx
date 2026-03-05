@@ -4,7 +4,7 @@ import { getToken } from "../../lib/api.js";
 /*
   SecurityToolMarketplace
   Enterprise Tool Deployment Panel
-  Auth Fixed • Production Stable
+  AUTH RACE FIXED • TOKEN SAFE • PRODUCTION STABLE
 */
 
 function apiBase() {
@@ -17,7 +17,6 @@ function apiBase() {
 
 export default function SecurityToolMarketplace() {
   const base = apiBase();
-  const token = getToken();
 
   const [tools, setTools] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -28,6 +27,8 @@ export default function SecurityToolMarketplace() {
   /* ================= LOAD TOOLS ================= */
 
   const loadTools = useCallback(async () => {
+    const token = getToken();
+
     if (!base || !token) {
       setError("Not authenticated");
       setLoading(false);
@@ -58,15 +59,23 @@ export default function SecurityToolMarketplace() {
     } finally {
       setLoading(false);
     }
-  }, [base, token]);
+  }, [base]);
 
   useEffect(() => {
     loadTools();
+
+    // 🔒 Reload if token changes (login / refresh)
+    const i = setInterval(() => {
+      loadTools();
+    }, 15000);
+
+    return () => clearInterval(i);
   }, [loadTools]);
 
   /* ================= INSTALL / UNINSTALL ================= */
 
   async function toggleInstall(tool) {
+    const token = getToken();
     if (!base || !token || busyId) return;
 
     setBusyId(tool.id);
@@ -85,13 +94,10 @@ export default function SecurityToolMarketplace() {
         },
       });
 
-      if (!res.ok) {
-        throw new Error("Action failed");
-      }
+      if (!res.ok) throw new Error();
 
       await loadTools();
 
-      // 🔥 Notify radar + score panel to refresh immediately
       window.dispatchEvent(new Event("security:refresh"));
     } catch {
       setError("Action failed. Please retry.");
