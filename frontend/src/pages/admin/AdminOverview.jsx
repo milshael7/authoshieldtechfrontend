@@ -28,23 +28,16 @@ import "../../styles/platform.css";
 /* ================= UTILITIES ================= */
 
 function containmentFromRisk(risk) {
-  const r = Number(risk || 0);
-
-  if (r >= 90) return "EMERGENCY";
-  if (r >= 75) return "LOCKDOWN";
-  if (r >= 50) return "MONITORING";
-  if (r >= 25) return "CONTAINED";
-
+  if (risk >= 75) return "LOCKDOWN";
+  if (risk >= 50) return "MONITORING";
+  if (risk >= 25) return "CONTAINED";
   return "STABLE";
 }
 
 function priorityFromRisk(risk) {
-  const r = Number(risk || 0);
-
-  if (r >= 85) return "P1";
-  if (r >= 65) return "P2";
-  if (r >= 40) return "P3";
-
+  if (risk >= 75) return "P1";
+  if (risk >= 60) return "P2";
+  if (risk >= 40) return "P3";
   return "P4";
 }
 
@@ -69,14 +62,10 @@ function slaDuration(priority) {
 }
 
 function formatCountdown(ms) {
-  const value = Number(ms || 0);
-
-  if (value <= 0) return "BREACHED";
-
-  const totalSec = Math.floor(value / 1000);
+  if (ms <= 0) return "BREACHED";
+  const totalSec = Math.floor(ms / 1000);
   const min = Math.floor(totalSec / 60);
   const sec = totalSec % 60;
-
   return `${min}:${sec.toString().padStart(2, "0")}`;
 }
 
@@ -85,34 +74,11 @@ function nowTs() {
 }
 
 function safeStr(v) {
-  if (v === null || v === undefined) return "";
-  return String(v).trim();
+  return String(v ?? "").trim();
 }
-
-/* safer unique id generator */
 
 function makeId(prefix = "id") {
-  try {
-    if (typeof crypto !== "undefined" && crypto.randomUUID) {
-      return `${prefix}-${crypto.randomUUID()}`;
-    }
-  } catch {}
-
-  return `${prefix}-${Math.random().toString(16).slice(2)}-${Date.now()}`;
-}
-
-/* safe integer parser */
-
-function safeInt(v, fallback = 0) {
-  const n = parseInt(v, 10);
-  return Number.isFinite(n) ? n : fallback;
-}
-
-/* safe number clamp */
-
-function clamp(num, min = 0, max = 100) {
-  const n = Number(num || 0);
-  return Math.max(min, Math.min(max, n));
+  return `${prefix}-${Math.random().toString(16).slice(2)}-${nowTs()}`;
 }
 
 function dayLabel(d) {
@@ -533,312 +499,98 @@ export default function AdminOverview() {
   }, []);
 
   /* ================= THREAT ENGINE =================
-   - Operator view + automatic mode only
-   - Risk-weighted threat generation
-   - Company risk decay
-   - Attack burst simulation
-   - Multi-vector threat modeling
-   - Coordinated attack waves
-   - Risk carryover stabilization
-*/
+     - Operator view + automatic mode only
+     - Option B: per-company gating (hours/days/vacation)
+  */
 
-useEffect(() => {
-  const active =
-    mode === "operator" &&
-    !enginePaused &&
-    operatorMode === "automatic";
+  useEffect(() => {
+    const active = mode === "operator" && !enginePaused && operatorMode === "automatic";
+    if (!active) return;
 
-  if (!active) return;
+    const interval = setInterval(() => {
+      setCompanyState((prev) => {
+        const updated = { ...prev };
+        const newAlerts = [];
 
-  const interval = setInterval(() => {
-    setCompanyState((prev) => {
-      const updated = { ...prev };
-      const newAlerts = [];
-
-      (companies || []).forEach((company) => {
-        const id = company.id;
-
-        // respect work policy window
-        if (!isWithinWorkWindow(company)) return;
-
-        const currentRisk = Number(updated[id]?.risk || 0);
-
-        /* ================= RISK DECAY ================= */
-
-        let nextRisk = currentRisk;
-
-        if (currentRisk > 0 && Math.random() < 0.35) {
-          nextRisk = Math.max(
-            0,
-            currentRisk - Math.floor(Math.random() * 4)
-          );
-        }
-
-        /* ================= ATTACK VECTOR SELECTION ================= */
-
-        const attackVectors = [
-          "Credential Stuffing",
-          "Malware Execution",
-          "Suspicious Login",
-          "Privilege Escalation",
-          "Data Exfiltration Attempt",
-          "Command & Control Beacon",
-          "Phishing Delivery",
-          "Lateral Movement"
-        ];
-
-        const attackType =
-          attackVectors[
-            Math.floor(Math.random() * attackVectors.length)
-          ];
-
-        /* ================= ATTACK PROBABILITY ================= */
-
-        const baseProbability = 0.12;
-
-        const riskFactor = currentRisk / 100;
-
-        const probability = Math.min(
-          0.85,
-          baseProbability + riskFactor
-        );
-
-        if (Math.random() < probability) {
-
-          /* ================= ATTACK WAVE ================= */
-
-          const burst =
-            Math.random() < 0.20
-              ? Math.floor(Math.random() * 28) + 12
-              : Math.floor(Math.random() * 14) + 4;
-
-          const newRisk = Math.min(100, nextRisk + burst);
-
-          const containment = containmentFromRisk(newRisk);
-          const priority = priorityFromRisk(newRisk);
-
-          updated[id] = {
-            risk: newRisk,
-            containment,
-          };
-
-          const createdAt = nowTs();
-          const deadline = createdAt + slaDuration(priority);
-
-          newAlerts.push({
-            id: makeId("alert"),
-            companyId: id,
-            risk: newRisk,
-            containment,
-            priority,
-            attackType,
-            createdAt,
-            deadline,
-            status: "NEW",
-            assignedTo: null,
-            locked: false,
-            autoEscalated: false,
-            activity: [
-              {
-                time: new Date(),
-                action: `ATTACK_DETECTED_${attackType.replace(/\s/g, "_")}`
-              },
-              {
-                time: new Date(),
-                action: "CREATED"
-              }
-            ],
-            resolution: null,
-          });
-        } else {
-          updated[id] = {
-            risk: nextRisk,
-            containment: containmentFromRisk(nextRisk),
-          };
-        }
-      });
-
-      /* ================= COORDINATED ATTACK EVENT ================= */
-
-      if (
-        companies.length >= 3 &&
-        Math.random() < 0.04
-      ) {
-        const targets = companies
-          .slice(0)
-          .sort(() => 0.5 - Math.random())
-          .slice(0, Math.floor(Math.random() * 3) + 2);
-
-        targets.forEach((company) => {
+        (companies || []).forEach((company) => {
           const id = company.id;
 
-          const newRisk = Math.min(
-            100,
-            (updated[id]?.risk || 0) + 20
-          );
+          // Option B: do NOT generate outside window
+          if (!isWithinWorkWindow(company)) return;
 
-          updated[id] = {
-            risk: newRisk,
-            containment: containmentFromRisk(newRisk),
+          if (Math.random() < 0.4) {
+            const spike = Math.floor(Math.random() * 15);
+            const newRisk = Math.min(100, (updated[id]?.risk || 0) + spike);
+            const containment = containmentFromRisk(newRisk);
+            const priority = priorityFromRisk(newRisk);
+
+            updated[id] = { risk: newRisk, containment };
+
+            const createdAt = nowTs();
+            const deadline = createdAt + slaDuration(priority);
+
+            newAlerts.push({
+              id: `${id}-${createdAt}`,
+              companyId: id,
+              risk: newRisk,
+              containment,
+              priority,
+              createdAt,
+              deadline,
+              status: "NEW",
+              assignedTo: null,
+              locked: false,
+              autoEscalated: false,
+              activity: [{ time: new Date(), action: "CREATED" }],
+              resolution: null,
+            });
+          }
+        });
+
+        if (newAlerts.length) {
+          setGlobalQueue((prevQ) => [...newAlerts, ...prevQ].slice(0, 200));
+        }
+
+        return updated;
+      });
+    }, speedMap[engineSpeed]);
+
+    return () => clearInterval(interval);
+  }, [mode, enginePaused, operatorMode, engineSpeed, speedMap, companies]);
+
+  /* ================= SLA AUTO ESCALATION ================= */
+
+  useEffect(() => {
+    if (mode !== "operator") return;
+    if (operatorMode === "manual") return;
+
+    setGlobalQueue((prev) =>
+      prev.map((alert) => {
+        if (!alert || alert.status === "RESOLVED") return alert;
+
+        const remaining = (alert.deadline || 0) - tick;
+
+        if (remaining <= 0 && !alert.autoEscalated && !alert.locked) {
+          const newPriority = bumpPriority(alert.priority);
+          const newDeadline = nowTs() + slaDuration(newPriority);
+
+          const escalated = {
+            ...alert,
+            priority: newPriority,
+            deadline: newDeadline,
+            autoEscalated: true,
+            locked: true,
+            activity: [{ time: new Date(), action: "AUTO_ESCALATED_LOCKED" }, ...(alert.activity || [])],
           };
 
-          const priority = priorityFromRisk(newRisk);
+          setIncidentRegistry((prevInc) => [{ ...escalated, escalatedAt: new Date() }, ...prevInc]);
+          return escalated;
+        }
 
-          const createdAt = nowTs();
-          const deadline = createdAt + slaDuration(priority);
-
-          newAlerts.push({
-            id: makeId("alert"),
-            companyId: id,
-            risk: newRisk,
-            containment: containmentFromRisk(newRisk),
-            priority,
-            attackType: "Coordinated Attack",
-            createdAt,
-            deadline,
-            status: "NEW",
-            assignedTo: null,
-            locked: false,
-            autoEscalated: false,
-            activity: [
-              {
-                time: new Date(),
-                action: "COORDINATED_ATTACK_DETECTED"
-              },
-              {
-                time: new Date(),
-                action: "CREATED"
-              }
-            ],
-            resolution: null,
-          });
-        });
-      }
-
-      if (newAlerts.length) {
-        setGlobalQueue((prevQ) =>
-          [...newAlerts, ...prevQ].slice(0, 200)
-        );
-      }
-
-      return updated;
-    });
-  }, speedMap[engineSpeed]);
-
-  return () => clearInterval(interval);
-}, [
-  mode,
-  enginePaused,
-  operatorMode,
-  engineSpeed,
-  speedMap,
-  companies,
-]);
-
-  /* ================= SLA AUTO ESCALATION =================
-   - Automatic SLA monitoring
-   - Breach detection
-   - Multi-level escalation
-   - Supervisor escalation
-   - Incident registry logging
-   - Breach severity classification
-*/
-
-useEffect(() => {
-  if (mode !== "operator") return;
-  if (operatorMode === "manual") return;
-
-  setGlobalQueue((prev) =>
-    prev.map((alert) => {
-      if (!alert) return alert;
-      if (alert.status === "RESOLVED") return alert;
-
-      const deadline = Number(alert.deadline || 0);
-      const remaining = deadline - tick;
-
-      /* ================= SLA BREACH ================= */
-
-      if (remaining <= 0 && !alert.locked) {
-
-        const newPriority = bumpPriority(alert.priority);
-        const newDeadline = nowTs() + slaDuration(newPriority);
-
-        /* ================= BREACH SEVERITY ================= */
-
-        let breachSeverity = "MINOR";
-
-        if (alert.priority === "P1") breachSeverity = "CRITICAL";
-        else if (alert.priority === "P2") breachSeverity = "HIGH";
-        else if (alert.priority === "P3") breachSeverity = "MEDIUM";
-
-        /* ================= ESCALATION TARGET ================= */
-
-        let escalatedTo = "Tier2";
-
-        if (alert.priority === "P1") escalatedTo = "Supervisor";
-
-        const escalated = {
-          ...alert,
-          priority: newPriority,
-          deadline: newDeadline,
-          autoEscalated: true,
-          locked: true,
-          breachedAt: new Date(),
-          escalationLevel: escalatedTo,
-          breachSeverity,
-          activity: [
-            {
-              time: new Date(),
-              action: `SLA_BREACH_${breachSeverity}`
-            },
-            {
-              time: new Date(),
-              action: `ESCALATED_TO_${escalatedTo}`
-            },
-            ...(alert.activity || []),
-          ],
-        };
-
-        /* ================= INCIDENT REGISTRY ================= */
-
-        setIncidentRegistry((prevInc) => [
-          {
-            ...escalated,
-            escalatedAt: new Date(),
-            escalationReason: "SLA_BREACH",
-            breachSeverity,
-            escalatedTo,
-          },
-          ...prevInc,
-        ]);
-
-        return escalated;
-      }
-
-      /* ================= APPROACHING BREACH WARNING ================= */
-
-      if (
-        remaining > 0 &&
-        remaining < 60000 && // 1 minute warning
-        !alert.slaWarning
-      ) {
-        return {
-          ...alert,
-          slaWarning: true,
-          activity: [
-            {
-              time: new Date(),
-              action: "SLA_WARNING_60_SECONDS"
-            },
-            ...(alert.activity || []),
-          ],
-        };
-      }
-
-      return alert;
-    })
-  );
-}, [tick, mode, operatorMode]);
+        return alert;
+      })
+    );
+  }, [tick, mode, operatorMode]);
 
   /* ================= HELPERS ================= */
 
@@ -993,239 +745,140 @@ useEffect(() => {
 
   /* ================= COMPANY METRICS + SIGNALS ================= */
 
-const companyMetrics = useMemo(() => {
-  const map = {};
+  const companyMetrics = useMemo(() => {
+    const map = {};
 
-  (companies || []).forEach((c) => {
-    map[c.id] = {
-      open: 0,
-      p1: 0,
-      breached: 0,
-      pressure: 0,
-      riskScore: 0,
-    };
-  });
+    (companies || []).forEach((c) => {
+      map[c.id] = { open: 0, p1: 0, breached: 0 };
+    });
 
-  (globalQueue || []).forEach((a) => {
-    if (!a?.companyId) return;
+    (globalQueue || []).forEach((a) => {
+      if (!a?.companyId) return;
 
-    if (!map[a.companyId]) {
-      map[a.companyId] = {
+      if (!map[a.companyId]) {
+        map[a.companyId] = { open: 0, p1: 0, breached: 0 };
+      }
+
+      if (a.status !== "RESOLVED") map[a.companyId].open += 1;
+      if (a.priority === "P1") map[a.companyId].p1 += 1;
+      if ((a.deadline || 0) - tick <= 0) map[a.companyId].breached += 1;
+    });
+
+    return map;
+  }, [companies, globalQueue, tick]);
+
+  const companySignals = useMemo(() => {
+    const sig = {};
+
+    (companies || []).forEach((c) => {
+      const metrics = companyMetrics[c.id] || {
         open: 0,
         p1: 0,
         breached: 0,
-        pressure: 0,
-        riskScore: 0,
       };
-    }
 
-    if (a.status !== "RESOLVED") map[a.companyId].open += 1;
+      const comms = companyComms[c.id] || {
+        notifications: [],
+        emails: [],
+      };
 
-    if (a.priority === "P1") map[a.companyId].p1 += 1;
+      const overload = metrics.p1 >= 2 || metrics.open >= 10;
 
-    if ((a.deadline || 0) - tick <= 0) map[a.companyId].breached += 1;
+      const unreadNotes =
+        (comms.notifications || []).filter((n) => !n.read).length;
 
-    /* ================= PRESSURE SCORING ================= */
+      const hasDraft =
+        (comms.emails || []).some((e) => e.status === "DRAFT");
 
-    if (a.status !== "RESOLVED") {
-      let weight = 1;
+      let level = "GREEN";
 
-      if (a.priority === "P1") weight = 6;
-      else if (a.priority === "P2") weight = 4;
-      else if (a.priority === "P3") weight = 2;
+      if (overload) level = "RED";
+      else if (hasDraft || unreadNotes > 0) level = "YELLOW";
 
-      map[a.companyId].pressure += weight;
-    }
-  });
+      sig[c.id] = {
+        level,
+        overload,
+        metrics,
+        hasDraft,
+        unreadNotes,
+      };
+    });
 
-  /* ================= RISK SCORE ================= */
-
-  Object.keys(map).forEach((cid) => {
-    const m = map[cid];
-
-    const breachWeight = m.breached * 10;
-    const p1Weight = m.p1 * 6;
-    const openWeight = m.open * 1;
-
-    m.riskScore =
-      m.pressure +
-      breachWeight +
-      p1Weight +
-      openWeight;
-  });
-
-  return map;
-}, [companies, globalQueue, tick]);
-
-const companySignals = useMemo(() => {
-  const sig = {};
-
-  (companies || []).forEach((c) => {
-    const metrics = companyMetrics[c.id] || {
-      open: 0,
-      p1: 0,
-      breached: 0,
-      pressure: 0,
-      riskScore: 0,
-    };
-
-    const comms = companyComms[c.id] || {
-      notifications: [],
-      emails: [],
-    };
-
-    /* ================= OVERLOAD DETECTION ================= */
-
-    const overload =
-      metrics.p1 >= 3 ||
-      metrics.breached >= 2 ||
-      metrics.pressure >= 20;
-
-    /* ================= COMMS STATE ================= */
-
-    const unreadNotes =
-      (comms.notifications || []).filter((n) => !n.read).length;
-
-    const hasDraft =
-      (comms.emails || []).some((e) => e.status === "DRAFT");
-
-    /* ================= SIGNAL LEVEL ================= */
-
-    let level = "GREEN";
-
-    if (overload) level = "RED";
-    else if (metrics.pressure >= 8) level = "YELLOW";
-    else if (hasDraft || unreadNotes > 0) level = "YELLOW";
-
-    /* ================= SIGNAL OBJECT ================= */
-
-    sig[c.id] = {
-      level,
-      overload,
-      metrics,
-      hasDraft,
-      unreadNotes,
-      pressure: metrics.pressure,
-      riskScore: metrics.riskScore,
-    };
-  });
-
-  return sig;
-}, [companies, companyMetrics, companyComms]);
+    return sig;
+  }, [companies, companyMetrics, companyComms]);
 
   /* ================= OVERLOAD AUTO DRAFT ================= */
 
-useEffect(() => {
-  (companies || []).forEach((c) => {
-    const cs = companySignals[c.id];
-    if (!cs) return;
+  useEffect(() => {
+    (companies || []).forEach((c) => {
+      const cs = companySignals[c.id];
+      if (!cs) return;
 
-    const prevOver = Boolean(overloadRef.current[c.id]);
-    const nowOver = Boolean(cs.overload);
+      const prevOver = Boolean(overloadRef.current[c.id]);
+      const nowOver = Boolean(cs.overload);
 
-    /* ================= EDGE DETECTION ================= */
+      // trigger only on edge change
+      if (!prevOver && nowOver) {
+        const companyId = c.id;
+        const companyName = getCompanyName(companyId);
 
-    if (!prevOver && nowOver) {
-      const companyId = c.id;
-      const companyName = getCompanyName(companyId);
-
-      const comms = companyComms[companyId] || {
-        emails: [],
-        notifications: [],
-      };
-
-      /* ================= EXISTING DRAFT CHECK ================= */
-
-      const alreadyDraft = (comms.emails || []).some(
-        (e) => e.status === "DRAFT" && e.kind === "OVERLOAD"
-      );
-
-      if (!alreadyDraft) {
-        const emailId = makeId("email");
-
-        /* ================= INCIDENT SNAPSHOT ================= */
-
-        const snapshot = {
-          open: cs.metrics.open,
-          p1: cs.metrics.p1,
-          breached: cs.metrics.breached,
-          pressure: cs.pressure,
-          riskScore: cs.riskScore,
+        const comms = companyComms[companyId] || {
+          emails: [],
+          notifications: [],
         };
 
-        /* ================= EMAIL DRAFT ================= */
+        const alreadyDraft = (comms.emails || []).some(
+          (e) => e.status === "DRAFT" && e.kind === "OVERLOAD"
+        );
 
-        addEmail(companyId, {
-          id: emailId,
-          kind: "OVERLOAD",
-          status: "DRAFT",
-          createdAt: nowTs(),
-          snapshot,
-          to: safeStr(c?.meta?.contactEmail),
-          subject: `[URGENT] Elevated Threat Pressure Detected — ${companyName}`,
-          body: [
-            `Hello ${companyName} Security Team,`,
-            ``,
-            `AutoProtect has detected elevated security pressure across your environment.`,
-            ``,
-            `Current Incident Snapshot`,
-            `--------------------------------`,
-            `Open Incidents: ${snapshot.open}`,
-            `Critical (P1): ${snapshot.p1}`,
-            `SLA Breaches: ${snapshot.breached}`,
-            `Threat Pressure: ${snapshot.pressure}`,
-            `Risk Score: ${snapshot.riskScore}`,
-            ``,
-            `Immediate Recommended Actions`,
-            `--------------------------------`,
-            `1. Review authentication logs for unusual login behavior`,
-            `2. Investigate any endpoints generating repeated alerts`,
-            `3. Verify multi-factor authentication enforcement`,
-            `4. Temporarily increase monitoring sensitivity`,
-            ``,
-            `Our operators are actively reviewing the situation.`,
-            `This message was automatically drafted and requires operator approval before sending.`,
-            ``,
-            `— AutoProtect Security Operations`,
-          ].join("\n"),
-        });
+        if (!alreadyDraft) {
+          const emailId = makeId("email");
 
-        /* ================= SOC NOTIFICATION ================= */
+          addEmail(companyId, {
+            id: emailId,
+            kind: "OVERLOAD",
+            status: "DRAFT",
+            createdAt: nowTs(),
+            to: safeStr(c?.meta?.contactEmail),
+            subject: `[URGENT] Elevated Threat Volume Detected — ${companyName}`,
+            body: [
+              `Hello ${companyName} Security Team,`,
+              ``,
+              `AutoProtect detected elevated threat volume for your environment.`,
+              ``,
+              `Snapshot:`,
+              `- Open items: ${cs.metrics.open}`,
+              `- P1 items: ${cs.metrics.p1}`,
+              `- SLA breached: ${cs.metrics.breached}`,
+              ``,
+              `Recommended immediate actions:`,
+              `1) Review recent authentication activity`,
+              `2) Validate suspicious IP addresses`,
+              `3) Rotate credentials if compromise suspected`,
+              `4) Verify MFA enforcement`,
+              ``,
+              `This message was drafted automatically and requires operator approval.`,
+              ``,
+              `— AutoProtect Operator Console`,
+            ].join("\n"),
+          });
 
-        addNotification(companyId, {
-          id: makeId("note"),
-          createdAt: nowTs(),
-          severity: "RED",
-          title: "Company overload detected",
-          message:
-            `Threat pressure spike detected for ${companyName}. ` +
-            `An escalation email draft has been created for review.`,
-          linkedEmailId: emailId,
-          read: false,
-        });
-
-        /* ================= INTERNAL INCIDENT LOG ================= */
-
-        setIncidentRegistry((prev) => [
-          {
-            id: makeId("incident"),
-            companyId,
-            type: "OVERLOAD_EVENT",
-            detectedAt: new Date(),
-            pressure: cs.pressure,
-            riskScore: cs.riskScore,
-            open: cs.metrics.open,
-            p1: cs.metrics.p1,
-            breached: cs.metrics.breached,
-          },
-          ...prev,
-        ]);
+          addNotification(companyId, {
+            id: makeId("note"),
+            createdAt: nowTs(),
+            severity: "RED",
+            title: "Overload detected",
+            message:
+              "High threat volume detected. AutoProtect drafted an urgent response email.",
+            linkedEmailId: emailId,
+            read: false,
+          });
+        }
       }
-    }
 
-    overloadRef.current[c.id] = nowOver;
-  });
-}, [companies, companySignals, companyComms]);
+      overloadRef.current[c.id] = nowOver;
+    });
+  }, [companies, companySignals, companyComms]);
 
   /* ================= ROLE RULES ================= */
 
@@ -1235,118 +888,64 @@ useEffect(() => {
 
   /* ================= GLOBAL SIGNAL + UNREAD COUNTER + THREAT TICKER ================= */
 
-const globalUnreadCount = useMemo(() => {
-  let count = 0;
+  const globalUnreadCount = useMemo(() => {
+    let count = 0;
 
-  Object.values(companyComms || {}).forEach((c) => {
-    (c.notifications || []).forEach((n) => {
-      if (!n.read) count += 1;
+    Object.values(companyComms || {}).forEach((c) => {
+      (c.notifications || []).forEach((n) => {
+        if (!n.read) count += 1;
+      });
     });
-  });
 
-  return count;
-}, [companyComms]);
+    return count;
+  }, [companyComms]);
 
-const globalSignalLevel = useMemo(() => {
-  let level = "GREEN";
+  const globalSignalLevel = useMemo(() => {
+    let level = "GREEN";
 
-  let redCount = 0;
-  let yellowCount = 0;
+    (companies || []).forEach((c) => {
+      const sig = companySignals?.[c.id];
+      if (!sig) return;
 
-  (companies || []).forEach((c) => {
-    const sig = companySignals?.[c.id];
-    if (!sig) return;
-
-    if (sig.level === "RED") redCount += 1;
-    if (sig.level === "YELLOW") yellowCount += 1;
-  });
-
-  /* ================= GLOBAL STATE ================= */
-
-  if (redCount >= 2) level = "CRITICAL";
-  else if (redCount === 1) level = "RED";
-  else if (yellowCount >= 1) level = "YELLOW";
-  else level = "GREEN";
-
-  return level;
-}, [companies, companySignals]);
-
-/* ================= GLOBAL PRESSURE ================= */
-
-const globalPressure = useMemo(() => {
-  let pressure = 0;
-
-  Object.values(companySignals || {}).forEach((sig) => {
-    pressure += Number(sig?.pressure || 0);
-  });
-
-  return pressure;
-}, [companySignals]);
-
-/* ================= THREAT TICKER DATA ================= */
-
-const threatTicker = useMemo(() => {
-  const rows = [];
-
-  (globalQueue || []).slice(0, 12).forEach((a) => {
-    rows.push({
-      id: a.id,
-      text: `⚠️ ${a.priority} incident — ${getCompanyName(a.companyId)} (risk ${a.risk})`,
-      priority: a.priority,
-      companyId: a.companyId,
-      risk: a.risk,
+      if (sig.level === "RED") level = "RED";
+      else if (sig.level === "YELLOW" && level !== "RED") level = "YELLOW";
     });
-  });
 
-  return rows;
-}, [globalQueue]);
-
-const tickerText = useMemo(() => {
-  if (!threatTicker.length)
-    return "System stable — no active threat spikes";
-
-  return threatTicker.map((t) => t.text).join("   •   ");
-}, [threatTicker]);
+    return level;
+  }, [companies, companySignals]);
 
   /* ================= CRISIS MODE DETECTION ================= */
 
-const crisisMode = useMemo(() => {
-  let redCount = 0;
-  let yellowCount = 0;
-  let breachedTotal = 0;
-  let p1Total = 0;
+  const crisisMode = useMemo(() => {
+    let redCount = 0;
 
-  (companies || []).forEach((c) => {
-    const sig = companySignals?.[c.id];
-    if (!sig) return;
+    (companies || []).forEach((c) => {
+      const sig = companySignals?.[c.id];
+      if (sig?.level === "RED") redCount += 1;
+    });
 
-    if (sig.level === "RED") redCount += 1;
-    if (sig.level === "YELLOW") yellowCount += 1;
+    return redCount >= 3;
+  }, [companies, companySignals]);
 
-    const metrics = sig.metrics || {};
+  /* ================= LIVE THREAT TICKER ================= */
 
-    breachedTotal += Number(metrics.breached || 0);
-    p1Total += Number(metrics.p1 || 0);
-  });
+  const threatTicker = useMemo(() => {
+    const rows = [];
 
-  /* ================= CRISIS CONDITIONS ================= */
+    (globalQueue || []).slice(0, 12).forEach((a) => {
+      rows.push({
+        id: a.id,
+        text: `⚠️ ${a.priority} incident — ${getCompanyName(a.companyId)} (risk ${a.risk})`,
+      });
+    });
 
-  const multiTenantOverload = redCount >= 3;
+    return rows;
+  }, [globalQueue]);
 
-  const massSlaFailure = breachedTotal >= 5;
-
-  const criticalIncidentWave = p1Total >= 6;
-
-  const widespreadInstability =
-    redCount >= 2 && yellowCount >= 2;
-
-  return (
-    multiTenantOverload ||
-    massSlaFailure ||
-    criticalIncidentWave ||
-    widespreadInstability
-  );
-}, [companies, companySignals]);
+  const tickerText = useMemo(() => {
+    if (!threatTicker.length) return "System stable — no active threat spikes";
+    return threatTicker.map((t) => t.text).join("   •   ");
+  }, [threatTicker]);
 
   /* ================= ONBOARDING ================= */
 
@@ -1617,7 +1216,14 @@ const crisisMode = useMemo(() => {
 
       {/* LIVE LOAD STATUS (subtle, won’t break UI) */}
       {(companiesLoading || companiesError) && (
-        <div className="postureCard" style={{ display: "flex", gap: 12, alignItems: "center" }}>
+        <div
+  className="postureCard"
+  style={{
+    overflow: "hidden",
+    whiteSpace: "nowrap",
+    position: "relative",
+  }}
+>
           {companiesLoading && <b>Loading companies from backend…</b>}
           {companiesError && <span style={{ opacity: 0.85 }}>⚠️ {companiesError}</span>}
           {crisisMode && <span style={{ marginLeft: "auto" }}>🚨 Crisis Mode</span>}
@@ -1625,25 +1231,19 @@ const crisisMode = useMemo(() => {
       )}
 
       <div
-        className="postureCard"
-        style={{
-          overflow: "hidden",
-          whiteSpace: "nowrap",
-          position: "relative",
-        }}
-      >
-        <div
-          style={{
-            display: "inline-block",
-            paddingLeft: "100%",
-            animation: "tickerMove 40s linear infinite",
-            opacity: 0.85,
-          }}
-        >
-          {tickerText}
-        </div>
-      </div>
-
+  className="postureCard"
+  style={{
+    overflow: "hidden",
+    whiteSpace: "nowrap",
+    position: "relative",
+  }}
+>
+  <div className="threatTicker">
+    <div className="threatTickerTrack">
+      {tickerText}
+    </div>
+  </div>
+</div>
 
       {/* ================= OPERATOR VIEW ================= */}
       {mode === "operator" && (
