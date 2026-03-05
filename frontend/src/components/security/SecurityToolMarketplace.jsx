@@ -4,7 +4,7 @@ import { getToken } from "../../lib/api.js";
 /*
 SecurityToolMarketplace
 Enterprise Tool Deployment Panel
-STABILITY UPGRADE • METRICS PANEL • SAFE FILTERING
+BACKEND-ALIGNED • REQUEST-BASED • STABLE
 */
 
 function apiBase() {
@@ -16,7 +16,6 @@ function apiBase() {
 }
 
 export default function SecurityToolMarketplace() {
-
   const base = apiBase();
 
   const [tools, setTools] = useState([]);
@@ -28,7 +27,6 @@ export default function SecurityToolMarketplace() {
   /* ================= LOAD TOOLS ================= */
 
   const loadTools = useCallback(async () => {
-
     const token = getToken();
 
     if (!base || !token) {
@@ -38,11 +36,10 @@ export default function SecurityToolMarketplace() {
     }
 
     try {
-
       setError(null);
       setLoading(true);
 
-      const res = await fetch(`${base}/api/security/tools`, {
+      const res = await fetch(`${base}/api/tools/catalog`, {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
@@ -51,149 +48,111 @@ export default function SecurityToolMarketplace() {
 
       const data = await res.json().catch(() => ({}));
 
-      if (!res.ok) {
+      if (!res.ok || !data.ok) {
         throw new Error(data?.error || "Failed to load tools");
       }
 
       setTools(Array.isArray(data.tools) ? data.tools : []);
-
     } catch {
-
       setTools([]);
       setError("Unable to load security modules");
-
     } finally {
-
       setLoading(false);
-
     }
-
   }, [base]);
 
   useEffect(() => {
-
     loadTools();
-
-    const i = setInterval(loadTools, 15000);
-
-    return () => clearInterval(i);
-
   }, [loadTools]);
 
-  /* ================= INSTALL / UNINSTALL ================= */
+  /* ================= REQUEST ACCESS ================= */
 
-  async function toggleInstall(tool) {
-
+  async function requestTool(tool) {
     const token = getToken();
-
     if (!base || !token || busyId) return;
 
     setBusyId(tool.id);
     setError(null);
 
-    const endpoint = tool.installed
-      ? `/api/security/tools/${tool.id}/uninstall`
-      : `/api/security/tools/${tool.id}/install`;
-
     try {
-
-      const res = await fetch(`${base}${endpoint}`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      });
+      const res = await fetch(
+        `${base}/api/tools/request/${tool.id}`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
 
       if (!res.ok) throw new Error();
 
       await loadTools();
-
-      window.dispatchEvent(new Event("security:refresh"));
-
     } catch {
-
-      setError("Action failed. Please retry.");
-
+      setError("Request failed. Please retry.");
     } finally {
-
       setBusyId(null);
-
     }
-
   }
 
   /* ================= FILTER ================= */
 
   const filteredTools = useMemo(() => {
-
     const q = search.toLowerCase();
-
-    return tools.filter(
-      (tool) =>
-        (tool?.name || "").toLowerCase().includes(q)
+    return tools.filter((tool) =>
+      (tool?.name || "").toLowerCase().includes(q)
     );
-
   }, [tools, search]);
 
   /* ================= METRICS ================= */
 
   const metrics = useMemo(() => {
-
-    const installed = tools.filter((t) => t.installed).length;
-
-    const available = tools.length - installed;
-
-    const domains = new Set(tools.map((t) => t.domain)).size;
+    const accessible = tools.filter((t) => t.accessible).length;
+    const restricted = tools.length - accessible;
+    const categories = new Set(tools.map((t) => t.category)).size;
 
     return {
-      installed,
-      available,
-      domains,
+      accessible,
+      restricted,
+      categories,
     };
-
   }, [tools]);
 
   /* ================= UI ================= */
 
   return (
     <div className="postureCard">
-
       <div style={{ marginBottom: 24 }}>
-
         <h3>Security Control Marketplace</h3>
 
         <small className="muted">
-          Deploy, activate, and manage enterprise-grade security modules.
+          Deploy, request, and manage enterprise-grade security modules.
         </small>
 
         {/* METRICS */}
-
         <div
           style={{
             display: "flex",
             gap: 12,
             marginTop: 16,
-            flexWrap: "wrap"
+            flexWrap: "wrap",
           }}
         >
-
           <div className="metricCard">
-            Installed: <b>{metrics.installed}</b>
+            Accessible: <b>{metrics.accessible}</b>
           </div>
 
           <div className="metricCard">
-            Available: <b>{metrics.available}</b>
+            Restricted: <b>{metrics.restricted}</b>
           </div>
 
           <div className="metricCard">
-            Domains: <b>{metrics.domains}</b>
+            Categories: <b>{metrics.categories}</b>
           </div>
-
         </div>
 
         {/* SEARCH */}
-
         <div style={{ marginTop: 16 }}>
           <input
             type="text"
@@ -211,7 +170,6 @@ export default function SecurityToolMarketplace() {
             }}
           />
         </div>
-
       </div>
 
       {loading && <div className="muted">Loading security modules…</div>}
@@ -223,51 +181,43 @@ export default function SecurityToolMarketplace() {
       )}
 
       <div className="toolGrid">
-
         {filteredTools.map((tool) => (
-
           <div key={tool.id} className="toolCard">
-
             <div className="toolHeader">
-
               <div>
                 <b>{tool.name}</b>
-
                 <div className="toolCategory">
-                  {(tool.domain || "").toUpperCase()}
+                  {(tool.category || "").toUpperCase()}
                 </div>
               </div>
 
-              <span className={`badge ${tool.installed ? "ok" : ""}`}>
-                {tool.installed ? "Installed" : "Available"}
+              <span
+                className={`badge ${
+                  tool.accessible ? "ok" : "warn"
+                }`}
+              >
+                {tool.accessible ? "Accessible" : "Restricted"}
               </span>
-
             </div>
 
             <div className="toolDesc">
-              Security domain coverage module.
+              {tool.description || "Security capability module."}
             </div>
 
             <div className="toolActions">
-
-              <button
-                className={`btn ${tool.installed ? "warn" : "ok"}`}
-                disabled={busyId === tool.id}
-                onClick={() => toggleInstall(tool)}
-              >
-
-                {busyId === tool.id
-                  ? "Processing..."
-                  : tool.installed
-                  ? "Uninstall"
-                  : "Install"}
-
-              </button>
-
+              {!tool.accessible && (
+                <button
+                  className="btn ok"
+                  disabled={busyId === tool.id}
+                  onClick={() => requestTool(tool)}
+                >
+                  {busyId === tool.id
+                    ? "Requesting..."
+                    : "Request Access"}
+                </button>
+              )}
             </div>
-
           </div>
-
         ))}
 
         {!loading && filteredTools.length === 0 && (
@@ -275,9 +225,7 @@ export default function SecurityToolMarketplace() {
             No matching security controls found.
           </div>
         )}
-
       </div>
-
     </div>
   );
 }
