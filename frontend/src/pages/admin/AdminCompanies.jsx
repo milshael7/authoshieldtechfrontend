@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { api } from "../../lib/api";
+import { req } from "../../lib/api.js";
 import { useSecurity } from "../../context/SecurityContext.jsx";
 
 /* =========================================================
-   Admin Companies — Executive Risk Heatmap v2
-   Multi-Tenant Risk Dominance Layer
+   Admin Companies — Executive Risk Heatmap v3
+   API-SAFE • NO RUNTIME LEAKS • WS ALIGNED
 ========================================================= */
 
 function riskColor(score = 0) {
@@ -41,9 +41,15 @@ export default function AdminCompanies() {
       setLoading(true);
       setError("");
 
-      const res = await api.adminCompanies();
-      setCompanies(res?.companies || []);
+      const res = await req("/api/admin/companies");
+
+      if (res?.error) {
+        throw new Error(res.error);
+      }
+
+      setCompanies(Array.isArray(res?.companies) ? res.companies : []);
     } catch (e) {
+      setCompanies([]);
       setError(e?.message || "Failed to load companies");
     } finally {
       setLoading(false);
@@ -65,9 +71,14 @@ export default function AdminCompanies() {
     try {
       setCreating(true);
 
-      await api.adminCreateCompany({
-        name: name.trim(),
+      const res = await req("/api/admin/companies", {
+        method: "POST",
+        body: { name: name.trim() },
       });
+
+      if (res?.error) {
+        throw new Error(res.error);
+      }
 
       setName("");
       await loadCompanies();
@@ -79,7 +90,7 @@ export default function AdminCompanies() {
   }
 
   /* =========================================================
-     RISK RANKING (LIVE FROM WEBSOCKET CONTEXT)
+     RISK RANKING (LIVE FROM WS CONTEXT)
   ========================================================= */
 
   const rankedCompanies = useMemo(() => {
@@ -91,7 +102,9 @@ export default function AdminCompanies() {
         return {
           ...c,
           riskScore: Number(riskData?.riskScore || 0),
-          exposureCount: Object.keys(exposureData?.exposure || {}).length,
+          exposureCount: Object.keys(
+            exposureData?.exposure || {}
+          ).length,
         };
       })
       .sort((a, b) => b.riskScore - a.riskScore);
@@ -108,7 +121,7 @@ export default function AdminCompanies() {
     <div className="page">
       <h2>Executive · Company Risk Heatmap</h2>
 
-      {/* ================= CREATE ================= */}
+      {/* CREATE */}
       <div className="card">
         <form onSubmit={createCompany} className="row">
           <input
@@ -123,7 +136,7 @@ export default function AdminCompanies() {
         </form>
       </div>
 
-      {/* ================= HEATMAP GRID ================= */}
+      {/* HEATMAP GRID */}
       <div
         className="card"
         style={{
@@ -144,16 +157,9 @@ export default function AdminCompanies() {
                 borderRadius: 14,
                 background: "rgba(255,255,255,.05)",
                 border: `2px solid ${color}`,
-                transition: "all .25s ease",
               }}
             >
-              <div
-                style={{
-                  fontSize: 16,
-                  fontWeight: 700,
-                  marginBottom: 6,
-                }}
-              >
+              <div style={{ fontSize: 16, fontWeight: 700 }}>
                 {c.name}
               </div>
 
@@ -211,9 +217,7 @@ export default function AdminCompanies() {
         })}
 
         {rankedCompanies.length === 0 && (
-          <div className="muted">
-            No companies created yet.
-          </div>
+          <div className="muted">No companies created yet.</div>
         )}
       </div>
     </div>
