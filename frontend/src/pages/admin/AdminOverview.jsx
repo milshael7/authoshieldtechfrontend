@@ -87,20 +87,12 @@ function dayLabel(d) {
 
 /* ================= BRANCHES (Job/Seat types) ================= */
 
-/*
-Master Cybersecurity Branch List
-This list can expand over time without breaking the system.
-Each company selects which branches they hired you for.
-*/
-
 const BRANCHES = [
   "Threat Response",
   "Security Analysis",
   "SOC Operator",
   "Incident Management",
   "Client Communications",
-
-  /* Expanded SOC Roles */
 
   "Threat Intelligence",
   "Digital Forensics",
@@ -116,25 +108,13 @@ const BRANCHES = [
 
   "Security Automation",
   "Endpoint Detection",
-  "Risk Management"
+  "Risk Management",
 ];
 
-/*
-Normalize branches so every company always
-has at least one active branch.
-*/
-
 function normalizeBranches(arr) {
-  const a = Array.isArray(arr)
-    ? arr.map(safeStr).filter(Boolean)
-    : [];
-
+  const a = Array.isArray(arr) ? arr.map(safeStr).filter(Boolean) : [];
   const uniq = Array.from(new Set(a));
-
-  if (uniq.length === 0) {
-    return ["Threat Response"];
-  }
-
+  if (uniq.length === 0) return ["Threat Response"];
   return uniq;
 }
 
@@ -153,9 +133,12 @@ function normalizePolicy(policy) {
   const startHour = Number.isFinite(Number(p.startHour)) ? Number(p.startHour) : 9;
   const endHour = Number.isFinite(Number(p.endHour)) ? Number(p.endHour) : 17;
 
+  const workDays =
+    Array.isArray(p.workDays) && p.workDays.length ? p.workDays : [1, 2, 3, 4, 5];
+
   return {
     timezone: safeStr(p.timezone) || "Local",
-    workDays: Array.isArray(p.workDays) && p.workDays.length ? p.workDays : [1, 2, 3, 4, 5],
+    workDays,
     startHour,
     endHour,
     vacationMode: Boolean(p.vacationMode),
@@ -184,11 +167,7 @@ function policyBadge(company) {
     : { label: "OUTSIDE HOURS", tone: "muted" };
 }
 
-/* ================= SIGNALS (Green/Yellow/Red) =================
-   - Red: overload (too many threats)
-   - Yellow: pending email draft exists
-   - Green: controlled
-*/
+/* ================= SIGNALS (Green/Yellow/Red) ================= */
 
 function dotStyle(level) {
   const base = {
@@ -230,6 +209,7 @@ export default function AdminOverview() {
   // UI
   const [selectedAlertId, setSelectedAlertId] = useState(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [globeOpen, setGlobeOpen] = useState(false); // 🌍 GLOBAL NOTIFICATION GLOBE STATE
 
   // comms selection
   const [selectedCompanyForComms, setSelectedCompanyForComms] = useState("ALL");
@@ -311,14 +291,12 @@ export default function AdminOverview() {
     name: "",
     domain: "",
     contactEmail: "",
-    engagement: "Standard", // renamed from plan (same dropdown, clearer meaning)
+    engagement: "Standard",
     seats: 1,
     notes: "",
 
-    // branches
     branches: ["Threat Response"],
 
-    // policy
     timezone: "Local",
     startHour: 9,
     endHour: 17,
@@ -378,24 +356,30 @@ export default function AdminOverview() {
 
       try {
         const try1 = await api.get("/api/admin/companies");
+
         const list1 = Array.isArray(try1)
           ? try1
           : Array.isArray(try1?.companies)
           ? try1.companies
           : Array.isArray(try1?.data)
           ? try1.data
+          : try1?.data?.companies && Array.isArray(try1.data.companies)
+          ? try1.data.companies
           : null;
 
         let finalList = list1;
 
         if (!finalList || finalList.length === 0) {
           const try2 = await api.get("/api/company");
+
           finalList = Array.isArray(try2)
             ? try2
             : Array.isArray(try2?.companies)
             ? try2.companies
             : Array.isArray(try2?.data)
             ? try2.data
+            : try2?.data?.companies && Array.isArray(try2.data.companies)
+            ? try2.data.companies
             : null;
         }
 
@@ -437,17 +421,6 @@ export default function AdminOverview() {
     return initial;
   });
 
-  // keep state keys in sync when company list changes
-  useEffect(() => {
-    setCompanyState((prev) => {
-      const next = { ...prev };
-      (companies || []).forEach((c) => {
-        if (!next[c.id]) next[c.id] = { risk: Math.floor(Math.random() * 25), containment: "STABLE" };
-      });
-      return next;
-    });
-  }, [companies]);
-
   // queues + records
   const [globalQueue, setGlobalQueue] = useState([]);
   const [incidentRegistry, setIncidentRegistry] = useState([]);
@@ -462,37 +435,57 @@ export default function AdminOverview() {
 
   /* ================= AUTO-HIDE TEMP TOOLS ================= */
   useEffect(() => {
-    // leaving operator view? hide onboarding + close email selection
     if (mode !== "operator") {
       setShowOnboarding(false);
       setSelectedEmailId(null);
       setSelectedCompanyForComms("ALL");
+      setGlobeOpen(false);
     }
   }, [mode]);
 
-  /* ================= KEEP COMMS KEYS IN SYNC ================= */
+  /* ================= KEEP COMMS KEYS + BRANCH KEYS IN SYNC ================= */
   useEffect(() => {
+    // comms keys
     setCompanyComms((prev) => {
-      const next = { ...prev };
+      const next = { ...(prev || {}) };
+
       (companies || []).forEach((c) => {
         if (!next[c.id]) next[c.id] = { notifications: [], emails: [] };
       });
+
+      // prune orphan keys
+      Object.keys(next).forEach((cid) => {
+        if (!(companies || []).some((c) => c.id === cid)) delete next[cid];
+      });
+
       return next;
     });
 
-    // set default active branch per company if missing
+    // default branch per company
     setActiveBranchByCompany((prev) => {
-      const next = { ...prev };
+      const next = { ...(prev || {}) };
+
       (companies || []).forEach((c) => {
         const branches = normalizeBranches(c?.meta?.branches);
-        if (!next[c.id]) next[c.id] = branches[0];
+        const cur = next[c.id];
+
+        if (!cur || !branches.includes(cur)) next[c.id] = branches[0];
+      });
+
+      return next;
+    });
+
+    // companyState keys
+    setCompanyState((prev) => {
+      const next = { ...(prev || {}) };
+      (companies || []).forEach((c) => {
+        if (!next[c.id]) next[c.id] = { risk: Math.floor(Math.random() * 25), containment: "STABLE" };
       });
       return next;
     });
   }, [companies]);
 
   /* ================= GLOBAL CLOCK ================= */
-
   useEffect(() => {
     const timer = setInterval(() => setTick(Date.now()), 1000);
     return () => clearInterval(timer);
@@ -502,23 +495,23 @@ export default function AdminOverview() {
      - Operator view + automatic mode only
      - Option B: per-company gating (hours/days/vacation)
   */
-
   useEffect(() => {
     const active = mode === "operator" && !enginePaused && operatorMode === "automatic";
     if (!active) return;
 
     const interval = setInterval(() => {
       setCompanyState((prev) => {
-        const updated = { ...prev };
+        const updated = { ...(prev || {}) };
         const newAlerts = [];
 
         (companies || []).forEach((company) => {
-          const id = company.id;
+          const id = company?.id;
+          if (!id) return;
 
           // Option B: do NOT generate outside window
           if (!isWithinWorkWindow(company)) return;
 
-          if (Math.random() < 0.4) {
+          if (Math.random() < 0.35) {
             const spike = Math.floor(Math.random() * 15);
             const newRisk = Math.min(100, (updated[id]?.risk || 0) + spike);
             const containment = containmentFromRisk(newRisk);
@@ -548,24 +541,23 @@ export default function AdminOverview() {
         });
 
         if (newAlerts.length) {
-          setGlobalQueue((prevQ) => [...newAlerts, ...prevQ].slice(0, 200));
+          setGlobalQueue((prevQ) => [...newAlerts, ...(prevQ || [])].slice(0, 200));
         }
 
         return updated;
       });
-    }, speedMap[engineSpeed]);
+    }, speedMap?.[engineSpeed] ?? 12000);
 
     return () => clearInterval(interval);
   }, [mode, enginePaused, operatorMode, engineSpeed, speedMap, companies]);
 
   /* ================= SLA AUTO ESCALATION ================= */
-
   useEffect(() => {
     if (mode !== "operator") return;
     if (operatorMode === "manual") return;
 
     setGlobalQueue((prev) =>
-      prev.map((alert) => {
+      (prev || []).map((alert) => {
         if (!alert || alert.status === "RESOLVED") return alert;
 
         const remaining = (alert.deadline || 0) - tick;
@@ -583,7 +575,7 @@ export default function AdminOverview() {
             activity: [{ time: new Date(), action: "AUTO_ESCALATED_LOCKED" }, ...(alert.activity || [])],
           };
 
-          setIncidentRegistry((prevInc) => [{ ...escalated, escalatedAt: new Date() }, ...prevInc]);
+          setIncidentRegistry((prevInc) => [{ ...escalated, escalatedAt: new Date() }, ...(prevInc || [])].slice(0, 200));
           return escalated;
         }
 
@@ -594,7 +586,7 @@ export default function AdminOverview() {
 
   /* ================= HELPERS ================= */
 
-  const getCompany = (companyId) => companies.find((c) => c.id === companyId) || null;
+  const getCompany = (companyId) => (companies || []).find((c) => c.id === companyId) || null;
   const getCompanyName = (companyId) => getCompany(companyId)?.name || companyId;
 
   const logActivity = (alert, action) => ({
@@ -603,21 +595,17 @@ export default function AdminOverview() {
   });
 
   const updateStatus = (id, status) => {
-    setGlobalQueue((prev) =>
-      prev.map((a) => (a.id !== id ? a : logActivity({ ...a, status }, `STATUS_${status}`)))
-    );
+    setGlobalQueue((prev) => (prev || []).map((a) => (a?.id !== id ? a : logActivity({ ...a, status }, `STATUS_${status}`))));
   };
 
   const assignAlert = (id, who) => {
-    setGlobalQueue((prev) =>
-      prev.map((a) => (a.id !== id ? a : logActivity({ ...a, assignedTo: who }, `ASSIGNED_${who}`)))
-    );
+    setGlobalQueue((prev) => (prev || []).map((a) => (a?.id !== id ? a : logActivity({ ...a, assignedTo: who }, `ASSIGNED_${who}`))));
   };
 
   const manualEscalate = (id) => {
     setGlobalQueue((prev) =>
-      prev.map((a) => {
-        if (a.id !== id) return a;
+      (prev || []).map((a) => {
+        if (a?.id !== id) return a;
         if (a.locked) return a;
         const newPriority = bumpPriority(a.priority);
         return logActivity({ ...a, priority: newPriority }, "MANUAL_ESCALATE");
@@ -627,32 +615,32 @@ export default function AdminOverview() {
 
   const buildResolution = (alert, payload) => {
     setGlobalQueue((prev) =>
-      prev.map((a) => (a.id !== alert.id ? a : logActivity({ ...a, resolution: payload }, "RESOLUTION_BUILT")))
+      (prev || []).map((a) => (a?.id !== alert?.id ? a : logActivity({ ...a, resolution: payload }, "RESOLUTION_BUILT")))
     );
   };
 
   const resolveAndArchive = (alert) => {
     setGlobalQueue((prev) =>
-      prev.map((a) =>
-        a.id === alert.id ? logActivity({ ...a, status: "RESOLVED", resolvedAt: new Date() }, "RESOLVED") : a
+      (prev || []).map((a) =>
+        a?.id === alert?.id ? logActivity({ ...a, status: "RESOLVED", resolvedAt: new Date() }, "RESOLVED") : a
       )
     );
-    setArchive((prev) => [{ ...alert, status: "RESOLVED", resolvedAt: new Date() }, ...prev].slice(0, 300));
+    setArchive((prev) => [{ ...alert, status: "RESOLVED", resolvedAt: new Date() }, ...(prev || [])].slice(0, 300));
   };
 
   const ensureComms = (companyId) => {
     setCompanyComms((prev) => {
-      if (prev[companyId]) return prev;
-      return { ...prev, [companyId]: { notifications: [], emails: [] } };
+      if (prev?.[companyId]) return prev;
+      return { ...(prev || {}), [companyId]: { notifications: [], emails: [] } };
     });
   };
 
   const addNotification = (companyId, note) => {
     ensureComms(companyId);
     setCompanyComms((prev) => {
-      const cur = prev[companyId] || { notifications: [], emails: [] };
+      const cur = prev?.[companyId] || { notifications: [], emails: [] };
       return {
-        ...prev,
+        ...(prev || {}),
         [companyId]: { ...cur, notifications: [note, ...(cur.notifications || [])].slice(0, 300) },
       };
     });
@@ -661,20 +649,20 @@ export default function AdminOverview() {
   const addEmail = (companyId, email) => {
     ensureComms(companyId);
     setCompanyComms((prev) => {
-      const cur = prev[companyId] || { notifications: [], emails: [] };
-      return { ...prev, [companyId]: { ...cur, emails: [email, ...(cur.emails || [])].slice(0, 300) } };
+      const cur = prev?.[companyId] || { notifications: [], emails: [] };
+      return { ...(prev || {}), [companyId]: { ...cur, emails: [email, ...(cur.emails || [])].slice(0, 300) } };
     });
   };
 
   const updateEmail = (companyId, emailId, patch) => {
     setCompanyComms((prev) => {
-      const cur = prev[companyId];
+      const cur = prev?.[companyId];
       if (!cur) return prev;
       return {
-        ...prev,
+        ...(prev || {}),
         [companyId]: {
           ...cur,
-          emails: (cur.emails || []).map((e) => (e.id === emailId ? { ...e, ...patch } : e)),
+          emails: (cur.emails || []).map((e) => (e?.id === emailId ? { ...e, ...patch } : e)),
         },
       };
     });
@@ -682,13 +670,13 @@ export default function AdminOverview() {
 
   const markNotificationRead = (companyId, noteId) => {
     setCompanyComms((prev) => {
-      const cur = prev[companyId];
+      const cur = prev?.[companyId];
       if (!cur) return prev;
       return {
-        ...prev,
+        ...(prev || {}),
         [companyId]: {
           ...cur,
-          notifications: (cur.notifications || []).map((n) => (n.id === noteId ? { ...n, read: true } : n)),
+          notifications: (cur.notifications || []).map((n) => (n?.id === noteId ? { ...n, read: true } : n)),
         },
       };
     });
@@ -723,24 +711,25 @@ export default function AdminOverview() {
   /* ================= DERIVED FILTERS ================= */
 
   const baseQueue = useMemo(() => {
-    let q = globalQueue;
-    if (workspace !== "ALL") q = q.filter((a) => a.companyId === workspace);
-    if (filter === "OPEN") q = q.filter((a) => a.status !== "RESOLVED");
-    if (filter === "BREACHED") q = q.filter((a) => (a.deadline || 0) - tick <= 0);
-    if (filter === "P1") q = q.filter((a) => a.priority === "P1");
+    let q = globalQueue || [];
+    if (workspace !== "ALL") q = q.filter((a) => a?.companyId === workspace);
+    if (filter === "OPEN") q = q.filter((a) => a?.status !== "RESOLVED");
+    if (filter === "BREACHED") q = q.filter((a) => (a?.deadline || 0) - tick <= 0);
+    if (filter === "P1") q = q.filter((a) => a?.priority === "P1");
     return q;
   }, [globalQueue, workspace, filter, tick]);
 
   const fleetStats = useMemo(() => {
-    const open = globalQueue.filter((a) => a.status !== "RESOLVED").length;
-    const p1 = globalQueue.filter((a) => a.priority === "P1").length;
-    const breached = globalQueue.filter((a) => (a.deadline || 0) - tick <= 0).length;
+    const q = globalQueue || [];
+    const open = q.filter((a) => a?.status !== "RESOLVED").length;
+    const p1 = q.filter((a) => a?.priority === "P1").length;
+    const breached = q.filter((a) => (a?.deadline || 0) - tick <= 0).length;
     return { open, p1, breached };
   }, [globalQueue, tick]);
 
   const selectedAlert = useMemo(() => {
     if (!selectedAlertId) return null;
-    return globalQueue.find((a) => a.id === selectedAlertId) || null;
+    return (globalQueue || []).find((a) => a?.id === selectedAlertId) || null;
   }, [selectedAlertId, globalQueue]);
 
   /* ================= COMPANY METRICS + SIGNALS ================= */
@@ -755,10 +744,7 @@ export default function AdminOverview() {
     (globalQueue || []).forEach((a) => {
       if (!a?.companyId) return;
 
-      if (!map[a.companyId]) {
-        map[a.companyId] = { open: 0, p1: 0, breached: 0 };
-      }
-
+      if (!map[a.companyId]) map[a.companyId] = { open: 0, p1: 0, breached: 0 };
       if (a.status !== "RESOLVED") map[a.companyId].open += 1;
       if (a.priority === "P1") map[a.companyId].p1 += 1;
       if ((a.deadline || 0) - tick <= 0) map[a.companyId].breached += 1;
@@ -771,37 +757,19 @@ export default function AdminOverview() {
     const sig = {};
 
     (companies || []).forEach((c) => {
-      const metrics = companyMetrics[c.id] || {
-        open: 0,
-        p1: 0,
-        breached: 0,
-      };
+      const metrics = companyMetrics[c.id] || { open: 0, p1: 0, breached: 0 };
 
-      const comms = companyComms[c.id] || {
-        notifications: [],
-        emails: [],
-      };
+      const comms = companyComms?.[c.id] || { notifications: [], emails: [] };
 
       const overload = metrics.p1 >= 2 || metrics.open >= 10;
-
-      const unreadNotes =
-        (comms.notifications || []).filter((n) => !n.read).length;
-
-      const hasDraft =
-        (comms.emails || []).some((e) => e.status === "DRAFT");
+      const unreadNotes = (comms.notifications || []).filter((n) => !n?.read).length;
+      const hasDraft = (comms.emails || []).some((e) => e?.status === "DRAFT");
 
       let level = "GREEN";
-
       if (overload) level = "RED";
       else if (hasDraft || unreadNotes > 0) level = "YELLOW";
 
-      sig[c.id] = {
-        level,
-        overload,
-        metrics,
-        hasDraft,
-        unreadNotes,
-      };
+      sig[c.id] = { level, overload, metrics, hasDraft, unreadNotes };
     });
 
     return sig;
@@ -811,10 +779,10 @@ export default function AdminOverview() {
 
   useEffect(() => {
     (companies || []).forEach((c) => {
-      const cs = companySignals[c.id];
+      const cs = companySignals?.[c.id];
       if (!cs) return;
 
-      const prevOver = Boolean(overloadRef.current[c.id]);
+      const prevOver = Boolean(overloadRef.current?.[c.id]);
       const nowOver = Boolean(cs.overload);
 
       // trigger only on edge change
@@ -822,14 +790,9 @@ export default function AdminOverview() {
         const companyId = c.id;
         const companyName = getCompanyName(companyId);
 
-        const comms = companyComms[companyId] || {
-          emails: [],
-          notifications: [],
-        };
+        const comms = companyComms?.[companyId] || { emails: [], notifications: [] };
 
-        const alreadyDraft = (comms.emails || []).some(
-          (e) => e.status === "DRAFT" && e.kind === "OVERLOAD"
-        );
+        const alreadyDraft = (comms.emails || []).some((e) => e?.status === "DRAFT" && e?.kind === "OVERLOAD");
 
         if (!alreadyDraft) {
           const emailId = makeId("email");
@@ -868,8 +831,7 @@ export default function AdminOverview() {
             createdAt: nowTs(),
             severity: "RED",
             title: "Overload detected",
-            message:
-              "High threat volume detected. AutoProtect drafted an urgent response email.",
+            message: "High threat volume detected. AutoProtect drafted an urgent response email.",
             linkedEmailId: emailId,
             read: false,
           });
@@ -878,7 +840,7 @@ export default function AdminOverview() {
 
       overloadRef.current[c.id] = nowOver;
     });
-  }, [companies, companySignals, companyComms]);
+  }, [companies, companySignals, companyComms]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ================= ROLE RULES ================= */
 
@@ -893,7 +855,7 @@ export default function AdminOverview() {
 
     Object.values(companyComms || {}).forEach((c) => {
       (c.notifications || []).forEach((n) => {
-        if (!n.read) count += 1;
+        if (!n?.read) count += 1;
       });
     });
 
@@ -933,6 +895,7 @@ export default function AdminOverview() {
     const rows = [];
 
     (globalQueue || []).slice(0, 12).forEach((a) => {
+      if (!a) return;
       rows.push({
         id: a.id,
         text: `⚠️ ${a.priority} incident — ${getCompanyName(a.companyId)} (risk ${a.risk})`,
@@ -940,7 +903,7 @@ export default function AdminOverview() {
     });
 
     return rows;
-  }, [globalQueue]);
+  }, [globalQueue]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const tickerText = useMemo(() => {
     if (!threatTicker.length) return "System stable — no active threat spikes";
@@ -952,7 +915,6 @@ export default function AdminOverview() {
   const toggleWorkDay = (day) => {
     setPlug((p) => {
       const set = new Set(p.workDays || []);
-
       if (set.has(day)) set.delete(day);
       else set.add(day);
 
@@ -966,16 +928,11 @@ export default function AdminOverview() {
   const toggleBranch = (branchName) => {
     setPlug((p) => {
       const set = new Set(normalizeBranches(p.branches));
-
       if (set.has(branchName)) set.delete(branchName);
       else set.add(branchName);
 
       const next = normalizeBranches(Array.from(set));
-
-      return {
-        ...p,
-        branches: next,
-      };
+      return { ...p, branches: next };
     });
   };
 
@@ -986,9 +943,7 @@ export default function AdminOverview() {
     if (!name) return;
 
     const id = `c${Math.floor(Math.random() * 99999)}`;
-
     const companyNumber = Math.floor(Math.random() * 900000 + 100000);
-
     const branches = normalizeBranches(plug.branches);
 
     const newCompany = {
@@ -1012,26 +967,20 @@ export default function AdminOverview() {
       },
     };
 
-    setCompanies((prev) => [newCompany, ...prev]);
+    setCompanies((prev) => [newCompany, ...(prev || [])]);
 
     setCompanyState((prev) => ({
-      ...prev,
-      [id]: {
-        risk: Math.floor(Math.random() * 20),
-        containment: "STABLE",
-      },
+      ...(prev || {}),
+      [id]: { risk: Math.floor(Math.random() * 20), containment: "STABLE" },
     }));
 
     setCompanyComms((prev) => ({
-      ...prev,
-      [id]: {
-        notifications: [],
-        emails: [],
-      },
+      ...(prev || {}),
+      [id]: { notifications: [], emails: [] },
     }));
 
     setActiveBranchByCompany((prev) => ({
-      ...prev,
+      ...(prev || {}),
       [id]: branches[0],
     }));
 
@@ -1055,14 +1004,8 @@ export default function AdminOverview() {
           { time: new Date(), action: `ENGAGEMENT_${safeStr(plug.engagement) || "Standard"}` },
           { time: new Date(), action: `SEATS_${Number(plug.seats || 1)}` },
           { time: new Date(), action: `BRANCHES_${branches.join("_")}` },
-          {
-            time: new Date(),
-            action: `WORKDAYS_${(plug.workDays || []).map(dayLabel).join("_")}`,
-          },
-          {
-            time: new Date(),
-            action: `WORKHOURS_${Number(plug.startHour)}-${Number(plug.endHour)}`,
-          },
+          { time: new Date(), action: `WORKDAYS_${(plug.workDays || []).map(dayLabel).join("_")}` },
+          { time: new Date(), action: `WORKHOURS_${Number(plug.startHour)}-${Number(plug.endHour)}` },
           { time: new Date(), action: plug.vacationMode ? "VACATION_ON" : "VACATION_OFF" },
         ],
         resolution: {
@@ -1073,7 +1016,7 @@ export default function AdminOverview() {
         },
         resolvedAt: new Date(),
       },
-      ...prev,
+      ...(prev || []),
     ]);
 
     setPlug({
@@ -1099,9 +1042,7 @@ export default function AdminOverview() {
   /* ================= BRANCH SELECTOR (Operator) ================= */
 
   const activeCompany = workspace !== "ALL" ? getCompany(workspace) : null;
-
   const activeCompanyBranches = normalizeBranches(activeCompany?.meta?.branches);
-
   const activeBranch = activeCompany
     ? activeBranchByCompany[activeCompany.id] || activeCompanyBranches[0]
     : "";
@@ -1111,7 +1052,7 @@ export default function AdminOverview() {
     if (!b) return;
 
     setActiveBranchByCompany((prev) => ({
-      ...prev,
+      ...(prev || {}),
       [companyId]: b,
     }));
   };
@@ -1124,7 +1065,7 @@ export default function AdminOverview() {
 
     if (!current || !branches.includes(current)) {
       setActiveBranchByCompany((prev) => ({
-        ...prev,
+        ...(prev || {}),
         [activeCompany.id]: branches[0],
       }));
     }
@@ -1162,24 +1103,112 @@ export default function AdminOverview() {
             <option value="operator">Operator View</option>
           </select>
 
-          {/* GLOBAL NOTIFICATION SIGNAL */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              fontSize: 13,
-              padding: "4px 10px",
-              borderRadius: 20,
-              background:
-                globalSignalLevel === "RED"
-                  ? "rgba(255,70,70,.15)"
-                  : globalSignalLevel === "YELLOW"
-                  ? "rgba(255,210,60,.15)"
-                  : "rgba(60,255,150,.15)",
-            }}
-          >
-            🌍 Notifications: <b>{globalUnreadCount}</b>
+          {/* GLOBAL NOTIFICATION GLOBE */}
+          <div style={{ position: "relative" }}>
+            <button
+              className="btn"
+              onClick={() => setGlobeOpen((v) => !v)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                fontSize: 13,
+                padding: "4px 10px",
+                borderRadius: 20,
+                background:
+                  globalSignalLevel === "RED"
+                    ? "rgba(255,70,70,.15)"
+                    : globalSignalLevel === "YELLOW"
+                    ? "rgba(255,210,60,.15)"
+                    : "rgba(60,255,150,.15)",
+              }}
+            >
+              🌍 Notifications: <b>{globalUnreadCount}</b>
+            </button>
+
+            {globeOpen && (
+              <div
+                className="postureCard"
+                style={{
+                  position: "absolute",
+                  right: 0,
+                  top: "110%",
+                  width: 420,
+                  maxHeight: 360,
+                  overflowY: "auto",
+                  zIndex: 999,
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginBottom: 10,
+                  }}
+                >
+                  <b>Recent Notifications</b>
+
+                  <button className="btn" onClick={() => setGlobeOpen(false)}>
+                    Close
+                  </button>
+                </div>
+
+                {Object.entries(companyComms || {})
+                  .flatMap(([companyId, c]) =>
+                    (c.notifications || []).map((n) => ({
+                      companyId,
+                      ...n,
+                    }))
+                  )
+                  .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+                  .slice(0, 20)
+                  .map((n) => (
+                    <div
+                      key={n.id}
+                      style={{
+                        padding: 10,
+                        borderBottom: "1px solid rgba(255,255,255,.06)",
+                        cursor: "pointer",
+                      }}
+                      onClick={() => {
+                        setGlobeOpen(false);
+
+                        setMode("operator");
+                        setOperatorPanel("notifications");
+                        setSelectedCompanyForComms(n.companyId);
+
+                        if (n.linkedEmailId) {
+                          setSelectedEmailId(n.linkedEmailId);
+                          setOperatorPanel("email");
+                        }
+                      }}
+                    >
+                      <div style={{ fontSize: 12, opacity: 0.7 }}>
+                        {new Date(n.createdAt || Date.now()).toLocaleString()}
+                      </div>
+
+                      <div style={{ marginTop: 4 }}>
+                        <b>{getCompanyName(n.companyId)}</b> — {n.title}
+
+                        {!n.read && (
+                          <span style={{ marginLeft: 8 }}>
+                            <b>NEW</b>
+                          </span>
+                        )}
+                      </div>
+
+                      <div style={{ opacity: 0.85, marginTop: 4 }}>{n.message}</div>
+                    </div>
+                  ))}
+
+                {globalUnreadCount === 0 && (
+                  <div className="muted" style={{ padding: 10 }}>
+                    No notifications yet.
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {mode === "operator" && (
@@ -1214,36 +1243,35 @@ export default function AdminOverview() {
         </div>
       </div>
 
-      {/* LIVE LOAD STATUS (subtle, won’t break UI) */}
-      {(companiesLoading || companiesError) && (
+      {/* LIVE LOAD STATUS */}
+      {(companiesLoading || companiesError || crisisMode) && (
         <div
-  className="postureCard"
-  style={{
-    overflow: "hidden",
-    whiteSpace: "nowrap",
-    position: "relative",
-  }}
->
+          className="postureCard"
+          style={{
+            overflow: "hidden",
+            whiteSpace: "nowrap",
+            position: "relative",
+          }}
+        >
           {companiesLoading && <b>Loading companies from backend…</b>}
           {companiesError && <span style={{ opacity: 0.85 }}>⚠️ {companiesError}</span>}
-          {crisisMode && <span style={{ marginLeft: "auto" }}>🚨 Crisis Mode</span>}
+          {crisisMode && <span style={{ marginLeft: 20 }}>🚨 Crisis Mode</span>}
         </div>
       )}
 
+      {/* THREAT TICKER */}
       <div
-  className="postureCard"
-  style={{
-    overflow: "hidden",
-    whiteSpace: "nowrap",
-    position: "relative",
-  }}
->
-  <div className="threatTicker">
-    <div className="threatTickerTrack">
-      {tickerText}
-    </div>
-  </div>
-</div>
+        className="postureCard"
+        style={{
+          overflow: "hidden",
+          whiteSpace: "nowrap",
+          position: "relative",
+        }}
+      >
+        <div className="threatTicker">
+          <div className="threatTickerTrack">{tickerText}</div>
+        </div>
+      </div>
 
       {/* ================= OPERATOR VIEW ================= */}
       {mode === "operator" && (
@@ -1286,7 +1314,7 @@ export default function AdminOverview() {
               }}
             >
               <option value="ALL">Workspace: All</option>
-              {companies.map((c) => (
+              {(companies || []).map((c) => (
                 <option key={c.id} value={c.id}>
                   Workspace: {c.name}
                 </option>
@@ -1325,7 +1353,7 @@ export default function AdminOverview() {
                     const remaining = (alert.deadline || 0) - tick;
                     const breached = remaining <= 0;
                     const selected = alert.id === selectedAlertId;
-                    const sig = companySignals[alert.companyId]?.level || "GREEN";
+                    const sig = companySignals?.[alert.companyId]?.level || "GREEN";
 
                     return (
                       <div
@@ -1484,9 +1512,7 @@ export default function AdminOverview() {
                             key={idx}
                             style={{ padding: "6px 0", borderBottom: "1px solid rgba(255,255,255,.06)" }}
                           >
-                            <small style={{ opacity: 0.7 }}>
-                              {new Date(a.time).toLocaleTimeString()}
-                            </small>
+                            <small style={{ opacity: 0.7 }}>{new Date(a.time).toLocaleTimeString()}</small>
                             <div>
                               <b>{a.action}</b>
                             </div>
@@ -1518,13 +1544,12 @@ export default function AdminOverview() {
           <div className="postureCard">
             <h3>🚨 Escalated Incidents</h3>
             <div style={{ maxHeight: 220, overflowY: "auto", marginTop: 10 }}>
-              {incidentRegistry.length === 0 ? (
+              {(incidentRegistry || []).length === 0 ? (
                 <div className="muted">No escalated incidents.</div>
               ) : (
-                incidentRegistry.slice(0, 60).map((inc) => (
+                (incidentRegistry || []).slice(0, 60).map((inc) => (
                   <div key={inc.id} style={{ padding: "8px 0", borderBottom: "1px solid rgba(255,255,255,.06)" }}>
-                    <b>{getCompanyName(inc.companyId)}</b>{" "}
-                    <span style={{ opacity: 0.7 }}>• {inc.priority}</span>
+                    <b>{getCompanyName(inc.companyId)}</b> <span style={{ opacity: 0.7 }}>• {inc.priority}</span>
                     <div style={{ fontSize: 12, opacity: 0.75 }}>
                       Escalated at {new Date(inc.escalatedAt || Date.now()).toLocaleTimeString()}
                     </div>
@@ -1547,18 +1572,18 @@ export default function AdminOverview() {
                   marginTop: 14,
                 }}
               >
-                {companies.map((c) => {
+                {(companies || []).map((c) => {
                   const badge = policyBadge(c);
                   const pol = normalizePolicy(c.policy);
 
-                  const sig = companySignals[c.id] || {
+                  const sig = companySignals?.[c.id] || {
                     level: "GREEN",
                     overload: false,
                     metrics: { open: 0, p1: 0, breached: 0 },
                   };
 
                   const branches = normalizeBranches(c?.meta?.branches);
-                  const active = activeBranchByCompany[c.id] || branches[0];
+                  const active = activeBranchByCompany?.[c.id] || branches[0];
 
                   return (
                     <div
@@ -1578,9 +1603,9 @@ export default function AdminOverview() {
                       </div>
 
                       <div style={{ marginTop: 8 }}>
-                        Risk: <b>{companyState[c.id]?.risk ?? 0}</b>
+                        Risk: <b>{companyState?.[c.id]?.risk ?? 0}</b>
                       </div>
-                      <div>Status: {companyState[c.id]?.containment ?? "STABLE"}</div>
+                      <div>Status: {companyState?.[c.id]?.containment ?? "STABLE"}</div>
 
                       <div style={{ marginTop: 8, fontSize: 12, opacity: 0.9 }}>
                         Policy:{" "}
@@ -1624,8 +1649,8 @@ export default function AdminOverview() {
                             const alert = {
                               id: `${c.id}-${createdAt}`,
                               companyId: c.id,
-                              risk: companyState[c.id]?.risk ?? 0,
-                              containment: companyState[c.id]?.containment ?? "STABLE",
+                              risk: companyState?.[c.id]?.risk ?? 0,
+                              containment: companyState?.[c.id]?.containment ?? "STABLE",
                               priority,
                               createdAt,
                               deadline,
@@ -1637,7 +1662,7 @@ export default function AdminOverview() {
                               resolution: null,
                             };
 
-                            setGlobalQueue((prev) => [alert, ...prev].slice(0, 200));
+                            setGlobalQueue((prev) => [alert, ...(prev || [])].slice(0, 200));
                             setOperatorMode("manual");
                             setOperatorPanel("queue");
                           }}
@@ -1746,10 +1771,10 @@ export default function AdminOverview() {
             <div className="postureCard executivePanel">
               <h3>🗄️ Archive</h3>
               <div style={{ height: 420, overflowY: "auto", marginTop: 10 }}>
-                {archive.length === 0 ? (
+                {(archive || []).length === 0 ? (
                   <div className="muted">Archive is empty.</div>
                 ) : (
-                  archive.slice(0, 200).map((a) => (
+                  (archive || []).slice(0, 200).map((a) => (
                     <div key={a.id} style={{ padding: 10, borderBottom: "1px solid rgba(255,255,255,.06)" }}>
                       <b>{getCompanyName(a.companyId)}</b>{" "}
                       <span style={{ opacity: 0.7 }}>
@@ -1812,7 +1837,7 @@ export default function AdminOverview() {
                     value={plug.engagement}
                     onChange={(e) => setPlug((p) => ({ ...p, engagement: e.target.value }))}
                     style={inputStyle}
-                    title="Not selling a product — this is how heavy the contract/coverage is for this company"
+                    title="Coverage level"
                   >
                     <option>Standard</option>
                     <option>Premium</option>
@@ -1975,45 +2000,6 @@ const inputStyle = {
   marginTop: 6,
 };
 
-const badgeStyle = {
-  display: "inline-flex",
-  alignItems: "center",
-  padding: "2px 8px",
-  borderRadius: 12,
-  fontSize: 11,
-  fontWeight: 600,
-  letterSpacing: ".3px",
-};
-
-const badgeOK = {
-  ...badgeStyle,
-  background: "rgba(60,255,150,.18)",
-  color: "#7CFFB2",
-};
-
-const badgeWarn = {
-  ...badgeStyle,
-  background: "rgba(255,210,60,.18)",
-  color: "#FFD84A",
-};
-
-const badgeDanger = {
-  ...badgeStyle,
-  background: "rgba(255,70,70,.18)",
-  color: "#FF6B6B",
-};
-
-const mutedText = {
-  opacity: 0.65,
-  fontSize: 12,
-};
-
-const panelGrid = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
-  gap: 16,
-};
-
 /* ================= RESOLUTION BUILDER ================= */
 
 function ResolutionBuilder({ disabled, existing, onSave }) {
@@ -2085,8 +2071,14 @@ function ResolutionBuilder({ disabled, existing, onSave }) {
           onSave({
             summary: summary.trim(),
             rootCause: rootCause.trim(),
-            actions: actions.split("\n").map((s) => s.trim()).filter(Boolean),
-            lessons: lessons.split("\n").map((s) => s.trim()).filter(Boolean),
+            actions: actions
+              .split("\n")
+              .map((s) => s.trim())
+              .filter(Boolean),
+            lessons: lessons
+              .split("\n")
+              .map((s) => s.trim())
+              .filter(Boolean),
           })
         }
       >
@@ -2113,23 +2105,15 @@ function EmailCabinet({
   onNewDraft,
 }) {
   const companyIds = (companies || []).map((c) => c.id);
-
   const scopeIds = selectedCompany === "ALL" ? companyIds : [selectedCompany];
 
   const emails = [];
-
   scopeIds.forEach((cid) => {
     const list = comms?.[cid]?.emails || [];
-    list.forEach((e) => {
-      emails.push({
-        companyId: cid,
-        ...e,
-      });
-    });
+    list.forEach((e) => emails.push({ companyId: cid, ...e }));
   });
 
   emails.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-
   const selected = emails.find((e) => e.id === selectedEmailId) || null;
 
   return (
@@ -2273,7 +2257,6 @@ function NotificationBoard({
   onMarkRead,
 }) {
   const companyIds = (companies || []).map((c) => c.id);
-
   const scopeIds = selectedCompany === "ALL" ? companyIds : [selectedCompany];
 
   const rows = useMemo(() => {
@@ -2281,17 +2264,10 @@ function NotificationBoard({
 
     scopeIds.forEach((cid) => {
       const notes = comms?.[cid]?.notifications || [];
-
-      notes.forEach((n) => {
-        out.push({
-          companyId: cid,
-          ...n,
-        });
-      });
+      notes.forEach((n) => out.push({ companyId: cid, ...n }));
     });
 
     out.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-
     return out.slice(0, 400);
   }, [scopeIds, comms]);
 
@@ -2375,11 +2351,7 @@ function NotificationBoard({
                       </button>
                     )}
 
-                    <button
-                      className="btn"
-                      onClick={() => onMarkRead(n.companyId, n.id)}
-                      disabled={Boolean(n.read)}
-                    >
+                    <button className="btn" onClick={() => onMarkRead(n.companyId, n.id)} disabled={Boolean(n.read)}>
                       {n.read ? "Read" : "Mark Read"}
                     </button>
                   </div>
