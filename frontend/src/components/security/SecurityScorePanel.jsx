@@ -21,19 +21,24 @@ function trendColor(trend) {
 }
 
 export default function SecurityScorePanel() {
+
   const [posture, setPosture] = useState(null);
   const [history, setHistory] = useState([]);
   const [status, setStatus] = useState("Loading");
 
   useEffect(() => {
+
     const base = apiBase();
+
     if (!base) {
       setStatus("Missing API");
       return;
     }
 
     async function load() {
+
       try {
+
         const p = await fetch(`${base}/api/security/posture`, {
           credentials: "include",
         }).then((r) => r.json());
@@ -42,20 +47,27 @@ export default function SecurityScorePanel() {
           credentials: "include",
         }).then((r) => r.json());
 
-        setPosture(p.posture);
-        setHistory(h.history || []);
+        setPosture(p?.posture || {});
+        setHistory(h?.history || []);
         setStatus("LIVE");
-      } catch {
+
+      } catch (err) {
+
+        console.error("Security score load failed", err);
         setStatus("ERROR");
+
       }
+
     }
 
     load();
+
     const t = setInterval(load, 10000);
     return () => clearInterval(t);
+
   }, []);
 
-  const score = posture?.score || 0;
+  const score = posture?.score ?? "--";
   const tier = posture?.tier || "Unknown";
   const risk = posture?.risk || "Unknown";
   const trend = posture?.trend || "stable";
@@ -64,17 +76,21 @@ export default function SecurityScorePanel() {
 
   return (
     <div className="card">
+
       <div style={{ display: "flex", justifyContent: "space-between" }}>
+
         <div>
           <div style={{ fontSize: 14, opacity: 0.6 }}>
             Executive Security Rating
           </div>
+
           <div style={{ fontSize: 56, fontWeight: 900 }}>
             {score}
           </div>
         </div>
 
         <div style={{ textAlign: "right" }}>
+
           <div
             style={{
               fontSize: 26,
@@ -84,6 +100,7 @@ export default function SecurityScorePanel() {
           >
             {trendArrow(trend)}
           </div>
+
           <div
             style={{
               marginTop: 6,
@@ -95,13 +112,17 @@ export default function SecurityScorePanel() {
           >
             {tier}
           </div>
+
           <div style={{ marginTop: 6, fontSize: 12, opacity: 0.6 }}>
             Risk Level: {risk}
           </div>
+
         </div>
+
       </div>
 
-      {/* Mini Trend Bar */}
+      {/* TREND GRAPH */}
+
       <div
         style={{
           display: "flex",
@@ -111,24 +132,37 @@ export default function SecurityScorePanel() {
           height: 60,
         }}
       >
-        {lastFive.map((entry, i) => (
-          <div
-            key={i}
-            style={{
-              width: 16,
-              height: `${entry.score || 0}%`,
-              background:
-                entry.score >= 75
-                  ? "#2bd576"
-                  : entry.score >= 50
-                  ? "#ffd166"
-                  : "#ff5a5f",
-              borderRadius: 6,
-              transition: "all .3s ease",
-            }}
-            title={`Score: ${entry.score}`}
-          />
-        ))}
+
+        {lastFive.length === 0 && (
+          <div style={{ opacity: 0.4 }}>
+            No trend data
+          </div>
+        )}
+
+        {lastFive.map((entry, i) => {
+
+          const safeScore = Math.min(entry.score || 0, 100);
+
+          return (
+            <div
+              key={i}
+              style={{
+                width: 16,
+                height: `${safeScore}%`,
+                background:
+                  safeScore >= 75
+                    ? "#2bd576"
+                    : safeScore >= 50
+                    ? "#ffd166"
+                    : "#ff5a5f",
+                borderRadius: 6,
+                transition: "all .3s ease",
+              }}
+              title={`Score: ${safeScore}`}
+            />
+          );
+        })}
+
       </div>
 
       <div style={{ marginTop: 18, fontSize: 13, opacity: 0.7 }}>
@@ -137,10 +171,13 @@ export default function SecurityScorePanel() {
       </div>
 
       <div style={{ marginTop: 12 }}>
+
         <span className={`badge ${status === "LIVE" ? "ok" : ""}`}>
           {status}
         </span>
+
       </div>
+
     </div>
   );
 }
