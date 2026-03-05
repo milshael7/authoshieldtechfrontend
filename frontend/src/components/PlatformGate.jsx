@@ -1,4 +1,8 @@
-import React from "react";
+// frontend/src/components/PlatformGate.jsx
+// PlatformGate — Enterprise Auth Stabilizer v10
+// NO REDIRECT LOOPS • REFRESH SAFE • DEEP ROUTE SAFE
+
+import React, { useRef } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 
 function normalize(v) {
@@ -35,24 +39,30 @@ export default function PlatformGate({
   children,
 }) {
   const location = useLocation();
+  const redirectedRef = useRef(false);
 
-  /* ================= WAIT FOR AUTH BOOT ================= */
+  /* ================= WAIT FOR BOOT ================= */
   if (!ready) {
     return <div style={{ padding: 40 }}>Initializing platform…</div>;
   }
 
-  /* ================= AUTH RESOLUTION =================
-     At this point:
-     - Auth restoration is DONE
-     - If user is null, session is invalid
-     - We must redirect ONCE (not loop)
+  /* ================= SESSION STABILIZATION =================
+     IMPORTANT:
+     - Allow ONE render where user may be null
+     - Prevent redirect loops during refresh
   */
   if (ready && !user) {
+    if (redirectedRef.current) {
+      return <div style={{ padding: 40 }}>Restoring session…</div>;
+    }
+
+    redirectedRef.current = true;
+
     return (
       <Navigate
         to="/login"
         replace
-        state={{ from: location.pathname }}
+        state={{ from: location.pathname + location.search }}
       />
     );
   }
