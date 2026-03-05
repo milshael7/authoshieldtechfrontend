@@ -1,5 +1,143 @@
 /* =========================================================
-   TRADING ROOM TERMINAL STYLES
+   AUTOSHIELD — CONTROLLED ENTERPRISE LAYOUT SYSTEM
+   FULL VERSION (INCLUDING TRADING DESK SUPPORT)
+   ========================================================= */
+
+html, body {
+  margin:0;
+  padding:0;
+  height:100%;
+  overflow:hidden;
+  background:#0b0f1a;
+  color:#eaf1ff;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+}
+
+/* =========================================================
+   ROOT
+   ========================================================= */
+
+.layout-root{
+  display:flex;
+  height:100vh;
+  width:100%;
+  overflow:hidden;
+  position:relative;
+}
+
+/* =========================================================
+   FIXED LOGO
+   ========================================================= */
+
+.brand-corner{
+  position:fixed;
+  top:0;
+  left:0;
+  width:260px;
+  padding:18px 18px 10px 18px;
+  z-index:50;
+}
+
+.brand-open-btn{
+  margin-top:14px;
+  background:transparent;
+  border:none;
+  color:#eaf1ff;
+  font-size:20px;
+  cursor:pointer;
+  padding:6px;
+}
+
+/* =========================================================
+   SIDEBAR
+   ========================================================= */
+
+.layout-sidebar{
+  width:260px;
+  flex-shrink:0;
+  display:flex;
+  flex-direction:column;
+  background:#111827;
+  border-right:1px solid rgba(255,255,255,.08);
+  overflow:hidden;
+  transition:width .28s ease, transform .28s ease;
+  z-index:20;
+  padding-top:95px;
+}
+
+.sidebar-collapsed .layout-sidebar{
+  width:0;
+  border-right:none;
+  transform:translateX(-100%);
+  padding-top:0;
+}
+
+/* =========================================================
+   NAV
+   ========================================================= */
+
+.layout-nav a,
+.nav-link{
+  display:block;
+  padding:10px 12px;
+  border-radius:10px;
+  text-decoration:none !important;
+  color:rgba(255,255,255,.85) !important;
+  font-size:14px;
+  font-weight:650;
+  transition:.2s ease;
+}
+
+.layout-nav a:hover,
+.nav-link:hover{
+  background:rgba(120,160,255,.15);
+}
+
+.layout-nav a.active,
+.nav-link.active{
+  background:linear-gradient(
+    180deg,
+    rgba(120,160,255,.9),
+    rgba(70,110,255,.8)
+  );
+}
+
+/* =========================================================
+   MAIN CONTENT
+   ========================================================= */
+
+.layout-content{
+  flex:1;
+  padding:90px 28px 28px 28px;
+  display:flex;
+  justify-content:center;
+  overflow-y:auto;
+  overflow-x:hidden;
+}
+
+.layout-content > *{
+  width:100%;
+  max-width:1400px;
+  margin:0 auto;
+}
+
+/* =========================================================
+   ADVISOR PANEL
+   ========================================================= */
+
+.enterprise-ai-panel{
+  width:380px;
+  flex-shrink:0;
+  display:flex;
+  flex-direction:column;
+  border-left:1px solid rgba(255,255,255,.05);
+  background:#0f172a;
+  transition:width .25s ease;
+  overflow:hidden;
+}
+
+/* =========================================================
+   ================= TRADING DESK =================
    ========================================================= */
 
 .trading-desk{
@@ -20,14 +158,6 @@
   padding:14px;
 }
 
-.trading-card-title{
-  font-size:13px;
-  font-weight:700;
-  letter-spacing:.05em;
-  opacity:.9;
-  margin-bottom:10px;
-}
-
 /* =========================================================
    WALLET PANEL
    ========================================================= */
@@ -35,16 +165,16 @@
 .wallet-box{
   display:flex;
   flex-direction:column;
-  gap:6px;
-  font-size:14px;
+  gap:4px;
 }
 
 .wallet-value{
   font-weight:700;
+  font-size:14px;
 }
 
 /* =========================================================
-   TRADING TABLE
+   TRADE TABLE
    ========================================================= */
 
 .trade-table{
@@ -53,18 +183,14 @@
   font-size:13px;
 }
 
-.trade-table thead{
-  opacity:.7;
-  text-align:left;
-  font-size:12px;
-}
-
 .trade-table th{
-  padding:6px 8px;
+  text-align:left;
+  opacity:.7;
+  padding:6px;
 }
 
 .trade-table td{
-  padding:6px 8px;
+  padding:6px;
   border-top:1px solid rgba(255,255,255,.06);
 }
 
@@ -89,27 +215,26 @@
 }
 
 .ai-engine-status{
+  font-weight:700;
   font-size:14px;
-  font-weight:600;
 }
 
 .ai-engine-info{
   font-size:12px;
-  opacity:.75;
+  opacity:.7;
 }
 
 /* =========================================================
-   LIVE PRICE LABEL
+   LIVE PRICE
    ========================================================= */
 
 .live-price{
   font-size:14px;
   font-weight:700;
-  margin-top:4px;
 }
 
 /* =========================================================
-   CHART WRAPPER
+   CHART
    ========================================================= */
 
 .chart-container{
@@ -117,4 +242,33 @@
   height:100%;
   border-radius:10px;
   overflow:hidden;
+}
+
+/* =========================================================
+   MOBILE
+   ========================================================= */
+
+@media (max-width:900px){
+
+  html, body {
+    overflow-y:auto;
+  }
+
+  .layout-root{
+    height:auto;
+  }
+
+  .layout-sidebar{
+    width:220px;
+    padding-top:20px;
+  }
+
+  .layout-content{
+    padding:20px;
+  }
+
+  .enterprise-ai-panel{
+    display:none;
+  }
+
 }
