@@ -1,12 +1,11 @@
 // frontend/src/pages/trading/TradingLayout.jsx
 // ============================================================
-// TRADING LAYOUT — ENTERPRISE TRADING MODULE
-// LIVE / AI CONTROL / ANALYTICS
-// STABLE ROUTING FIX
+// TRADING LAYOUT — ENTERPRISE TRADING MODULE v2
+// ROUTE-STABLE • REFRESH-SAFE • NO SNAP-BACK
 // ============================================================
 
 import React from "react";
-import { NavLink, Routes, Route, Navigate } from "react-router-dom";
+import { NavLink, Routes, Route } from "react-router-dom";
 
 import TradingRoom from "../TradingRoom";
 import Market from "./Market";
@@ -33,18 +32,17 @@ export default function TradingLayout() {
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
 
-      {/* ================= TRADING MODULE HEADER ================= */}
+      {/* ================= HEADER ================= */}
       <div
         style={{
-          padding: "18px 22px 14px 22px",
+          padding: "18px 22px 14px",
           borderBottom: "1px solid rgba(255,255,255,.06)",
-          background: "linear-gradient(180deg, rgba(255,255,255,.02), transparent)"
+          background: "linear-gradient(180deg, rgba(255,255,255,.02), transparent)",
         }}
       >
         <div style={{ fontSize: 18, fontWeight: 700 }}>
           Internal Trading Engine
         </div>
-
         <div
           style={{
             fontSize: 11,
@@ -57,7 +55,7 @@ export default function TradingLayout() {
         </div>
       </div>
 
-      {/* ================= NAVIGATION BAR ================= */}
+      {/* ================= NAV ================= */}
       <div
         style={{
           display: "flex",
@@ -69,6 +67,7 @@ export default function TradingLayout() {
       >
         <NavLink
           to="live"
+          end
           style={({ isActive }) =>
             isActive ? { ...linkBase, ...linkActive } : linkBase
           }
@@ -95,23 +94,14 @@ export default function TradingLayout() {
         </NavLink>
       </div>
 
-      {/* ================= ROUTED CONTENT ================= */}
-      <div style={{ flex: 1 }}>
+      {/* ================= CONTENT ================= */}
+      <div style={{ flex: 1, overflow: "auto" }}>
 
         <Routes>
-
-          {/* DEFAULT ENTRY */}
-          <Route index element={<Navigate to="live" replace />} />
-
-          {/* MODULES */}
           <Route path="live" element={<TradingRoom />} />
           <Route path="control" element={<AIControl />} />
           <Route path="analytics" element={<Analytics />} />
           <Route path="market" element={<Market />} />
-
-          {/* SAFETY REDIRECT */}
-          <Route path="*" element={<Navigate to="live" replace />} />
-
         </Routes>
 
       </div>
