@@ -1,6 +1,6 @@
 // frontend/src/pages/TradingRoom.jsx
 // ============================================================
-// TRADING ROOM — PRODUCTION CLEAN (NO DEBUG OUTPUT)
+// TRADING ROOM — AI PAPER TRADING ENGINE
 // ============================================================
 
 import React, { useEffect, useRef, useState } from "react";
@@ -58,16 +58,18 @@ export default function TradingRoom() {
   const [lastTickAt, setLastTickAt] = useState(null);
   const [lastPrice, setLastPrice] = useState(null);
 
-  const [positions] = useState([]);
-  const [orders] = useState([]);
-  const [news] = useState([]);
-  const [signal] = useState({
-    side: "BUY",
-    confidence: 92,
-    reason: "Bullish structure confirmed",
+  // ================= PAPER WALLET =================
+
+  const [wallet, setWallet] = useState({
+    usd: 1000,
+    btc: 0,
   });
 
+  const [tradeHistory, setTradeHistory] = useState([]);
+  const [positions, setPositions] = useState([]);
+
   // ================= CHART INIT =================
+
   useEffect(() => {
     if (!containerRef.current) return;
 
@@ -95,12 +97,6 @@ export default function TradingRoom() {
       downColor: "#dc2626",
       wickUpColor: "#16a34a",
       wickDownColor: "#dc2626",
-      borderUpColor: "#16a34a",
-      borderDownColor: "#dc2626",
-      borderVisible: true,
-      wickVisible: true,
-      priceLineVisible: true,
-      lastValueVisible: true,
     });
 
     chartRef.current = chart;
@@ -109,22 +105,13 @@ export default function TradingRoom() {
     seedCandles();
     chart.timeScale().fitContent();
 
-    const ro = new ResizeObserver((entries) => {
-      const { width, height } = entries[0].contentRect;
-      chart.applyOptions({ width, height });
-    });
-    ro.observe(containerRef.current);
-
     setChartReady(true);
 
     return () => {
-      ro.disconnect();
       chart.remove();
       chartRef.current = null;
       seriesRef.current = null;
-      setChartReady(false);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function seedCandles() {
@@ -173,142 +160,106 @@ export default function TradingRoom() {
     chartRef.current.timeScale().scrollToRealTime();
   }
 
+  // ================= SIMPLE AI STRATEGY =================
+
+  function runAI(price) {
+    setWallet((w) => {
+      if (w.usd > 100 && Math.random() > 0.7) {
+        const btcBought = 100 / price;
+
+        setPositions((p) => [
+          ...p,
+          { side: "BUY", price, size: btcBought, time: Date.now() },
+        ]);
+
+        setTradeHistory((h) => [
+          { side: "BUY", price, size: btcBought, time: Date.now() },
+          ...h,
+        ]);
+
+        return { usd: w.usd - 100, btc: w.btc + btcBought };
+      }
+
+      if (w.btc > 0.0005 && Math.random() > 0.8) {
+        const btcSell = 0.0005;
+
+        setTradeHistory((h) => [
+          { side: "SELL", price, size: btcSell, time: Date.now() },
+          ...h,
+        ]);
+
+        return { usd: w.usd + btcSell * price, btc: w.btc - btcSell };
+      }
+
+      return w;
+    });
+  }
+
   // ================= WEBSOCKET =================
+
   useEffect(() => {
     if (!chartReady) return;
 
     const url = buildWsUrl();
-    if (!url) {
-      setConnectionStatus("NO_TOKEN_OR_API_BASE");
-      return;
-    }
+    if (!url) return;
 
-    let ws;
-    let stopped = false;
+    const ws = new WebSocket(url);
 
-    const connect = () => {
-      if (stopped) return;
+    ws.onopen = () => setConnectionStatus("CONNECTED");
 
-      setConnectionStatus("CONNECTING");
-      ws = new WebSocket(url);
-      wsRef.current = ws;
+    ws.onmessage = (event) => {
+      const data = JSON.parse(event.data);
 
-      ws.onopen = () => setConnectionStatus("CONNECTED");
+      if (data?.type === "tick" && data?.price) {
+        const p = Number(data.price);
 
-      ws.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          if (data?.type === "tick" && data?.price != null) {
-            const p = Number(data.price);
-            setLastPrice(p);
-            setLastTickAt(Date.now());
-            updateCandle(p);
-          }
-        } catch {}
-      };
+        setLastPrice(p);
+        setLastTickAt(Date.now());
 
-      ws.onclose = () => {
-        if (stopped) return;
-        setConnectionStatus("RECONNECTING");
-        setTimeout(connect, 2500);
-      };
-
-      ws.onerror = () => {
-        try { ws.close(); } catch {}
-      };
+        updateCandle(p);
+        runAI(p);
+      }
     };
 
-    connect();
+    ws.onclose = () => setConnectionStatus("RECONNECTING");
 
-    return () => {
-      stopped = true;
-      try { ws?.close(); } catch {}
-    };
+    wsRef.current = ws;
+
+    return () => ws.close();
   }, [chartReady]);
 
   // ================= UI =================
+
   return (
     <div style={{ display: "flex", height: "100vh", background: "#0a0f1c", color: "#fff" }}>
-      <div style={{ width: 60, background: "#111827", borderRight: "1px solid rgba(255,255,255,.08)" }} />
-
       <div style={{ flex: 1, display: "flex", flexDirection: "column", padding: 20 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", height: 28 }}>
-          <div>
-            <div style={{ fontWeight: 700 }}>EURUSD • {timeframe} • LIVE</div>
-            <div style={{ fontSize: 12, opacity: 0.7 }}>
-              WS: {connectionStatus}
-              {lastPrice != null ? ` • ${lastPrice.toFixed(5)}` : ""}
-              {lastTickAt ? ` • ${new Date(lastTickAt).toLocaleTimeString()}` : ""}
-            </div>
-          </div>
-
-          <button
-            onClick={() => setPanelOpen(!panelOpen)}
-            style={{
-              padding: "6px 14px",
-              background: "#1e2536",
-              border: "1px solid rgba(255,255,255,.1)",
-              cursor: "pointer",
-            }}
-          >
-            Execute Order
-          </button>
+        <div style={{ fontWeight: 700 }}>
+          EURUSD • LIVE • {lastPrice ? lastPrice.toFixed(5) : "--"}
         </div>
 
-        <div style={{ flex: 1, background: "#111827", borderRadius: 12, overflow: "hidden", border: "1px solid rgba(255,255,255,.08)", marginTop: 10 }}>
+        <div style={{ flex: 1, marginTop: 10 }}>
           <div ref={containerRef} style={{ width: "100%", height: "100%" }} />
         </div>
 
-        <div style={{
-          height: 220,
-          marginTop: 20,
-          background: "#111827",
-          borderRadius: 12,
-          border: "1px solid rgba(255,255,255,.08)",
-          display: "flex",
-          flexDirection: "column",
-        }}>
-          <div style={{ display: "flex", borderBottom: "1px solid rgba(255,255,255,.08)" }}>
-            {["positions", "orders", "news", "signals"].map((tab) => (
-              <div
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                style={{
-                  padding: "12px 18px",
-                  cursor: "pointer",
-                  background: activeTab === tab ? "#1e2536" : "transparent",
-                  fontWeight: activeTab === tab ? 700 : 400,
-                }}
-              >
-                {tab.toUpperCase()}
-              </div>
-            ))}
-          </div>
-
-          <div style={{ flex: 1, padding: 16 }}>
-            {activeTab === "positions" && <div>No open positions</div>}
-            {activeTab === "orders" && <div>No pending orders</div>}
-            {activeTab === "news" && <div>No live news</div>}
-            {activeTab === "signals" && (
-              <div>
-                <div style={{ fontWeight: 700 }}>{signal.side} EURUSD</div>
-                <div>Confidence: {signal.confidence}%</div>
-                <div style={{ opacity: 0.7 }}>{signal.reason}</div>
-              </div>
-            )}
-          </div>
+        <div style={{ marginTop: 20 }}>
+          Wallet: ${wallet.usd.toFixed(2)} | BTC: {wallet.btc.toFixed(5)}
         </div>
       </div>
 
-      {panelOpen && (
-        <div style={{ width: 360, background: "#111827", borderLeft: "1px solid rgba(255,255,255,.08)", padding: 20 }}>
-          <div style={{ fontWeight: 700, marginBottom: 12 }}>AI Engine Status</div>
-          <div>State: {connectionStatus === "CONNECTED" ? "STREAMING" : "WAITING"}</div>
-          <div style={{ marginTop: 10, opacity: 0.7 }}>
-            Live engine status only. Analytics/history goes in Analytics page.
+      <div style={{ width: 350, padding: 20, background: "#111827" }}>
+        <h3>AI Trading Engine</h3>
+
+        <div>Status: {connectionStatus}</div>
+        <div>Last Price: {lastPrice}</div>
+
+        <h4 style={{ marginTop: 20 }}>Trade History</h4>
+
+        {tradeHistory.slice(0, 8).map((t, i) => (
+          <div key={i}>
+            {t.side} {t.size.toFixed(5)} @ {t.price.toFixed(5)}
           </div>
-        </div>
-      )}
+        ))}
+      </div>
     </div>
   );
 }
