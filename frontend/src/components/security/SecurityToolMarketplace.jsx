@@ -1,10 +1,10 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { getToken } from "../../lib/api.js";
 
 /*
-  SecurityToolMarketplace
-  Enterprise Tool Deployment Panel
-  AUTH RACE FIXED • TOKEN SAFE • PRODUCTION STABLE
+SecurityToolMarketplace
+Enterprise Tool Deployment Panel
+STABILITY UPGRADE • METRICS PANEL • SAFE FILTERING
 */
 
 function apiBase() {
@@ -16,6 +16,7 @@ function apiBase() {
 }
 
 export default function SecurityToolMarketplace() {
+
   const base = apiBase();
 
   const [tools, setTools] = useState([]);
@@ -27,6 +28,7 @@ export default function SecurityToolMarketplace() {
   /* ================= LOAD TOOLS ================= */
 
   const loadTools = useCallback(async () => {
+
     const token = getToken();
 
     if (!base || !token) {
@@ -36,6 +38,7 @@ export default function SecurityToolMarketplace() {
     }
 
     try {
+
       setError(null);
       setLoading(true);
 
@@ -53,29 +56,36 @@ export default function SecurityToolMarketplace() {
       }
 
       setTools(Array.isArray(data.tools) ? data.tools : []);
+
     } catch {
+
       setTools([]);
       setError("Unable to load security modules");
+
     } finally {
+
       setLoading(false);
+
     }
+
   }, [base]);
 
   useEffect(() => {
+
     loadTools();
 
-    // 🔒 Reload if token changes (login / refresh)
-    const i = setInterval(() => {
-      loadTools();
-    }, 15000);
+    const i = setInterval(loadTools, 15000);
 
     return () => clearInterval(i);
+
   }, [loadTools]);
 
   /* ================= INSTALL / UNINSTALL ================= */
 
   async function toggleInstall(tool) {
+
     const token = getToken();
+
     if (!base || !token || busyId) return;
 
     setBusyId(tool.id);
@@ -86,6 +96,7 @@ export default function SecurityToolMarketplace() {
       : `/api/security/tools/${tool.id}/install`;
 
     try {
+
       const res = await fetch(`${base}${endpoint}`, {
         method: "POST",
         headers: {
@@ -99,28 +110,89 @@ export default function SecurityToolMarketplace() {
       await loadTools();
 
       window.dispatchEvent(new Event("security:refresh"));
+
     } catch {
+
       setError("Action failed. Please retry.");
+
     } finally {
+
       setBusyId(null);
+
     }
+
   }
 
   /* ================= FILTER ================= */
 
-  const filteredTools = tools.filter((tool) =>
-    tool.name.toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredTools = useMemo(() => {
+
+    const q = search.toLowerCase();
+
+    return tools.filter(
+      (tool) =>
+        (tool?.name || "").toLowerCase().includes(q)
+    );
+
+  }, [tools, search]);
+
+  /* ================= METRICS ================= */
+
+  const metrics = useMemo(() => {
+
+    const installed = tools.filter((t) => t.installed).length;
+
+    const available = tools.length - installed;
+
+    const domains = new Set(tools.map((t) => t.domain)).size;
+
+    return {
+      installed,
+      available,
+      domains,
+    };
+
+  }, [tools]);
 
   /* ================= UI ================= */
 
   return (
     <div className="postureCard">
+
       <div style={{ marginBottom: 24 }}>
+
         <h3>Security Control Marketplace</h3>
+
         <small className="muted">
           Deploy, activate, and manage enterprise-grade security modules.
         </small>
+
+        {/* METRICS */}
+
+        <div
+          style={{
+            display: "flex",
+            gap: 12,
+            marginTop: 16,
+            flexWrap: "wrap"
+          }}
+        >
+
+          <div className="metricCard">
+            Installed: <b>{metrics.installed}</b>
+          </div>
+
+          <div className="metricCard">
+            Available: <b>{metrics.available}</b>
+          </div>
+
+          <div className="metricCard">
+            Domains: <b>{metrics.domains}</b>
+          </div>
+
+        </div>
+
+        {/* SEARCH */}
 
         <div style={{ marginTop: 16 }}>
           <input
@@ -139,6 +211,7 @@ export default function SecurityToolMarketplace() {
             }}
           />
         </div>
+
       </div>
 
       {loading && <div className="muted">Loading security modules…</div>}
@@ -150,19 +223,25 @@ export default function SecurityToolMarketplace() {
       )}
 
       <div className="toolGrid">
+
         {filteredTools.map((tool) => (
+
           <div key={tool.id} className="toolCard">
+
             <div className="toolHeader">
+
               <div>
                 <b>{tool.name}</b>
+
                 <div className="toolCategory">
-                  {tool.domain?.toUpperCase()}
+                  {(tool.domain || "").toUpperCase()}
                 </div>
               </div>
 
               <span className={`badge ${tool.installed ? "ok" : ""}`}>
                 {tool.installed ? "Installed" : "Available"}
               </span>
+
             </div>
 
             <div className="toolDesc">
@@ -170,19 +249,25 @@ export default function SecurityToolMarketplace() {
             </div>
 
             <div className="toolActions">
+
               <button
                 className={`btn ${tool.installed ? "warn" : "ok"}`}
                 disabled={busyId === tool.id}
                 onClick={() => toggleInstall(tool)}
               >
+
                 {busyId === tool.id
                   ? "Processing..."
                   : tool.installed
                   ? "Uninstall"
                   : "Install"}
+
               </button>
+
             </div>
+
           </div>
+
         ))}
 
         {!loading && filteredTools.length === 0 && (
@@ -190,7 +275,9 @@ export default function SecurityToolMarketplace() {
             No matching security controls found.
           </div>
         )}
+
       </div>
+
     </div>
   );
 }
