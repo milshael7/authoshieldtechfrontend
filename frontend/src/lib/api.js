@@ -1,6 +1,6 @@
 /* =========================================================
-   AUTOSHIELD FRONTEND API LAYER — ENTERPRISE v13 (FIXED)
-   NO FLASH • NO HARD REDIRECT • SESSION SAFE
+   AUTOSHIELD FRONTEND API LAYER — ENTERPRISE v14
+   CONTRACT COMPLETE • NO FLASH • SESSION SAFE
 ========================================================= */
 
 const API_BASE = import.meta.env.VITE_API_BASE?.trim();
@@ -20,7 +20,9 @@ export function getToken() {
 }
 
 export function setToken(token) {
-  token ? localStorage.setItem(TOKEN_KEY, token) : localStorage.removeItem(TOKEN_KEY);
+  token
+    ? localStorage.setItem(TOKEN_KEY, token)
+    : localStorage.removeItem(TOKEN_KEY);
 }
 
 export function clearToken() {
@@ -36,7 +38,9 @@ export function getSavedUser() {
 }
 
 export function saveUser(user) {
-  user ? localStorage.setItem(USER_KEY, JSON.stringify(user)) : localStorage.removeItem(USER_KEY);
+  user
+    ? localStorage.setItem(USER_KEY, JSON.stringify(user))
+    : localStorage.removeItem(USER_KEY);
 }
 
 export function clearUser() {
@@ -52,7 +56,6 @@ function joinUrl(base, path) {
 async function fetchWithTimeout(url, options = {}, ms = REQUEST_TIMEOUT) {
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), ms);
-
   try {
     return await fetch(url, { ...options, signal: controller.signal });
   } finally {
@@ -71,7 +74,6 @@ function attachTenantHeader(headers) {
 /* ================= CORE REQUEST ================= */
 
 export async function req(path, { method = "GET", body, auth = true } = {}) {
-
   if (!API_BASE) throw new Error("API base URL not configured");
 
   const headers = attachTenantHeader({
@@ -99,8 +101,6 @@ export async function req(path, { method = "GET", body, auth = true } = {}) {
     data = await res.json();
   } catch {}
 
-  /* ================= FIXED SESSION HANDLING ================= */
-
   if (res.status === 401 && auth) {
     clearToken();
     clearUser();
@@ -120,7 +120,6 @@ export async function req(path, { method = "GET", body, auth = true } = {}) {
 /* ================= API OBJECT ================= */
 
 export const api = {
-
   /* AUTH */
   login: async (email, password) => {
     const res = await fetch(`${API_BASE}/api/auth/login`, {
@@ -132,28 +131,38 @@ export const api = {
     const data = await res.json().catch(() => null);
 
     if (!res.ok) throw new Error(data?.error || "Login failed");
-    if (!data?.token || !data?.user) throw new Error("Invalid login response");
+    if (!data?.token || !data?.user)
+      throw new Error("Invalid login response");
 
     return data;
   },
 
-  signup: (payload) => req("/api/auth/signup", { method: "POST", body: payload, auth: false }),
+  signup: (payload) =>
+    req("/api/auth/signup", { method: "POST", body: payload, auth: false }),
+
   refresh: () => req("/api/auth/refresh", { method: "POST" }),
 
   /* USERS */
   listUsers: () => req("/api/users"),
   getUser: (id) => req(`/api/users/${id}`),
 
+  /* INCIDENTS — 🔥 RESTORED */
+  incidents: () => req("/api/incidents"),
+  createIncident: (payload) =>
+    req("/api/incidents", { method: "POST", body: payload }),
+
   /* SECURITY */
   postureSummary: () => req("/api/security/posture-summary"),
   securityEvents: () => req("/api/security/events"),
   vulnerabilities: () => req("/api/security/vulnerabilities"),
 
+  /* SECURITY TOOLS — 🔥 RESTORED */
+  securityTools: () => req("/api/security/tools"),
+  installSecurityTool: (id) =>
+    req(`/api/security/tools/${id}/install`, { method: "POST" }),
+  uninstallSecurityTool: (id) =>
+    req(`/api/security/tools/${id}/uninstall`, { method: "POST" }),
+
   /* ADMIN */
   adminPlatformHealth: () => req("/api/admin/platform-health"),
-
-  /* TOOLS */
-  toolCatalog: () => req("/api/tools/catalog"),
-  requestTool: (toolId) => req(`/api/tools/request/${toolId}`, { method: "POST" }),
-
 };
