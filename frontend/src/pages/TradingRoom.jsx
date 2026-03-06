@@ -1,6 +1,7 @@
+// frontend/src/pages/TradingRoom.jsx
 // ============================================================
-// TRADING ROOM — REALTIME MARKET + PAPER ENGINE (STABLE)
-// ROUTE-SAFE • NO REDIRECTS • LIVE CANDLES • WS-OWNED
+// TRADING ROOM — REALTIME MARKET + PAPER ENGINE (HARD STABLE)
+// QUIET • SINGLE WS • PROPER CANDLES • NO SHELL CRASH
 // ============================================================
 
 import React, { useEffect, useRef, useState } from "react";
@@ -9,12 +10,14 @@ import { getToken } from "../lib/api.js";
 
 const API_BASE = import.meta.env.VITE_API_BASE?.replace(/\/+$/, "");
 const SYMBOL = "BTCUSDT";
+const CANDLE_SECONDS = 60;
 
 export default function TradingRoom() {
   const containerRef = useRef(null);
   const chartRef = useRef(null);
   const seriesRef = useRef(null);
   const wsRef = useRef(null);
+  const lastCandleRef = useRef(null);
 
   const [price, setPrice] = useState(0);
   const [equity, setEquity] = useState(0);
@@ -27,7 +30,11 @@ export default function TradingRoom() {
   useEffect(() => {
     if (!containerRef.current) return;
 
+    const height = Math.max(containerRef.current.clientHeight, 300);
+
     const chart = createChart(containerRef.current, {
+      width: containerRef.current.clientWidth,
+      height,
       layout: {
         background: { color: "#0f1626" },
         textColor: "#d1d5db",
@@ -36,8 +43,6 @@ export default function TradingRoom() {
         vertLines: { color: "#1f2937" },
         horzLines: { color: "#1f2937" },
       },
-      width: containerRef.current.clientWidth,
-      height: containerRef.current.clientHeight,
     });
 
     const series = chart.addCandlestickSeries({
@@ -57,7 +62,7 @@ export default function TradingRoom() {
       if (!containerRef.current) return;
       chart.applyOptions({
         width: containerRef.current.clientWidth,
-        height: containerRef.current.clientHeight,
+        height: Math.max(containerRef.current.clientHeight, 300),
       });
     };
 
@@ -68,7 +73,7 @@ export default function TradingRoom() {
     };
   }, []);
 
-  /* ================= LOAD CANDLES ================= */
+  /* ================= LOAD HISTORICAL ================= */
 
   async function loadCandles() {
     try {
@@ -87,6 +92,10 @@ export default function TradingRoom() {
         close: c.close,
       }));
 
+      if (candles.length) {
+        lastCandleRef.current = candles[candles.length - 1];
+      }
+
       seriesRef.current?.setData(candles);
     } catch {}
   }
@@ -94,6 +103,8 @@ export default function TradingRoom() {
   /* ================= LIVE WS ================= */
 
   useEffect(() => {
+    if (wsRef.current) return; // HARD GUARD
+
     const token = getToken();
     if (!token || !API_BASE) return;
 
@@ -109,16 +120,34 @@ export default function TradingRoom() {
     ws.onmessage = (msg) => {
       try {
         const data = JSON.parse(msg.data);
-        if (data.type === "tick" && data.symbol === SYMBOL) {
-          setPrice(data.price);
-          seriesRef.current?.update({
-            time: Math.floor(data.ts / 1000),
+        if (data.type !== "tick" || data.symbol !== SYMBOL) return;
+
+        setPrice(data.price);
+
+        const ts = Math.floor(data.ts / 1000);
+        const bucket = Math.floor(ts / CANDLE_SECONDS) * CANDLE_SECONDS;
+
+        let candle = lastCandleRef.current;
+
+        if (!candle || candle.time !== bucket) {
+          candle = {
+            time: bucket,
             open: data.price,
             high: data.price,
             low: data.price,
             close: data.price,
-          });
+          };
+        } else {
+          candle = {
+            ...candle,
+            high: Math.max(candle.high, data.price),
+            low: Math.min(candle.low, data.price),
+            close: data.price,
+          };
         }
+
+        lastCandleRef.current = candle;
+        seriesRef.current?.update(candle);
       } catch {}
     };
 
@@ -126,6 +155,7 @@ export default function TradingRoom() {
       try {
         ws.close();
       } catch {}
+      wsRef.current = null;
     };
   }, []);
 
