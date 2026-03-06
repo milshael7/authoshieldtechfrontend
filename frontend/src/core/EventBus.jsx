@@ -1,8 +1,9 @@
 // frontend/src/core/EventBus.jsx
 // ======================================================
-// GLOBAL PLATFORM EVENT BUS — QUIET MODE v17
+// GLOBAL PLATFORM EVENT BUS — QUIET MODE v18 (SEALED)
 // DETERMINISTIC • BACKPRESSURE-AWARE • NO SELF-ECHO
 // THREAT-FIRST • ENTERPRISE-STABLE • FAIL-SILENT
+// SINGLE-SOURCE SIGNAL FLOW
 // ======================================================
 
 import { createContext, useContext, useRef, useCallback } from "react";
@@ -11,11 +12,12 @@ const EventBusContext = createContext(null);
 
 /* ================= CONFIG ================= */
 
-// absolute safety caps
+// absolute safety caps (hard guarantees)
 const MAX_LISTENERS_PER_EVENT = 20;
 const MAX_EMITS_PER_EVENT_PER_SEC = 10;
 
-// events allowed higher frequency (must be intentional)
+// events explicitly allowed higher frequency
+// (connectivity / advisory only — no state meaning)
 const HIGH_FREQ_EVENTS = new Set([
   "security_ws_connected",
   "security_ws_disconnected",
@@ -24,54 +26,57 @@ const HIGH_FREQ_EVENTS = new Set([
 /* ================= PROVIDER ================= */
 
 export function EventBusProvider({ children }) {
-  const listenersRef = useRef({});
-  const emitWindowRef = useRef({}); // event → { count, ts }
+  const listenersRef = useRef(Object.create(null));
+  const emitWindowRef = useRef(Object.create(null)); // event → { count, ts }
 
-  /* ================= INTERNAL GUARD ================= */
+  /* ================= EMIT GUARD ================= */
 
-  function canEmit(event) {
+  const canEmit = useCallback((event) => {
     const now = Date.now();
-    const window = emitWindowRef.current[event];
+    const win = emitWindowRef.current[event];
 
-    // initialize window
-    if (!window || now - window.ts > 1000) {
+    // initialize or reset window
+    if (!win || now - win.ts >= 1000) {
       emitWindowRef.current[event] = { count: 1, ts: now };
       return true;
     }
 
-    // allow whitelisted high-frequency events
+    // high-frequency whitelist (still counted, never blocked)
     if (HIGH_FREQ_EVENTS.has(event)) {
-      window.count += 1;
+      win.count += 1;
       return true;
     }
 
     // enforce per-second cap
-    if (window.count >= MAX_EMITS_PER_EVENT_PER_SEC) {
+    if (win.count >= MAX_EMITS_PER_EVENT_PER_SEC) {
       return false;
     }
 
-    window.count += 1;
+    win.count += 1;
     return true;
-  }
+  }, []);
 
   /* ================= EMIT ================= */
 
-  const emit = useCallback((event, payload) => {
-    const listeners = listenersRef.current[event];
-    if (!listeners || listeners.length === 0) return;
-    if (!canEmit(event)) return;
+  const emit = useCallback(
+    (event, payload) => {
+      const listeners = listenersRef.current[event];
+      if (!listeners || listeners.length === 0) return;
+      if (!canEmit(event)) return;
 
-    // snapshot listeners (no mutation side-effects)
-    const snapshot = listeners.slice();
+      // snapshot prevents mutation / re-entrancy issues
+      const snapshot = listeners.slice();
 
-    for (const cb of snapshot) {
-      try {
-        cb(payload);
-      } catch {
-        // 🔇 silent by design
+      for (const cb of snapshot) {
+        try {
+          cb(payload);
+        } catch {
+          // 🔇 FAIL-SILENT by design
+        }
       }
-    }
-  }, []);
+    },
+    [canEmit]
+  );
 
   /* ================= ON ================= */
 
@@ -82,7 +87,7 @@ export function EventBusProvider({ children }) {
 
     const list = listenersRef.current[event];
 
-    // 🔒 hard cap listener growth
+    // hard cap listener growth (prevents leaks & storms)
     if (list.length >= MAX_LISTENERS_PER_EVENT) {
       return () => {};
     }
@@ -107,12 +112,14 @@ export function EventBusProvider({ children }) {
         try {
           callback(payload);
         } catch {
-          // silent
+          // 🔇 silent
         }
       });
     },
     [on]
   );
+
+  /* ================= CONTEXT ================= */
 
   const bus = {
     emit,
