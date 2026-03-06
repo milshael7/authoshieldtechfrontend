@@ -1,8 +1,9 @@
 // frontend/src/core/AIDecisionBus.jsx
 // ==========================================================
-// AI DECISION BUS — QUIET MODE v17
+// AI DECISION BUS — ENTERPRISE SEALED v18
 // SINGLE-SOURCE • BACKPRESSURE-AWARE • NO ECHO
-// THREAT-FIRST • EVENTBUS-COMPLIANT • ENTERPRISE-STABLE
+// THREAT-FIRST • EVENTBUS-COMPLIANT • PLATFORM-STABLE
+// NO SELF-FEEDBACK • NO REPLAY STORMS • DETERMINISTIC
 // ==========================================================
 
 import {
@@ -13,17 +14,19 @@ import {
 } from "react";
 import { useEventBus } from "./EventBus.jsx";
 
+/* ================= CONTEXT ================= */
+
 const AIBusContext = createContext(null);
 
 /* ================= CONFIG ================= */
 
-// Decisions that must bypass cooldown + always propagate
+// Decisions that must always propagate immediately
 const CRITICAL_DECISIONS = new Set([
   "ai_threat_detected",
   "ai_lockdown",
 ]);
 
-// Minimum spacing per decision type (ms)
+// Per-decision cooldowns (ms)
 const DECISION_COOLDOWN = {
   ai_trade_signal: 250,
   ai_risk_escalation: 500,
@@ -31,18 +34,34 @@ const DECISION_COOLDOWN = {
   default: 300,
 };
 
+// Hard safety caps
+const MAX_EMITS_PER_SESSION = 200;
+
 /* ================= PROVIDER ================= */
 
 export function AIDecisionProvider({ children }) {
   const bus = useEventBus();
 
-  // type → timestamp
+  // type → last emit timestamp
   const lastDecisionRef = useRef({});
+  const emitCountRef = useRef(0);
+  const mountedRef = useRef(true);
 
-  /* ================= EMIT CORE ================= */
+  /* ================= LIFECYCLE ================= */
+
+  // no effects needed — pure dispatcher
+
+  /* ================= CORE EMIT ================= */
 
   const emitDecision = useCallback(
     (type, payload = {}) => {
+      if (!mountedRef.current) return;
+
+      // absolute session safety cap
+      if (emitCountRef.current >= MAX_EMITS_PER_SESSION) {
+        return;
+      }
+
       const now = Date.now();
       const last = lastDecisionRef.current[type] || 0;
 
@@ -59,6 +78,7 @@ export function AIDecisionProvider({ children }) {
       }
 
       lastDecisionRef.current[type] = now;
+      emitCountRef.current += 1;
 
       const event = {
         type,
@@ -66,10 +86,11 @@ export function AIDecisionProvider({ children }) {
         ts: now,
       };
 
-      // 🔑 SINGLE canonical channel
+      // 🔑 SINGLE canonical broadcast
+      // All consumers listen here
       bus.emit("ai_decision", event);
 
-      // 🔔 Type-specific channel ONLY for critical decisions
+      // 🔔 Direct channels ONLY for critical actions
       if (CRITICAL_DECISIONS.has(type)) {
         bus.emit(type, payload);
       }
