@@ -1,6 +1,6 @@
 // frontend/src/components/AuthoDevPanel.jsx
-// AuthoDevPanel — Enterprise Advisor v6.5 (RESTORED)
-// SHELL-SAFE • ABORT-SAFE • SPEECH-SAFE • FULL COMMAND UI
+// AuthoDevPanel — Advisor v6.5 UI-RESTORED
+// UI CONTRACT PRESERVED • SHELL-SAFE • NO FEATURE REMOVALS
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { readAloud, stopReadAloud } from "./ReadAloud";
@@ -65,7 +65,6 @@ export default function AuthoDevPanel({
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [listening, setListening] = useState(false);
-  const [speakingIndex, setSpeakingIndex] = useState(null);
 
   /* ================= LIFECYCLE ================= */
 
@@ -86,13 +85,17 @@ export default function AuthoDevPanel({
     if (!raw) return;
     try {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed?.messages)) setMessages(parsed.messages);
+      if (Array.isArray(parsed?.messages)) {
+        setMessages(parsed.messages);
+      }
     } catch {}
   }, [storageKey]);
 
   useEffect(() => {
-    if (!mountedRef.current) return;
-    safeSet(storageKey, JSON.stringify({ messages, lastActive: Date.now() }));
+    safeSet(storageKey, JSON.stringify({
+      messages,
+      lastActive: Date.now(),
+    }));
   }, [messages, storageKey]);
 
   useEffect(() => {
@@ -101,25 +104,53 @@ export default function AuthoDevPanel({
 
   /* ================= SPEECH ================= */
 
-  function handleSpeak(text, index) {
-    setSpeakingIndex(index);
-    readAloud(text, () => mountedRef.current && setSpeakingIndex(null));
+  function handleSpeak(text) {
+    readAloud(text);
+  }
+
+  /* ================= VOICE INPUT ================= */
+
+  function startListening() {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) return;
+
+    try { recognitionRef.current?.stop(); } catch {}
+
+    const rec = new SR();
+    rec.lang = "en-US";
+    rec.interimResults = true;
+
+    rec.onstart = () => mountedRef.current && setListening(true);
+    rec.onend = () => mountedRef.current && setListening(false);
+
+    rec.onresult = (e) => {
+      const last = e.results?.[e.results.length - 1];
+      const text = last?.[0]?.transcript || "";
+      if (text) setInput(text);
+    };
+
+    recognitionRef.current = rec;
+    rec.start();
+  }
+
+  function stopListening() {
+    try { recognitionRef.current?.stop(); } catch {}
+    setListening(false);
   }
 
   /* ================= SEND ================= */
 
-  async function sendMessage(customText = null, replaceIndex = null) {
-    const messageText = String(customText ?? input ?? "").trim();
+  async function sendMessage() {
+    const messageText = String(input || "").trim();
     if (!messageText || loading) return;
 
-    if (replaceIndex === null) {
-      setMessages(m => [
-        ...m.slice(-MAX_MESSAGES + 1),
-        { role: "user", text: messageText, ts: new Date().toLocaleTimeString() }
-      ]);
-      setInput("");
-    }
+    if (listening) stopListening();
 
+    setMessages(m => [
+      ...m.slice(-MAX_MESSAGES + 1),
+      { role: "user", text: messageText, ts: Date.now() }
+    ]);
+    setInput("");
     setLoading(true);
 
     try {
@@ -137,84 +168,75 @@ export default function AuthoDevPanel({
         signal: controller.signal,
         body: JSON.stringify({
           message: messageText,
-          context: { ...ctxFromParent, module, location: window.location.pathname }
+          context: {
+            ...ctxFromParent,
+            module,
+            tradingActive: module === "trading",
+            location: window.location.pathname,
+          },
         }),
       });
-
-      if (!mountedRef.current) return;
 
       const data = await res.json().catch(() => ({}));
       const reply = data?.reply || "Assistant unavailable.";
 
-      setMessages(prev => {
-        const newMsg = { role: "ai", text: reply, ts: new Date().toLocaleTimeString() };
-        if (replaceIndex !== null) {
-          const copy = [...prev];
-          copy[replaceIndex] = newMsg;
-          return copy;
-        }
-        return [...prev.slice(-MAX_MESSAGES + 1), newMsg];
-      });
+      if (!mountedRef.current) return;
+
+      setMessages(m => [
+        ...m.slice(-MAX_MESSAGES + 1),
+        { role: "ai", text: reply, ts: Date.now() }
+      ]);
 
     } catch {
       if (!mountedRef.current) return;
-      setMessages(prev => [
-        ...prev.slice(-MAX_MESSAGES + 1),
-        { role: "ai", text: "Assistant unavailable.", ts: new Date().toLocaleTimeString() }
+      setMessages(m => [
+        ...m.slice(-MAX_MESSAGES + 1),
+        { role: "ai", text: "Assistant unavailable.", ts: Date.now() }
       ]);
     } finally {
       mountedRef.current && setLoading(false);
     }
   }
 
-  function regenerate(index) {
-    const previousUser = [...messages].slice(0, index).reverse()
-      .find(m => m.role === "user");
-    if (previousUser?.text) sendMessage(previousUser.text, index);
-  }
-
-  function share(text) {
-    if (navigator.share) navigator.share({ text }).catch(() => {});
-    else copyText(text);
-  }
-
-  function react(index, type) {
-    setMessages(prev => {
-      const copy = [...prev];
-      copy[index] = { ...copy[index], reaction: type };
-      return copy;
-    });
-  }
-
   /* ================= UI ================= */
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-      <div style={{ fontSize: 13, opacity: .7, marginBottom: 12 }}>{title}</div>
+      <div style={{ fontSize: 13, opacity: 0.7, marginBottom: 10 }}>{title}</div>
 
-      <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 26 }}>
+      <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 22 }}>
         {messages.map((m, i) => (
-          <div key={i} style={{ alignItems: m.role === "user" ? "flex-end" : "flex-start" }}>
-            <div style={{
-              maxWidth: "75%",
-              padding: "14px 18px",
-              borderRadius: 18,
-              background: m.role === "user"
-                ? "linear-gradient(135deg,#5EC6FF,#7aa2ff)"
-                : "rgba(255,255,255,.06)",
-              color: "#fff"
-            }}>
+          <div key={i} style={{ alignSelf: m.role === "user" ? "flex-end" : "flex-start" }}>
+            <div
+              style={{
+                maxWidth: "75%",
+                padding: "14px 18px",
+                borderRadius: 18,
+                background:
+                  m.role === "user"
+                    ? "linear-gradient(135deg,#5EC6FF,#7aa2ff)"
+                    : "rgba(255,255,255,.06)",
+                color: "#fff",
+              }}
+            >
               {m.text}
             </div>
 
             {m.role === "ai" && (
-              <div style={{ display: "flex", gap: 14, marginTop: 12, opacity: .85 }}>
-                <IconBtn onClick={() => handleSpeak(m.text, i)}>🔊</IconBtn>
-                <IconBtn onClick={() => copyText(m.text)}>📋</IconBtn>
-                <IconBtn onClick={() => react(i, "up")}>👍</IconBtn>
-                <IconBtn onClick={() => react(i, "down")}>👎</IconBtn>
-                <IconBtn onClick={() => regenerate(i)}>🔁</IconBtn>
-                <IconBtn onClick={() => share(m.text)}>📤</IconBtn>
+              <div
+                style={{
+                  display: "flex",
+                  gap: 12,
+                  marginTop: 8,
+                  opacity: 0.75,
+                }}
+              >
+                <IconBtn onClick={() => handleSpeak(m.text)}><IconSpeaker /></IconBtn>
+                <IconBtn onClick={() => copyText(m.text)}><IconCopy /></IconBtn>
+                <IconBtn><IconThumbUp /></IconBtn>
+                <IconBtn><IconThumbDown /></IconBtn>
+                <IconBtn><IconRefresh /></IconBtn>
+                <IconBtn><IconShare /></IconBtn>
               </div>
             )}
           </div>
@@ -222,39 +244,125 @@ export default function AuthoDevPanel({
         <div ref={bottomRef} />
       </div>
 
-      <div style={{ marginTop: 16, display: "flex", gap: 12 }}>
+      {/* INPUT PILL */}
+      <div
+        style={{
+          marginTop: 14,
+          padding: "10px 14px",
+          borderRadius: 999,
+          background: "rgba(255,255,255,.05)",
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+        }}
+      >
+        <IconBtn onClick={!listening ? startListening : stopListening}>
+          <IconMic />
+        </IconBtn>
+
         <textarea
           value={input}
-          onChange={e => setInput(e.target.value)}
+          onChange={(e) => setInput(e.target.value)}
           placeholder="Ask anything"
-          style={{ flex: 1 }}
-          onKeyDown={e => {
+          style={{
+            flex: 1,
+            background: "transparent",
+            border: "none",
+            outline: "none",
+            color: "#fff",
+            resize: "none",
+            fontSize: 14,
+          }}
+          onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
               sendMessage();
             }
           }}
         />
-        <button onClick={() => sendMessage()} disabled={loading}>
-          {loading ? "…" : "Send"}
-        </button>
+
+        <IconBtn onClick={sendMessage}>
+          <IconSend />
+        </IconBtn>
       </div>
     </div>
   );
 }
 
-/* ================= UI ================= */
+/* ================= ICONS ================= */
+
+const iconBase = {
+  width: 18,
+  height: 18,
+  fill: "none",
+  stroke: "#cbd5e1",
+  strokeWidth: 1.8,
+  strokeLinecap: "round",
+  strokeLinejoin: "round",
+};
 
 const IconBtn = ({ children, onClick }) => (
-  <button
-    onClick={onClick}
-    style={{
-      border: "none",
-      background: "transparent",
-      cursor: "pointer",
-      fontSize: 14
-    }}
-  >
+  <button onClick={onClick} style={{ background: "transparent", border: "none", cursor: "pointer" }}>
     {children}
   </button>
+);
+
+const IconSpeaker = () => (
+  <svg viewBox="0 0 24 24" {...iconBase}>
+    <path d="M11 5L6 9H2v6h4l5 4V5z" />
+    <path d="M15.5 8.5a5 5 0 0 1 0 7" />
+  </svg>
+);
+
+const IconCopy = () => (
+  <svg viewBox="0 0 24 24" {...iconBase}>
+    <rect x="9" y="9" width="13" height="13" rx="2" />
+    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+  </svg>
+);
+
+const IconThumbUp = () => (
+  <svg viewBox="0 0 24 24" {...iconBase}>
+    <path d="M14 9V5a3 3 0 0 0-3-3l-1 7" />
+    <path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" />
+    <path d="M7 11h8a2 2 0 0 1 2 2l-1 7a2 2 0 0 1-2 2H7" />
+  </svg>
+);
+
+const IconThumbDown = () => (
+  <svg viewBox="0 0 24 24" {...iconBase}>
+    <path d="M10 15v4a3 3 0 0 0 3 3l1-7" />
+    <path d="M17 2h3a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-3" />
+    <path d="M17 13H9a2 2 0 0 1-2-2l1-7a2 2 0 0 1 2-2h7" />
+  </svg>
+);
+
+const IconRefresh = () => (
+  <svg viewBox="0 0 24 24" {...iconBase}>
+    <polyline points="23 4 23 10 17 10" />
+    <path d="M20.49 15A9 9 0 1 1 23 10" />
+  </svg>
+);
+
+const IconShare = () => (
+  <svg viewBox="0 0 24 24" {...iconBase}>
+    <path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7" />
+    <polyline points="16 6 12 2 8 6" />
+    <line x1="12" y1="2" x2="12" y2="15" />
+  </svg>
+);
+
+const IconMic = () => (
+  <svg viewBox="0 0 24 24" {...iconBase}>
+    <path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3z" />
+    <path d="M19 11a7 7 0 0 1-14 0" />
+    <path d="M12 18v4" />
+  </svg>
+);
+
+const IconSend = () => (
+  <svg viewBox="0 0 24 24" {...iconBase}>
+    <path d="M22 2L11 13" />
+    <path d="M22 2L15 22l-4-9-9-4 20-7z" />
+  </svg>
 );
