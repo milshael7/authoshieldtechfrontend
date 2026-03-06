@@ -6,7 +6,7 @@
 // ======================================================
 
 import React, { useEffect, useMemo, useState } from "react";
-import { api, req } from "../lib/api.js";
+import { req } from "../lib/api.js";
 import NotificationList from "../components/NotificationList.jsx";
 import PosturePanel from "../components/PosturePanel.jsx";
 
@@ -53,7 +53,7 @@ export default function User() {
       setMe(meRes?.user || meRes || null);
       setEntitlements(safeArray(entRes?.entitlements?.tools));
       setTools(safeArray(toolsRes?.tools));
-      setNotifications(safeArray(eventsRes?.events));
+      setNotifications(safeArray(eventsRes?.events || eventsRes));
 
     } catch (e) {
       setErr(e?.message || "Failed to load user workspace");
