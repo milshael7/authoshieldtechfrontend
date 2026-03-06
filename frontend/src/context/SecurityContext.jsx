@@ -1,7 +1,10 @@
 // frontend/src/context/SecurityContext.jsx
-// Security Context — Enterprise Hardened v17
+// ==========================================================
+// SECURITY CONTEXT — ENTERPRISE HARDENED v18 (SEALED)
 // QUIET-BY-DEFAULT • REST-PRIMARY • WS-ADVISORY ONLY
-// NO ESCALATION LOOPS • NO SELF-NOISE • PLATFORM-SAFE
+// SINGLE SOURCE OF TRUTH • NO ESCALATION LOOPS
+// NO SELF-NOISE • PLATFORM-SAFE • DETERMINISTIC
+// ==========================================================
 
 import React, {
   createContext,
@@ -16,12 +19,18 @@ import React, {
 import { getToken, api } from "../lib/api.js";
 import { useEventBus } from "../core/EventBus.jsx";
 
+/* ================= CONTEXT ================= */
+
 const SecurityContext = createContext(null);
 
 /* ================= CONFIG ================= */
 
-const ALERT_COOLDOWN = 30000; // 30s between escalations
-const WS_MAX_RETRY = 1;       // advisory only, never persistent
+// escalation rules
+const RISK_THRESHOLD = 75;
+const ALERT_COOLDOWN = 30000; // 30s minimum between alerts
+
+// advisory WS rules (never persistent)
+const WS_MAX_RETRY = 1;
 
 /* ================= PROVIDER ================= */
 
@@ -30,7 +39,7 @@ export function SecurityProvider({ children }) {
 
   /* ================= STATE ================= */
 
-  const [systemStatus, setSystemStatus] = useState("secure");
+  const [systemStatus, setSystemStatus] = useState("secure"); // secure | compromised
   const [integrityAlert, setIntegrityAlert] = useState(null);
   const [riskScore, setRiskScore] = useState(0);
   const [domains, setDomains] = useState([]);
@@ -39,8 +48,9 @@ export function SecurityProvider({ children }) {
   /* ================= REFS ================= */
 
   const mountedRef = useRef(true);
-  const quietRef = useRef(true);          // 🔇 global quiet flag
+  const quietRef = useRef(true); // global noise gate
   const lastAlertRef = useRef(0);
+
   const socketRef = useRef(null);
   const wsRetryRef = useRef(0);
 
@@ -48,6 +58,7 @@ export function SecurityProvider({ children }) {
 
   useEffect(() => {
     mountedRef.current = true;
+
     return () => {
       mountedRef.current = false;
       try {
@@ -60,6 +71,7 @@ export function SecurityProvider({ children }) {
      - NEVER required for correctness
      - NEVER blocks UI
      - NEVER retries aggressively
+     - CONFIRMATION channel only
   ======================================================== */
 
   const connectWS = useCallback(() => {
@@ -72,6 +84,7 @@ export function SecurityProvider({ children }) {
     if (!token) return;
 
     let ws;
+
     try {
       const base = import.meta.env.VITE_API_BASE;
       if (!base) return;
@@ -100,8 +113,8 @@ export function SecurityProvider({ children }) {
         return;
       }
 
+      // advisory confirmation only
       if (data?.type === "integrity_alert") {
-        // advisory confirmation only — REST remains source of truth
         setIntegrityAlert(data);
         setSystemStatus("compromised");
         bus.emit("security_threat_detected", data);
@@ -132,9 +145,9 @@ export function SecurityProvider({ children }) {
   }, [bus]);
 
   /* ================= REST SECURITY TELEMETRY =================
-     - SINGLE SOURCE OF TRUTH
-     - SLOW CADENCE
-     - SILENT ON FAILURE
+     SINGLE SOURCE OF TRUTH
+     SLOW CADENCE
+     SILENT ON FAILURE
   ============================================================ */
 
   useEffect(() => {
@@ -149,46 +162,51 @@ export function SecurityProvider({ children }) {
         if (!summary?.ok) return;
 
         const score = Number(summary.score || 0);
+        const now = Date.now();
 
         setRiskScore(score);
         setDomains(Array.isArray(summary.domains) ? summary.domains : []);
 
-        const now = Date.now();
-
-        if (score >= 75) {
-          quietRef.current = false;
-
-          if (now - lastAlertRef.current >= ALERT_COOLDOWN) {
-            lastAlertRef.current = now;
-
-            const alert = {
-              type: "risk_threshold",
-              score,
-              ts: now,
-            };
-
-            setIntegrityAlert(alert);
-            setSystemStatus("compromised");
-
-            // 🔔 single controlled broadcast
-            bus.emit("security_threat_detected", alert);
-
-            // optional advisory channel
-            connectWS();
-          }
-        } else {
+        // ================= SECURE STATE =================
+        if (score < RISK_THRESHOLD) {
           quietRef.current = true;
           setIntegrityAlert(null);
           setSystemStatus("secure");
           setWsStatus("quiet");
+          return;
         }
+
+        // ================= COMPROMISED STATE =================
+        quietRef.current = false;
+
+        if (now - lastAlertRef.current < ALERT_COOLDOWN) {
+          return; // hard cooldown — prevents oscillation
+        }
+
+        lastAlertRef.current = now;
+
+        const alert = {
+          type: "risk_threshold",
+          score,
+          ts: now,
+        };
+
+        setIntegrityAlert(alert);
+        setSystemStatus("compromised");
+
+        // single, controlled broadcast
+        bus.emit("security_threat_detected", alert);
+
+        // optional advisory confirmation
+        connectWS();
       } catch {
         // 🔇 intentional silence
       }
     }
 
+    // delayed boot to avoid startup noise
     const boot = setTimeout(load, 4000);
-    const interval = setInterval(load, 120000);
+    const interval = setInterval(load, 120000); // 2 min cadence
 
     return () => {
       active = false;
@@ -197,7 +215,7 @@ export function SecurityProvider({ children }) {
     };
   }, [bus, connectWS]);
 
-  /* ================= CONTEXT ================= */
+  /* ================= CONTEXT VALUE ================= */
 
   const value = useMemo(
     () => ({
