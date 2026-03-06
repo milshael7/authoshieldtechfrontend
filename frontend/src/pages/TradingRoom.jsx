@@ -1,11 +1,9 @@
 // frontend/src/pages/TradingRoom.jsx
 // ============================================================
 // TRADING ROOM — REALTIME MARKET + PAPER ENGINE (ENTERPRISE)
-// Uses TerminalChart component
-// Stable websocket + clean architecture
 // ============================================================
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useMemo } from "react";
 import TerminalChart from "../components/TerminalChart";
 import { getToken } from "../lib/api.js";
 
@@ -30,9 +28,42 @@ export default function TradingRoom() {
   const [engineStatus, setEngineStatus] = useState("CONNECTED");
   const [engineMode, setEngineMode] = useState("Paper Trading");
 
+  /* ================= DERIVED DATA ================= */
+
+  const volume = useMemo(() => {
+    return candles.map(c => ({
+      time: c.time,
+      value: Math.abs(c.close - c.open) * 10,
+    }));
+  }, [candles]);
+
+  const pnlSeries = useMemo(() => {
+    let running = 0;
+
+    return trades
+      .slice()
+      .reverse()
+      .map(t => {
+        running += Number(t.profit || 0);
+
+        return {
+          time: Math.floor(t.time / 1000),
+          value: running,
+        };
+      });
+
+  }, [trades]);
+
+  const aiSignals = useMemo(() => {
+    return trades.map(t => ({
+      time: Math.floor(t.time / 1000),
+    }));
+  }, [trades]);
+
   /* ================= LOAD HISTORICAL ================= */
 
   async function loadCandles() {
+
     try {
 
       const res = await fetch(
@@ -41,6 +72,7 @@ export default function TradingRoom() {
       );
 
       const data = await res.json();
+
       if (!data?.ok) return;
 
       const formatted = (data.candles || []).map(c => ({
@@ -48,7 +80,7 @@ export default function TradingRoom() {
         open: Number(c.open),
         high: Number(c.high),
         low: Number(c.low),
-        close: Number(c.close)
+        close: Number(c.close),
       }));
 
       if (formatted.length) {
@@ -105,7 +137,7 @@ export default function TradingRoom() {
             open: data.price,
             high: data.price,
             low: data.price,
-            close: data.price
+            close: data.price,
           };
 
           setCandles(prev => {
@@ -119,7 +151,7 @@ export default function TradingRoom() {
             ...candle,
             high: Math.max(candle.high, data.price),
             low: Math.min(candle.low, data.price),
-            close: data.price
+            close: data.price,
           };
 
           setCandles(prev => {
@@ -138,6 +170,7 @@ export default function TradingRoom() {
 
     ws.onclose = () => {
       wsRef.current = null;
+      setEngineStatus("DISCONNECTED");
     };
 
     return () => {
@@ -154,7 +187,7 @@ export default function TradingRoom() {
     try {
 
       const res = await fetch(`${API_BASE}/api/paper/status`, {
-        headers: authHeader()
+        headers: authHeader(),
       });
 
       const data = await res.json();
@@ -166,7 +199,7 @@ export default function TradingRoom() {
 
       setWallet({
         usd: Number(snap.cashBalance || 0),
-        btc: Number(snap.position?.qty || 0)
+        btc: Number(snap.position?.qty || 0),
       });
 
       setPosition(snap.position || null);
@@ -221,10 +254,12 @@ export default function TradingRoom() {
           Live Price: {price ? price.toLocaleString() : "Loading..."}
         </div>
 
-        {/* CHART */}
-
         <TerminalChart
           candles={candles}
+          volume={volume}
+          trades={trades}
+          aiSignals={aiSignals}
+          pnlSeries={pnlSeries}
           height={460}
         />
 
@@ -318,7 +353,6 @@ function Panel({ title, children, flex = 1, style = {} }) {
     }}>
 
       <h4>{title}</h4>
-
       {children}
 
     </div>
