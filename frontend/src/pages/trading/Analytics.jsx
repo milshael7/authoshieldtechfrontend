@@ -11,51 +11,41 @@ const API_BASE = import.meta.env.VITE_API_BASE?.replace(/\/+$/, "");
 
 export default function Analytics() {
 
-  const [stats, setStats] = useState({
-    equity: 0,
-    winRate: 0,
-    trades: 0,
-    pnl: 0,
-    drawdown: 0,
-    sharpe: 0,
-    profitFactor: 0,
-    avgWin: 0,
-    avgLoss: 0,
-    largestWin: 0,
-    largestLoss: 0
-  });
-
+  const [stats, setStats] = useState({});
   const [equityHistory, setEquityHistory] = useState([]);
   const [tradeLog, setTradeLog] = useState([]);
+  const [behavior, setBehavior] = useState({
+    buy:0,
+    sell:0,
+    accuracy:0
+  });
 
-  useEffect(() => {
-    loadAnalytics();
-  }, []);
+  useEffect(()=>{ loadAnalytics(); },[]);
 
-  async function loadAnalytics() {
+  async function loadAnalytics(){
 
-    try {
+    try{
 
-      const res = await fetch(`${API_BASE}/api/paper/status`, {
-        headers: authHeader()
+      const res = await fetch(`${API_BASE}/api/paper/status`,{
+        headers:authHeader()
       });
 
       const data = await res.json();
-      if (!data?.ok) return;
+      if(!data?.ok) return;
 
       const snap = data.snapshot;
       const trades = snap.trades || [];
 
-      const wins = trades.filter(t => t.profit > 0);
-      const losses = trades.filter(t => t.profit <= 0);
+      const wins = trades.filter(t=>t.profit>0);
+      const losses = trades.filter(t=>t.profit<=0);
 
       const winRate =
-        trades.length ? (wins.length / trades.length) * 100 : 0;
+        trades.length ? (wins.length/trades.length)*100 : 0;
 
       const pnl =
-        trades.reduce((sum,t)=>sum+(t.profit||0),0);
+        trades.reduce((s,t)=>s+(t.profit||0),0);
 
-      /* ================= PROFIT METRICS ================= */
+      /* PROFIT FACTOR */
 
       const grossProfit =
         wins.reduce((s,t)=>s+t.profit,0);
@@ -64,40 +54,22 @@ export default function Analytics() {
         losses.reduce((s,t)=>s+Math.abs(t.profit||0),0);
 
       const profitFactor =
-        grossLoss ? grossProfit / grossLoss : 0;
+        grossLoss ? grossProfit/grossLoss : 0;
 
-      const avgWin =
-        wins.length ? grossProfit / wins.length : 0;
+      /* SHARPE */
 
-      const avgLoss =
-        losses.length ? grossLoss / losses.length : 0;
+      const returns = trades.map(t=>t.profit||0);
 
-      const largestWin =
-        Math.max(...wins.map(t=>t.profit),0);
-
-      const largestLoss =
-        Math.min(...losses.map(t=>t.profit),0);
-
-      /* ================= SHARPE ================= */
-
-      const returns = trades.map(t => t.profit || 0);
-
-      const avgReturn =
-        returns.reduce((a,b)=>a+b,0) /
-        (returns.length || 1);
+      const avg =
+        returns.reduce((a,b)=>a+b,0)/(returns.length||1);
 
       const variance =
-        returns.reduce(
-          (sum,r)=>sum+Math.pow(r-avgReturn,2),
-          0
-        ) / (returns.length || 1);
-
-      const std = Math.sqrt(variance);
+        returns.reduce((s,r)=>s+Math.pow(r-avg,2),0)/(returns.length||1);
 
       const sharpe =
-        std ? avgReturn / std : 0;
+        variance ? avg/Math.sqrt(variance) : 0;
 
-      /* ================= EQUITY CURVE ================= */
+      /* EQUITY CURVE */
 
       let equity = 10000;
       let peak = equity;
@@ -105,77 +77,81 @@ export default function Analytics() {
 
       const curve = [];
 
-      trades.forEach(t => {
+      trades.forEach(t=>{
 
-        equity += t.profit || 0;
+        equity += t.profit||0;
 
-        peak = Math.max(peak, equity);
+        peak = Math.max(peak,equity);
 
-        const dd = (peak - equity) / peak;
+        const dd = (peak-equity)/peak;
 
-        maxDD = Math.max(maxDD, dd);
+        maxDD = Math.max(maxDD,dd);
 
         curve.push(equity);
 
       });
 
-      setStats({
-        equity: snap.equity.toFixed(2),
-        winRate: winRate.toFixed(1),
-        trades: trades.length,
-        pnl: pnl.toFixed(2),
-        drawdown: (maxDD * 100).toFixed(2),
-        sharpe: sharpe.toFixed(2),
-        profitFactor: profitFactor.toFixed(2),
-        avgWin: avgWin.toFixed(2),
-        avgLoss: avgLoss.toFixed(2),
-        largestWin: largestWin.toFixed(2),
-        largestLoss: largestLoss.toFixed(2)
-      });
-
+      setEquityHistory(curve);
       setTradeLog(trades.slice(-20).reverse());
 
-      setEquityHistory(curve);
+      setStats({
+        equity:snap.equity?.toFixed(2),
+        winRate:winRate.toFixed(1),
+        trades:trades.length,
+        pnl:pnl.toFixed(2),
+        drawdown:(maxDD*100).toFixed(2),
+        sharpe:sharpe.toFixed(2),
+        profitFactor:profitFactor.toFixed(2)
+      });
 
-    } catch {}
+      /* AI BEHAVIOR */
+
+      let buy=0;
+      let sell=0;
+
+      trades.forEach(t=>{
+        if(t.side==="BUY") buy++;
+        if(t.side==="SELL") sell++;
+      });
+
+      setBehavior({
+        buy,
+        sell,
+        accuracy:winRate.toFixed(1)
+      });
+
+    }catch{}
 
   }
 
-  return (
+  return(
 
-    <div style={{ padding: 24, color: "#fff" }}>
+    <div style={{padding:24,color:"#fff"}}>
 
-      <h2 style={{ marginBottom: 20 }}>
+      <h2 style={{marginBottom:20}}>
         AI Trading Analytics
       </h2>
 
-      {/* ================= METRICS ================= */}
+      {/* METRICS */}
 
       <div style={{
         display:"flex",
         gap:20,
-        marginBottom:30,
-        flexWrap:"wrap"
+        flexWrap:"wrap",
+        marginBottom:30
       }}>
 
         <Metric title="Equity" value={`$${stats.equity}`} />
         <Metric title="Win Rate" value={`${stats.winRate}%`} />
         <Metric title="Trades" value={stats.trades} />
         <Metric title="PnL" value={`$${stats.pnl}`} />
-        <Metric title="Max Drawdown" value={`${stats.drawdown}%`} />
-
+        <Metric title="Drawdown" value={`${stats.drawdown}%`} />
         <Metric title="Sharpe Ratio" value={stats.sharpe} />
         <Metric title="Profit Factor" value={stats.profitFactor} />
 
-        <Metric title="Avg Win" value={`$${stats.avgWin}`} />
-        <Metric title="Avg Loss" value={`$${stats.avgLoss}`} />
-
-        <Metric title="Largest Win" value={`$${stats.largestWin}`} />
-        <Metric title="Largest Loss" value={`$${stats.largestLoss}`} />
-
       </div>
 
-      {/* ================= EQUITY CURVE ================= */}
+      {/* EQUITY CURVE */}
 
       <Panel title="Equity Curve">
 
@@ -185,14 +161,49 @@ export default function Analytics() {
 
       </Panel>
 
-      {/* ================= TRADE LOG ================= */}
+      {/* AI BEHAVIOR */}
+
+      <Panel
+        title="AI Behavior Intelligence"
+        style={{marginTop:30}}
+      >
+
+        <div style={{marginBottom:10}}>
+          <strong>AI Accuracy:</strong> {behavior.accuracy}%
+        </div>
+
+        <div>
+          <strong>Decision Distribution</strong>
+
+          <div style={{
+            display:"flex",
+            gap:20,
+            marginTop:8
+          }}>
+
+            <span style={{color:"#22c55e"}}>
+              BUY: {behavior.buy}
+            </span>
+
+            <span style={{color:"#ef4444"}}>
+              SELL: {behavior.sell}
+            </span>
+
+          </div>
+
+        </div>
+
+      </Panel>
+
+      {/* TRADE LOG */}
 
       <Panel
         title="Recent Trades"
-        style={{ marginTop:30 }}
+        style={{marginTop:30}}
       >
 
         {tradeLog.map((t,i)=>(
+
           <div
             key={i}
             style={{
@@ -214,13 +225,14 @@ export default function Analytics() {
             </span>
 
           </div>
+
         ))}
 
       </Panel>
 
     </div>
 
-  );
+  )
 
 }
 
