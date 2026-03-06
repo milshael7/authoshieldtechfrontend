@@ -1,6 +1,6 @@
 // frontend/src/context/SecurityContext.jsx
-// Security Context — Enterprise Hardened v11
-// BACKEND-ALIGNED • NO LOOPS • ROUTE-SAFE • WS-STABLE
+// Security Context — Enterprise Hardened v12
+// SECURITY-ONLY • ROUTE-STABLE • TRADING-SAFE • NO MARKET SOCKETS
 
 import React, {
   createContext,
@@ -52,12 +52,12 @@ export function SecurityProvider({ children }) {
 
   /* ================= HELPERS ================= */
 
-  function buildWsUrl(token) {
+  function buildSecurityWsUrl(token) {
     if (!API_BASE || !token) return null;
     try {
       const url = new URL(API_BASE);
       const protocol = url.protocol === "https:" ? "wss:" : "ws:";
-      return `${protocol}//${url.host}/ws/market?token=${encodeURIComponent(
+      return `${protocol}//${url.host}/ws/security?token=${encodeURIComponent(
         token
       )}`;
     } catch {
@@ -93,7 +93,7 @@ export function SecurityProvider({ children }) {
     if (!token || !mountedRef.current) return;
     if (socketRef.current?.readyState === 1) return;
 
-    const wsUrl = buildWsUrl(token);
+    const wsUrl = buildSecurityWsUrl(token);
     if (!wsUrl) return;
 
     let socket;
@@ -116,6 +116,11 @@ export function SecurityProvider({ children }) {
       if (data.type === "integrity_alert") {
         setIntegrityAlert(data);
         setSystemStatus("compromised");
+      }
+
+      if (data.type === "integrity_clear") {
+        setIntegrityAlert(null);
+        setSystemStatus("secure");
       }
     };
 
@@ -173,7 +178,7 @@ export function SecurityProvider({ children }) {
     return () => clearInterval(interval);
   }, [connectSocket, closeSocket]);
 
-  /* ================= REST TELEMETRY (BACKEND-ALIGNED) ================= */
+  /* ================= REST TELEMETRY ================= */
 
   useEffect(() => {
     let active = true;
@@ -185,10 +190,11 @@ export function SecurityProvider({ children }) {
         const summary = await api.postureSummary();
         if (!active || !summary?.ok) return;
 
-        setRiskScore(Number(summary.score || 0));
+        const score = Number(summary.score || 0);
+        setRiskScore(score);
         setDomains(Array.isArray(summary.domains) ? summary.domains : []);
 
-        if (Number(summary.score || 0) < 30) {
+        if (score < 30 && !integrityAlert) {
           setSystemStatus("secure");
         }
       } catch {
@@ -203,7 +209,7 @@ export function SecurityProvider({ children }) {
       active = false;
       clearInterval(interval);
     };
-  }, []);
+  }, [integrityAlert]);
 
   /* ================= CONTEXT ================= */
 
