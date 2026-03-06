@@ -2,7 +2,7 @@
 // ======================================================
 // COMPANY WORKSPACE — ORGANIZATION CONTROL
 // Strict tenant scope • No global visibility
-// Backend-aligned • No phantom APIs
+// Backend-aligned • Zero phantom APIs
 // ======================================================
 
 import React, { useEffect, useMemo, useState } from "react";
@@ -34,22 +34,19 @@ export default function Company() {
     setErr("");
 
     try {
-      const [companies, users, ev, inc] = await Promise.all([
-        api.listCompanies(),
-        api.listUsers(),
-        api.securityEvents(),
+      // 🔒 TENANT-SAFE APIs ONLY
+      const [companyRes, evRes, incRes] = await Promise.all([
+        api.req("/api/company/me"),
+        api.securityEvents({ silent: true }),
         api.incidents(),
       ]);
 
-      const c =
-        arr(companies?.companies || companies).find(
-          (x) => x.id
-        ) || null;
+      const c = companyRes?.company || companyRes;
 
-      setCompanyData(c);
-      setMembers(arr(users));
-      setEvents(arr(ev?.events));
-      setIncidents(arr(inc?.incidents));
+      setCompanyData(c || null);
+      setMembers(arr(c?.members || c?.users));
+      setEvents(arr(evRes?.events));
+      setIncidents(arr(incRes?.incidents));
 
       if (c?.id) {
         setCompany({ id: c.id, name: c.name });
@@ -144,7 +141,9 @@ export default function Company() {
             value={newMemberId}
             onChange={(e) => setNewMemberId(e.target.value)}
           />
-          <button onClick={addMember}>Add</button>
+          <button onClick={addMember} disabled={!newMemberId.trim()}>
+            Add
+          </button>
         </div>
 
         <table className="table">
@@ -152,7 +151,7 @@ export default function Company() {
             <tr>
               <th>Email</th>
               <th>Role</th>
-              <th>Status</th>
+              <th>Subscription</th>
               <th />
             </tr>
           </thead>
@@ -173,7 +172,7 @@ export default function Company() {
             {members.length === 0 && (
               <tr>
                 <td colSpan={4}>
-                  <small>No members</small>
+                  <small>No members registered</small>
                 </td>
               </tr>
             )}
