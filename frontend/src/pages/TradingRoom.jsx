@@ -12,6 +12,7 @@ import { getToken } from "../lib/api.js";
 const API_BASE = import.meta.env.VITE_API_BASE?.replace(/\/+$/, "");
 const SYMBOL = "BTCUSDT";
 const CANDLE_SECONDS = 60;
+const MAX_CANDLES = 200;
 
 export default function TradingRoom() {
 
@@ -26,25 +27,28 @@ export default function TradingRoom() {
   const [position, setPosition] = useState(null);
   const [trades, setTrades] = useState([]);
 
+  const [engineStatus, setEngineStatus] = useState("CONNECTED");
+  const [engineMode, setEngineMode] = useState("Paper Trading");
+
   /* ================= LOAD HISTORICAL ================= */
 
   async function loadCandles() {
     try {
 
       const res = await fetch(
-        `${API_BASE}/api/market/candles?symbol=${SYMBOL}&limit=200`,
+        `${API_BASE}/api/market/candles?symbol=${SYMBOL}&limit=${MAX_CANDLES}`,
         { headers: authHeader() }
       );
 
       const data = await res.json();
       if (!data?.ok) return;
 
-      const formatted = data.candles.map(c => ({
+      const formatted = (data.candles || []).map(c => ({
         time: c.time,
-        open: c.open,
-        high: c.high,
-        low: c.low,
-        close: c.close
+        open: Number(c.open),
+        high: Number(c.high),
+        low: Number(c.low),
+        close: Number(c.close)
       }));
 
       if (formatted.length) {
@@ -54,6 +58,7 @@ export default function TradingRoom() {
       setCandles(formatted);
 
     } catch {}
+
   }
 
   useEffect(() => {
@@ -86,7 +91,7 @@ export default function TradingRoom() {
 
         if (data.type !== "tick" || data.symbol !== SYMBOL) return;
 
-        setPrice(data.price);
+        setPrice(Number(data.price));
 
         const ts = Math.floor(data.ts / 1000);
         const bucket = Math.floor(ts / CANDLE_SECONDS) * CANDLE_SECONDS;
@@ -103,7 +108,10 @@ export default function TradingRoom() {
             close: data.price
           };
 
-          setCandles(prev => [...prev.slice(-199), candle]);
+          setCandles(prev => {
+            const updated = [...prev, candle];
+            return updated.slice(-MAX_CANDLES);
+          });
 
         } else {
 
@@ -128,6 +136,10 @@ export default function TradingRoom() {
 
     };
 
+    ws.onclose = () => {
+      wsRef.current = null;
+    };
+
     return () => {
       try { ws.close(); } catch {}
       wsRef.current = null;
@@ -148,18 +160,24 @@ export default function TradingRoom() {
       const data = await res.json();
       if (!data?.ok) return;
 
-      const snap = data.snapshot;
+      const snap = data.snapshot || {};
 
-      setEquity(snap.equity);
+      setEquity(Number(snap.equity || 0));
 
       setWallet({
-        usd: snap.cashBalance,
-        btc: snap.position?.qty || 0
+        usd: Number(snap.cashBalance || 0),
+        btc: Number(snap.position?.qty || 0)
       });
 
       setPosition(snap.position || null);
 
       setTrades((snap.trades || []).slice(-10).reverse());
+
+      if (snap.mode === "live") {
+        setEngineMode("Live Trading");
+      } else {
+        setEngineMode("Paper Trading");
+      }
 
     } catch {}
 
@@ -200,7 +218,7 @@ export default function TradingRoom() {
         </div>
 
         <div style={{ opacity: 0.7 }}>
-          Live Price: {price ?? "Loading..."}
+          Live Price: {price ? price.toLocaleString() : "Loading..."}
         </div>
 
         {/* CHART */}
@@ -238,6 +256,12 @@ export default function TradingRoom() {
         {/* TRADES */}
 
         <Panel title="Recent Trades" style={{ marginTop: 20 }}>
+          {trades.length === 0 && (
+            <div style={{ opacity: 0.6 }}>
+              No trades yet
+            </div>
+          )}
+
           {trades.map((t, i) => (
             <div key={i}>
               {t.side} {t.qty} @ {t.price}
@@ -257,8 +281,12 @@ export default function TradingRoom() {
 
         <h3>AI Engine</h3>
 
-        <div>Status: CONNECTED</div>
-        <div>Mode: Paper Trading</div>
+        <div>Status: {engineStatus}</div>
+        <div>Mode: {engineMode}</div>
+
+        <div style={{ marginTop: 20, opacity: 0.7 }}>
+          Live decision stream will appear here.
+        </div>
 
       </div>
 
