@@ -1,13 +1,9 @@
 /* =========================================================
-   AUTOSHIELD FRONTEND API LAYER — ENTERPRISE v14
-   CONTRACT COMPLETE • NO FLASH • SESSION SAFE
+   AUTOSHIELD FRONTEND API LAYER — ENTERPRISE v15 (QUIET)
+   QUIET • DECISION-BASED • NO AUTH THRASH • SESSION SAFE
 ========================================================= */
 
 const API_BASE = import.meta.env.VITE_API_BASE?.trim();
-
-if (!API_BASE) {
-  console.error("❌ VITE_API_BASE is missing");
-}
 
 const TOKEN_KEY = "as_token";
 const USER_KEY = "as_user";
@@ -20,9 +16,8 @@ export function getToken() {
 }
 
 export function setToken(token) {
-  token
-    ? localStorage.setItem(TOKEN_KEY, token)
-    : localStorage.removeItem(TOKEN_KEY);
+  if (token) localStorage.setItem(TOKEN_KEY, token);
+  else localStorage.removeItem(TOKEN_KEY);
 }
 
 export function clearToken() {
@@ -38,9 +33,8 @@ export function getSavedUser() {
 }
 
 export function saveUser(user) {
-  user
-    ? localStorage.setItem(USER_KEY, JSON.stringify(user))
-    : localStorage.removeItem(USER_KEY);
+  if (user) localStorage.setItem(USER_KEY, JSON.stringify(user));
+  else localStorage.removeItem(USER_KEY);
 }
 
 export function clearUser() {
@@ -50,7 +44,9 @@ export function clearUser() {
 /* ================= UTIL ================= */
 
 function joinUrl(base, path) {
-  return `${String(base).replace(/\/+$/, "")}${path.startsWith("/") ? path : `/${path}`}`;
+  return `${String(base).replace(/\/+$/, "")}${
+    path.startsWith("/") ? path : `/${path}`
+  }`;
 }
 
 async function fetchWithTimeout(url, options = {}, ms = REQUEST_TIMEOUT) {
@@ -73,8 +69,13 @@ function attachTenantHeader(headers) {
 
 /* ================= CORE REQUEST ================= */
 
-export async function req(path, { method = "GET", body, auth = true } = {}) {
-  if (!API_BASE) throw new Error("API base URL not configured");
+export async function req(
+  path,
+  { method = "GET", body, auth = true, silent = true } = {}
+) {
+  if (!API_BASE) {
+    return { error: "API base missing", silent: true };
+  }
 
   const headers = attachTenantHeader({
     "Content-Type": "application/json",
@@ -83,6 +84,10 @@ export async function req(path, { method = "GET", body, auth = true } = {}) {
   if (auth) {
     const token = getToken();
     if (token) headers.Authorization = `Bearer ${token}`;
+    else {
+      // 🔇 No token = no request, no noise
+      return { error: "No session", silent: true };
+    }
   }
 
   let res;
@@ -93,28 +98,34 @@ export async function req(path, { method = "GET", body, auth = true } = {}) {
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });
   } catch {
-    return { error: "Network unreachable" };
+    return { error: "Network unreachable", silent: true };
   }
 
-  let data = {};
+  let data = null;
   try {
     data = await res.json();
   } catch {}
 
+  // 🔇 QUIET 401 HANDLING (NO LOOPS, NO FLASH)
   if (res.status === 401 && auth) {
     clearToken();
     clearUser();
-    return { error: "Session expired", unauthorized: true };
+    return {
+      error: "Session expired",
+      unauthorized: true,
+      silent: true,
+    };
   }
 
   if (!res.ok) {
     return {
       error: data?.error || `Request failed (${res.status})`,
       status: res.status,
+      silent,
     };
   }
 
-  return data;
+  return data ?? {};
 }
 
 /* ================= API OBJECT ================= */
@@ -139,9 +150,17 @@ export const api = {
   },
 
   signup: (payload) =>
-    req("/api/auth/signup", { method: "POST", body: payload, auth: false }),
+    req("/api/auth/signup", {
+      method: "POST",
+      body: payload,
+      auth: false,
+    }),
 
-  refresh: () => req("/api/auth/refresh", { method: "POST" }),
+  refresh: () =>
+    req("/api/auth/refresh", {
+      method: "POST",
+      silent: true,
+    }),
 
   /* ================= USERS ================= */
 
@@ -156,9 +175,14 @@ export const api = {
 
   /* ================= SECURITY ================= */
 
-  postureSummary: () => req("/api/security/posture-summary"),
-  securityEvents: () => req("/api/security/events"),
-  vulnerabilities: () => req("/api/security/vulnerabilities"),
+  postureSummary: () =>
+    req("/api/security/posture-summary", { silent: true }),
+
+  securityEvents: () =>
+    req("/api/security/events", { silent: true }),
+
+  vulnerabilities: () =>
+    req("/api/security/vulnerabilities", { silent: true }),
 
   /* ================= SECURITY TOOLS ================= */
 
@@ -168,16 +192,17 @@ export const api = {
   uninstallSecurityTool: (id) =>
     req(`/api/security/tools/${id}/uninstall`, { method: "POST" }),
 
-  /* ================= ADMIN (FIXED) ================= */
+  /* ================= ADMIN ================= */
 
-  adminPlatformHealth: () => req("/api/admin/platform-health"),
+  adminPlatformHealth: () =>
+    req("/api/admin/platform-health", { silent: true }),
 
-  // REQUIRED by ExecutiveRiskBanner / Live Trading
-  adminExecutiveRisk: () => req("/api/admin/executive-risk"),
+  adminExecutiveRisk: () =>
+    req("/api/admin/executive-risk", { silent: true }),
 
   adminPostureSummary: () =>
-    req("/api/admin/security/posture-summary"),
+    req("/api/admin/security/posture-summary", { silent: true }),
 
   adminSecurityFeed: () =>
-    req("/api/admin/security/feed"),
+    req("/api/admin/security/feed", { silent: true }),
 };
