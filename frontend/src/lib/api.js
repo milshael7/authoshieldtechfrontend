@@ -1,9 +1,12 @@
 /* =========================================================
-   AUTOSHIELD FRONTEND API LAYER — ENTERPRISE v15 (QUIET)
-   QUIET • DECISION-BASED • NO AUTH THRASH • SESSION SAFE
+   AUTOSHIELD FRONTEND API LAYER — ENTERPRISE v19 (SEALED)
+   SINGLE SOURCE OF TRUTH FOR ALL API CALLS
+   QUIET • TENANT-AWARE • SESSION-SAFE • PLATFORM-STABLE
 ========================================================= */
 
 const API_BASE = import.meta.env.VITE_API_BASE?.trim();
+
+/* ================= CONFIG ================= */
 
 const TOKEN_KEY = "as_token";
 const USER_KEY = "as_user";
@@ -63,7 +66,9 @@ async function fetchWithTimeout(url, options = {}, ms = REQUEST_TIMEOUT) {
 
 function attachTenantHeader(headers) {
   const user = getSavedUser();
-  if (user?.companyId) headers["x-company-id"] = user.companyId;
+  if (user?.companyId) {
+    headers["x-company-id"] = String(user.companyId);
+  }
   return headers;
 }
 
@@ -71,23 +76,29 @@ function attachTenantHeader(headers) {
 
 export async function req(
   path,
-  { method = "GET", body, auth = true, silent = true } = {}
+  {
+    method = "GET",
+    body,
+    auth = true,
+    silent = true,
+    headers: extraHeaders = {},
+  } = {}
 ) {
   if (!API_BASE) {
-    return { error: "API base missing", silent: true };
+    return { ok: false, error: "API base missing", silent: true };
   }
 
   const headers = attachTenantHeader({
     "Content-Type": "application/json",
+    ...extraHeaders,
   });
 
   if (auth) {
     const token = getToken();
-    if (token) headers.Authorization = `Bearer ${token}`;
-    else {
-      // 🔇 No token = no request, no noise
-      return { error: "No session", silent: true };
+    if (!token) {
+      return { ok: false, error: "No session", silent: true };
     }
+    headers.Authorization = `Bearer ${token}`;
   }
 
   let res;
@@ -98,7 +109,7 @@ export async function req(
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });
   } catch {
-    return { error: "Network unreachable", silent: true };
+    return { ok: false, error: "Network unreachable", silent: true };
   }
 
   let data = null;
@@ -106,11 +117,12 @@ export async function req(
     data = await res.json();
   } catch {}
 
-  // 🔇 QUIET 401 HANDLING (NO LOOPS, NO FLASH)
+  // 🔇 QUIET AUTH HANDLING
   if (res.status === 401 && auth) {
     clearToken();
     clearUser();
     return {
+      ok: false,
       error: "Session expired",
       unauthorized: true,
       silent: true,
@@ -119,22 +131,27 @@ export async function req(
 
   if (!res.ok) {
     return {
+      ok: false,
       error: data?.error || `Request failed (${res.status})`,
       status: res.status,
       silent,
     };
   }
 
-  return data ?? {};
+  return data ?? { ok: true };
 }
 
-/* ================= API OBJECT ================= */
+/* =========================================================
+   API SURFACE — EVERYTHING LIVES HERE
+========================================================= */
 
 export const api = {
   /* ================= AUTH ================= */
 
   login: async (email, password) => {
-    const res = await fetch(`${API_BASE}/api/auth/login`, {
+    if (!API_BASE) throw new Error("API base missing");
+
+    const res = await fetch(joinUrl(API_BASE, "/api/auth/login"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
@@ -162,10 +179,25 @@ export const api = {
       silent: true,
     }),
 
+  logout: () =>
+    req("/api/auth/logout", {
+      method: "POST",
+      silent: true,
+    }),
+
   /* ================= USERS ================= */
 
   listUsers: () => req("/api/users"),
   getUser: (id) => req(`/api/users/${id}`),
+  updateUser: (id, payload) =>
+    req(`/api/users/${id}`, { method: "PUT", body: payload }),
+
+  /* ================= COMPANY ================= */
+
+  listCompanies: () => req("/api/company"),
+  getCompany: (id) => req(`/api/company/${id}`),
+  updateCompany: (id, payload) =>
+    req(`/api/company/${id}`, { method: "PUT", body: payload }),
 
   /* ================= INCIDENTS ================= */
 
@@ -184,6 +216,12 @@ export const api = {
   vulnerabilities: () =>
     req("/api/security/vulnerabilities", { silent: true }),
 
+  enforceZeroTrust: (companyId, payload) =>
+    req(`/api/security/enforce/${companyId}`, {
+      method: "POST",
+      body: payload,
+    }),
+
   /* ================= SECURITY TOOLS ================= */
 
   securityTools: () => req("/api/security/tools"),
@@ -191,6 +229,36 @@ export const api = {
     req(`/api/security/tools/${id}/install`, { method: "POST" }),
   uninstallSecurityTool: (id) =>
     req(`/api/security/tools/${id}/uninstall`, { method: "POST" }),
+
+  /* ================= MARKET ================= */
+
+  marketPrice: (symbol) =>
+    req(`/api/market/price?symbol=${encodeURIComponent(symbol)}`),
+
+  marketCandles: (symbol, limit = 200) =>
+    req(
+      `/api/market/candles?symbol=${encodeURIComponent(
+        symbol
+      )}&limit=${limit}`
+    ),
+
+  /* ================= PAPER TRADING ================= */
+
+  paperAccount: () => req("/api/paper/account"),
+  paperPositions: () => req("/api/paper/positions"),
+  paperOrders: () => req("/api/paper/orders"),
+  placePaperOrder: (payload) =>
+    req("/api/paper/orders", { method: "POST", body: payload }),
+
+  /* ================= SOC ================= */
+
+  socFeed: () => req("/api/soc/feed", { silent: true }),
+
+  /* ================= BILLING ================= */
+
+  billingStatus: () => req("/api/billing/status"),
+  billingPortal: () =>
+    req("/api/billing/portal", { method: "POST" }),
 
   /* ================= ADMIN ================= */
 
@@ -205,4 +273,7 @@ export const api = {
 
   adminSecurityFeed: () =>
     req("/api/admin/security/feed", { silent: true }),
+
+  adminAIDecisions: () =>
+    req("/api/admin/ai-decisions", { silent: true }),
 };
