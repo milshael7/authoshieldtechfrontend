@@ -6,7 +6,7 @@
 // ======================================================
 
 import React from "react";
-import User from "./User.jsx";
+import User from "./User";
 
 export default function UserIndex() {
   return <User />;
