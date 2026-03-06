@@ -227,7 +227,7 @@ export default function AuthoDevPanel({
               <div
                 style={{
                   display: "flex",
-                  gap: 3,          // ✅ EXACT GAP REQUESTED
+                  gap: 1,          // ✅ EXACT GAP REQUESTED
                   marginTop: 6,
                   opacity: 0.75,
                 }}
