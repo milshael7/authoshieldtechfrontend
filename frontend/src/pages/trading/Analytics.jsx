@@ -1,6 +1,6 @@
 // frontend/src/pages/trading/Analytics.jsx
 // ============================================================
-// ANALYTICS ROOM — REAL TRADING PERFORMANCE DASHBOARD
+// ANALYTICS ROOM — INSTITUTIONAL AI PERFORMANCE DASHBOARD
 // ============================================================
 
 import React, { useEffect, useState } from "react";
@@ -16,13 +16,17 @@ export default function Analytics() {
     winRate: 0,
     trades: 0,
     pnl: 0,
-    drawdown: 0
+    drawdown: 0,
+    sharpe: 0,
+    profitFactor: 0,
+    avgWin: 0,
+    avgLoss: 0,
+    largestWin: 0,
+    largestLoss: 0
   });
 
   const [equityHistory, setEquityHistory] = useState([]);
   const [tradeLog, setTradeLog] = useState([]);
-
-  /* ================= LOAD DATA ================= */
 
   useEffect(() => {
     loadAnalytics();
@@ -37,49 +41,105 @@ export default function Analytics() {
       });
 
       const data = await res.json();
-
       if (!data?.ok) return;
 
       const snap = data.snapshot;
-
       const trades = snap.trades || [];
 
-      const wins = trades.filter(t => t.profit > 0).length;
-      const losses = trades.filter(t => t.profit <= 0).length;
+      const wins = trades.filter(t => t.profit > 0);
+      const losses = trades.filter(t => t.profit <= 0);
 
-      const winRate = trades.length
-        ? (wins / trades.length) * 100
-        : 0;
+      const winRate =
+        trades.length ? (wins.length / trades.length) * 100 : 0;
 
-      const pnl = trades.reduce((sum,t)=>sum+(t.profit||0),0);
+      const pnl =
+        trades.reduce((sum,t)=>sum+(t.profit||0),0);
 
-      setStats({
-        equity: snap.equity,
-        winRate: winRate.toFixed(1),
-        trades: trades.length,
-        pnl: pnl.toFixed(2),
-        drawdown: snap.drawdown || 0
-      });
+      /* ================= PROFIT METRICS ================= */
 
-      setTradeLog(trades.slice(-20).reverse());
+      const grossProfit =
+        wins.reduce((s,t)=>s+t.profit,0);
 
-      /* BUILD EQUITY CURVE */
+      const grossLoss =
+        losses.reduce((s,t)=>s+Math.abs(t.profit||0),0);
+
+      const profitFactor =
+        grossLoss ? grossProfit / grossLoss : 0;
+
+      const avgWin =
+        wins.length ? grossProfit / wins.length : 0;
+
+      const avgLoss =
+        losses.length ? grossLoss / losses.length : 0;
+
+      const largestWin =
+        Math.max(...wins.map(t=>t.profit),0);
+
+      const largestLoss =
+        Math.min(...losses.map(t=>t.profit),0);
+
+      /* ================= SHARPE ================= */
+
+      const returns = trades.map(t => t.profit || 0);
+
+      const avgReturn =
+        returns.reduce((a,b)=>a+b,0) /
+        (returns.length || 1);
+
+      const variance =
+        returns.reduce(
+          (sum,r)=>sum+Math.pow(r-avgReturn,2),
+          0
+        ) / (returns.length || 1);
+
+      const std = Math.sqrt(variance);
+
+      const sharpe =
+        std ? avgReturn / std : 0;
+
+      /* ================= EQUITY CURVE ================= */
 
       let equity = 10000;
+      let peak = equity;
+      let maxDD = 0;
+
       const curve = [];
 
       trades.forEach(t => {
+
         equity += t.profit || 0;
+
+        peak = Math.max(peak, equity);
+
+        const dd = (peak - equity) / peak;
+
+        maxDD = Math.max(maxDD, dd);
+
         curve.push(equity);
+
       });
+
+      setStats({
+        equity: snap.equity.toFixed(2),
+        winRate: winRate.toFixed(1),
+        trades: trades.length,
+        pnl: pnl.toFixed(2),
+        drawdown: (maxDD * 100).toFixed(2),
+        sharpe: sharpe.toFixed(2),
+        profitFactor: profitFactor.toFixed(2),
+        avgWin: avgWin.toFixed(2),
+        avgLoss: avgLoss.toFixed(2),
+        largestWin: largestWin.toFixed(2),
+        largestLoss: largestLoss.toFixed(2)
+      });
+
+      setTradeLog(trades.slice(-20).reverse());
 
       setEquityHistory(curve);
 
     } catch {}
 
   }
-
-  /* ================= UI ================= */
 
   return (
 
@@ -89,42 +149,33 @@ export default function Analytics() {
         AI Trading Analytics
       </h2>
 
-      {/* METRICS */}
+      {/* ================= METRICS ================= */}
 
       <div style={{
         display:"flex",
         gap:20,
-        marginBottom:30
+        marginBottom:30,
+        flexWrap:"wrap"
       }}>
 
-        <Metric
-          title="Equity"
-          value={`$${stats.equity}`}
-        />
+        <Metric title="Equity" value={`$${stats.equity}`} />
+        <Metric title="Win Rate" value={`${stats.winRate}%`} />
+        <Metric title="Trades" value={stats.trades} />
+        <Metric title="PnL" value={`$${stats.pnl}`} />
+        <Metric title="Max Drawdown" value={`${stats.drawdown}%`} />
 
-        <Metric
-          title="Win Rate"
-          value={`${stats.winRate}%`}
-        />
+        <Metric title="Sharpe Ratio" value={stats.sharpe} />
+        <Metric title="Profit Factor" value={stats.profitFactor} />
 
-        <Metric
-          title="Trades"
-          value={stats.trades}
-        />
+        <Metric title="Avg Win" value={`$${stats.avgWin}`} />
+        <Metric title="Avg Loss" value={`$${stats.avgLoss}`} />
 
-        <Metric
-          title="PnL"
-          value={`$${stats.pnl}`}
-        />
-
-        <Metric
-          title="Drawdown"
-          value={`${stats.drawdown}%`}
-        />
+        <Metric title="Largest Win" value={`$${stats.largestWin}`} />
+        <Metric title="Largest Loss" value={`$${stats.largestLoss}`} />
 
       </div>
 
-      {/* EQUITY CURVE */}
+      {/* ================= EQUITY CURVE ================= */}
 
       <Panel title="Equity Curve">
 
@@ -134,7 +185,7 @@ export default function Analytics() {
 
       </Panel>
 
-      {/* TRADE LOG */}
+      {/* ================= TRADE LOG ================= */}
 
       <Panel
         title="Recent Trades"
@@ -155,6 +206,7 @@ export default function Analytics() {
             <span>{t.side}</span>
             <span>{t.qty}</span>
             <span>@ {t.price}</span>
+
             <span style={{
               color:t.profit>0?"#22c55e":"#ef4444"
             }}>
@@ -172,7 +224,7 @@ export default function Analytics() {
 
 }
 
-/* ================= METRIC COMPONENT ================= */
+/* ================= METRIC ================= */
 
 function Metric({title,value}){
 
@@ -228,7 +280,7 @@ function Panel({title,children,style={}}){
 
 }
 
-/* ================= AUTH HEADER ================= */
+/* ================= AUTH ================= */
 
 function authHeader(){
 
