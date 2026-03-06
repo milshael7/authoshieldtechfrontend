@@ -1,57 +1,78 @@
 // frontend/src/core/BrainAdapter.jsx
 // ==========================================================
-// AI BRAIN ADAPTER
-// Connects backend AI brain → AI Decision Bus
+// AI BRAIN ADAPTER — QUIET MODE v16
+// PASSIVE • DEDUPED • AUTH-AWARE
+// NO SELF-NOISE • NO REPLAY STORMS
 // ==========================================================
 
-import { useEffect } from "react";
-import { api } from "../lib/api.js";
+import { useEffect, useRef } from "react";
+import { api, getToken } from "../lib/api.js";
 import { useAIDecision } from "./AIDecisionBus.jsx";
 
-export default function BrainAdapter() {
+const POLL_INTERVAL = 30000; // 30s — slower, quieter
+const MAX_CACHE = 100; // prevent memory growth
 
+export default function BrainAdapter() {
   const ai = useAIDecision();
 
+  const seenRef = useRef(new Set());
+  const intervalRef = useRef(null);
+  const mountedRef = useRef(true);
+
   useEffect(() => {
+    mountedRef.current = true;
 
     async function loadDecisions() {
+      // 🔇 QUIET RULE: no auth, no brain
+      if (!getToken()) return;
 
       try {
+        const res = await api.req("/api/admin/ai-decisions?limit=10");
 
-        const res = await api.get("/api/admin/ai-decisions?limit=10");
+        if (!mountedRef.current) return;
+        if (!Array.isArray(res?.decisions)) return;
 
-        if (!res?.decisions) return;
+        for (const decision of res.decisions) {
+          const id =
+            decision.id ||
+            `${decision.type}:${decision.ts || decision.createdAt}`;
 
-        res.decisions.forEach(decision => {
+          if (seenRef.current.has(id)) continue;
+
+          seenRef.current.add(id);
+
+          // prevent unbounded growth
+          if (seenRef.current.size > MAX_CACHE) {
+            seenRef.current = new Set(
+              Array.from(seenRef.current).slice(-MAX_CACHE)
+            );
+          }
 
           const type = String(decision.type || "").toLowerCase();
 
           if (type.includes("trade")) {
             ai.tradeSignal(decision);
-          }
-
-          else if (type.includes("threat")) {
+          } else if (type.includes("threat")) {
             ai.threatDetected(decision);
-          }
-
-          else if (type.includes("risk")) {
+          } else if (type.includes("risk")) {
             ai.riskEscalation(decision);
           }
-
-        });
-
-      } catch {}
-
+        }
+      } catch {
+        // 🔕 silent by design
+      }
     }
 
+    // initial passive sync
     loadDecisions();
 
-    const interval = setInterval(loadDecisions, 20000);
+    intervalRef.current = setInterval(loadDecisions, POLL_INTERVAL);
 
-    return () => clearInterval(interval);
-
+    return () => {
+      mountedRef.current = false;
+      clearInterval(intervalRef.current);
+    };
   }, [ai]);
 
   return null;
-
 }
