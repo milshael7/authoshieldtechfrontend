@@ -41,13 +41,13 @@ export default function SmallCompanyOverview() {
     setErr("");
 
     try {
-      const [posture, notifications] = await Promise.all([
+      const [posture, events] = await Promise.all([
         api.postureSummary(),
-        api.companyNotifications?.() || Promise.resolve([]),
+        api.securityEvents?.() || Promise.resolve([]),
       ]);
 
       setSummary(posture || null);
-      setNotes(safeArray(notifications));
+      setNotes(safeArray(events));
 
     } catch (e) {
       setErr(e?.message || "Failed to load small company workspace");
