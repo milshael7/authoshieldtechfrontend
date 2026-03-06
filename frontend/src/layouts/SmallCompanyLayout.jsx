@@ -38,6 +38,9 @@ export default function SmallCompanyLayout() {
   const DRAWER_OPEN_W = 360;
   const drawerWidth = advisorOpen ? DRAWER_OPEN_W : 0;
 
+  const navClass = ({ isActive }) =>
+    isActive ? "nav-link active" : "nav-link";
+
   return (
     <div
       className={`layout-root enterprise ${menuOpen ? "sidebar-open" : ""}`}
@@ -58,24 +61,16 @@ export default function SmallCompanyLayout() {
         </div>
 
         <nav className="layout-nav">
-          <NavLink to="." end onClick={closeMenu}>
+          <NavLink to="." end className={navClass} onClick={closeMenu}>
             Security Overview
           </NavLink>
 
-          <NavLink to="assets" onClick={closeMenu}>
+          <NavLink to="assets" className={navClass} onClick={closeMenu}>
             Asset Inventory
           </NavLink>
 
-          <NavLink to="threats" onClick={closeMenu}>
-            Threat Monitoring
-          </NavLink>
-
-          <NavLink to="incidents" onClick={closeMenu}>
+          <NavLink to="incidents" className={navClass} onClick={closeMenu}>
             Incident Tracking
-          </NavLink>
-
-          <NavLink to="reports" onClick={closeMenu}>
-            Basic Reports
           </NavLink>
 
           <hr style={{ opacity: 0.2 }} />
@@ -134,15 +129,13 @@ export default function SmallCompanyLayout() {
         <div
           className="advisor-rail"
           style={{ right: advisorOpen ? DRAWER_OPEN_W : 0 }}
-          onClick={() => setAdvisorOpen(v => !v)}
+          onClick={() => setAdvisorOpen((v) => !v)}
         >
           <div className="advisor-rail-arrow">
             {advisorOpen ? "▶" : "◀"}
           </div>
 
-          <div className="advisor-rail-text">
-            ADVISOR
-          </div>
+          <div className="advisor-rail-text">ADVISOR</div>
 
           <div className="advisor-rail-arrow">
             {advisorOpen ? "▶" : "◀"}
