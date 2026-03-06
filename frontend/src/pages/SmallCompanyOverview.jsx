@@ -1,12 +1,14 @@
 // frontend/src/pages/SmallCompanyOverview.jsx
-// Small Company Workspace — Limited Organizational Tier
+// ======================================================
+// SMALL COMPANY WORKSPACE — LIMITED ORGANIZATIONAL TIER
 // Scoped to assigned organization
 // No compliance engine
-// No advanced governance controls
+// No advanced governance
 // Clear upgrade path to full Company
+// ======================================================
 
 import React, { useEffect, useMemo, useState } from "react";
-import { api } from "../lib/api";
+import { api } from "../lib/api.js";
 import NotificationList from "../components/NotificationList.jsx";
 import PosturePanel from "../components/PosturePanel.jsx";
 import { useCompany } from "../context/CompanyContext";
@@ -26,7 +28,6 @@ function pct(n) {
 /* ================= PAGE ================= */
 
 export default function SmallCompanyOverview() {
-
   const { company } = useCompany();
 
   const [summary, setSummary] = useState(null);
@@ -40,13 +41,13 @@ export default function SmallCompanyOverview() {
     setErr("");
 
     try {
-      const [s, n] = await Promise.all([
+      const [posture, events] = await Promise.all([
         api.postureSummary(),
-        api.companyNotifications?.() || Promise.resolve([])
+        api.securityEvents?.() || Promise.resolve([]),
       ]);
 
-      setSummary(s || null);
-      setNotes(safeArray(n));
+      setSummary(posture || null);
+      setNotes(safeArray(events?.events || events));
 
     } catch (e) {
       setErr(e?.message || "Failed to load small company workspace");
@@ -65,23 +66,28 @@ export default function SmallCompanyOverview() {
     // eslint-disable-next-line
   }, []);
 
+  /* ================= DERIVED ================= */
+
   const score = useMemo(
-    () => pct(summary?.score ?? 72),
+    () => pct(summary?.score ?? 0),
     [summary]
   );
 
-  const kpis = useMemo(() => [
-    { label: "Employees", value: summary?.users ?? 5 },
-    { label: "Devices", value: summary?.devices ?? 6 },
-    { label: "Assets", value: summary?.assets ?? 10 },
-    { label: "Active Alerts", value: summary?.alerts ?? notes.length }
-  ], [summary, notes]);
+  const kpis = useMemo(
+    () => [
+      { label: "Incidents", value: summary?.incidents ?? 0 },
+      { label: "Critical Alerts", value: summary?.criticalAlerts ?? 0 },
+      { label: "Domains Covered", value: summary?.domains?.length ?? 0 },
+      { label: "Notifications", value: notes.length },
+    ],
+    [summary, notes]
+  );
 
   const limits = [
-    "Up to 5 employees",
+    "Up to 5 users",
     "No compliance frameworks",
-    "No internal policy management",
-    "Manual security operations only"
+    "No internal policy engine",
+    "Manual incident response only",
   ];
 
   /* ================= UI ================= */
@@ -144,7 +150,7 @@ export default function SmallCompanyOverview() {
             style={{
               height: 6,
               background: "rgba(255,255,255,0.08)",
-              borderRadius: 999
+              borderRadius: 999,
             }}
           >
             <div
@@ -152,26 +158,24 @@ export default function SmallCompanyOverview() {
                 width: `${score}%`,
                 height: "100%",
                 borderRadius: 999,
-                background: "#5EC6FF"
+                background: "#5EC6FF",
               }}
             />
           </div>
         </div>
 
-        <div style={{
-          marginTop: 20,
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit,minmax(140px,1fr))",
-          gap: 16
-        }}>
-          {kpis.map(k => (
+        <div
+          style={{
+            marginTop: 20,
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit,minmax(140px,1fr))",
+            gap: 16,
+          }}
+        >
+          {kpis.map((k) => (
             <div key={k.label}>
-              <div style={{ fontSize: 12, opacity: 0.6 }}>
-                {k.label}
-              </div>
-              <div style={{ fontSize: 20, fontWeight: 700 }}>
-                {k.value}
-              </div>
+              <div style={{ fontSize: 12, opacity: 0.6 }}>{k.label}</div>
+              <div style={{ fontSize: 20, fontWeight: 700 }}>{k.value}</div>
             </div>
           ))}
         </div>
@@ -182,7 +186,7 @@ export default function SmallCompanyOverview() {
         <h3>Current Plan Limits</h3>
 
         <ul style={{ marginTop: 12 }}>
-          {limits.map(l => (
+          {limits.map((l) => (
             <li key={l} style={{ marginBottom: 8 }}>
               {l}
             </li>
@@ -208,8 +212,8 @@ export default function SmallCompanyOverview() {
         <h3>Upgrade to Full Company</h3>
 
         <div style={{ opacity: 0.7, fontSize: 13 }}>
-          Unlock compliance modules, unlimited employees,
-          advanced reporting, and governance automation.
+          Unlock compliance modules, unlimited users, advanced reporting,
+          and automated governance controls.
         </div>
 
         <button style={{ marginTop: 18 }}>
