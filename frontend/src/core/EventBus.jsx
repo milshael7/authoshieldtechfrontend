@@ -1,54 +1,91 @@
 // frontend/src/core/EventBus.jsx
 // ======================================================
-// GLOBAL PLATFORM EVENT BUS
-// Real-time internal platform messaging system
+// GLOBAL PLATFORM EVENT BUS — QUIET MODE v16
+// SIGNAL-SAFE • NO EVENT STORMS • NO SELF-ECHO
+// THREAT-DRIVEN • ENTERPRISE STABLE
 // ======================================================
 
-import { createContext, useContext, useRef } from "react";
+import { createContext, useContext, useRef, useCallback } from "react";
 
 const EventBusContext = createContext(null);
 
+/* ================= CONFIG ================= */
+
+// hard cap to prevent listener explosions
+const MAX_LISTENERS_PER_EVENT = 25;
+
+// events that are allowed to repeat rapidly (whitelist)
+const HIGH_FREQ_EVENTS = new Set([
+  "security_ws_connected",
+  "security_ws_disconnected",
+]);
+
+/* ================= PROVIDER ================= */
+
 export function EventBusProvider({ children }) {
-
   const listenersRef = useRef({});
+  const lastEmitRef = useRef({}); // event → timestamp
 
-  function emit(event, payload) {
+  /* ================= EMIT ================= */
 
+  const emit = useCallback((event, payload) => {
     const listeners = listenersRef.current[event];
+    if (!listeners || listeners.length === 0) return;
 
-    if (!listeners) return;
+    const now = Date.now();
+    const last = lastEmitRef.current[event] || 0;
 
-    listeners.forEach((callback) => {
+    // 🔇 Quiet guard: block rapid self-noise unless whitelisted
+    if (!HIGH_FREQ_EVENTS.has(event) && now - last < 50) {
+      return;
+    }
+
+    lastEmitRef.current[event] = now;
+
+    // snapshot to prevent mutation during emit
+    [...listeners].forEach((callback) => {
       try {
         callback(payload);
-      } catch {}
+      } catch {
+        // silent by design
+      }
     });
+  }, []);
 
-  }
+  /* ================= ON ================= */
 
-  function on(event, callback) {
-
+  const on = useCallback((event, callback) => {
     if (!listenersRef.current[event]) {
       listenersRef.current[event] = [];
     }
 
-    listenersRef.current[event].push(callback);
+    const list = listenersRef.current[event];
+
+    // 🔇 prevent runaway listener growth
+    if (list.length >= MAX_LISTENERS_PER_EVENT) {
+      return () => {};
+    }
+
+    list.push(callback);
 
     return () => {
       listenersRef.current[event] =
         listenersRef.current[event].filter((cb) => cb !== callback);
     };
+  }, []);
 
-  }
+  /* ================= ONCE ================= */
 
-  function once(event, callback) {
-
+  const once = useCallback((event, callback) => {
     const unsubscribe = on(event, (payload) => {
       unsubscribe();
-      callback(payload);
+      try {
+        callback(payload);
+      } catch {
+        /* silent */
+      }
     });
-
-  }
+  }, [on]);
 
   const bus = {
     emit,
@@ -61,17 +98,14 @@ export function EventBusProvider({ children }) {
       {children}
     </EventBusContext.Provider>
   );
-
 }
 
+/* ================= HOOK ================= */
+
 export function useEventBus() {
-
   const ctx = useContext(EventBusContext);
-
   if (!ctx) {
     throw new Error("useEventBus must be used inside EventBusProvider");
   }
-
   return ctx;
-
 }
