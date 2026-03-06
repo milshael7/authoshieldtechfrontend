@@ -1,7 +1,6 @@
-// frontend/src/pages/trading/Analytics.jsx
 // ============================================================
 // ANALYTICS ROOM — INSTITUTIONAL AI PERFORMANCE DASHBOARD
-// Now includes Portfolio Allocation
+// Equity Curve • Risk Metrics • Portfolio Allocation
 // ============================================================
 
 import React, { useEffect, useState } from "react";
@@ -11,31 +10,42 @@ import PortfolioAllocation from "../../components/PortfolioAllocation.jsx";
 
 const API_BASE = import.meta.env.VITE_API_BASE?.replace(/\/+$/, "");
 
-export default function Analytics() {
+export default function Analytics(){
 
-  const [stats, setStats] = useState({});
-  const [equityHistory, setEquityHistory] = useState([]);
-  const [tradeLog, setTradeLog] = useState([]);
-  const [behavior, setBehavior] = useState({
+  const [stats,setStats] = useState({});
+  const [equityHistory,setEquityHistory] = useState([]);
+  const [tradeLog,setTradeLog] = useState([]);
+
+  const [behavior,setBehavior] = useState({
     buy:0,
     sell:0,
     accuracy:0
   });
 
-  useEffect(()=>{ loadAnalytics(); },[]);
+  const [risk,setRisk] = useState({
+    exposure:0,
+    avgTrade:0
+  });
+
+  useEffect(()=>{
+    loadAnalytics();
+    const loop=setInterval(loadAnalytics,6000);
+    return ()=>clearInterval(loop);
+  },[]);
 
   async function loadAnalytics(){
 
     try{
 
-      const res = await fetch(`${API_BASE}/api/paper/status`,{
-        headers:authHeader()
-      });
+      const res = await fetch(
+        `${API_BASE}/api/paper/snapshot`,
+        {headers:authHeader()}
+      );
 
       const data = await res.json();
       if(!data?.ok) return;
 
-      const snap = data.snapshot;
+      const snap = data.snapshot || {};
       const trades = snap.trades || [];
 
       const wins = trades.filter(t=>t.profit>0);
@@ -48,7 +58,7 @@ export default function Analytics() {
         trades.reduce((s,t)=>s+(t.profit||0),0);
 
       const grossProfit =
-        wins.reduce((s,t)=>s+t.profit,0);
+        wins.reduce((s,t)=>s+(t.profit||0),0);
 
       const grossLoss =
         losses.reduce((s,t)=>s+Math.abs(t.profit||0),0);
@@ -67,7 +77,7 @@ export default function Analytics() {
       const sharpe =
         variance ? avg/Math.sqrt(variance) : 0;
 
-      /* EQUITY CURVE */
+      /* ================= EQUITY CURVE ================= */
 
       let equity = 10000;
       let peak = equity;
@@ -90,19 +100,24 @@ export default function Analytics() {
       });
 
       setEquityHistory(curve);
-      setTradeLog(trades.slice(-20).reverse());
+
+      setTradeLog(
+        trades.slice(-20).reverse()
+      );
 
       setStats({
-        equity:snap.equity?.toFixed(2),
+
+        equity:Number(snap.equity||0).toFixed(2),
         winRate:winRate.toFixed(1),
         trades:trades.length,
         pnl:pnl.toFixed(2),
         drawdown:(maxDD*100).toFixed(2),
         sharpe:sharpe.toFixed(2),
         profitFactor:profitFactor.toFixed(2)
+
       });
 
-      /* AI BEHAVIOR */
+      /* ================= AI BEHAVIOR ================= */
 
       let buy=0;
       let sell=0;
@@ -116,6 +131,27 @@ export default function Analytics() {
         buy,
         sell,
         accuracy:winRate.toFixed(1)
+      });
+
+      /* ================= RISK ================= */
+
+      const exposure =
+        snap.position
+          ? Math.abs(
+              snap.position.qty *
+              snap.lastPrice
+            )
+          : 0;
+
+      const avgTrade =
+        trades.length
+          ? trades.reduce((s,t)=>s+Math.abs(t.profit||0),0)
+            / trades.length
+          : 0;
+
+      setRisk({
+        exposure:exposure.toFixed(2),
+        avgTrade:avgTrade.toFixed(2)
       });
 
     }catch{}
@@ -149,9 +185,18 @@ export default function Analytics() {
 
       </div>
 
+      {/* RISK */}
+
+      <Panel title="Risk Metrics">
+
+        <div>Exposure: ${risk.exposure}</div>
+        <div>Avg Trade: ${risk.avgTrade}</div>
+
+      </Panel>
+
       {/* EQUITY CURVE */}
 
-      <Panel title="Equity Curve">
+      <Panel title="Equity Curve" style={{marginTop:30}}>
 
         <EquityCurve
           scalpHistory={equityHistory}
@@ -193,7 +238,7 @@ export default function Analytics() {
 
       </Panel>
 
-      {/* PORTFOLIO ALLOCATION */}
+      {/* PORTFOLIO */}
 
       <Panel
         title="Portfolio Allocation"
@@ -232,7 +277,7 @@ export default function Analytics() {
             <span style={{
               color:t.profit>0?"#22c55e":"#ef4444"
             }}>
-              {t.profit?.toFixed(2)}
+              {Number(t.profit||0).toFixed(2)}
             </span>
 
           </div>
@@ -243,7 +288,7 @@ export default function Analytics() {
 
     </div>
 
-  )
+  );
 
 }
 
@@ -273,7 +318,7 @@ function Metric({title,value}){
 
     </div>
 
-  )
+  );
 
 }
 
@@ -299,7 +344,7 @@ function Panel({title,children,style={}}){
 
     </div>
 
-  )
+  );
 
 }
 
@@ -310,7 +355,7 @@ function authHeader(){
   const token = getToken();
 
   return token
-    ? { Authorization:`Bearer ${token}` }
+    ? {Authorization:`Bearer ${token}`}
     : {};
 
 }
