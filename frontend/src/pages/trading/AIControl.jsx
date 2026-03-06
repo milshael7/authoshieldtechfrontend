@@ -1,6 +1,6 @@
 // frontend/src/pages/trading/AIControl.jsx
 // ============================================================
-// AI CONTROL ROOM — CONNECTED TO BACKEND ENGINE
+// AI CONTROL ROOM — LIVE / PAPER KILL SWITCH + ENGINE CONFIG
 // ============================================================
 
 import React, { useEffect, useState } from "react";
@@ -12,11 +12,14 @@ export default function AIControl() {
 
   const [enabled, setEnabled] = useState(true);
   const [tradingMode, setTradingMode] = useState("paper");
+
   const [maxTrades, setMaxTrades] = useState(5);
   const [riskPercent, setRiskPercent] = useState(1.5);
   const [positionMultiplier, setPositionMultiplier] = useState(1);
   const [aggressiveness, setAggressiveness] = useState("Balanced");
+
   const [saving, setSaving] = useState(false);
+  const [statusMsg, setStatusMsg] = useState("");
 
   /* ================= LOAD CONFIG ================= */
 
@@ -33,17 +36,16 @@ export default function AIControl() {
       });
 
       const data = await res.json();
-
       if (!data?.ok) return;
 
-      const cfg = data.config;
+      const cfg = data.config || {};
 
       setEnabled(cfg.enabled);
       setTradingMode(cfg.tradingMode || "paper");
-      setMaxTrades(cfg.maxTrades);
-      setRiskPercent(cfg.riskPercent);
-      setPositionMultiplier(cfg.positionMultiplier);
-      setAggressiveness(cfg.strategyMode);
+      setMaxTrades(cfg.maxTrades || 5);
+      setRiskPercent(cfg.riskPercent || 1.5);
+      setPositionMultiplier(cfg.positionMultiplier || 1);
+      setAggressiveness(cfg.strategyMode || "Balanced");
 
     } catch {}
 
@@ -54,10 +56,11 @@ export default function AIControl() {
   async function saveConfig() {
 
     setSaving(true);
+    setStatusMsg("");
 
     try {
 
-      await fetch(`${API_BASE}/api/ai/config`, {
+      const res = await fetch(`${API_BASE}/api/ai/config`, {
 
         method: "POST",
 
@@ -79,9 +82,37 @@ export default function AIControl() {
 
       });
 
-    } catch {}
+      const data = await res.json();
+
+      if (data?.ok === false) {
+        setStatusMsg("Configuration rejected by server");
+      } else {
+        setStatusMsg("Configuration saved");
+      }
+
+    } catch {
+
+      setStatusMsg("Connection error");
+
+    }
 
     setSaving(false);
+
+  }
+
+  /* ================= MODE SWITCH ================= */
+
+  function switchMode(mode) {
+
+    if (mode === tradingMode) return;
+
+    setTradingMode(mode);
+
+    if (mode === "live") {
+      setStatusMsg("⚠ LIVE TRADING ENABLED");
+    } else {
+      setStatusMsg("Paper trading mode");
+    }
 
   }
 
@@ -127,14 +158,14 @@ export default function AIControl() {
         </div>
 
 
-        {/* TRADING MODE SWITCH */}
+        {/* ================= TRADING MODE ================= */}
 
         <div style={{ marginBottom: 20 }}>
 
           <label>Trading Mode:</label>
 
           <button
-            onClick={() => setTradingMode("paper")}
+            onClick={() => switchMode("paper")}
             style={{
               marginLeft: 15,
               padding: "6px 14px",
@@ -143,14 +174,15 @@ export default function AIControl() {
                 : "#374151",
               color: "#fff",
               border: "none",
-              borderRadius: 6
+              borderRadius: 6,
+              cursor: "pointer"
             }}
           >
             PAPER
           </button>
 
           <button
-            onClick={() => setTradingMode("live")}
+            onClick={() => switchMode("live")}
             style={{
               marginLeft: 10,
               padding: "6px 14px",
@@ -159,7 +191,8 @@ export default function AIControl() {
                 : "#374151",
               color: "#fff",
               border: "none",
-              borderRadius: 6
+              borderRadius: 6,
+              cursor: "pointer"
             }}
           >
             LIVE
@@ -168,15 +201,13 @@ export default function AIControl() {
         </div>
 
 
-        {/* MAX TRADES */}
+        {/* ================= CONTROLS ================= */}
 
         <Control
           label="Max Trades Per Day"
           value={maxTrades}
           onChange={setMaxTrades}
         />
-
-        {/* RISK */}
 
         <Control
           label="Risk % Per Trade"
@@ -185,8 +216,6 @@ export default function AIControl() {
           onChange={setRiskPercent}
         />
 
-        {/* POSITION MULTIPLIER */}
-
         <Control
           label="Position Multiplier"
           value={positionMultiplier}
@@ -194,7 +223,8 @@ export default function AIControl() {
           onChange={setPositionMultiplier}
         />
 
-        {/* STRATEGY */}
+
+        {/* ================= STRATEGY ================= */}
 
         <div style={{ marginBottom: 20 }}>
 
@@ -213,7 +243,7 @@ export default function AIControl() {
         </div>
 
 
-        {/* SAVE */}
+        {/* ================= SAVE ================= */}
 
         <button
           onClick={saveConfig}
@@ -228,10 +258,20 @@ export default function AIControl() {
             borderRadius: 6
           }}
         >
-
           {saving ? "Saving..." : "Save Configuration"}
-
         </button>
+
+
+        {/* ================= STATUS ================= */}
+
+        {statusMsg && (
+          <div style={{
+            marginTop: 15,
+            opacity: 0.7
+          }}>
+            {statusMsg}
+          </div>
+        )}
 
       </div>
 
