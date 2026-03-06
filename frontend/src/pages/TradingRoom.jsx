@@ -1,7 +1,7 @@
 // frontend/src/pages/TradingRoom.jsx
 // ============================================================
 // TRADING ROOM — REALTIME MARKET + PAPER ENGINE (ENTERPRISE)
-// AI decision stream + chart overlays
+// AI decision stream + chart overlays + risk dashboard
 // ============================================================
 
 import React, { useEffect, useRef, useState, useMemo } from "react";
@@ -31,7 +31,9 @@ export default function TradingRoom() {
 
   const [decisions, setDecisions] = useState([]);
 
-  /* ================= DERIVED DATA ================= */
+  /* =========================================================
+     DERIVED CHART DATA
+  ========================================================= */
 
   const volume = useMemo(() => {
     return candles.map(c => ({
@@ -63,7 +65,55 @@ export default function TradingRoom() {
     }));
   }, [trades]);
 
-  /* ================= LOAD HISTORICAL ================= */
+  /* =========================================================
+     AI METRICS
+  ========================================================= */
+
+  const aiConfidence = useMemo(() => {
+
+    if (!decisions.length) return 0;
+
+    const total =
+      decisions.reduce((s, d) =>
+        s + (d.confidence || 0), 0);
+
+    return total / decisions.length;
+
+  }, [decisions]);
+
+  const riskLevel = useMemo(() => {
+
+    if (!position) return "LOW";
+
+    const exposure =
+      Math.abs(position.qty * price);
+
+    if (exposure > equity * 0.4) return "HIGH";
+    if (exposure > equity * 0.2) return "MEDIUM";
+
+    return "LOW";
+
+  }, [position, price, equity]);
+
+  const marketRegime = useMemo(() => {
+
+    if (candles.length < 20) return "Unknown";
+
+    const last = candles[candles.length - 1].close;
+    const prev = candles[candles.length - 20].close;
+
+    const change = (last - prev) / prev;
+
+    if (change > 0.02) return "Bull Trend";
+    if (change < -0.02) return "Bear Trend";
+
+    return "Sideways";
+
+  }, [candles]);
+
+  /* =========================================================
+     LOAD HISTORICAL
+  ========================================================= */
 
   async function loadCandles() {
 
@@ -77,7 +127,7 @@ export default function TradingRoom() {
       const data = await res.json();
       if (!data?.ok) return;
 
-      const formatted = (data.candles || []).map(c => ({
+      const formatted = data.candles.map(c => ({
         time: c.time,
         open: Number(c.open),
         high: Number(c.high),
@@ -85,9 +135,9 @@ export default function TradingRoom() {
         close: Number(c.close),
       }));
 
-      if (formatted.length) {
-        lastCandleRef.current = formatted[formatted.length - 1];
-      }
+      if (formatted.length)
+        lastCandleRef.current =
+          formatted[formatted.length - 1];
 
       setCandles(formatted);
 
@@ -95,11 +145,11 @@ export default function TradingRoom() {
 
   }
 
-  useEffect(() => {
-    loadCandles();
-  }, []);
+  useEffect(() => { loadCandles(); }, []);
 
-  /* ================= LIVE WEBSOCKET ================= */
+  /* =========================================================
+     WEBSOCKET MARKET
+  ========================================================= */
 
   useEffect(() => {
 
@@ -111,10 +161,10 @@ export default function TradingRoom() {
     const url = new URL(API_BASE);
     const protocol = url.protocol === "https:" ? "wss:" : "ws:";
 
-    const wsUrl =
-      `${protocol}//${url.host}/ws/market?token=${encodeURIComponent(token)}`;
+    const ws = new WebSocket(
+      `${protocol}//${url.host}/ws/market?token=${encodeURIComponent(token)}`
+    );
 
-    const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
     ws.onmessage = (msg) => {
@@ -122,7 +172,6 @@ export default function TradingRoom() {
       try {
 
         const data = JSON.parse(msg.data);
-
         if (data.type !== "tick" || data.symbol !== SYMBOL) return;
 
         setPrice(Number(data.price));
@@ -142,10 +191,9 @@ export default function TradingRoom() {
             close: data.price,
           };
 
-          setCandles(prev => {
-            const updated = [...prev, candle];
-            return updated.slice(-MAX_CANDLES);
-          });
+          setCandles(prev =>
+            [...prev, candle].slice(-MAX_CANDLES)
+          );
 
         } else {
 
@@ -175,27 +223,27 @@ export default function TradingRoom() {
       setEngineStatus("DISCONNECTED");
     };
 
-    return () => {
-      try { ws.close(); } catch {}
-      wsRef.current = null;
-    };
+    return () => ws.close();
 
   }, []);
 
-  /* ================= PAPER ACCOUNT ================= */
+  /* =========================================================
+     PAPER STATUS
+  ========================================================= */
 
   async function loadPaper() {
 
     try {
 
-      const res = await fetch(`${API_BASE}/api/paper/status`, {
-        headers: authHeader(),
-      });
+      const res =
+        await fetch(`${API_BASE}/api/paper/status`, {
+          headers: authHeader(),
+        });
 
       const data = await res.json();
       if (!data?.ok) return;
 
-      const snap = data.snapshot || {};
+      const snap = data.snapshot;
 
       setEquity(Number(snap.equity || 0));
 
@@ -207,12 +255,6 @@ export default function TradingRoom() {
       setPosition(snap.position || null);
       setTrades((snap.trades || []).slice(-10).reverse());
 
-      if (snap.mode === "live") {
-        setEngineMode("Live Trading");
-      } else {
-        setEngineMode("Paper Trading");
-      }
-
     } catch {}
 
   }
@@ -220,28 +262,28 @@ export default function TradingRoom() {
   useEffect(() => {
 
     loadPaper();
-
     const loop = setInterval(loadPaper, 4000);
-
     return () => clearInterval(loop);
 
   }, []);
 
-  /* ================= AI DECISIONS ================= */
+  /* =========================================================
+     AI DECISIONS
+  ========================================================= */
 
   async function loadDecisions() {
 
     try {
 
-      const res = await fetch(`${API_BASE}/api/paper/decisions`, {
-        headers: authHeader(),
-      });
+      const res =
+        await fetch(`${API_BASE}/api/paper/decisions`, {
+          headers: authHeader(),
+        });
 
       const data = await res.json();
 
-      if (!data?.ok) return;
-
-      setDecisions((data.decisions || []).slice(-12).reverse());
+      if (data?.ok)
+        setDecisions(data.decisions.slice(-12).reverse());
 
     } catch {}
 
@@ -250,14 +292,14 @@ export default function TradingRoom() {
   useEffect(() => {
 
     loadDecisions();
-
     const loop = setInterval(loadDecisions, 4000);
-
     return () => clearInterval(loop);
 
   }, []);
 
-  /* ================= UI ================= */
+  /* =========================================================
+     UI
+  ========================================================= */
 
   return (
 
@@ -282,7 +324,7 @@ export default function TradingRoom() {
         </div>
 
         <div style={{ opacity: 0.7 }}>
-          Live Price: {price ? price.toLocaleString() : "Loading..."}
+          Live Price: {price?.toLocaleString() || "Loading..."}
         </div>
 
         <TerminalChart
@@ -293,39 +335,6 @@ export default function TradingRoom() {
           pnlSeries={pnlSeries}
           height={460}
         />
-
-        <div style={{ display: "flex", gap: 20, marginTop: 20 }}>
-
-          <Panel title="Wallet">
-            USD: ${wallet.usd.toFixed(2)} <br />
-            BTC: {wallet.btc.toFixed(6)}
-          </Panel>
-
-          <Panel title="Equity">
-            ${equity.toFixed(2)}
-          </Panel>
-
-          <Panel title="Open Position" flex={2}>
-            {position
-              ? `${position.qty} @ ${position.entry}`
-              : "No position"}
-          </Panel>
-
-        </div>
-
-        <Panel title="Recent Trades" style={{ marginTop: 20 }}>
-          {trades.length === 0 && (
-            <div style={{ opacity: 0.6 }}>
-              No trades yet
-            </div>
-          )}
-
-          {trades.map((t, i) => (
-            <div key={i}>
-              {t.side} {t.qty} @ {t.price}
-            </div>
-          ))}
-        </Panel>
 
       </div>
 
@@ -342,15 +351,27 @@ export default function TradingRoom() {
         <div>Status: {engineStatus}</div>
         <div>Mode: {engineMode}</div>
 
-        <h4 style={{ marginTop: 20 }}>
-          AI Decisions
-        </h4>
+        {/* CONFIDENCE */}
 
-        {decisions.length === 0 && (
-          <div style={{ opacity: 0.6 }}>
-            No AI decisions yet
-          </div>
-        )}
+        <Panel title="AI Confidence">
+          {(aiConfidence * 100).toFixed(0)}%
+        </Panel>
+
+        {/* RISK */}
+
+        <Panel title="Risk Level">
+          {riskLevel}
+        </Panel>
+
+        {/* REGIME */}
+
+        <Panel title="Market Regime">
+          {marketRegime}
+        </Panel>
+
+        {/* DECISIONS */}
+
+        <h4 style={{ marginTop: 20 }}>AI Decisions</h4>
 
         {decisions.map((d, i) => (
           <div key={i} style={{
@@ -374,7 +395,7 @@ export default function TradingRoom() {
 
 }
 
-/* ================= HELPERS ================= */
+/* ========================================================= */
 
 function authHeader() {
   const token = getToken();
@@ -383,21 +404,18 @@ function authHeader() {
     : {};
 }
 
-function Panel({ title, children, flex = 1, style = {} }) {
+function Panel({ title, children }) {
 
   return (
 
     <div style={{
-      flex,
       background: "#111827",
-      padding: 15,
-      borderRadius: 8,
-      ...style
+      padding: 12,
+      marginTop: 12,
+      borderRadius: 8
     }}>
-
-      <h4>{title}</h4>
-      {children}
-
+      <strong>{title}</strong>
+      <div style={{ marginTop: 6 }}>{children}</div>
     </div>
 
   );
