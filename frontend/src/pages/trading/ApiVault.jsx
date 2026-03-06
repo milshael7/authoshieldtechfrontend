@@ -1,106 +1,146 @@
 // KeyVault.js
-// Secure Exchange Credential Manager (Persistent + Hardened)
+// Secure Exchange Credential Manager (Frontend Safe)
+
+import { getToken } from "../lib/api.js";
+
+const API_BASE = import.meta.env.VITE_API_BASE?.replace(/\/+$/, "");
 
 class KeyVault {
+
   constructor() {
-    this.storageKey = "trading.exchange.keys";
-    this.keys = this.load();
+    this.exchanges = [];
   }
 
-  /* ================= LOAD / SAVE ================= */
+  /* ================= LOAD FROM SERVER ================= */
 
-  load() {
-    try {
-      const raw = localStorage.getItem(this.storageKey);
-      return raw ? JSON.parse(raw) : {};
-    } catch {
-      return {};
-    }
-  }
+  async load() {
 
-  persist() {
     try {
-      localStorage.setItem(
-        this.storageKey,
-        JSON.stringify(this.keys)
-      );
-    } catch {
-      // fail silently
-    }
+
+      const res = await fetch(`${API_BASE}/api/exchange/keys`, {
+        headers: this.auth()
+      });
+
+      const data = await res.json();
+
+      if (data?.ok) {
+        this.exchanges = data.keys || [];
+      }
+
+    } catch {}
+
+    return this.exchanges;
   }
 
   /* ================= ADD KEY ================= */
 
-  addKey(exchange, { apiKey, secret }) {
+  async addKey(exchange, { apiKey, secret }) {
+
     if (!exchange || !apiKey || !secret) {
       throw new Error("Invalid key payload");
     }
 
-    this.keys[exchange] = {
-      apiKey,
-      secret,
-      enabled: true,
-      addedAt: Date.now(),
-    };
+    const res = await fetch(`${API_BASE}/api/exchange/keys`, {
 
-    this.persist();
+      method: "POST",
+
+      headers: {
+        ...this.auth(),
+        "Content-Type": "application/json"
+      },
+
+      body: JSON.stringify({
+        exchange,
+        apiKey,
+        secret
+      })
+
+    });
+
+    const data = await res.json();
+
+    if (!data?.ok) {
+      throw new Error("Failed to save key");
+    }
+
+    await this.load();
+
     return true;
+
   }
 
   /* ================= REMOVE KEY ================= */
 
-  removeKey(exchange) {
-    if (!this.keys[exchange]) return false;
+  async removeKey(exchange) {
 
-    delete this.keys[exchange];
-    this.persist();
+    const res = await fetch(
+      `${API_BASE}/api/exchange/keys/${exchange}`,
+      {
+        method: "DELETE",
+        headers: this.auth()
+      }
+    );
+
+    const data = await res.json();
+
+    if (!data?.ok) return false;
+
+    await this.load();
+
     return true;
+
   }
 
   /* ================= ENABLE / DISABLE ================= */
 
-  setEnabled(exchange, state) {
-    if (!this.keys[exchange]) return false;
+  async setEnabled(exchange, state) {
 
-    this.keys[exchange].enabled = !!state;
-    this.persist();
+    const res = await fetch(
+      `${API_BASE}/api/exchange/keys/${exchange}/toggle`,
+      {
+
+        method: "POST",
+
+        headers: {
+          ...this.auth(),
+          "Content-Type": "application/json"
+        },
+
+        body: JSON.stringify({
+          enabled: !!state
+        })
+
+      }
+    );
+
+    const data = await res.json();
+
+    if (!data?.ok) return false;
+
+    await this.load();
+
     return true;
+
   }
 
-  /* ================= GET KEY (LIVE USE) ================= */
-
-  getKey(exchange) {
-    const key = this.keys[exchange];
-
-    if (!key) {
-      throw new Error(`No key configured for ${exchange}`);
-    }
-
-    if (!key.enabled) {
-      throw new Error(`Exchange ${exchange} disabled`);
-    }
-
-    return key;
-  }
-
-  /* ================= SAFE LIST (UI ONLY) ================= */
+  /* ================= LIST ================= */
 
   listExchanges() {
-    return Object.keys(this.keys).map((ex) => ({
-      exchange: ex,
-      enabled: this.keys[ex].enabled,
-      addedAt: this.keys[ex].addedAt,
-      maskedKey:
-        this.keys[ex].apiKey.slice(0, 4) + "****",
-    }));
+    return this.exchanges || [];
   }
 
-  /* ================= CLEAR ALL ================= */
+  /* ================= AUTH ================= */
 
-  clearAll() {
-    this.keys = {};
-    this.persist();
+  auth() {
+
+    const token = getToken();
+
+    return token
+      ? { Authorization: `Bearer ${token}` }
+      : {};
+
   }
+
 }
 
 export const keyVault = new KeyVault();
