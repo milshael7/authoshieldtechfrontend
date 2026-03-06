@@ -12,7 +12,7 @@ import "../styles/layout.css";
 
 export default function UserLayout() {
   const { user } = useTools();
-  const { wsStatus, systemStatus } = useSecurity();
+  const { wsStatus = "disconnected", systemStatus = "ok" } = useSecurity();
 
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -38,7 +38,6 @@ export default function UserLayout() {
   const subscriptionStatus = user?.subscriptionStatus || "Unknown";
   const freedomEnabled = !!user?.freedomEnabled;
   const autoprotectEnabled = !!user?.autoprotectEnabled;
-  const managedCompanies = user?.managedCompanies || [];
 
   function wsColor() {
     if (wsStatus === "connected") return "#22c55e";
@@ -84,33 +83,17 @@ export default function UserLayout() {
             Security Overview
           </NavLink>
 
-          <NavLink to="notifications" className={navClass} onClick={closeMenu}>
+          <NavLink
+            to="notifications"
+            className={navClass}
+            onClick={closeMenu}
+          >
             Notifications
-          </NavLink>
-
-          <NavLink to="reports" className={navClass} onClick={closeMenu}>
-            My Reports
-          </NavLink>
-
-          <hr style={{ opacity: 0.15 }} />
-
-          <div className="nav-section-label">
-            Managed Companies
-          </div>
-
-          <NavLink to="managed" className={navClass} onClick={closeMenu}>
-            My External Companies ({managedCompanies.length}/10)
           </NavLink>
 
           {!freedomEnabled && (
             <NavLink to="/pricing" className={navClass} onClick={closeMenu}>
               Activate Freedom
-            </NavLink>
-          )}
-
-          {freedomEnabled && (
-            <NavLink to="autoprotect" className={navClass} onClick={closeMenu}>
-              Autoprotect (Autodev 6.5)
             </NavLink>
           )}
         </nav>
@@ -221,7 +204,6 @@ export default function UserLayout() {
               scope: "individual-control",
               freedom: freedomEnabled,
               autoprotect: autoprotectEnabled,
-              managedCount: managedCompanies.length,
               subscription: subscriptionStatus,
               location: window.location.pathname,
               systemStatus,
@@ -233,15 +215,13 @@ export default function UserLayout() {
         <div
           className="advisor-rail"
           style={{ right: advisorOpen ? DRAWER_OPEN_W : 0 }}
-          onClick={() => setAdvisorOpen(v => !v)}
+          onClick={() => setAdvisorOpen((v) => !v)}
         >
           <div className="advisor-rail-arrow">
             {advisorOpen ? "▶" : "◀"}
           </div>
 
-          <div className="advisor-rail-text">
-            ADVISOR
-          </div>
+          <div className="advisor-rail-text">ADVISOR</div>
 
           <div className="advisor-rail-arrow">
             {advisorOpen ? "▶" : "◀"}
