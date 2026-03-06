@@ -7,8 +7,6 @@ import {
   getToken,
   setToken,
   saveUser,
-  clearToken,
-  clearUser,
 } from "./lib/api.js";
 
 import { CompanyProvider } from "./context/CompanyContext";
@@ -215,13 +213,11 @@ export default function App() {
         });
 
         if (!res.ok) {
-          // DO NOT destroy session here
           setUser(storedUser);
           return;
         }
 
         const data = await res.json();
-
         if (data?.token && data?.user) {
           setToken(data.token);
           saveUser(data.user);
@@ -230,7 +226,6 @@ export default function App() {
           setUser(storedUser);
         }
       } catch {
-        // keep last known user to prevent flashing
         setUser(getSavedUser());
       } finally {
         setReady(true);
@@ -240,6 +235,11 @@ export default function App() {
     bootAuth();
   }, [base]);
 
+  // 🔇 QUIET MODE: do not start engines until auth is ready
+  if (!ready) {
+    return <div style={{ padding: 40 }}>Initializing platform…</div>;
+  }
+
   return (
     <EventBusProvider>
       <AIDecisionProvider>
@@ -247,7 +247,7 @@ export default function App() {
         <AutoDevEngine />
 
         <CompanyProvider>
-          <ToolProvider user={ready ? user : null}>
+          <ToolProvider user={user}>
             <SecurityProvider>
               <BrowserRouter>
                 <AppRoutes user={user} ready={ready} />
