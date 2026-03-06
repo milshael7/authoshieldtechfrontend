@@ -5,7 +5,7 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { createChart } from "lightweight-charts";
-import { getToken } from "../../lib/api.js";
+import { getToken } from "../lib/api.js";
 
 const API_BASE = import.meta.env.VITE_API_BASE?.replace(/\/+$/, "");
 const SYMBOL = "BTCUSDT";
@@ -62,7 +62,6 @@ export default function TradingRoom() {
     };
 
     window.addEventListener("resize", resize);
-
     return () => {
       window.removeEventListener("resize", resize);
       chart.remove();
@@ -112,8 +111,6 @@ export default function TradingRoom() {
         const data = JSON.parse(msg.data);
         if (data.type === "tick" && data.symbol === SYMBOL) {
           setPrice(data.price);
-
-          // update last candle
           seriesRef.current?.update({
             time: Math.floor(data.ts / 1000),
             open: data.price,
@@ -162,33 +159,14 @@ export default function TradingRoom() {
   /* ================= UI ================= */
 
   return (
-    <div
-      style={{
-        display: "flex",
-        flex: 1,
-        minHeight: 0,
-        background: "#0a0f1c",
-        color: "#fff",
-        overflow: "hidden",
-      }}
-    >
-      {/* MAIN */}
+    <div style={{ display: "flex", flex: 1, background: "#0a0f1c", color: "#fff" }}>
       <div style={{ flex: 1, padding: 20, display: "flex", flexDirection: "column" }}>
-        <div style={{ fontWeight: 700, fontSize: 16 }}>
-          AI Trading Desk • {SYMBOL}
-        </div>
-        <div style={{ opacity: 0.7, fontSize: 13 }}>
-          Live Price: {price}
-        </div>
+        <div style={{ fontWeight: 700 }}>AI Trading Desk • {SYMBOL}</div>
+        <div style={{ opacity: 0.7 }}>Live Price: {price}</div>
 
         <div
           ref={containerRef}
-          style={{
-            flex: 1,
-            marginTop: 10,
-            background: "#111827",
-            borderRadius: 10,
-          }}
+          style={{ flex: 1, marginTop: 10, background: "#111827", borderRadius: 10 }}
         />
 
         <div style={{ display: "flex", gap: 20, marginTop: 20 }}>
@@ -196,12 +174,9 @@ export default function TradingRoom() {
             USD: ${wallet.usd.toFixed(2)} <br />
             BTC: {wallet.btc.toFixed(6)}
           </Panel>
-
           <Panel title="Equity">${equity.toFixed(2)}</Panel>
-
           <Panel title="Open Position" flex={2}>
-            {!position && "No position"}
-            {position && `${position.qty} @ ${position.entry}`}
+            {position ? `${position.qty} @ ${position.entry}` : "No position"}
           </Panel>
         </div>
 
@@ -214,7 +189,6 @@ export default function TradingRoom() {
         </Panel>
       </div>
 
-      {/* AI */}
       <div style={{ width: 320, background: "#111827", padding: 20 }}>
         <h3>AI Engine</h3>
         <div>Status: CONNECTED</div>
