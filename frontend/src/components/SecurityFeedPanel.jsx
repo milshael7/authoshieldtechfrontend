@@ -1,22 +1,16 @@
 // frontend/src/components/SecurityFeedPanel.jsx
-// SOC Live Threat Intelligence Stream — SHELL-SAFE • QUIET • BACKOFF-ENABLED
+// SOC Live Threat Intelligence Stream — SHELL-SAFE • QUIET • HARDENED
 
 import React, { useEffect, useRef, useState } from "react";
 import { api } from "../lib/api";
+import { readAloud } from "./ReadAloud";
 
 /* ================= HELPERS ================= */
 
-function speak(text) {
-  if (!("speechSynthesis" in window)) return;
-  const u = new SpeechSynthesisUtterance(text);
-  u.rate = 0.95;
-  u.pitch = 1.0;
-  window.speechSynthesis.cancel();
-  window.speechSynthesis.speak(u);
-}
-
 function copy(text) {
-  navigator.clipboard?.writeText(text);
+  try {
+    navigator.clipboard?.writeText(String(text || ""));
+  } catch {}
 }
 
 function formatTime(iso) {
@@ -34,18 +28,23 @@ export default function SecurityFeedPanel() {
 
   const failureCount = useRef(0);
   const timerRef = useRef(null);
-  const aliveRef = useRef(true);
+  const aliveRef = useRef(false);
+  const runningRef = useRef(false);
 
   async function load() {
+    if (!aliveRef.current) return;
+
     try {
-      // HARD RULE: only use api layer
       const res = await api.securityEvents?.();
 
-      // If backend explicitly says unauthorized or error → go quiet
       if (!res || res.error || !Array.isArray(res.events)) {
         failureCount.current += 1;
         setStatus("QUIET");
-        setEvents([]);
+
+        // Only clear once to avoid flicker
+        if (failureCount.current === 1) {
+          setEvents([]);
+        }
         return;
       }
 
@@ -54,10 +53,12 @@ export default function SecurityFeedPanel() {
       setEvents(res.events);
       setStatus("LIVE");
     } catch {
-      // HARD RULE: never throw, never log spam
       failureCount.current += 1;
       setStatus("QUIET");
-      setEvents([]);
+
+      if (failureCount.current === 1) {
+        setEvents([]);
+      }
     } finally {
       setLoading(false);
     }
@@ -66,12 +67,14 @@ export default function SecurityFeedPanel() {
   useEffect(() => {
     aliveRef.current = true;
 
+    if (runningRef.current) return;
+    runningRef.current = true;
+
     load();
 
-    function schedule() {
+    const schedule = () => {
       if (!aliveRef.current) return;
 
-      // Adaptive backoff
       const delay =
         failureCount.current >= 3
           ? 20000
@@ -83,12 +86,13 @@ export default function SecurityFeedPanel() {
         await load();
         schedule();
       }, delay);
-    }
+    };
 
     schedule();
 
     return () => {
       aliveRef.current = false;
+      runningRef.current = false;
       clearTimeout(timerRef.current);
     };
   }, []);
@@ -119,9 +123,13 @@ export default function SecurityFeedPanel() {
           const severity = String(e.severity || "low").toLowerCase();
           const explanation = buildExplanation(e);
 
+          const key =
+            e.id ||
+            `${e.type || "event"}-${e.iso || ""}-${e.source || ""}`;
+
           return (
             <div
-              key={e.id || e.iso || Math.random()}
+              key={key}
               style={{
                 display: "flex",
                 border: "1px solid rgba(255,255,255,.12)",
@@ -165,7 +173,7 @@ export default function SecurityFeedPanel() {
                   <button style={actionBtn} onClick={() => copy(explanation)}>
                     Copy Report
                   </button>
-                  <button style={actionBtn} onClick={() => speak(explanation)}>
+                  <button style={actionBtn} onClick={() => readAloud(explanation)}>
                     Read Aloud
                   </button>
                 </div>
