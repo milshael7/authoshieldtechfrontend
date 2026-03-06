@@ -1,6 +1,6 @@
 // frontend/src/context/SecurityContext.jsx
-// Security Context — Enterprise Hardened v12
-// SECURITY-ONLY • ROUTE-STABLE • TRADING-SAFE • NO MARKET SOCKETS
+// Security Context — Enterprise Hardened v13
+// QUIET MODE • EVENT-DRIVEN • NO SELF-NOISE • TRADING-SAFE
 
 import React, {
   createContext,
@@ -17,6 +17,8 @@ import { useEventBus } from "../core/EventBus.jsx";
 
 const SecurityContext = createContext(null);
 
+/* ================= UTILS ================= */
+
 function safeJsonParse(v) {
   try {
     return typeof v === "string" ? JSON.parse(v) : v;
@@ -24,6 +26,8 @@ function safeJsonParse(v) {
     return null;
   }
 }
+
+/* ================= PROVIDER ================= */
 
 export function SecurityProvider({ children }) {
   const API_BASE = import.meta.env.VITE_API_BASE?.replace(/\/+$/, "");
@@ -47,17 +51,18 @@ export function SecurityProvider({ children }) {
   const socketRef = useRef(null);
   const reconnectTimerRef = useRef(null);
   const reconnectAttemptsRef = useRef(0);
-  const tokenRef = useRef(null);
+  const tokenRef = useRef(getToken());
   const mountedRef = useRef(true);
+  const quietRef = useRef(false);
 
-  /* ================= HELPERS ================= */
+  /* ================= WS URL ================= */
 
   function buildSecurityWsUrl(token) {
     if (!API_BASE || !token) return null;
     try {
-      const url = new URL(API_BASE);
-      const protocol = url.protocol === "https:" ? "wss:" : "ws:";
-      return `${protocol}//${url.host}/ws/security?token=${encodeURIComponent(
+      const u = new URL(API_BASE);
+      const proto = u.protocol === "https:" ? "wss:" : "ws:";
+      return `${proto}//${u.host}/ws/security?token=${encodeURIComponent(
         token
       )}`;
     } catch {
@@ -87,8 +92,10 @@ export function SecurityProvider({ children }) {
   /* ================= CONNECT ================= */
 
   const connectSocket = useCallback(() => {
+    if (quietRef.current) return;
+
     const token = getToken();
-    tokenRef.current = token || null;
+    tokenRef.current = token;
 
     if (!token || !mountedRef.current) return;
     if (socketRef.current?.readyState === 1) return;
@@ -116,11 +123,13 @@ export function SecurityProvider({ children }) {
       if (data.type === "integrity_alert") {
         setIntegrityAlert(data);
         setSystemStatus("compromised");
+        quietRef.current = false;
       }
 
       if (data.type === "integrity_clear") {
         setIntegrityAlert(null);
         setSystemStatus("secure");
+        quietRef.current = true; // go quiet after clear
       }
     };
 
@@ -136,25 +145,30 @@ export function SecurityProvider({ children }) {
 
       if (!mountedRef.current) return;
       if (!getToken()) return;
-      if (reconnectAttemptsRef.current >= 5) return;
+      if (document.hidden) return;
+
+      if (reconnectAttemptsRef.current >= 3) {
+        quietRef.current = true; // stop thrashing
+        return;
+      }
 
       reconnectAttemptsRef.current += 1;
 
-      reconnectTimerRef.current = setTimeout(() => {
-        connectSocket();
-      }, 5000);
+      reconnectTimerRef.current = setTimeout(
+        connectSocket,
+        3000 * reconnectAttemptsRef.current
+      );
     };
 
     socketRef.current = socket;
   }, [bus, closeSocket]);
 
-  /* ================= BOOT / UNMOUNT ================= */
+  /* ================= BOOT ================= */
 
   useEffect(() => {
     mountedRef.current = true;
 
-    const token = getToken();
-    if (token) connectSocket();
+    if (getToken()) connectSocket();
 
     return () => {
       mountedRef.current = false;
@@ -162,29 +176,30 @@ export function SecurityProvider({ children }) {
     };
   }, [connectSocket, closeSocket]);
 
-  /* ================= TOKEN WATCH ================= */
+  /* ================= TOKEN CHANGE (EVENT-BASED) ================= */
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      const latest = getToken() || null;
+    const handler = () => {
+      const latest = getToken();
+      if (latest === tokenRef.current) return;
 
-      if (latest !== tokenRef.current) {
-        tokenRef.current = latest;
-        closeSocket();
-        if (latest) connectSocket();
-      }
-    }, 4000);
+      tokenRef.current = latest;
+      quietRef.current = false;
+      closeSocket();
+      if (latest) connectSocket();
+    };
 
-    return () => clearInterval(interval);
+    window.addEventListener("storage", handler);
+    return () => window.removeEventListener("storage", handler);
   }, [connectSocket, closeSocket]);
 
-  /* ================= REST TELEMETRY ================= */
+  /* ================= REST TELEMETRY (PASSIVE) ================= */
 
   useEffect(() => {
     let active = true;
 
     async function load() {
-      if (!getToken()) return;
+      if (!getToken() || integrityAlert) return;
 
       try {
         const summary = await api.postureSummary();
@@ -195,19 +210,20 @@ export function SecurityProvider({ children }) {
         setDomains(Array.isArray(summary.domains) ? summary.domains : []);
 
         if (score < 30 && !integrityAlert) {
+          quietRef.current = true;
           setSystemStatus("secure");
         }
       } catch {
-        /* silent by design */
+        /* silent */
       }
     }
 
     load();
-    const interval = setInterval(load, 30000);
+    const t = setInterval(load, 60000);
 
     return () => {
       active = false;
-      clearInterval(interval);
+      clearInterval(t);
     };
   }, [integrityAlert]);
 
@@ -253,6 +269,8 @@ export function SecurityProvider({ children }) {
     </SecurityContext.Provider>
   );
 }
+
+/* ================= HOOK ================= */
 
 export function useSecurity() {
   const ctx = useContext(SecurityContext);
