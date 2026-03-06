@@ -120,7 +120,8 @@ export async function req(path, { method = "GET", body, auth = true } = {}) {
 /* ================= API OBJECT ================= */
 
 export const api = {
-  /* AUTH */
+  /* ================= AUTH ================= */
+
   login: async (email, password) => {
     const res = await fetch(`${API_BASE}/api/auth/login`, {
       method: "POST",
@@ -142,27 +143,41 @@ export const api = {
 
   refresh: () => req("/api/auth/refresh", { method: "POST" }),
 
-  /* USERS */
+  /* ================= USERS ================= */
+
   listUsers: () => req("/api/users"),
   getUser: (id) => req(`/api/users/${id}`),
 
-  /* INCIDENTS — 🔥 RESTORED */
+  /* ================= INCIDENTS ================= */
+
   incidents: () => req("/api/incidents"),
   createIncident: (payload) =>
     req("/api/incidents", { method: "POST", body: payload }),
 
-  /* SECURITY */
+  /* ================= SECURITY ================= */
+
   postureSummary: () => req("/api/security/posture-summary"),
   securityEvents: () => req("/api/security/events"),
   vulnerabilities: () => req("/api/security/vulnerabilities"),
 
-  /* SECURITY TOOLS — 🔥 RESTORED */
+  /* ================= SECURITY TOOLS ================= */
+
   securityTools: () => req("/api/security/tools"),
   installSecurityTool: (id) =>
     req(`/api/security/tools/${id}/install`, { method: "POST" }),
   uninstallSecurityTool: (id) =>
     req(`/api/security/tools/${id}/uninstall`, { method: "POST" }),
 
-  /* ADMIN */
+  /* ================= ADMIN (FIXED) ================= */
+
   adminPlatformHealth: () => req("/api/admin/platform-health"),
+
+  // REQUIRED by ExecutiveRiskBanner / Live Trading
+  adminExecutiveRisk: () => req("/api/admin/executive-risk"),
+
+  adminPostureSummary: () =>
+    req("/api/admin/security/posture-summary"),
+
+  adminSecurityFeed: () =>
+    req("/api/admin/security/feed"),
 };
