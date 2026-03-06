@@ -6,7 +6,7 @@
 // ======================================================
 
 import React, { useEffect, useMemo, useState } from "react";
-import { api } from "../lib/api.js";
+import { api, req } from "../lib/api.js";
 import NotificationList from "../components/NotificationList.jsx";
 import PosturePanel from "../components/PosturePanel.jsx";
 
@@ -39,21 +39,21 @@ export default function User() {
 
     try {
       const [
-        userRes,
+        meRes,
         entRes,
-        toolRes,
-        noteRes,
+        toolsRes,
+        eventsRes,
       ] = await Promise.all([
-        api.getUser?.("me") || api.req("/api/users/me"),
-        api.req("/api/entitlements/me"),
-        api.req("/api/security/tools"),
-        api.req("/api/security/events", { silent: true }),
+        req("/api/users/me"),
+        req("/api/entitlements/me"),
+        req("/api/security/tools"),
+        req("/api/security/events", { silent: true }),
       ]);
 
-      setMe(userRes?.user || userRes || null);
+      setMe(meRes?.user || meRes || null);
       setEntitlements(safeArray(entRes?.entitlements?.tools));
-      setTools(safeArray(toolRes?.tools));
-      setNotifications(safeArray(noteRes?.events || noteRes));
+      setTools(safeArray(toolsRes?.tools));
+      setNotifications(safeArray(eventsRes?.events));
 
     } catch (e) {
       setErr(e?.message || "Failed to load user workspace");
@@ -69,16 +69,15 @@ export default function User() {
   useEffect(() => {
     loadWorkspace();
     refreshPosture();
+    // eslint-disable-next-line
   }, []);
 
   /* ================= DERIVED ================= */
 
-  const activeTools = useMemo(() => {
+  const accessibleTools = useMemo(() => {
     if (!tools.length) return [];
     return tools.filter(
-      (t) =>
-        t.accessible === true ||
-        entitlements.includes(t.id)
+      (t) => t.accessible === true || entitlements.includes(t.id)
     );
   }, [tools, entitlements]);
 
@@ -131,19 +130,25 @@ export default function User() {
       <div className="card">
         <h3>Available Security Tools</h3>
 
-        {activeTools.length === 0 && (
+        {accessibleTools.length === 0 && (
           <p className="muted">
             No tools available under your current subscription.
           </p>
         )}
 
         <ul style={{ marginTop: 12 }}>
-          {activeTools.map((t) => (
-            <li key={t.id} style={{ marginBottom: 10 }}>
+          {accessibleTools.map((t) => (
+            <li key={t.id} style={{ marginBottom: 12 }}>
               <strong>{safeStr(t.name)}</strong>
               <div style={{ fontSize: 13, opacity: 0.7 }}>
                 {safeStr(t.description)}
               </div>
+
+              {t.requiresApproval && !t.hasActiveGrant && (
+                <div style={{ fontSize: 12, opacity: 0.5 }}>
+                  Approval required
+                </div>
+              )}
             </li>
           ))}
         </ul>
@@ -169,6 +174,13 @@ export default function User() {
       {/* ================= NOTIFICATIONS ================= */}
       <div className="card">
         <h3>Security Notifications</h3>
+
+        {notifications.length === 0 && (
+          <div style={{ opacity: 0.6 }}>
+            {loading ? "Loading…" : "No alerts detected."}
+          </div>
+        )}
+
         <NotificationList items={notifications} />
       </div>
 
