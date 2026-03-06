@@ -5,7 +5,7 @@
 // Read-only • No tenant control • No admin authority
 // ======================================================
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { req, getSavedUser } from "../../lib/api.js";
 
 /* ================= HELPERS ================= */
@@ -21,7 +21,7 @@ export default function Managed() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
 
-  async function loadManaged() {
+  const loadManaged = useCallback(async () => {
     setLoading(true);
     setErr("");
 
@@ -33,22 +33,21 @@ export default function Managed() {
        */
       if (arr(user?.managedCompanies).length === 0) {
         setCompanies([]);
-        return;
+      } else {
+        const res = await req("/api/company/managed", { silent: true });
+        setCompanies(arr(res?.companies || res));
       }
-
-      const res = await req("/api/company/managed", { silent: true });
-      setCompanies(arr(res?.companies || res));
     } catch {
       // graceful fallback (NO HARD FAILURE)
       setCompanies(arr(user?.managedCompanies));
     } finally {
       setLoading(false);
     }
-  }
+  }, [user]);
 
   useEffect(() => {
     loadManaged();
-  }, []);
+  }, [loadManaged]);
 
   /* ================= DERIVED ================= */
 
@@ -59,7 +58,6 @@ export default function Managed() {
 
   return (
     <div className="grid">
-
       {/* ================= HEADER ================= */}
       <div className="card" style={{ gridColumn: "1 / -1" }}>
         <h2>Managed External Companies</h2>
@@ -141,7 +139,6 @@ export default function Managed() {
           </button>
         </div>
       )}
-
     </div>
   );
 }
