@@ -11,6 +11,7 @@ const API_BASE = import.meta.env.VITE_API_BASE?.replace(/\/+$/, "");
 export default function AIControl() {
 
   const [enabled, setEnabled] = useState(true);
+  const [tradingMode, setTradingMode] = useState("paper");
   const [maxTrades, setMaxTrades] = useState(5);
   const [riskPercent, setRiskPercent] = useState(1.5);
   const [positionMultiplier, setPositionMultiplier] = useState(1);
@@ -38,6 +39,7 @@ export default function AIControl() {
       const cfg = data.config;
 
       setEnabled(cfg.enabled);
+      setTradingMode(cfg.tradingMode || "paper");
       setMaxTrades(cfg.maxTrades);
       setRiskPercent(cfg.riskPercent);
       setPositionMultiplier(cfg.positionMultiplier);
@@ -67,6 +69,7 @@ export default function AIControl() {
         body: JSON.stringify({
 
           enabled,
+          tradingMode,
           maxTrades: Number(maxTrades),
           riskPercent: Number(riskPercent),
           positionMultiplier: Number(positionMultiplier),
@@ -100,7 +103,7 @@ export default function AIControl() {
         maxWidth: 800
       }}>
 
-        {/* STATUS */}
+        {/* AI STATUS */}
 
         <div style={{ marginBottom: 20 }}>
 
@@ -122,6 +125,48 @@ export default function AIControl() {
           </button>
 
         </div>
+
+
+        {/* TRADING MODE SWITCH */}
+
+        <div style={{ marginBottom: 20 }}>
+
+          <label>Trading Mode:</label>
+
+          <button
+            onClick={() => setTradingMode("paper")}
+            style={{
+              marginLeft: 15,
+              padding: "6px 14px",
+              background: tradingMode === "paper"
+                ? "#2563eb"
+                : "#374151",
+              color: "#fff",
+              border: "none",
+              borderRadius: 6
+            }}
+          >
+            PAPER
+          </button>
+
+          <button
+            onClick={() => setTradingMode("live")}
+            style={{
+              marginLeft: 10,
+              padding: "6px 14px",
+              background: tradingMode === "live"
+                ? "#16a34a"
+                : "#374151",
+              color: "#fff",
+              border: "none",
+              borderRadius: 6
+            }}
+          >
+            LIVE
+          </button>
+
+        </div>
+
 
         {/* MAX TRADES */}
 
@@ -167,7 +212,8 @@ export default function AIControl() {
 
         </div>
 
-        {/* SAVE BUTTON */}
+
+        {/* SAVE */}
 
         <button
           onClick={saveConfig}
@@ -195,7 +241,7 @@ export default function AIControl() {
 
 }
 
-/* ================= SMALL CONTROL COMPONENT ================= */
+/* ================= CONTROL COMPONENT ================= */
 
 function Control({ label, value, onChange, step = 1 }) {
 
