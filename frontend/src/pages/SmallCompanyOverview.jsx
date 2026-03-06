@@ -41,13 +41,13 @@ export default function SmallCompanyOverview() {
     setErr("");
 
     try {
-      const [posture, events] = await Promise.all([
+      const [posture, notifications] = await Promise.all([
         api.postureSummary(),
-        api.securityEvents?.() || Promise.resolve([]),
+        api.companyNotifications?.() || Promise.resolve([]),
       ]);
 
       setSummary(posture || null);
-      setNotes(safeArray(events?.events || events));
+      setNotes(safeArray(notifications));
 
     } catch (e) {
       setErr(e?.message || "Failed to load small company workspace");
@@ -77,7 +77,7 @@ export default function SmallCompanyOverview() {
     () => [
       { label: "Incidents", value: summary?.incidents ?? 0 },
       { label: "Critical Alerts", value: summary?.criticalAlerts ?? 0 },
-      { label: "Domains Covered", value: summary?.domains?.length ?? 0 },
+      { label: "Assets", value: summary?.assets ?? 0 },
       { label: "Notifications", value: notes.length },
     ],
     [summary, notes]
