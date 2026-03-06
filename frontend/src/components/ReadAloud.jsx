@@ -1,12 +1,13 @@
 /**
- * AuthoDev 6.5 — Unified Read Aloud Engine
- * Single voice, consistent across the platform
+ * AuthoDev 6.6 — Unified Read Aloud Engine (HARDENED)
+ * Single voice • single stream • lifecycle-safe
  *
- * Rules:
+ * Guarantees:
  * - One voice
  * - One cadence
  * - One speaker at a time
  * - No overlap
+ * - Safe on unmount / route change
  */
 
 let synth = null;
@@ -18,21 +19,35 @@ function getSynth() {
   return synth;
 }
 
+/**
+ * Hard stop — always safe
+ */
 export function stopReadAloud() {
   const s = getSynth();
   if (!s) return;
-  s.cancel();
+
+  try {
+    s.cancel();
+  } catch {}
+
   currentUtterance = null;
 }
 
-export function readAloud(text) {
+/**
+ * Read text aloud
+ * @param {string} text
+ * @param {function} onEnd optional callback when speech finishes
+ */
+export function readAloud(text, onEnd) {
   if (!text) return;
 
   const s = getSynth();
   if (!s) return;
 
-  // stop anything currently speaking
-  s.cancel();
+  // HARD RULE: never overlap
+  try {
+    s.cancel();
+  } catch {}
 
   const utter = new SpeechSynthesisUtterance(
     String(text)
@@ -42,10 +57,29 @@ export function readAloud(text) {
   );
 
   // 🔊 AuthoDev voice tuning
-  utter.rate = 0.95;     // calm, human pace
-  utter.pitch = 1.0;     // neutral, professional
+  utter.rate = 0.95;
+  utter.pitch = 1.0;
   utter.volume = 1.0;
 
+  utter.onend = () => {
+    currentUtterance = null;
+    if (typeof onEnd === "function") {
+      try { onEnd(); } catch {}
+    }
+  };
+
+  utter.onerror = () => {
+    currentUtterance = null;
+    try {
+      s.cancel();
+    } catch {}
+  };
+
   currentUtterance = utter;
-  s.speak(utter);
+
+  try {
+    s.speak(utter);
+  } catch {
+    currentUtterance = null;
+  }
 }
