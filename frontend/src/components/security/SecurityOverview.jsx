@@ -1,19 +1,29 @@
+// frontend/src/components/security/SecurityOverview.jsx
+// SecurityOverview — Quiet Compliance v14
+// QUIET • SIGNAL-ONLY • NO FALSE ALARMS • INTEGRITY-FIRST
+
 import React, { useRef } from "react";
 import { useSecurity } from "../../context/SecurityContext.jsx";
 import SecurityRadar from "./SecurityRadar.jsx";
 import SecurityToolMarketplace from "./SecurityToolMarketplace.jsx";
 
-function getRiskColor(score) {
+/* ================= RISK HELPERS ================= */
+
+function getRiskColor(score, integrityAlert) {
+  if (integrityAlert) return "#ff4d4f";
   if (score >= 60) return "#ff4d4f";
   if (score >= 30) return "#faad14";
   return "#52c41a";
 }
 
-function getRiskLabel(score) {
+function getRiskLabel(score, integrityAlert) {
+  if (integrityAlert) return "CRITICAL";
   if (score >= 60) return "HIGH";
   if (score >= 30) return "ELEVATED";
   return "STABLE";
 }
+
+/* ================= COMPONENT ================= */
 
 export default function SecurityOverview() {
   const radarRef = useRef(null);
@@ -21,22 +31,22 @@ export default function SecurityOverview() {
   const {
     systemStatus,
     riskScore,
-    integrityAlert
+    integrityAlert,
   } = useSecurity();
 
   function refreshRadar() {
-    if (radarRef.current?.reload) {
-      radarRef.current.reload();
-    }
+    radarRef.current?.reload?.();
   }
 
-  const riskColor = getRiskColor(riskScore);
-  const riskLabel = getRiskLabel(riskScore);
+  const riskColor = getRiskColor(riskScore, integrityAlert);
+  const riskLabel = getRiskLabel(riskScore, integrityAlert);
+
+  const isQuiet = systemStatus === "secure" && !integrityAlert;
 
   return (
     <div className="postureWrap">
 
-      {/* COMMAND HEADER */}
+      {/* ================= COMMAND HEADER ================= */}
 
       <div style={styles.commandHeader}>
 
@@ -44,16 +54,13 @@ export default function SecurityOverview() {
           <div
             style={{
               ...styles.statusDot,
-              backgroundColor:
-                systemStatus === "secure" ? "#52c41a" : "#ff4d4f"
+              backgroundColor: isQuiet ? "#52c41a" : "#ff4d4f",
             }}
           />
           <span>
             System:{" "}
             <strong>
-              {systemStatus === "secure"
-                ? "SECURE"
-                : "COMPROMISED"}
+              {isQuiet ? "SECURE" : "COMPROMISED"}
             </strong>
           </span>
         </div>
@@ -63,85 +70,64 @@ export default function SecurityOverview() {
             <div
               style={{
                 ...styles.riskFill,
-                width: `${riskScore}%`,
-                backgroundColor: riskColor
+                width: `${Math.min(riskScore, 100)}%`,
+                backgroundColor: riskColor,
               }}
             />
           </div>
 
           <div style={styles.riskMeta}>
-            <span style={{ color: riskColor }}>
-              {riskLabel}
-            </span>
+            <span style={{ color: riskColor }}>{riskLabel}</span>
             <span>{riskScore}/100</span>
           </div>
         </div>
 
       </div>
 
-      {/* INTEGRITY ALERT */}
+      {/* ================= INTEGRITY ALERT (ONLY REAL NOISE) ================= */}
 
       {integrityAlert && (
         <div style={styles.integrityAlert}>
-          ⚠ AUDIT INTEGRITY FAILURE DETECTED
+          ⚠ INTEGRITY BREACH DETECTED — IMMEDIATE ATTENTION REQUIRED
         </div>
       )}
 
-      {/* SECURITY METRIC CARDS */}
+      {/* ================= METRICS (PASSIVE / QUIET) ================= */}
 
       <div style={styles.metricsGrid}>
 
-        <div style={styles.metricCard}>
-          <h4>Active Incidents</h4>
-          <div style={styles.metricValue}>0</div>
-        </div>
-
-        <div style={styles.metricCard}>
-          <h4>Threat Events</h4>
-          <div style={styles.metricValue}>0</div>
-        </div>
-
-        <div style={styles.metricCard}>
-          <h4>Trusted Devices</h4>
-          <div style={styles.metricValue}>0</div>
-        </div>
-
-        <div style={styles.metricCard}>
-          <h4>Security Modules</h4>
-          <div style={styles.metricValue}>Active</div>
-        </div>
+        <Metric label="Active Incidents" value={integrityAlert ? "1+" : "0"} />
+        <Metric label="Threat Events" value={integrityAlert ? "Detected" : "None"} />
+        <Metric label="Trusted Devices" value="Verified" />
+        <Metric label="Security Modules" value="Active" />
 
       </div>
 
-      {/* SECURITY RADAR */}
+      {/* ================= RADAR (PASSIVE) ================= */}
 
       <SecurityRadar ref={radarRef} />
 
-      {/* QUICK ACTIONS */}
+      {/* ================= ACTIONS (INTENTION-ONLY) ================= */}
 
       <div style={styles.actionPanel}>
-
         <h3 style={styles.actionTitle}>Security Actions</h3>
 
         <div style={styles.actionButtons}>
-
-          <button style={styles.actionBtn}>
+          <button style={styles.actionBtn} disabled={isQuiet}>
             Run Integrity Scan
           </button>
 
-          <button style={styles.actionBtn}>
+          <button style={styles.actionBtn} disabled={isQuiet}>
             Refresh Threat Intelligence
           </button>
 
           <button style={styles.actionBtn}>
             Generate Security Report
           </button>
-
         </div>
-
       </div>
 
-      {/* SECURITY TOOL MARKETPLACE */}
+      {/* ================= MARKETPLACE ================= */}
 
       <SecurityToolMarketplace onChange={refreshRadar} />
 
@@ -149,8 +135,20 @@ export default function SecurityOverview() {
   );
 }
 
-const styles = {
+/* ================= SMALL HELPERS ================= */
 
+function Metric({ label, value }) {
+  return (
+    <div style={styles.metricCard}>
+      <h4>{label}</h4>
+      <div style={styles.metricValue}>{value}</div>
+    </div>
+  );
+}
+
+/* ================= STYLES ================= */
+
+const styles = {
   commandHeader: {
     background: "#0f172a",
     borderRadius: 12,
@@ -161,7 +159,6 @@ const styles = {
     alignItems: "center",
     gap: 20,
     flexWrap: "wrap",
-    boxShadow: "0 0 20px rgba(0,0,0,0.4)"
   },
 
   statusBlock: {
@@ -169,37 +166,37 @@ const styles = {
     alignItems: "center",
     gap: 10,
     color: "#e5e7eb",
-    fontSize: 15
+    fontSize: 15,
   },
 
   statusDot: {
-    width: 12,
-    height: 12,
-    borderRadius: "50%"
+    width: 10,
+    height: 10,
+    borderRadius: "50%",
   },
 
   riskBlock: {
-    minWidth: 280
+    minWidth: 260,
   },
 
   riskBar: {
-    height: 10,
+    height: 8,
     backgroundColor: "#1e293b",
     borderRadius: 6,
     overflow: "hidden",
-    marginBottom: 6
+    marginBottom: 6,
   },
 
   riskFill: {
     height: "100%",
-    transition: "width 0.4s ease"
+    transition: "width 0.3s ease",
   },
 
   riskMeta: {
     display: "flex",
     justifyContent: "space-between",
-    fontSize: 13,
-    color: "#cbd5e1"
+    fontSize: 12,
+    color: "#cbd5e1",
   },
 
   integrityAlert: {
@@ -208,45 +205,44 @@ const styles = {
     backgroundColor: "#7f1d1d",
     color: "#fff",
     borderRadius: 8,
-    fontWeight: 600,
-    textAlign: "center"
+    fontWeight: 700,
+    textAlign: "center",
   },
 
   metricsGrid: {
     display: "grid",
     gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-    gap: 20,
-    marginBottom: 28
+    gap: 18,
+    marginBottom: 28,
   },
 
   metricCard: {
     background: "#0f172a",
-    padding: 18,
+    padding: 16,
     borderRadius: 10,
-    boxShadow: "0 0 14px rgba(0,0,0,0.4)",
-    color: "#e5e7eb"
+    color: "#e5e7eb",
   },
 
   metricValue: {
-    fontSize: 26,
+    fontSize: 22,
     fontWeight: 700,
-    marginTop: 8
+    marginTop: 6,
   },
 
   actionPanel: {
-    marginTop: 30,
-    marginBottom: 30
+    marginTop: 28,
+    marginBottom: 28,
   },
 
   actionTitle: {
-    marginBottom: 14,
-    color: "#e5e7eb"
+    marginBottom: 12,
+    color: "#e5e7eb",
   },
 
   actionButtons: {
     display: "flex",
     flexWrap: "wrap",
-    gap: 12
+    gap: 12,
   },
 
   actionBtn: {
@@ -256,7 +252,7 @@ const styles = {
     borderRadius: 8,
     color: "#fff",
     cursor: "pointer",
-    fontWeight: 600
-  }
-
+    fontWeight: 600,
+    opacity: 0.9,
+  },
 };
