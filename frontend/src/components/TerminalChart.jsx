@@ -3,14 +3,6 @@ import { createChart, CrosshairMode } from "lightweight-charts";
 
 /**
  * TerminalChart — Institutional Trading Chart
- *
- * ✔ Candles
- * ✔ Volume
- * ✔ Trade markers
- * ✔ AI signals
- * ✔ PnL overlay
- * ✔ Trend overlay
- * ✔ Chart type switch
  */
 
 export default function TerminalChart({
@@ -30,12 +22,14 @@ export default function TerminalChart({
   const volumeSeriesRef = useRef(null);
   const pnlSeriesRef = useRef(null);
   const trendSeriesRef = useRef(null);
+  const emaSeriesRef = useRef(null);
 
   const lineSeriesRef = useRef(null);
   const areaSeriesRef = useRef(null);
 
   const [chartType,setChartType] = useState("candles");
   const [showTrend,setShowTrend] = useState(true);
+  const [showEMA,setShowEMA] = useState(true);
 
   /* ================= NORMALIZE ================= */
 
@@ -79,7 +73,7 @@ export default function TerminalChart({
 
   },[pnlSeries]);
 
-  /* ================= TREND ================= */
+  /* ================= TREND (SMA 20) ================= */
 
   const trendData = useMemo(()=>{
 
@@ -101,6 +95,32 @@ export default function TerminalChart({
       });
 
     }
+
+    return out;
+
+  },[candleData]);
+
+  /* ================= EMA 50 ================= */
+
+  const emaData = useMemo(()=>{
+
+    if(candleData.length<50) return [];
+
+    const out=[];
+    const k = 2/(50+1);
+
+    let ema=candleData[0].close;
+
+    candleData.forEach(c=>{
+
+      ema = c.close*k + ema*(1-k);
+
+      out.push({
+        time:c.time,
+        value:ema
+      });
+
+    });
 
     return out;
 
@@ -174,87 +194,79 @@ export default function TerminalChart({
 
     });
 
-    /* ===== CANDLES ===== */
+    /* SERIES */
 
-    const candleSeries = chart.addCandlestickSeries({
-
+    candleSeriesRef.current = chart.addCandlestickSeries({
       upColor:"#22c55e",
       downColor:"#ef4444",
-
       borderUpColor:"#22c55e",
       borderDownColor:"#ef4444",
-
       wickUpColor:"#22c55e",
       wickDownColor:"#ef4444"
-
     });
 
-    candleSeries.applyOptions({
-      priceLineVisible:true,
-      priceLineColor:accent
-    });
+    lineSeriesRef.current =
+      chart.addLineSeries({color:"#60a5fa",lineWidth:2});
 
-    /* ===== LINE ===== */
+    areaSeriesRef.current =
+      chart.addAreaSeries({
+        topColor:"rgba(96,165,250,.35)",
+        bottomColor:"rgba(96,165,250,.02)",
+        lineColor:"#60a5fa",
+        lineWidth:2
+      });
 
-    const lineSeries = chart.addLineSeries({
-      color:"#60a5fa",
-      lineWidth:2
-    });
+    volumeSeriesRef.current =
+      chart.addHistogramSeries({
+        priceFormat:{type:"volume"},
+        priceScaleId:"",
+        scaleMargins:{top:0.82,bottom:0}
+      });
 
-    /* ===== AREA ===== */
+    pnlSeriesRef.current =
+      chart.addLineSeries({
+        color:"#facc15",
+        lineWidth:2,
+        priceScaleId:"left"
+      });
 
-    const areaSeries = chart.addAreaSeries({
+    trendSeriesRef.current =
+      chart.addLineSeries({
+        color:"#38bdf8",
+        lineWidth:2
+      });
 
-      topColor:"rgba(96,165,250,.35)",
-      bottomColor:"rgba(96,165,250,.02)",
-      lineColor:"#60a5fa",
-      lineWidth:2
-
-    });
-
-    /* ===== VOLUME ===== */
-
-    const volumeSeries = chart.addHistogramSeries({
-
-      priceFormat:{type:"volume"},
-      priceScaleId:"",
-
-      scaleMargins:{
-        top:0.82,
-        bottom:0
-      }
-
-    });
-
-    /* ===== PNL ===== */
-
-    const pnlLine = chart.addLineSeries({
-
-      color:"#facc15",
-      lineWidth:2,
-      priceScaleId:"left"
-
-    });
-
-    /* ===== TREND ===== */
-
-    const trendLine = chart.addLineSeries({
-
-      color:"#38bdf8",
-      lineWidth:2
-
-    });
+    emaSeriesRef.current =
+      chart.addLineSeries({
+        color:"#a78bfa",
+        lineWidth:2
+      });
 
     chartRef.current=chart;
 
-    candleSeriesRef.current=candleSeries;
-    volumeSeriesRef.current=volumeSeries;
-    pnlSeriesRef.current=pnlLine;
-    trendSeriesRef.current=trendLine;
-    lineSeriesRef.current=lineSeries;
-    areaSeriesRef.current=areaSeries;
-
     chart.timeScale().fitContent();
+
+    /* RESIZE OBSERVER */
+
+    const ro = new ResizeObserver(entries=>{
+
+      const rect = entries[0].contentRect;
+
+      chart.applyOptions({
+        width:rect.width,
+        height
+      });
+
+    });
+
+    ro.observe(el);
+
+    return ()=>{
+
+      try{ro.disconnect()}catch{}
+      try{chart.remove()}catch{}
+
+    };
 
   },[height]);
 
@@ -291,6 +303,15 @@ export default function TerminalChart({
   },[trendData,showTrend]);
 
   useEffect(()=>{
+
+    if(showEMA)
+      emaSeriesRef.current?.setData(emaData);
+    else
+      emaSeriesRef.current?.setData([]);
+
+  },[emaData,showEMA]);
+
+  useEffect(()=>{
     candleSeriesRef.current?.setMarkers(markers);
   },[markers]);
 
@@ -300,7 +321,7 @@ export default function TerminalChart({
 
     <div style={{width:"100%"}}>
 
-      {/* ===== TOOLBAR ===== */}
+      {/* TOOLBAR */}
 
       <div style={{
         display:"flex",
@@ -312,13 +333,12 @@ export default function TerminalChart({
         <button onClick={()=>setChartType("line")}>📈</button>
         <button onClick={()=>setChartType("area")}>≈</button>
 
-        <button onClick={()=>setShowTrend(v=>!v)}>
-          ƒx
-        </button>
+        <button onClick={()=>setShowTrend(v=>!v)}>SMA</button>
+        <button onClick={()=>setShowEMA(v=>!v)}>EMA</button>
 
       </div>
 
-      {/* ===== CHART ===== */}
+      {/* CHART */}
 
       <div
         ref={wrapRef}
