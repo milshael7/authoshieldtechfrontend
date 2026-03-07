@@ -4,7 +4,6 @@ import "../../styles/terminal.css";
 
 /**
  * Market.jsx — INTERNAL MULTI-ASSET MARKET PANEL
- * Institutional style — internal chart engine
  */
 
 const SYMBOL_GROUPS = {
@@ -19,6 +18,15 @@ const ALL_SYMBOLS = Object.values(SYMBOL_GROUPS).flat();
 const SNAP_POS = { x: 16, y: 110 };
 const SNAP_DELAY = 2200;
 
+/* timeframe → seconds */
+const TF_SECONDS = {
+  "1":60,
+  "5":300,
+  "15":900,
+  "60":3600,
+  "D":86400
+};
+
 export default function Market({
   mode="paper",
   dailyLimit=5,
@@ -26,7 +34,7 @@ export default function Market({
 }){
 
   const [symbol,setSymbol] = useState(ALL_SYMBOLS[0]);
-  const [tf,setTf] = useState("D");
+  const [tf,setTf] = useState("1");
   const [side,setSide] = useState("BUY");
 
   const [panelOpen,setPanelOpen] = useState(false);
@@ -46,39 +54,51 @@ export default function Market({
   const [aiSignals,setAiSignals] = useState([]);
   const [pnlSeries,setPnlSeries] = useState([]);
 
-  /* ================= DEMO DATA (until live feed connects) ================= */
+  /* ================= DEMO DATA ENGINE ================= */
 
   useEffect(()=>{
 
-    let price = 65000;
+    const interval = TF_SECONDS[tf] || 60;
+
+    let price =
+      symbol==="BTCUSDT" ? 65000 :
+      symbol==="ETHUSDT" ? 3500 :
+      symbol==="SOLUSDT" ? 150 :
+      100;
 
     const fake=[];
 
     for(let i=0;i<120;i++){
 
       const open = price;
-      const move = (Math.random()-0.5)*600;
+
+      const move = (Math.random()-0.5) * price * 0.01;
 
       const close = open + move;
 
-      const high = Math.max(open,close)+Math.random()*200;
-      const low = Math.min(open,close)-Math.random()*200;
+      const high = Math.max(open,close) + Math.random()*price*0.003;
+      const low = Math.min(open,close) - Math.random()*price*0.003;
 
       price = close;
 
       fake.push({
-        time:Math.floor(Date.now()/1000)-((120-i)*60),
+
+        time:
+          Math.floor(Date.now()/1000) -
+          ((120-i)*interval),
+
         open,
         high,
         low,
         close
+
       });
 
     }
 
     setCandles(fake);
 
-  },[symbol]);
+  },[symbol,tf]);
 
   /* ================= DRAG LOGIC ================= */
 
