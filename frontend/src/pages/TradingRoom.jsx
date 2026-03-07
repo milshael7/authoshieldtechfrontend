@@ -5,6 +5,7 @@
 
 import React, { useEffect, useRef, useState, useMemo } from "react";
 import TerminalChart from "../components/TerminalChart";
+import OrderPanel from "../components/OrderPanel";
 import { getToken } from "../lib/api.js";
 
 const API_BASE = import.meta.env.VITE_API_BASE?.replace(/\/+$/, "");
@@ -199,7 +200,6 @@ export default function TradingRoom() {
         if(data.type!=="snapshot") return;
 
         const market = data.data;
-
         const node = market[SYMBOL];
 
         if(!node) return;
@@ -214,36 +214,30 @@ export default function TradingRoom() {
           Math.floor(ts/CANDLE_SECONDS) *
           CANDLE_SECONDS;
 
-        let candle =
-          lastCandleRef.current;
+        let candle = lastCandleRef.current;
 
         if(!candle || candle.time!==bucket){
 
           candle = {
-
             time:bucket,
             open:priceNow,
             high:priceNow,
             low:priceNow,
             close:priceNow
-
           };
 
-          setCandles(prev=>
-            [...prev,candle]
-              .slice(-MAX_CANDLES)
+          setCandles(prev =>
+            [...prev,candle].slice(-MAX_CANDLES)
           );
 
         }
         else{
 
           candle = {
-
             ...candle,
             high:Math.max(candle.high,priceNow),
             low:Math.min(candle.low,priceNow),
             close:priceNow
-
           };
 
           setCandles(prev=>{
@@ -400,18 +394,36 @@ export default function TradingRoom() {
         </div>
 
         <div style={{
-          border:"1px solid rgba(255,255,255,.08)",
-          borderRadius:10,
-          overflow:"hidden"
+          display:"flex",
+          gap:12,
+          flex:1
         }}>
 
-          <TerminalChart
-            candles={candles}
-            volume={volume}
-            trades={trades}
-            aiSignals={aiSignals}
-            pnlSeries={pnlSeries}
-            height={520}
+          {/* CHART */}
+
+          <div style={{
+            flex:1,
+            border:"1px solid rgba(255,255,255,.08)",
+            borderRadius:10,
+            overflow:"hidden"
+          }}>
+
+            <TerminalChart
+              candles={candles}
+              volume={volume}
+              trades={trades}
+              aiSignals={aiSignals}
+              pnlSeries={pnlSeries}
+              height={520}
+            />
+
+          </div>
+
+          {/* ORDER PANEL */}
+
+          <OrderPanel
+            symbol={SYMBOL}
+            price={price}
           />
 
         </div>
