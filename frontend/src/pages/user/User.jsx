@@ -1,4 +1,4 @@
-// frontend/src/pages/User.jsx
+// frontend/src/pages/user/User.jsx
 // ======================================================
 // USER WORKSPACE — INDIVIDUAL / SEAT VIEW
 // Scoped • Non-admin • Non-manager
@@ -6,9 +6,9 @@
 // ======================================================
 
 import React, { useEffect, useMemo, useState, useCallback } from "react";
-import { req } from "../lib/api.js";
-import NotificationList from "../components/NotificationList.jsx";
-import PosturePanel from "../components/PosturePanel.jsx";
+import { req } from "../../lib/api.js";
+import NotificationList from "../../components/NotificationList.jsx";
+import PosturePanel from "../../components/PosturePanel.jsx";
 
 /* ================= HELPERS ================= */
 
