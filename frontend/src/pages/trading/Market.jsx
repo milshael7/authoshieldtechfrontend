@@ -2,25 +2,26 @@ import React, { useMemo, useRef, useState, useEffect, useCallback } from "react"
 import "../../styles/terminal.css";
 
 /**
- * Market.jsx — MULTI-ASSET PORTFOLIO MARKET
+ * Market.jsx — INTERNAL MULTI-ASSET MARKET PANEL
+ * Institutional style — no external TradingView iframe
  */
 
 const SYMBOL_GROUPS = {
   Crypto: [
-    "BINANCE:BTCUSDT",
-    "BINANCE:ETHUSDT",
-    "BINANCE:SOLUSDT",
+    "BTCUSDT",
+    "ETHUSDT",
+    "SOLUSDT",
   ],
   Forex: [
-    "OANDA:EURUSD",
-    "OANDA:GBPUSD",
+    "EURUSD",
+    "GBPUSD",
   ],
   Indices: [
-    "FOREXCOM:SPXUSD",
-    "FOREXCOM:NSXUSD",
+    "SPX",
+    "NASDAQ",
   ],
   Commodities: [
-    "FOREXCOM:XAUUSD",
+    "GOLD",
   ]
 };
 
@@ -48,27 +49,12 @@ export default function Market({
 
   const limitReached = tradesUsed >= dailyLimit;
 
-  /* ================= TRADINGVIEW ================= */
-
-  const tvSrc = useMemo(() => {
-    const params = new URLSearchParams({
-      symbol,
-      interval: tf,
-      theme: "light",
-      style: "1",
-      locale: "en",
-    });
-
-    return `https://s.tradingview.com/widgetembed/?${params.toString()}`;
-
-  }, [symbol, tf]);
-
   /* ================= DRAG LOGIC ================= */
 
   const clampToViewport = useCallback((x, y) => {
 
     const padding = 12;
-    const maxX = window.innerWidth - 320;
+    const maxX = window.innerWidth - 340;
     const maxY = window.innerHeight - 420;
 
     return {
@@ -169,7 +155,7 @@ export default function Market({
 
       </div>
 
-      {/* TOP BAR */}
+      {/* ================= TOP BAR ================= */}
 
       <header className="tvTopBar">
 
@@ -225,19 +211,32 @@ export default function Market({
 
       </header>
 
+      {/* ================= BODY ================= */}
+
       <div className={`tvBody ${panelOpen && docked ? "withPanel" : ""}`}>
 
         <main className="tvChartArea">
 
-          <iframe
-            className="tvIframe"
-            title="market-chart"
-            src={tvSrc}
-            frameBorder="0"
-            loading="lazy"
-            sandbox="allow-scripts allow-same-origin"
-            referrerPolicy="no-referrer"
-          />
+          {/* INTERNAL CHART PANEL */}
+
+          <div className="internalChart">
+
+            <div className="chartHeader">
+              <strong>{symbol}</strong>
+              <span className="tfLabel">{tf}</span>
+            </div>
+
+            <div className="chartCanvas">
+
+              {/* Chart engine will mount here */}
+
+              <div className="chartPlaceholder">
+                Internal Chart Engine
+              </div>
+
+            </div>
+
+          </div>
 
         </main>
 
