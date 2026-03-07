@@ -1,6 +1,6 @@
 // frontend/src/pages/DeviceIntegrityPanel.jsx
 // Device & System Integrity Command Panel
-// Integrity Alerts • Device Events • Audit Anomalies • Live Risk Correlation
+// HARDENED — Never crashes on undefined data
 
 import React, { useMemo } from "react";
 import { useSecurity } from "../context/SecurityContext.jsx";
@@ -14,23 +14,31 @@ function severityColor(level) {
 }
 
 export default function DeviceIntegrityPanel() {
-  const {
-    deviceAlerts,
-    integrityAlert,
-    auditFeed,
-    riskScore,
-    systemStatus
-  } = useSecurity();
+  const security = useSecurity() || {};
+
+  const deviceAlerts = Array.isArray(security.deviceAlerts)
+    ? security.deviceAlerts
+    : [];
+
+  const auditFeed = Array.isArray(security.auditFeed)
+    ? security.auditFeed
+    : [];
+
+  const integrityAlert = !!security.integrityAlert;
+  const riskScore = Number(security.riskScore || 0);
+  const systemStatus = String(security.systemStatus || "secure");
 
   const sortedAlerts = useMemo(() => {
-    return [...(deviceAlerts || [])].sort(
-      (a, b) => new Date(b.timestamp) - new Date(a.timestamp)
+    return [...deviceAlerts].sort(
+      (a, b) =>
+        new Date(b?.timestamp || 0).getTime() -
+        new Date(a?.timestamp || 0).getTime()
     );
   }, [deviceAlerts]);
 
   const anomalyDetected = useMemo(() => {
     return auditFeed.some(e =>
-      String(e.action || "").toLowerCase().includes("failure")
+      String(e?.action || "").toLowerCase().includes("failure")
     );
   }, [auditFeed]);
 
@@ -61,7 +69,7 @@ export default function DeviceIntegrityPanel() {
                 : "#22c55e",
           }}
         >
-          {String(systemStatus || "secure").toUpperCase()}
+          {systemStatus.toUpperCase()}
         </div>
 
         {integrityAlert && (
@@ -84,14 +92,14 @@ export default function DeviceIntegrityPanel() {
         <h3>Risk Correlation</h3>
 
         <div style={{ fontSize: 16 }}>
-          Current Risk Score:{" "}
+          Current Risk Score:
           <b
             style={{
               color: riskScore >= 80 ? "#ff4d4f" : "#22c55e",
               marginLeft: 8,
             }}
           >
-            {Number(riskScore || 0)}
+            {riskScore}
           </b>
         </div>
 
@@ -125,27 +133,27 @@ export default function DeviceIntegrityPanel() {
                 style={{
                   padding: 12,
                   borderRadius: 8,
-                  border: `1px solid ${severityColor(alert.severity)}40`,
+                  border: `1px solid ${severityColor(alert?.severity)}40`,
                   background: "rgba(255,255,255,.03)",
                 }}
               >
                 <div style={{ fontWeight: 600 }}>
-                  {alert.deviceName || "Unknown Device"}
+                  {alert?.deviceName || "Unknown Device"}
                 </div>
 
                 <div style={{ fontSize: 13, opacity: 0.7 }}>
-                  {alert.message || "No message provided"}
+                  {alert?.message || "No message provided"}
                 </div>
 
                 <div
                   style={{
                     marginTop: 6,
                     fontSize: 12,
-                    color: severityColor(alert.severity),
+                    color: severityColor(alert?.severity),
                     fontWeight: 700,
                   }}
                 >
-                  {String(alert.severity || "low").toUpperCase()}
+                  {String(alert?.severity || "low").toUpperCase()}
                 </div>
               </div>
             ))}
