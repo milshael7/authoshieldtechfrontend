@@ -4,7 +4,7 @@ const API = process.env.REACT_APP_API || "http://localhost:5000";
 
 export default function TradingDashboard(){
 
-  const [snapshot,setSnapshot] = useState(null);
+  const [snapshot,setSnapshot] = useState({});
   const [decisions,setDecisions] = useState([]);
   const [price,setPrice] = useState(null);
   const [loading,setLoading] = useState(true);
@@ -29,7 +29,9 @@ FETCH SNAPSHOT
         setSnapshot(data.snapshot);
       }
 
-    }catch{}
+    }catch(err){
+      console.log("snapshot error",err);
+    }
 
   }
 
@@ -51,7 +53,9 @@ FETCH DECISIONS
         setDecisions(data.reverse());
       }
 
-    }catch{}
+    }catch(err){
+      console.log("decisions error",err);
+    }
 
   }
 
@@ -69,11 +73,13 @@ FETCH PRICE
 
       const data = await res.json();
 
-      if(data?.price){
+      if(data?.price !== undefined){
         setPrice(data.price);
       }
 
-    }catch{}
+    }catch(err){
+      console.log("price error",err);
+    }
 
   }
 
@@ -97,8 +103,7 @@ AUTO REFRESH
 
     load();
 
-    const interval =
-      setInterval(load,2000);
+    const interval = setInterval(load,2000);
 
     return ()=>clearInterval(interval);
 
@@ -126,9 +131,9 @@ ACCOUNT
 
         <h2>Account</h2>
 
-        <div>Equity: ${snapshot?.equity?.toFixed(2)}</div>
-        <div>Cash: ${snapshot?.cashBalance?.toFixed(2)}</div>
-        <div>Peak Equity: ${snapshot?.peakEquity?.toFixed(2)}</div>
+        <div>Equity: ${Number(snapshot?.equity || 0).toFixed(2)}</div>
+        <div>Cash: ${Number(snapshot?.cashBalance || 0).toFixed(2)}</div>
+        <div>Peak Equity: ${Number(snapshot?.peakEquity || 0).toFixed(2)}</div>
 
       </div>
 
@@ -152,7 +157,7 @@ POSITION
 
         ) : (
 
-          <div>No open position</div>
+          <div style={{color:"#777"}}>No open position</div>
 
         )}
 
@@ -166,17 +171,25 @@ MARKET
 
         <h2>Market</h2>
 
-        <div>Last Price: {price}</div>
+        <div>
+          Last Price: {price ? price : "waiting for price feed..."}
+        </div>
 
       </div>
 
 {/* =========================================================
-DECISION STREAM
+AI DECISIONS
 ========================================================= */}
 
       <div style={{marginTop:20}}>
 
         <h2>AI Decisions</h2>
+
+        {decisions.length === 0 && (
+          <div style={{color:"#777"}}>
+            Waiting for AI engine decisions...
+          </div>
+        )}
 
         <table border="1" cellPadding="6">
 
@@ -204,7 +217,7 @@ DECISION STREAM
 
                 <td>{d.price}</td>
 
-                <td>{(d.riskPct*100).toFixed(2)}%</td>
+                <td>{((d.riskPct || 0)*100).toFixed(2)}%</td>
 
               </tr>
             ))}
@@ -216,12 +229,18 @@ DECISION STREAM
       </div>
 
 {/* =========================================================
-TRADE HISTORY
+TRADES
 ========================================================= */}
 
       <div style={{marginTop:20}}>
 
         <h2>Recent Trades</h2>
+
+        {(!snapshot?.trades || snapshot.trades.length===0) && (
+          <div style={{color:"#777"}}>
+            No trades yet
+          </div>
+        )}
 
         <table border="1" cellPadding="6">
 
@@ -246,7 +265,7 @@ TRADE HISTORY
                 <td style={{
                   color: t.pnl >=0 ? "green":"red"
                 }}>
-                  {t.pnl?.toFixed(2)}
+                  {Number(t.pnl || 0).toFixed(2)}
                 </td>
 
               </tr>
