@@ -3,11 +3,6 @@ import TerminalChart from "../../components/TerminalChart";
 import { getToken } from "../../lib/api.js";
 import "../../styles/terminal.css";
 
-/*
-REAL MARKET PANEL
-Real websocket price → candle builder → chart
-*/
-
 const SYMBOL_GROUPS = {
   Crypto: ["BTCUSDT","ETHUSDT","SOLUSDT"],
   Forex: ["EURUSD","GBPUSD"],
@@ -40,53 +35,59 @@ export default function Market(){
 
     const now = Math.floor(Date.now()/1000);
     const candleTime = Math.floor(now / CANDLE_SECONDS) * CANDLE_SECONDS;
-
     const last = lastCandleRef.current;
 
-    if(!last || last.time !== candleTime){
+    setCandles(prev => {
 
-      const newCandle = {
-        time:candleTime,
-        open:priceNow,
-        high:priceNow,
-        low:priceNow,
-        close:priceNow
-      };
+      let next;
 
-      lastCandleRef.current = newCandle;
+      if(!last || last.time !== candleTime){
 
-      setCandles(prev=>{
-        const next = [...prev,newCandle];
-        return next.slice(-MAX_CANDLES);
-      });
+        const newCandle = {
+          time:candleTime,
+          open:priceNow,
+          high:priceNow,
+          low:priceNow,
+          close:priceNow
+        };
 
-    }else{
+        lastCandleRef.current = newCandle;
+        next = [...prev,newCandle].slice(-MAX_CANDLES);
 
-      const updated = {
-        ...last,
-        high:Math.max(last.high,priceNow),
-        low:Math.min(last.low,priceNow),
-        close:priceNow
-      };
+      }else{
 
-      lastCandleRef.current = updated;
+        const updated = {
+          ...last,
+          high:Math.max(last.high,priceNow),
+          low:Math.min(last.low,priceNow),
+          close:priceNow
+        };
 
-      setCandles(prev=>{
-        const next=[...prev];
+        lastCandleRef.current = updated;
+
+        next=[...prev];
         next[next.length-1] = updated;
-        return next;
-      });
+      }
 
-    }
+      return next;
+    });
 
   }
 
+  /* ================= MARKET WS ================= */
+
   useEffect(()=>{
 
-    if(wsRef.current || !API_BASE) return;
+    if(!API_BASE) return;
 
     const token = getToken();
     if(!token) return;
+
+    // Always close previous socket when symbol changes
+    if(wsRef.current){
+      wsRef.current.close();
+      wsRef.current = null;
+    }
 
     try{
 
@@ -121,9 +122,14 @@ export default function Market(){
         wsRef.current = null;
       };
 
-      return ()=>ws.close();
-
     }catch{}
+
+    return ()=>{
+      if(wsRef.current){
+        wsRef.current.close();
+        wsRef.current = null;
+      }
+    };
 
   },[symbol]);
 
@@ -138,7 +144,11 @@ export default function Market(){
           <select
             className="tvSelect"
             value={symbol}
-            onChange={(e)=>setSymbol(e.target.value)}
+            onChange={(e)=>{
+              setCandles([]);
+              lastCandleRef.current = null;
+              setSymbol(e.target.value);
+            }}
           >
 
             {Object.entries(SYMBOL_GROUPS).map(([group,list])=>(
@@ -154,11 +164,9 @@ export default function Market(){
         </div>
 
         <div className="tvTopRight">
-
           <div style={{fontWeight:600}}>
             {symbol} — {price ? price.toLocaleString() : "Loading"}
           </div>
-
         </div>
 
       </header>
