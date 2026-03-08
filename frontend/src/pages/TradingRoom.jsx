@@ -7,14 +7,27 @@ const API_BASE = import.meta.env.VITE_API_BASE?.replace(/\/+$/, "");
 const SYMBOL = "BTCUSDT";
 const CANDLE_SECONDS = 60;
 
+/* ================= GLOBAL CACHE ================= */
+/* Keeps candles alive even when page changes */
+
+if (!window.__TRADING_CACHE__) {
+  window.__TRADING_CACHE__ = {
+    candles: [],
+    lastCandle: null
+  };
+}
+
 export default function TradingRoom(){
 
   const marketWsRef = useRef(null);
   const paperWsRef = useRef(null);
 
-  const lastCandleRef = useRef(null);
+  const lastCandleRef = useRef(window.__TRADING_CACHE__.lastCandle);
 
-  const [candles,setCandles] = useState([]);
+  const [candles,setCandles] = useState(
+    window.__TRADING_CACHE__.candles
+  );
+
   const [price,setPrice] = useState(null);
 
   const [equity,setEquity] = useState(0);
@@ -62,7 +75,11 @@ export default function TradingRoom(){
 
       };
 
-      return ()=>ws.close();
+      ws.onclose = ()=>{
+
+        marketWsRef.current = null;
+
+      };
 
     }catch{}
 
@@ -111,13 +128,17 @@ export default function TradingRoom(){
 
       };
 
-      return ()=>ws.close();
+      ws.onclose = ()=>{
+
+        paperWsRef.current = null;
+
+      };
 
     }catch{}
 
   },[]);
 
-  /* ================= CANDLES ================= */
+  /* ================= CANDLE BUILDER ================= */
 
   function updateCandles(priceNow){
 
@@ -139,7 +160,12 @@ export default function TradingRoom(){
 
       lastCandleRef.current=newCandle;
 
-      setCandles(prev=>[...prev.slice(-200),newCandle]);
+      const updated=[...candles.slice(-200),newCandle];
+
+      window.__TRADING_CACHE__.candles = updated;
+      window.__TRADING_CACHE__.lastCandle = newCandle;
+
+      setCandles(updated);
 
     }else{
 
@@ -152,11 +178,13 @@ export default function TradingRoom(){
 
       lastCandleRef.current=updated;
 
-      setCandles(prev=>{
-        const arr=[...prev];
-        arr[arr.length-1]=updated;
-        return arr;
-      });
+      const arr=[...candles];
+      arr[arr.length-1]=updated;
+
+      window.__TRADING_CACHE__.candles = arr;
+      window.__TRADING_CACHE__.lastCandle = updated;
+
+      setCandles(arr);
 
     }
 
