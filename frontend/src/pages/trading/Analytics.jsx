@@ -1,6 +1,6 @@
 // ============================================================
 // ANALYTICS ROOM — INSTITUTIONAL AI PERFORMANCE DASHBOARD
-// Equity Curve • Risk Metrics • Portfolio Allocation
+// FIXED: Correct API endpoint + accurate equity curve
 // ============================================================
 
 import React, { useEffect, useState } from "react";
@@ -29,7 +29,7 @@ export default function Analytics(){
 
   useEffect(()=>{
     loadAnalytics();
-    const loop=setInterval(loadAnalytics,6000);
+    const loop=setInterval(loadAnalytics,3000);
     return ()=>clearInterval(loop);
   },[]);
 
@@ -38,7 +38,7 @@ export default function Analytics(){
     try{
 
       const res = await fetch(
-        `${API_BASE}/api/paper/snapshot`,
+        `${API_BASE}/api/paper/status`,
         {headers:authHeader()}
       );
 
@@ -55,18 +55,18 @@ export default function Analytics(){
         trades.length ? (wins.length/trades.length)*100 : 0;
 
       const pnl =
-        trades.reduce((s,t)=>s+(t.profit||0),0);
+        trades.reduce((s,t)=>s+(Number(t.profit)||0),0);
 
       const grossProfit =
-        wins.reduce((s,t)=>s+(t.profit||0),0);
+        wins.reduce((s,t)=>s+(Number(t.profit)||0),0);
 
       const grossLoss =
-        losses.reduce((s,t)=>s+Math.abs(t.profit||0),0);
+        losses.reduce((s,t)=>s+Math.abs(Number(t.profit)||0),0);
 
       const profitFactor =
         grossLoss ? grossProfit/grossLoss : 0;
 
-      const returns = trades.map(t=>t.profit||0);
+      const returns = trades.map(t=>Number(t.profit)||0);
 
       const avg =
         returns.reduce((a,b)=>a+b,0)/(returns.length||1);
@@ -79,7 +79,7 @@ export default function Analytics(){
 
       /* ================= EQUITY CURVE ================= */
 
-      let equity = 10000;
+      let equity = Number(snap.cashBalance || 0);
       let peak = equity;
       let maxDD = 0;
 
@@ -87,7 +87,7 @@ export default function Analytics(){
 
       trades.forEach(t=>{
 
-        equity += t.profit||0;
+        equity += Number(t.profit)||0;
 
         peak = Math.max(peak,equity);
 
@@ -138,14 +138,14 @@ export default function Analytics(){
       const exposure =
         snap.position
           ? Math.abs(
-              snap.position.qty *
-              snap.lastPrice
+              Number(snap.position.qty) *
+              Number(snap.lastPrice)
             )
           : 0;
 
       const avgTrade =
         trades.length
-          ? trades.reduce((s,t)=>s+Math.abs(t.profit||0),0)
+          ? trades.reduce((s,t)=>s+Math.abs(Number(t.profit)||0),0)
             / trades.length
           : 0;
 
@@ -154,7 +154,9 @@ export default function Analytics(){
         avgTrade:avgTrade.toFixed(2)
       });
 
-    }catch{}
+    }catch(e){
+      console.error("Analytics load failed",e);
+    }
 
   }
 
@@ -206,16 +208,14 @@ export default function Analytics(){
 
       {/* AI BEHAVIOR */}
 
-      <Panel
-        title="AI Behavior Intelligence"
-        style={{marginTop:30}}
-      >
+      <Panel title="AI Behavior Intelligence" style={{marginTop:30}}>
 
         <div style={{marginBottom:10}}>
           <strong>AI Accuracy:</strong> {behavior.accuracy}%
         </div>
 
         <div>
+
           <strong>Decision Distribution</strong>
 
           <div style={{
@@ -240,23 +240,15 @@ export default function Analytics(){
 
       {/* PORTFOLIO */}
 
-      <Panel
-        title="Portfolio Allocation"
-        style={{marginTop:30}}
-      >
+      <Panel title="Portfolio Allocation" style={{marginTop:30}}>
 
-        <PortfolioAllocation
-          trades={tradeLog}
-        />
+        <PortfolioAllocation trades={tradeLog} />
 
       </Panel>
 
       {/* TRADE LOG */}
 
-      <Panel
-        title="Recent Trades"
-        style={{marginTop:30}}
-      >
+      <Panel title="Recent Trades" style={{marginTop:30}}>
 
         {tradeLog.map((t,i)=>(
 
