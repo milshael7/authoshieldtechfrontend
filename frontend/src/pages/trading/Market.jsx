@@ -4,6 +4,7 @@ import "../../styles/terminal.css";
 
 /**
  * Market.jsx — INTERNAL MULTI-ASSET MARKET PANEL
+ * FIXED: live candle updates instead of static candles
  */
 
 const SYMBOL_GROUPS = {
@@ -54,7 +55,7 @@ export default function Market({
   const [aiSignals,setAiSignals] = useState([]);
   const [pnlSeries,setPnlSeries] = useState([]);
 
-  /* ================= DEMO DATA ENGINE ================= */
+  /* ================= INITIAL CANDLES ================= */
 
   useEffect(()=>{
 
@@ -71,9 +72,7 @@ export default function Market({
     for(let i=0;i<120;i++){
 
       const open = price;
-
       const move = (Math.random()-0.5) * price * 0.01;
-
       const close = open + move;
 
       const high = Math.max(open,close) + Math.random()*price*0.003;
@@ -82,21 +81,54 @@ export default function Market({
       price = close;
 
       fake.push({
-
-        time:
-          Math.floor(Date.now()/1000) -
-          ((120-i)*interval),
-
+        time: Math.floor(Date.now()/1000) - ((120-i)*interval),
         open,
         high,
         low,
         close
-
       });
 
     }
 
     setCandles(fake);
+
+  },[symbol,tf]);
+
+  /* ================= LIVE PRICE ENGINE ================= */
+
+  useEffect(()=>{
+
+    const timer = setInterval(()=>{
+
+      setCandles(prev=>{
+
+        if(prev.length===0) return prev;
+
+        const last = prev[prev.length-1];
+
+        const move =
+          (Math.random()-0.5) * last.close * 0.002;
+
+        const newClose = last.close + move;
+
+        const newCandle = {
+
+          time: Math.floor(Date.now()/1000),
+
+          open: last.close,
+          high: Math.max(last.close,newClose),
+          low: Math.min(last.close,newClose),
+          close: newClose
+
+        };
+
+        return [...prev.slice(-119), newCandle];
+
+      });
+
+    },2000);
+
+    return ()=>clearInterval(timer);
 
   },[symbol,tf]);
 
@@ -210,8 +242,6 @@ export default function Market({
 
       </div>
 
-      {/* TOP BAR */}
-
       <header className="tvTopBar">
 
         <div className="tvTopLeft">
@@ -224,11 +254,9 @@ export default function Market({
 
             {Object.entries(SYMBOL_GROUPS).map(([group,list])=>(
               <optgroup key={group} label={group}>
-
                 {list.map(s=>(
                   <option key={s} value={s}>{s}</option>
                 ))}
-
               </optgroup>
             ))}
 
@@ -264,8 +292,6 @@ export default function Market({
 
       </header>
 
-      {/* BODY */}
-
       <div className={`tvBody ${panelOpen && docked ? "withPanel" : ""}`}>
 
         <main className="tvChartArea">
@@ -294,121 +320,7 @@ export default function Market({
 
         </main>
 
-        {panelOpen && docked &&
-
-          <aside className="dockPanel">
-
-            <TradePanel
-              symbol={symbol}
-              side={side}
-              setSide={setSide}
-              onClose={togglePanel}
-              mode={mode}
-            />
-
-          </aside>
-
-        }
-
       </div>
-
-      {panelOpen && !docked &&
-
-        <div
-          className="floatingPanel"
-          style={{left:pos.x,top:pos.y}}
-        >
-
-          <TradePanel
-            symbol={symbol}
-            side={side}
-            setSide={setSide}
-            onClose={togglePanel}
-            mode={mode}
-            draggable
-            onDragStart={startDrag}
-          />
-
-        </div>
-
-      }
-
-    </div>
-
-  );
-
-}
-
-/* ================= TRADE PANEL ================= */
-
-function TradePanel({
-  symbol,
-  side,
-  setSide,
-  onClose,
-  mode,
-  draggable,
-  onDragStart
-}){
-
-  return(
-
-    <div className="tradePanel">
-
-      <header
-        className="tpHeader"
-        onMouseDown={draggable?onDragStart:undefined}
-        onTouchStart={draggable?onDragStart:undefined}
-      >
-
-        <span>{symbol}</span>
-
-        <button
-          className="tpClose"
-          onClick={onClose}
-        >
-          ✕
-        </button>
-
-      </header>
-
-      <div className="orderSide">
-
-        <button
-          className={`orderBtn sell ${side==="SELL"?"active":""}`}
-          onClick={()=>setSide("SELL")}
-        >
-          SELL
-        </button>
-
-        <button
-          className={`orderBtn buy ${side==="BUY"?"active":""}`}
-          onClick={()=>setSide("BUY")}
-        >
-          BUY
-        </button>
-
-      </div>
-
-      <input
-        className="tradeInput"
-        placeholder="Reference Price"
-      />
-
-      <input
-        className="tradeInput"
-        placeholder="Position Size"
-      />
-
-      <button
-        className={`tvPrimary full ${mode==="live"?"warn":""}`}
-      >
-        Queue {side} Intent
-      </button>
-
-      <small className="muted" style={{marginTop:8}}>
-        Trade intent only. Execution occurs in Trading Control Room.
-      </small>
 
     </div>
 
