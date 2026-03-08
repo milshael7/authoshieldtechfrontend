@@ -1,11 +1,10 @@
-// frontend/src/pages/trading/TradingLayout.jsx
 // ============================================================
-// TRADING TERMINAL — ENTERPRISE TRADING MODULE v4
-// Single mount • institutional workspace • socket-safe
+// TRADING TERMINAL — ENTERPRISE TRADING MODULE v5
+// Persistent engine mount • zero reset switching
 // ============================================================
 
 import React, { useEffect, useState } from "react";
-import { NavLink, Routes, Route, Navigate } from "react-router-dom";
+import { NavLink, useLocation, Navigate } from "react-router-dom";
 
 import TradingRoom from "../TradingRoom";
 import Market from "./Market";
@@ -14,22 +13,21 @@ import Analytics from "./Analytics";
 
 export default function TradingLayout() {
 
+  const location = useLocation();
+
   const [engineStatus,setEngineStatus] = useState("CONNECTED");
   const [mode,setMode] = useState("PAPER");
 
+  const page = location.pathname.split("/").pop();
+
   /* =========================================================
-  ENGINE HEARTBEAT (simple health check)
+  ENGINE HEARTBEAT
   ========================================================= */
 
   useEffect(()=>{
 
     const interval = setInterval(()=>{
-
-      // lightweight heartbeat indicator
-      // future: connect to engine status endpoint
-
       setEngineStatus(prev=>prev);
-
     },5000);
 
     return ()=>clearInterval(interval);
@@ -102,8 +100,6 @@ export default function TradingLayout() {
             </div>
 
           </div>
-
-          {/* ENGINE STATUS */}
 
           <div style={{
             display:"flex",
@@ -192,42 +188,31 @@ export default function TradingLayout() {
         style={{
           flex:1,
           minHeight:0,
-          overflow:"auto"
+          position:"relative"
         }}
       >
 
-        <Routes>
+        {/* TRADING ROOM (ALWAYS MOUNTED) */}
+        <div
+          style={{
+            display: page==="live" ? "block" : "none",
+            height:"100%"
+          }}
+        >
+          <TradingRoom />
+        </div>
 
-          {/* CANONICAL ENTRY */}
+        {/* MARKET */}
+        {page==="market" && <Market />}
 
-          <Route
-            index
-            element={<Navigate to="live" replace />}
-          />
+        {/* AI CONTROL */}
+        {page==="control" && <AIControl />}
 
-          {/* MODULES */}
+        {/* ANALYTICS */}
+        {page==="analytics" && <Analytics />}
 
-          <Route
-            path="live"
-            element={<TradingRoom />}
-          />
-
-          <Route
-            path="market"
-            element={<Market />}
-          />
-
-          <Route
-            path="control"
-            element={<AIControl />}
-          />
-
-          <Route
-            path="analytics"
-            element={<Analytics />}
-          />
-
-        </Routes>
+        {/* DEFAULT */}
+        {page==="" && <Navigate to="live" replace />}
 
       </div>
 
