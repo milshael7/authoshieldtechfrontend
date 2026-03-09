@@ -18,8 +18,9 @@ export default function TerminalChart({
   const pnlSeriesRef = useRef(null);
 
   const lastTimeRef = useRef(null);
+  const initializedRef = useRef(false);
 
-  /* ================= STRICT SANITIZATION ================= */
+  /* ================= SANITIZE CANDLES ================= */
 
   const candleData = useMemo(() => {
 
@@ -46,8 +47,6 @@ export default function TerminalChart({
 
       })
       .filter(Boolean);
-
-    /* enforce time ordering */
 
     cleaned.sort((a,b)=>a.time-b.time);
 
@@ -107,26 +106,40 @@ export default function TerminalChart({
     try { chartRef.current?.remove(); } catch {}
 
     const chart = createChart(el, {
+
       height,
       width: el.clientWidth,
+
       layout: {
         background: { color: "#0b1220" },
         textColor: "#9ca3af"
       },
+
       grid: {
         vertLines: { color: "rgba(148,163,184,.05)" },
         horzLines: { color: "rgba(148,163,184,.05)" }
       },
+
       rightPriceScale: {
-        borderColor: "rgba(148,163,184,.15)"
+        borderColor: "rgba(148,163,184,.15)",
+        scaleMargins: {
+          top: 0.2,
+          bottom: 0.2
+        }
       },
+
       crosshair: {
         mode: CrosshairMode.Normal
       },
+
       timeScale: {
         borderColor: "rgba(148,163,184,.15)",
-        timeVisible: true
+        timeVisible: true,
+        rightBarStaysOnScroll: true,
+        fixLeftEdge: true,
+        barSpacing: 8
       }
+
     });
 
     candleSeriesRef.current = chart.addCandlestickSeries({
@@ -158,7 +171,6 @@ export default function TerminalChart({
 
       try {
         chart.resize(rect.width, height);
-        chart.timeScale().fitContent();
       } catch {}
 
     });
@@ -175,12 +187,13 @@ export default function TerminalChart({
       volumeSeriesRef.current = null;
       pnlSeriesRef.current = null;
       lastTimeRef.current = null;
+      initializedRef.current = false;
 
     };
 
   }, [height]);
 
-  /* ================= SAFE DATA UPDATE ================= */
+  /* ================= DATA UPDATE ================= */
 
   useEffect(() => {
 
@@ -188,12 +201,9 @@ export default function TerminalChart({
     const chart = chartRef.current;
 
     if (!series || !chart) return;
-
     if (!candleData.length) return;
 
     const last = candleData[candleData.length - 1];
-
-    if (!Number.isFinite(last.time)) return;
 
     if (lastTimeRef.current === null) {
 
@@ -201,7 +211,12 @@ export default function TerminalChart({
 
       lastTimeRef.current = last.time;
 
-      try { chart.timeScale().fitContent(); } catch {}
+      if (!initializedRef.current) {
+
+        chart.timeScale().fitContent();
+        initializedRef.current = true;
+
+      }
 
       return;
 
@@ -210,20 +225,13 @@ export default function TerminalChart({
     if (last.time >= lastTimeRef.current) {
 
       series.update(last);
-
       lastTimeRef.current = last.time;
-
       return;
 
     }
 
-    /* fallback reset */
-
     series.setData(candleData);
-
     lastTimeRef.current = last.time;
-
-    try { chart.timeScale().fitContent(); } catch {}
 
   }, [candleData]);
 
@@ -234,6 +242,8 @@ export default function TerminalChart({
   useEffect(() => {
     pnlSeriesRef.current?.setData(pnlData);
   }, [pnlData]);
+
+  /* ================= MARKERS ================= */
 
   useEffect(() => {
 
