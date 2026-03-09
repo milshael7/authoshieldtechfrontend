@@ -248,10 +248,23 @@ export default function TradingRoom() {
   /* ================= UI ================= */
 
   return (
-    <div style={{ display: "flex", flex: 1, background: "#0a0f1c", color: "#fff" }}>
+    <div style={{
+      display: "flex",
+      flex: 1,
+      background: "#0a0f1c",
+      color: "#fff"
+    }}>
 
-      <div style={{ flex: 1, padding: 20 }}>
+      {/* CHART AREA */}
+
+      <div style={{
+        flex: 1,
+        padding: 20,
+        minWidth: 0
+      }}>
+
         <div style={{ fontWeight: 700 }}>{SYMBOL}</div>
+
         <div style={{ opacity: .7 }}>
           Live Price: {price ? price.toLocaleString() : "Loading"}
         </div>
@@ -262,14 +275,25 @@ export default function TradingRoom() {
           aiSignals={aiSignals}
           pnlSeries={pnlSeries}
         />
+
       </div>
 
-      <OrderPanel symbol={SYMBOL} price={price} />
+      {/* ORDER PANEL */}
 
       <div style={{
-        width: 280,
+        width: 260,
+        borderLeft: "1px solid rgba(255,255,255,.06)"
+      }}>
+        <OrderPanel symbol={SYMBOL} price={price} />
+      </div>
+
+      {/* AI PANEL */}
+
+      <div style={{
+        width: 220,
         padding: 16,
         background: "#111827",
+        borderLeft: "1px solid rgba(255,255,255,.06)",
         overflowY: "auto"
       }}>
         <h3>AI Engine</h3>
