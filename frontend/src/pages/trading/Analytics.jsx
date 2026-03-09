@@ -1,6 +1,6 @@
 // ============================================================
-// ANALYTICS ROOM — INSTITUTIONAL AI PERFORMANCE DASHBOARD
-// FIXED: Correct API endpoint + accurate equity curve
+// ANALYTICS ROOM — INSTITUTIONAL AI PERFORMANCE DASHBOARD v2
+// FULL ENGINE INTELLIGENCE CONNECTED
 // ============================================================
 
 import React, { useEffect, useState } from "react";
@@ -16,16 +16,11 @@ export default function Analytics(){
   const [equityHistory,setEquityHistory] = useState([]);
   const [tradeLog,setTradeLog] = useState([]);
 
-  const [behavior,setBehavior] = useState({
-    buy:0,
-    sell:0,
-    accuracy:0
-  });
-
-  const [risk,setRisk] = useState({
-    exposure:0,
-    avgTrade:0
-  });
+  const [behavior,setBehavior] = useState({});
+  const [risk,setRisk] = useState({});
+  const [brain,setBrain] = useState({});
+  const [engine,setEngine] = useState({});
+  const [config,setConfig] = useState({});
 
   useEffect(()=>{
     loadAnalytics();
@@ -37,16 +32,32 @@ export default function Analytics(){
 
     try{
 
-      const res = await fetch(
+      const token = getToken();
+      if(!token) return;
+
+      const headers = {Authorization:`Bearer ${token}`};
+
+      // 1️⃣ Paper Snapshot
+      const paperRes = await fetch(
         `${API_BASE}/api/paper/status`,
-        {headers:authHeader()}
+        {headers}
       );
 
-      const data = await res.json();
-      if(!data?.ok) return;
+      const paperData = await paperRes.json();
+      if(!paperData?.ok) return;
 
-      const snap = data.snapshot || {};
+      const snap = paperData.snapshot || {};
       const trades = snap.trades || [];
+
+      // 2️⃣ AI Analytics (Brain + Config + Engine)
+      const aiRes = await fetch(
+        `${API_BASE}/api/ai/analytics`,
+        {headers}
+      );
+
+      const aiData = await aiRes.json();
+
+      /* ================= PERFORMANCE ================= */
 
       const wins = trades.filter(t=>t.profit>0);
       const losses = trades.filter(t=>t.profit<=0);
@@ -57,67 +68,41 @@ export default function Analytics(){
       const pnl =
         trades.reduce((s,t)=>s+(Number(t.profit)||0),0);
 
-      const grossProfit =
-        wins.reduce((s,t)=>s+(Number(t.profit)||0),0);
-
-      const grossLoss =
-        losses.reduce((s,t)=>s+Math.abs(Number(t.profit)||0),0);
-
-      const profitFactor =
-        grossLoss ? grossProfit/grossLoss : 0;
-
-      const returns = trades.map(t=>Number(t.profit)||0);
-
-      const avg =
-        returns.reduce((a,b)=>a+b,0)/(returns.length||1);
-
-      const variance =
-        returns.reduce((s,r)=>s+Math.pow(r-avg,2),0)/(returns.length||1);
-
-      const sharpe =
-        variance ? avg/Math.sqrt(variance) : 0;
-
-      /* ================= EQUITY CURVE ================= */
-
       let equity = Number(snap.cashBalance || 0);
       let peak = equity;
       let maxDD = 0;
-
       const curve = [];
 
       trades.forEach(t=>{
-
         equity += Number(t.profit)||0;
-
         peak = Math.max(peak,equity);
-
         const dd = (peak-equity)/peak;
-
         maxDD = Math.max(maxDD,dd);
-
         curve.push(equity);
-
       });
 
       setEquityHistory(curve);
-
-      setTradeLog(
-        trades.slice(-20).reverse()
-      );
+      setTradeLog(trades.slice(-20).reverse());
 
       setStats({
-
         equity:Number(snap.equity||0).toFixed(2),
         winRate:winRate.toFixed(1),
         trades:trades.length,
         pnl:pnl.toFixed(2),
-        drawdown:(maxDD*100).toFixed(2),
-        sharpe:sharpe.toFixed(2),
-        profitFactor:profitFactor.toFixed(2)
-
+        drawdown:(maxDD*100).toFixed(2)
       });
 
-      /* ================= AI BEHAVIOR ================= */
+      /* ================= AI BRAIN ================= */
+
+      if(aiData?.ok){
+
+        setBrain(aiData.brain || {});
+        setConfig(aiData.config || {});
+        setEngine(aiData.execution || {});
+
+      }
+
+      /* ================= BEHAVIOR ================= */
 
       let buy=0;
       let sell=0;
@@ -143,15 +128,11 @@ export default function Analytics(){
             )
           : 0;
 
-      const avgTrade =
-        trades.length
-          ? trades.reduce((s,t)=>s+Math.abs(Number(t.profit)||0),0)
-            / trades.length
-          : 0;
-
       setRisk({
         exposure:exposure.toFixed(2),
-        avgTrade:avgTrade.toFixed(2)
+        riskPercent:config.riskPercent,
+        maxTrades:config.maxTrades,
+        mode:config.tradingMode
       });
 
     }catch(e){
@@ -168,7 +149,7 @@ export default function Analytics(){
         AI Trading Analytics
       </h2>
 
-      {/* METRICS */}
+      {/* PERFORMANCE METRICS */}
 
       <div style={{
         display:"flex",
@@ -182,17 +163,32 @@ export default function Analytics(){
         <Metric title="Trades" value={stats.trades} />
         <Metric title="PnL" value={`$${stats.pnl}`} />
         <Metric title="Drawdown" value={`${stats.drawdown}%`} />
-        <Metric title="Sharpe Ratio" value={stats.sharpe} />
-        <Metric title="Profit Factor" value={stats.profitFactor} />
 
       </div>
 
-      {/* RISK */}
+      {/* ENGINE STATE */}
 
-      <Panel title="Risk Metrics">
+      <Panel title="AI Engine State">
 
-        <div>Exposure: ${risk.exposure}</div>
-        <div>Avg Trade: ${risk.avgTrade}</div>
+        <div>Mode: {risk.mode}</div>
+        <div>Risk %: {risk.riskPercent}%</div>
+        <div>Max Trades/Day: {risk.maxTrades}</div>
+        <div>Ticks Processed: {engine.ticks}</div>
+        <div>Total Decisions: {engine.decisions}</div>
+        <div>Total Executions: {engine.trades}</div>
+
+      </Panel>
+
+      {/* BRAIN INTELLIGENCE */}
+
+      <Panel title="AI Brain Intelligence" style={{marginTop:30}}>
+
+        <div>Last Action: {brain.lastAction}</div>
+        <div>Smoothed Confidence: {(brain.smoothedConfidence||0).toFixed(3)}</div>
+        <div>Edge Momentum: {(brain.edgeMomentum||0).toFixed(4)}</div>
+        <div>Win Streak: {brain.winStreak}</div>
+        <div>Loss Streak: {brain.lossStreak}</div>
+        <div>Aggression Factor: {(brain.aggressionFactor||1).toFixed(2)}</div>
 
       </Panel>
 
@@ -200,41 +196,17 @@ export default function Analytics(){
 
       <Panel title="Equity Curve" style={{marginTop:30}}>
 
-        <EquityCurve
-          scalpHistory={equityHistory}
-        />
+        <EquityCurve scalpHistory={equityHistory} />
 
       </Panel>
 
-      {/* AI BEHAVIOR */}
+      {/* BEHAVIOR */}
 
       <Panel title="AI Behavior Intelligence" style={{marginTop:30}}>
 
-        <div style={{marginBottom:10}}>
-          <strong>AI Accuracy:</strong> {behavior.accuracy}%
-        </div>
-
-        <div>
-
-          <strong>Decision Distribution</strong>
-
-          <div style={{
-            display:"flex",
-            gap:20,
-            marginTop:8
-          }}>
-
-            <span style={{color:"#22c55e"}}>
-              BUY: {behavior.buy}
-            </span>
-
-            <span style={{color:"#ef4444"}}>
-              SELL: {behavior.sell}
-            </span>
-
-          </div>
-
-        </div>
+        <div>BUY: {behavior.buy}</div>
+        <div>SELL: {behavior.sell}</div>
+        <div>Accuracy: {behavior.accuracy}%</div>
 
       </Panel>
 
@@ -246,14 +218,13 @@ export default function Analytics(){
 
       </Panel>
 
-      {/* TRADE LOG */}
+      {/* RECENT TRADES */}
 
       <Panel title="Recent Trades" style={{marginTop:30}}>
 
         {tradeLog.map((t,i)=>(
 
-          <div
-            key={i}
+          <div key={i}
             style={{
               display:"flex",
               justifyContent:"space-between",
@@ -261,17 +232,14 @@ export default function Analytics(){
               padding:"6px 0"
             }}
           >
-
             <span>{t.side}</span>
             <span>{t.qty}</span>
             <span>@ {t.price}</span>
-
             <span style={{
               color:t.profit>0?"#22c55e":"#ef4444"
             }}>
               {Number(t.profit||0).toFixed(2)}
             </span>
-
           </div>
 
         ))}
@@ -284,42 +252,28 @@ export default function Analytics(){
 
 }
 
-/* ================= METRIC ================= */
+/* ================= UI HELPERS ================= */
 
 function Metric({title,value}){
 
   return(
-
     <div style={{
       background:"#111827",
       padding:20,
       borderRadius:10,
       minWidth:140
     }}>
-
-      <div style={{opacity:.6}}>
-        {title}
-      </div>
-
-      <div style={{
-        fontSize:24,
-        fontWeight:700
-      }}>
+      <div style={{opacity:.6}}>{title}</div>
+      <div style={{fontSize:24,fontWeight:700}}>
         {value}
       </div>
-
     </div>
-
   );
-
 }
-
-/* ================= PANEL ================= */
 
 function Panel({title,children,style={}}){
 
   return(
-
     <div style={{
       background:"#111827",
       padding:20,
@@ -327,27 +281,10 @@ function Panel({title,children,style={}}){
       border:"1px solid rgba(255,255,255,.08)",
       ...style
     }}>
-
       <h3 style={{marginBottom:12}}>
         {title}
       </h3>
-
       {children}
-
     </div>
-
   );
-
-}
-
-/* ================= AUTH ================= */
-
-function authHeader(){
-
-  const token = getToken();
-
-  return token
-    ? {Authorization:`Bearer ${token}`}
-    : {};
-
 }
