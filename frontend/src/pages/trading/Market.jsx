@@ -13,106 +13,217 @@ const SYMBOL_GROUPS = {
 const ALL_SYMBOLS = Object.values(SYMBOL_GROUPS).flat();
 
 const CANDLE_SECONDS = 60;
-const MAX_CANDLES = 200;
-
+const MAX_CANDLES = 500;
 const API_BASE = import.meta.env.VITE_API_BASE?.replace(/\/+$/, "");
 
-export default function Market(){
+/* ================= GLOBAL CACHE ================= */
+
+if (!window.__MARKET_CACHE__) {
+  window.__MARKET_CACHE__ = {};
+}
+
+function getStorageKey(symbol) {
+  return `market_candles_${symbol}`;
+}
+
+function loadPersisted(symbol) {
+  try {
+    const raw = localStorage.getItem(getStorageKey(symbol));
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function savePersisted(symbol, candles) {
+  try {
+    localStorage.setItem(
+      getStorageKey(symbol),
+      JSON.stringify(candles.slice(-MAX_CANDLES))
+    );
+  } catch {}
+}
+
+function ensureSymbolCache(symbol) {
+  if (!window.__MARKET_CACHE__[symbol]) {
+    window.__MARKET_CACHE__[symbol] = {
+      candles: [],
+      lastCandle: null
+    };
+  }
+  return window.__MARKET_CACHE__[symbol];
+}
+
+export default function Market() {
 
   const wsRef = useRef(null);
-  const lastCandleRef = useRef(null);
+  const symbolRef = useRef(ALL_SYMBOLS[0]);
 
-  const [symbol,setSymbol] = useState(ALL_SYMBOLS[0]);
-  const [price,setPrice] = useState(null);
-  const [candles,setCandles] = useState([]);
+  const [symbol, setSymbol] = useState(ALL_SYMBOLS[0]);
 
-  function toNumber(v){
+  const initialCache = ensureSymbolCache(ALL_SYMBOLS[0]);
+  const initialPersisted = loadPersisted(ALL_SYMBOLS[0]);
+
+  const lastCandleRef = useRef(
+    initialCache.lastCandle ||
+    initialPersisted[initialPersisted.length - 1] ||
+    null
+  );
+
+  const [candles, setCandles] = useState(
+    initialCache.candles.length
+      ? initialCache.candles
+      : initialPersisted
+  );
+
+  const [price, setPrice] = useState(null);
+
+  function toNumber(v) {
     const n = Number(v);
     return Number.isFinite(n) ? n : null;
   }
 
-  /* ================= LOAD HISTORY ================= */
+  function syncCache(sym, nextCandles, lastCandle) {
+    const cache = ensureSymbolCache(sym);
+    cache.candles = nextCandles;
+    cache.lastCandle = lastCandle;
+    savePersisted(sym, nextCandles);
+  }
 
-  async function loadHistory(sym){
+  function updateCandles(sym, priceNow) {
+    if (!Number.isFinite(priceNow)) return;
 
-    if(!API_BASE) return;
+    const now = Math.floor(Date.now() / 1000);
+    const candleTime = Math.floor(now / CANDLE_SECONDS) * CANDLE_SECONDS;
+
+    setCandles(prev => {
+      const currentSymbol = symbolRef.current;
+      if (sym !== currentSymbol) return prev;
+
+      const last = lastCandleRef.current;
+      let next;
+      let nextLast;
+
+      if (!last || last.time !== candleTime) {
+        nextLast = {
+          time: candleTime,
+          open: priceNow,
+          high: priceNow,
+          low: priceNow,
+          close: priceNow
+        };
+
+        next = [...prev.slice(-MAX_CANDLES), nextLast];
+      } else {
+        nextLast = {
+          ...last,
+          high: Math.max(last.high, priceNow),
+          low: Math.min(last.low, priceNow),
+          close: priceNow
+        };
+
+        if (prev.length === 0) {
+          next = [nextLast];
+        } else {
+          next = [...prev];
+          next[next.length - 1] = nextLast;
+        }
+      }
+
+      lastCandleRef.current = nextLast;
+      syncCache(sym, next, nextLast);
+
+      return next;
+    });
+  }
+
+  async function loadHistory(sym) {
+    if (!API_BASE) return;
 
     const token = getToken();
-    if(!token) return;
+    if (!token) return;
 
-    try{
-
+    try {
       const res = await fetch(
         `${API_BASE}/api/market/candles/${sym}?limit=${MAX_CANDLES}`,
-        { headers:{ Authorization:`Bearer ${token}` } }
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
       );
 
       const data = await res.json();
+      if (!data?.ok || !Array.isArray(data.candles)) return;
 
-      if(!data?.ok) return;
+      const formatted = data.candles
+        .map(c => {
+          const time = toNumber(c?.time);
+          const open = toNumber(c?.open);
+          const high = toNumber(c?.high);
+          const low = toNumber(c?.low);
+          const close = toNumber(c?.close);
 
-      const formatted = (data.candles || [])
-        .map(c => ({
-          time:Number(c.time),
-          open:Number(c.open),
-          high:Number(c.high),
-          low:Number(c.low),
-          close:Number(c.close)
-        }))
-        .filter(c =>
-          Number.isFinite(c.time) &&
-          Number.isFinite(c.open) &&
-          Number.isFinite(c.high) &&
-          Number.isFinite(c.low) &&
-          Number.isFinite(c.close)
-        );
+          if (
+            time === null ||
+            open === null ||
+            high === null ||
+            low === null ||
+            close === null
+          ) {
+            return null;
+          }
 
-      if(formatted.length){
+          return { time, open, high, low, close };
+        })
+        .filter(Boolean)
+        .sort((a, b) => a.time - b.time)
+        .slice(-MAX_CANDLES);
 
-        lastCandleRef.current =
-          formatted[formatted.length-1];
+      if (!formatted.length) return;
+      if (symbolRef.current !== sym) return;
 
-        setCandles(formatted.slice(-MAX_CANDLES));
-
-      }
-
-    }catch(err){
-
-      console.log("history load skipped",err);
-
-    }
-
+      const nextLast = formatted[formatted.length - 1];
+      lastCandleRef.current = nextLast;
+      syncCache(sym, formatted, nextLast);
+      setCandles(formatted);
+    } catch {}
   }
 
-  /* ================= SYMBOL CHANGE ================= */
+  /* ================= SYMBOL SWITCH ================= */
 
-  useEffect(()=>{
+  useEffect(() => {
+    symbolRef.current = symbol;
 
-    setCandles([]);
-    lastCandleRef.current = null;
+    const cache = ensureSymbolCache(symbol);
+    const persisted = loadPersisted(symbol);
+
+    const nextCandles =
+      cache.candles.length ? cache.candles : persisted;
+
+    const nextLast =
+      cache.lastCandle ||
+      nextCandles[nextCandles.length - 1] ||
+      null;
+
+    lastCandleRef.current = nextLast;
+    setCandles(nextCandles);
 
     loadHistory(symbol);
-
-  },[symbol]);
+  }, [symbol]);
 
   /* ================= MARKET WS ================= */
 
-  useEffect(()=>{
-
-    if(!API_BASE) return;
+  useEffect(() => {
+    if (!API_BASE) return;
 
     const token = getToken();
-    if(!token) return;
+    if (!token) return;
+    if (wsRef.current) return;
 
-    if(wsRef.current){
-      wsRef.current.close();
-      wsRef.current = null;
-    }
-
-    try{
-
+    try {
       const url = new URL(API_BASE);
-      const protocol = url.protocol==="https:"?"wss:":"ws:";
+      const protocol = url.protocol === "https:" ? "wss:" : "ws:";
 
       const ws = new WebSocket(
         `${protocol}//${url.host}/ws?channel=market&token=${encodeURIComponent(token)}`
@@ -120,124 +231,63 @@ export default function Market(){
 
       wsRef.current = ws;
 
-      ws.onmessage = (msg)=>{
-
-        try{
-
+      ws.onmessage = (msg) => {
+        try {
           const data = JSON.parse(msg.data);
-          const market = data?.data?.[symbol];
-
-          if(!market) return;
+          const currentSymbol = symbolRef.current;
+          const market = data?.data?.[currentSymbol];
+          if (!market) return;
 
           const priceNow = toNumber(market.price);
-          if(priceNow === null) return;
+          if (priceNow === null) return;
 
           setPrice(priceNow);
-
-          const now = Math.floor(Date.now()/1000);
-          const candleTime =
-            Math.floor(now/CANDLE_SECONDS)*CANDLE_SECONDS;
-
-          const last = lastCandleRef.current;
-
-          setCandles(prev=>{
-
-            let next;
-
-            if(!last || last.time !== candleTime){
-
-              const newCandle={
-                time:candleTime,
-                open:priceNow,
-                high:priceNow,
-                low:priceNow,
-                close:priceNow
-              };
-
-              lastCandleRef.current=newCandle;
-
-              next=[...prev,newCandle]
-                .slice(-MAX_CANDLES);
-
-            }else{
-
-              const updated={
-                ...last,
-                high:Math.max(last.high,priceNow),
-                low:Math.min(last.low,priceNow),
-                close:priceNow
-              };
-
-              lastCandleRef.current=updated;
-
-              next=[...prev];
-              next[next.length-1]=updated;
-
-            }
-
-            return next;
-
-          });
-
-        }catch{}
-
+          updateCandles(currentSymbol, priceNow);
+        } catch {}
       };
 
-      ws.onclose = ()=>{
-
+      ws.onclose = () => {
         wsRef.current = null;
-
       };
 
-    }catch{}
+    } catch {}
 
-    return ()=>{
-
-      if(wsRef.current){
+    return () => {
+      if (wsRef.current) {
         wsRef.current.close();
         wsRef.current = null;
       }
-
     };
+  }, []);
 
-  },[symbol]);
-
-  return(
-
+  return (
     <div className="terminalRoot">
 
       <header className="tvTopBar">
-
         <div className="tvTopLeft">
-
           <select
             className="tvSelect"
             value={symbol}
-            onChange={(e)=>setSymbol(e.target.value)}
+            onChange={(e) => setSymbol(e.target.value)}
           >
-
-            {Object.entries(SYMBOL_GROUPS).map(([group,list])=>(
+            {Object.entries(SYMBOL_GROUPS).map(([group, list]) => (
               <optgroup key={group} label={group}>
-                {list.map(s=>(
+                {list.map(s => (
                   <option key={s} value={s}>{s}</option>
                 ))}
               </optgroup>
             ))}
-
           </select>
-
         </div>
 
         <div className="tvTopRight">
-          <div style={{fontWeight:600}}>
+          <div style={{ fontWeight: 600 }}>
             {symbol} — {price ? price.toLocaleString() : "Loading"}
           </div>
         </div>
-
       </header>
 
       <main className="tvChartArea">
-
         <TerminalChart
           candles={candles}
           volume={[]}
@@ -246,11 +296,8 @@ export default function Market(){
           pnlSeries={[]}
           height={520}
         />
-
       </main>
 
     </div>
-
   );
-
 }
