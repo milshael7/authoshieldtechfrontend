@@ -68,6 +68,8 @@ export default function TradingRoom() {
 
   function updateCandles(priceNow) {
 
+    if (!Number.isFinite(priceNow)) return;
+
     const now = Math.floor(Date.now() / 1000);
     const candleTime =
       Math.floor(now / CANDLE_SECONDS) * CANDLE_SECONDS;
@@ -141,8 +143,11 @@ export default function TradingRoom() {
           if (!market) return;
 
           const p = Number(market.price);
+          if (!Number.isFinite(p)) return;
+
           setPrice(p);
           updateCandles(p);
+
         } catch {}
       };
 
@@ -250,28 +255,38 @@ export default function TradingRoom() {
   return (
     <div style={{ display: "flex", flex: 1, background: "#0a0f1c", color: "#fff" }}>
 
-      {/* CHART */}
       <div style={{ flex: 1, padding: 20 }}>
         <div style={{ fontWeight: 700 }}>{SYMBOL}</div>
 
         <div style={{ opacity: .7 }}>
-          Live Price: {price ? price.toLocaleString() : "Loading"}
+          Live Price: {price ? price.toLocaleString() : "Connecting..."}
         </div>
 
-        <TerminalChart
-          candles={candles}
-          trades={trades}
-          aiSignals={aiSignals}
-          pnlSeries={pnlSeries}
-        />
+        {/* DO NOT RENDER CHART UNTIL PRICE EXISTS */}
+
+        {price && candles.length > 0 ? (
+
+          <TerminalChart
+            candles={candles}
+            trades={trades}
+            aiSignals={aiSignals}
+            pnlSeries={pnlSeries}
+          />
+
+        ) : (
+
+          <div style={{ padding: 40, opacity: .6 }}>
+            Connecting to market feed...
+          </div>
+
+        )}
+
       </div>
 
-      {/* ORDER PANEL */}
       <div style={{ width: 240 }}>
         <OrderPanel symbol={SYMBOL} price={price} />
       </div>
 
-      {/* AI PANEL */}
       <div style={{
         width: 180,
         padding: 16,
