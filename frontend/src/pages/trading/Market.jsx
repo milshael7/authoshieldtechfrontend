@@ -44,7 +44,7 @@ export default function Market(){
     try{
 
       const res = await fetch(
-        `${API_BASE}/api/market/candles?symbol=${sym}&limit=${MAX_CANDLES}`,
+        `${API_BASE}/api/market/candles/${sym}?limit=${MAX_CANDLES}`,
         { headers:{ Authorization:`Bearer ${token}` } }
       );
 
@@ -66,9 +66,7 @@ export default function Market(){
             high === null ||
             low  === null ||
             close=== null
-          ){
-            return null;
-          }
+          ) return null;
 
           if(high < low) return null;
 
@@ -144,11 +142,13 @@ export default function Market(){
           const candleTime =
             Math.floor(now/CANDLE_SECONDS)*CANDLE_SECONDS;
 
-          const last = lastCandleRef.current;
-
           setCandles(prev=>{
 
+            const last = lastCandleRef.current;
+
             let next;
+
+            /* NEW CANDLE */
 
             if(!last || last.time !== candleTime){
 
@@ -161,10 +161,13 @@ export default function Market(){
               };
 
               lastCandleRef.current=newCandle;
-              next=[...prev,newCandle]
-                .slice(-MAX_CANDLES);
 
-            }else{
+              next=[...prev,newCandle].slice(-MAX_CANDLES);
+
+            }
+            /* UPDATE CURRENT */
+
+            else{
 
               const updated={
                 ...last,
@@ -175,8 +178,13 @@ export default function Market(){
 
               lastCandleRef.current=updated;
 
-              next=[...prev];
-              next[next.length-1]=updated;
+              if(prev.length === 0){
+                next=[updated];
+              }else{
+                next=[...prev];
+                next[next.length-1]=updated;
+              }
+
             }
 
             return next;
