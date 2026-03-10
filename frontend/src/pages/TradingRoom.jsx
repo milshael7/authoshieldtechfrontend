@@ -9,118 +9,116 @@ const SYMBOL = "BTCUSDT";
 const CANDLE_SECONDS = 60;
 const MAX_CANDLES = 500;
 
-function toNumber(v) {
+function toNumber(v){
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
 }
 
-export default function TradingRoom() {
+export default function TradingRoom(){
 
   const marketWsRef = useRef(null);
   const paperWsRef = useRef(null);
   const lastCandleRef = useRef(null);
 
-  const [candles, setCandles] = useState([]);
-  const [price, setPrice] = useState(null);
-  const [equity, setEquity] = useState(0);
-  const [wallet, setWallet] = useState({ usd: 0, btc: 0 });
-  const [position, setPosition] = useState(null);
-  const [trades, setTrades] = useState([]);
-  const [decisions, setDecisions] = useState([]);
+  const [candles,setCandles] = useState([]);
+  const [price,setPrice] = useState(null);
+  const [equity,setEquity] = useState(0);
+  const [wallet,setWallet] = useState({usd:0,btc:0});
+  const [position,setPosition] = useState(null);
+  const [trades,setTrades] = useState([]);
+  const [decisions,setDecisions] = useState([]);
+
+  const [aiControl,setAiControl] = useState({
+    enabled:true,
+    tradingMode:"paper",
+    strategyMode:"Balanced"
+  });
 
   /* ================= LOAD HISTORY ================= */
 
-  async function loadHistory() {
+  async function loadHistory(){
 
-    if (!API_BASE) return;
+    if(!API_BASE) return;
     const token = getToken();
-    if (!token) return;
+    if(!token) return;
 
-    try {
+    try{
 
       const res = await fetch(
         `${API_BASE}/api/market/candles?symbol=${SYMBOL}&limit=${MAX_CANDLES}`,
-        {
-          headers: { Authorization: `Bearer ${token}` }
-        }
+        {headers:{Authorization:`Bearer ${token}`}}
       );
 
       const data = await res.json();
-      if (!data?.ok || !Array.isArray(data.candles)) return;
+      if(!data?.ok || !Array.isArray(data.candles)) return;
 
       const formatted = data.candles
-        .map(c => {
+        .map(c=>{
           const time = toNumber(c?.time);
           const open = toNumber(c?.open);
           const high = toNumber(c?.high);
           const low = toNumber(c?.low);
           const close = toNumber(c?.close);
 
-          if (
-            time === null ||
-            open === null ||
-            high === null ||
-            low === null ||
-            close === null
-          ) return null;
+          if(time===null||open===null||high===null||low===null||close===null)
+            return null;
 
-          return { time, open, high, low, close };
+          return {time,open,high,low,close};
         })
         .filter(Boolean)
         .sort((a,b)=>a.time-b.time)
         .slice(-MAX_CANDLES);
 
-      if (!formatted.length) return;
+      if(!formatted.length) return;
 
-      lastCandleRef.current = formatted[formatted.length - 1];
+      lastCandleRef.current = formatted[formatted.length-1];
       setCandles(formatted);
 
-    } catch {}
-
+    }catch{}
   }
 
   /* ================= CANDLE BUILDER ================= */
 
-  function updateCandles(priceNow) {
+  function updateCandles(priceNow){
 
-    if (!Number.isFinite(priceNow)) return;
+    if(!Number.isFinite(priceNow)) return;
 
-    const now = Math.floor(Date.now() / 1000);
-    const candleTime = Math.floor(now / CANDLE_SECONDS) * CANDLE_SECONDS;
+    const now = Math.floor(Date.now()/1000);
+    const candleTime = Math.floor(now/CANDLE_SECONDS)*CANDLE_SECONDS;
 
     const last = lastCandleRef.current;
 
-    setCandles(prev => {
+    setCandles(prev=>{
 
       let next;
       let nextLast;
 
-      if (!last || last.time !== candleTime) {
+      if(!last || last.time!==candleTime){
 
         nextLast = {
-          time: candleTime,
-          open: priceNow,
-          high: priceNow,
-          low: priceNow,
-          close: priceNow
+          time:candleTime,
+          open:priceNow,
+          high:priceNow,
+          low:priceNow,
+          close:priceNow
         };
 
-        next = [...prev.slice(-MAX_CANDLES), nextLast];
+        next = [...prev.slice(-MAX_CANDLES),nextLast];
 
-      } else {
+      }else{
 
         nextLast = {
           ...last,
-          high: Math.max(last.high, priceNow),
-          low: Math.min(last.low, priceNow),
-          close: priceNow
+          high:Math.max(last.high,priceNow),
+          low:Math.min(last.low,priceNow),
+          close:priceNow
         };
 
-        next = [...prev];
-        next[next.length - 1] = nextLast;
+        next=[...prev];
+        next[next.length-1]=nextLast;
       }
 
-      lastCandleRef.current = nextLast;
+      lastCandleRef.current=nextLast;
       return next;
 
     });
@@ -129,165 +127,151 @@ export default function TradingRoom() {
 
   /* ================= INITIAL LOAD ================= */
 
-  useEffect(() => {
-    loadHistory();
-  }, []);
+  useEffect(()=>{loadHistory()},[]);
 
   /* ================= MARKET WS ================= */
 
-  useEffect(() => {
+  useEffect(()=>{
 
     const token = getToken();
-    if (!token) return;
+    if(!token) return;
 
-    try {
+    try{
 
       const url = new URL(API_BASE);
-      const protocol = url.protocol === "https:" ? "wss:" : "ws:";
+      const protocol = url.protocol==="https:"?"wss:":"ws:";
 
       const ws = new WebSocket(
         `${protocol}//${url.host}/ws?channel=market&token=${encodeURIComponent(token)}`
       );
 
-      marketWsRef.current = ws;
+      marketWsRef.current=ws;
 
-      ws.onmessage = (msg) => {
+      ws.onmessage=(msg)=>{
 
-        try {
+        try{
 
           const data = JSON.parse(msg.data);
           const market = data?.data?.[SYMBOL];
-          if (!market) return;
+          if(!market) return;
 
           const p = toNumber(market.price);
-          if (p === null || p <= 0) return;
+          if(p===null || p<=0) return;
 
           setPrice(p);
           updateCandles(p);
 
-        } catch {}
+        }catch{}
       };
 
-      return () => ws.close();
+      return ()=>ws.close();
 
-    } catch {}
+    }catch{}
 
-  }, []);
+  },[]);
 
   /* ================= PAPER WS ================= */
 
-  useEffect(() => {
+  useEffect(()=>{
 
     const token = getToken();
-    if (!token) return;
+    if(!token) return;
 
-    try {
+    try{
 
       const url = new URL(API_BASE);
-      const protocol = url.protocol === "https:" ? "wss:" : "ws:";
+      const protocol = url.protocol==="https:"?"wss:":"ws:";
 
       const ws = new WebSocket(
         `${protocol}//${url.host}/ws?channel=paper&token=${encodeURIComponent(token)}`
       );
 
-      paperWsRef.current = ws;
+      paperWsRef.current=ws;
 
-      ws.onmessage = (msg) => {
+      ws.onmessage=(msg)=>{
 
-        try {
+        try{
 
           const data = JSON.parse(msg.data);
-          if (data?.channel !== "paper") return;
+          if(data?.channel!=="paper") return;
 
           const snap = data.snapshot || {};
           const dec = data.decisions || [];
 
-          setEquity(Number(snap.equity || 0));
+          setEquity(Number(snap.equity||0));
 
           setWallet({
-            usd: Number(snap.cashBalance || 0),
-            btc: Number(snap.position?.qty || 0)
+            usd:Number(snap.cashBalance||0),
+            btc:Number(snap.position?.qty||0)
           });
 
-          setPosition(snap.position || null);
-          setTrades(snap.trades || []);
+          setPosition(snap.position||null);
+          setTrades(snap.trades||[]);
           setDecisions(dec);
 
-        } catch {}
+          if(snap.aiControl){
+            setAiControl(snap.aiControl);
+          }
+
+        }catch{}
       };
 
-      return () => ws.close();
+      return ()=>ws.close();
 
-    } catch {}
+    }catch{}
 
-  }, []);
+  },[]);
 
   /* ================= AI ANALYTICS ================= */
 
-  const aiConfidence = useMemo(() => {
-    if (!decisions.length) return 0;
+  const aiConfidence = useMemo(()=>{
+    if(!decisions.length) return 0;
     const total = decisions.reduce((s,d)=>s+Number(d.confidence||0),0);
-    return total / decisions.length;
-  }, [decisions]);
+    return total/decisions.length;
+  },[decisions]);
 
   const lastDecision = decisions.length
-    ? decisions[decisions.length - 1]
+    ? decisions[decisions.length-1]
     : null;
 
-  /* ================= CHART DATA ================= */
+  /* ================= AI STATUS ================= */
 
-  const pnlSeries = useMemo(() => {
-    let running = 0;
-    return trades.map(t => {
-      running += Number(t.profit || 0);
-      return {
-        time: Math.floor(Number(t.time) / 1000),
-        value: running
-      };
-    });
-  }, [trades]);
+  const aiStatus = useMemo(()=>{
 
-  const aiSignals = useMemo(() => {
-    return trades.map(t => ({
-      time: Math.floor(Number(t.time) / 1000)
-    }));
-  }, [trades]);
+    if(!aiControl?.enabled) return "DISABLED";
+    if(aiControl?.tradingMode==="manual") return "HUMAN OVERRIDE";
+    return "ACTIVE";
+
+  },[aiControl]);
 
   /* ================= UI ================= */
 
-  return (
+  return(
 
-    <div style={{ display:"flex", flex:1, background:"#0a0f1c", color:"#fff" }}>
+    <div style={{display:"flex",flex:1,background:"#0a0f1c",color:"#fff"}}>
 
-      {/* CHART */}
+      <div style={{flex:1,padding:20}}>
 
-      <div style={{ flex:1, padding:20 }}>
+        <div style={{fontWeight:700}}>{SYMBOL}</div>
 
-        <div style={{ fontWeight:700 }}>{SYMBOL}</div>
-
-        <div style={{ opacity:.7 }}>
+        <div style={{opacity:.7}}>
           Live Price: {price ? price.toLocaleString() : "Loading"}
         </div>
 
         <TerminalChart
           candles={candles}
           trades={trades}
-          aiSignals={aiSignals}
-          pnlSeries={pnlSeries}
+          pnlSeries={trades}
         />
 
       </div>
 
-      {/* ORDER PANEL */}
-
-      <div style={{ width:240 }}>
+      <div style={{width:240}}>
         <OrderPanel symbol={SYMBOL} price={price}/>
       </div>
 
-      {/* AI PANEL */}
-
       <div style={{
-        width:200,
+        width:220,
         padding:16,
         background:"#111827",
         overflowY:"auto"
@@ -295,38 +279,29 @@ export default function TradingRoom() {
 
         <h3>AI Engine</h3>
 
-        <div>Equity: ${equity.toFixed(2)}</div>
+        <div>Status: {aiStatus}</div>
+        <div>Mode: {aiControl?.strategyMode || "Unknown"}</div>
+
+        <div style={{marginTop:10}}>
+          Equity: ${equity.toFixed(2)}
+        </div>
+
         <div>Cash: ${wallet.usd.toFixed(2)}</div>
 
-        <div style={{ marginTop:10 }}>
+        <div style={{marginTop:10}}>
           AI Confidence: {(aiConfidence*100).toFixed(0)}%
         </div>
 
-        {lastDecision && (
+        {lastDecision &&(
 
-          <div style={{ marginTop:14, fontSize:12, opacity:.8 }}>
+          <div style={{marginTop:14,fontSize:12,opacity:.8}}>
 
-            <div>
-              Last Action: {lastDecision.action}
-            </div>
+            <div>Last Action: {lastDecision.action}</div>
 
             <div>
-              Decision Confidence:
+              Confidence:
               {(lastDecision.confidence*100).toFixed(0)}%
             </div>
-
-            <div>
-              Decision Price:
-              {lastDecision.price?.toLocaleString?.()}
-            </div>
-
-            {lastDecision.reason && (
-
-              <div style={{ marginTop:6, color:"#facc15" }}>
-                Reason: {lastDecision.reason}
-              </div>
-
-            )}
 
           </div>
 
