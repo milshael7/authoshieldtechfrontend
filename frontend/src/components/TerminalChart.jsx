@@ -61,7 +61,7 @@ export default function TerminalChart({
     const el = wrapRef.current;
     if (!el) return;
 
-    try { chartRef.current?.remove(); } catch {}
+    if (chartRef.current) return;
 
     const chart = createChart(el, {
 
@@ -94,14 +94,15 @@ export default function TerminalChart({
       timeScale: {
 
         borderColor: "rgba(148,163,184,.15)",
+
         timeVisible: true,
 
-        barSpacing: 8,
-        minBarSpacing: 5,
+        barSpacing: 10,
+        minBarSpacing: 6,
 
-        rightBarOffset: 10,
-        shiftVisibleRangeOnNewBar: true,
+        rightBarOffset: 8,
 
+        shiftVisibleRangeOnNewBar: false,
         rightBarStaysOnScroll: true,
         fixLeftEdge: false
 
@@ -157,12 +158,34 @@ export default function TerminalChart({
       candleSeriesRef.current = null;
       volumeSeriesRef.current = null;
       pnlSeriesRef.current = null;
+
       lastTimeRef.current = null;
       initializedRef.current = false;
 
     };
 
   }, [height]);
+
+  /* ================= EDGE DETECTION ================= */
+
+  function isAtRightEdge(chart){
+
+    try{
+
+      const range =
+        chart.timeScale().getVisibleLogicalRange();
+
+      if(!range) return true;
+
+      return range.to >= candleData.length - 5;
+
+    }catch{
+
+      return true;
+
+    }
+
+  }
 
   /* ================= DATA UPDATE ================= */
 
@@ -186,9 +209,6 @@ export default function TerminalChart({
 
         chart.timeScale().fitContent();
 
-        /* move viewport to newest candles */
-        chart.timeScale().scrollToRealTime();
-
         initializedRef.current = true;
 
       }
@@ -200,16 +220,19 @@ export default function TerminalChart({
     if (last.time >= lastTimeRef.current) {
 
       series.update(last);
+
       lastTimeRef.current = last.time;
 
-      /* keep chart pinned to newest candle */
-      chart.timeScale().scrollToRealTime();
+      if (isAtRightEdge(chart)) {
+        chart.timeScale().scrollToRealTime();
+      }
 
       return;
 
     }
 
     series.setData(candleData);
+
     lastTimeRef.current = last.time;
 
   }, [candleData]);
