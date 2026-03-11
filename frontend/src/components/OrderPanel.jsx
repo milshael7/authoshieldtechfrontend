@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { getToken } from "../lib/api.js";
 
-const API_BASE = import.meta.env.VITE_API_BASE?.replace(/\/+$/, "");
+const API_BASE = (import.meta.env.VITE_API_BASE || "").replace(/\/+$/, "");
 
 export default function OrderPanel({ symbol="BTCUSDT", price=0 }) {
 
@@ -19,6 +19,18 @@ export default function OrderPanel({ symbol="BTCUSDT", price=0 }) {
   const [loading,setLoading] = useState(false);
   const [msg,setMsg] = useState("");
 
+  /* ================= AUTH ================= */
+
+  function authHeader(){
+    const token = getToken();
+    return token ? { Authorization:`Bearer ${token}` } : {};
+  }
+
+  function safeNumber(v){
+    const n = Number(v);
+    return Number.isFinite(n) ? n : 0;
+  }
+
   /* ================= LOAD TRADING MODE ================= */
 
   useEffect(()=>{
@@ -29,7 +41,7 @@ export default function OrderPanel({ symbol="BTCUSDT", price=0 }) {
 
         const res = await fetch(
           `${API_BASE}/api/ai/config`,
-          {headers:authHeader()}
+          { headers:authHeader() }
         );
 
         const data = await res.json();
@@ -53,16 +65,6 @@ export default function OrderPanel({ symbol="BTCUSDT", price=0 }) {
     }
   },[orderType,price]);
 
-  function authHeader(){
-    const token = getToken();
-    return token ? {Authorization:`Bearer ${token}`} : {};
-  }
-
-  function safeNumber(v){
-    const n = Number(v);
-    return Number.isFinite(n) ? n : 0;
-  }
-
   /* ================= SUBMIT ORDER ================= */
 
   async function submitOrder(){
@@ -74,7 +76,7 @@ export default function OrderPanel({ symbol="BTCUSDT", price=0 }) {
 
     const qty = safeNumber(size);
 
-    if(qty<=0){
+    if(qty <= 0){
       setMsg("Invalid size");
       return;
     }
@@ -85,7 +87,7 @@ export default function OrderPanel({ symbol="BTCUSDT", price=0 }) {
     try{
 
       const res = await fetch(
-        `${API_BASE}/api/trading/order`,
+        `${API_BASE}/api/paper/order`,   // ✅ FIXED ENDPOINT
         {
           method:"POST",
           headers:{
@@ -96,8 +98,6 @@ export default function OrderPanel({ symbol="BTCUSDT", price=0 }) {
 
             symbol,
             side,
-            type:orderType,
-
             qty,
 
             price:
@@ -112,9 +112,7 @@ export default function OrderPanel({ symbol="BTCUSDT", price=0 }) {
               takeProfit ? safeNumber(takeProfit) : null,
 
             risk:
-              risk ? safeNumber(risk) : null,
-
-            mode
+              risk ? safeNumber(risk)/100 : 0.01
 
           })
         }
@@ -123,15 +121,18 @@ export default function OrderPanel({ symbol="BTCUSDT", price=0 }) {
       const data = await res.json();
 
       if(!data?.ok){
+
         setMsg(data?.error || "Order rejected");
+
       }else{
 
-        setMsg(`Order executed (${mode})`);
+        setMsg("Order executed (paper)");
 
         setSize("");
         setLimitPrice("");
         setStopLoss("");
         setTakeProfit("");
+        setRisk("");
 
       }
 
@@ -165,54 +166,14 @@ export default function OrderPanel({ symbol="BTCUSDT", price=0 }) {
         Market Price: {price ? price.toLocaleString() : "Loading..."}
       </div>
 
-      {/* MODE */}
-
       <div style={{
         fontSize:11,
         padding:"4px 8px",
         borderRadius:6,
-        background:mode==="paper"
-          ?"rgba(59,130,246,.15)"
-          :"rgba(16,185,129,.15)"
+        background:"rgba(59,130,246,.15)"
       }}>
         MODE: {mode.toUpperCase()}
       </div>
-
-      {/* ORDER TYPE */}
-
-      <div style={{display:"flex",gap:6}}>
-
-        <button
-          onClick={()=>setOrderType("MARKET")}
-          style={{
-            flex:1,
-            background:orderType==="MARKET"?"#2563eb":"#1f2937",
-            border:"none",
-            padding:"6px 0",
-            color:"#fff",
-            borderRadius:6
-          }}
-        >
-          Market
-        </button>
-
-        <button
-          onClick={()=>setOrderType("LIMIT")}
-          style={{
-            flex:1,
-            background:orderType==="LIMIT"?"#2563eb":"#1f2937",
-            border:"none",
-            padding:"6px 0",
-            color:"#fff",
-            borderRadius:6
-          }}
-        >
-          Limit
-        </button>
-
-      </div>
-
-      {/* SIDE */}
 
       <div style={{display:"flex",gap:6}}>
 
@@ -253,9 +214,7 @@ export default function OrderPanel({ symbol="BTCUSDT", price=0 }) {
       )}
 
       <Input label="Stop Loss" value={stopLoss} setValue={setStopLoss} placeholder="Optional"/>
-
       <Input label="Take Profit" value={takeProfit} setValue={setTakeProfit} placeholder="Optional"/>
-
       <Input label="Risk %" value={risk} setValue={setRisk} placeholder="1"/>
 
       <button
@@ -285,8 +244,6 @@ export default function OrderPanel({ symbol="BTCUSDT", price=0 }) {
   );
 
 }
-
-/* INPUT COMPONENT */
 
 function Input({label,value,setValue,placeholder}){
 
