@@ -1,7 +1,6 @@
 /* =========================================================
-   AUTOSHIELD FRONTEND API LAYER — ENTERPRISE v19 (SEALED)
-   SINGLE SOURCE OF TRUTH FOR ALL API CALLS
-   QUIET • TENANT-AWARE • SESSION-SAFE • PLATFORM-STABLE
+   AUTOSHIELD FRONTEND API LAYER — ENTERPRISE v20
+   FIXED: AI snapshot + AI config endpoints
 ========================================================= */
 
 const API_BASE = import.meta.env.VITE_API_BASE?.trim();
@@ -141,7 +140,7 @@ export async function req(
 }
 
 /* =========================================================
-   API SURFACE — EVERYTHING LIVES HERE
+   API SURFACE
 ========================================================= */
 
 export const api = {
@@ -149,86 +148,35 @@ export const api = {
   /* ================= AUTH ================= */
 
   login: async (email, password) => {
-    if (!API_BASE) throw new Error("API base missing");
-
     const res = await fetch(joinUrl(API_BASE, "/api/auth/login"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
     });
 
-    const data = await res.json().catch(() => null);
+    const data = await res.json();
 
     if (!res.ok) throw new Error(data?.error || "Login failed");
-    if (!data?.token || !data?.user)
-      throw new Error("Invalid login response");
+
+    setToken(data.token);
+    saveUser(data.user);
 
     return data;
   },
 
-  signup: (payload) =>
-    req("/api/auth/signup", {
-      method: "POST",
-      body: payload,
-      auth: false,
-    }),
+  logout: () =>
+    req("/api/auth/logout", { method: "POST" }),
 
   refresh: () =>
-    req("/api/auth/refresh", {
-      method: "POST",
-      silent: true,
-    }),
+    req("/api/auth/refresh", { method: "POST" }),
 
-  logout: () =>
-    req("/api/auth/logout", {
-      method: "POST",
-      silent: true,
-    }),
+  /* ================= AI ENGINE ================= */
 
-  /* ================= USERS ================= */
+  aiSnapshot: () =>
+    req("/api/trading/ai/snapshot"),
 
-  listUsers: () => req("/api/users"),
-  getUser: (id) => req(`/api/users/${id}`),
-  updateUser: (id, payload) =>
-    req(`/api/users/${id}`, { method: "PUT", body: payload }),
-
-  /* ================= COMPANY ================= */
-
-  listCompanies: () => req("/api/company"),
-  getCompany: (id) => req(`/api/company/${id}`),
-  updateCompany: (id, payload) =>
-    req(`/api/company/${id}`, { method: "PUT", body: payload }),
-
-  /* ================= INCIDENTS ================= */
-
-  incidents: () => req("/api/incidents"),
-  createIncident: (payload) =>
-    req("/api/incidents", { method: "POST", body: payload }),
-
-  /* ================= SECURITY ================= */
-
-  postureSummary: () =>
-    req("/api/security/posture-summary", { silent: true }),
-
-  securityEvents: () =>
-    req("/api/security/events", { silent: true }),
-
-  vulnerabilities: () =>
-    req("/api/security/vulnerabilities", { silent: true }),
-
-  enforceZeroTrust: (companyId, payload) =>
-    req(`/api/security/enforce/${companyId}`, {
-      method: "POST",
-      body: payload,
-    }),
-
-  /* ================= SECURITY TOOLS ================= */
-
-  securityTools: () => req("/api/security/tools"),
-  installSecurityTool: (id) =>
-    req(`/api/security/tools/${id}/install`, { method: "POST" }),
-  uninstallSecurityTool: (id) =>
-    req(`/api/security/tools/${id}/uninstall`, { method: "POST" }),
+  aiConfig: () =>
+    req("/api/ai/config"),
 
   /* ================= MARKET ================= */
 
@@ -241,37 +189,15 @@ export const api = {
   /* ================= PAPER TRADING ================= */
 
   paperAccount: () => req("/api/paper/account"),
+
   paperPositions: () => req("/api/paper/positions"),
+
   paperOrders: () => req("/api/paper/orders"),
 
-  /* FIXED ROUTE */
   placePaperOrder: (payload) =>
-    req("/api/paper/order", { method: "POST", body: payload }),
+    req("/api/paper/order", {
+      method: "POST",
+      body: payload
+    }),
 
-  /* ================= SOC ================= */
-
-  socFeed: () => req("/api/soc/feed", { silent: true }),
-
-  /* ================= BILLING ================= */
-
-  billingStatus: () => req("/api/billing/status"),
-  billingPortal: () =>
-    req("/api/billing/portal", { method: "POST" }),
-
-  /* ================= ADMIN ================= */
-
-  adminPlatformHealth: () =>
-    req("/api/admin/platform-health", { silent: true }),
-
-  adminExecutiveRisk: () =>
-    req("/api/admin/executive-risk", { silent: true }),
-
-  adminPostureSummary: () =>
-    req("/api/admin/security/posture-summary", { silent: true }),
-
-  adminSecurityFeed: () =>
-    req("/api/admin/security/feed", { silent: true }),
-
-  adminAIDecisions: () =>
-    req("/api/admin/ai-decisions", { silent: true }),
 };
