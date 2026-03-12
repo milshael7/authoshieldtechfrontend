@@ -154,8 +154,6 @@ export default function TradingRoom(){
 
   }
 
-  /* ================= INITIAL LOAD ================= */
-
   useEffect(()=>{loadHistory()},[]);
 
   /* ================= MARKET WS ================= */
@@ -234,7 +232,6 @@ export default function TradingRoom(){
         }
 
         const snap = data.snapshot || {};
-        const dec = data.decisions || [];
 
         setEquity(Number(snap.equity||0));
 
@@ -245,7 +242,7 @@ export default function TradingRoom(){
 
         setPosition(snap.position||null);
         setTrades(snap.trades||[]);
-        setDecisions(dec);
+        setDecisions(snap.decisions||[]);
 
       }catch{}
 
@@ -256,8 +253,6 @@ export default function TradingRoom(){
     return ()=>ws.close();
 
   },[]);
-
-  /* ================= AI ANALYTICS ================= */
 
   const aiConfidence = useMemo(()=>{
 
@@ -275,8 +270,6 @@ export default function TradingRoom(){
     ? decisions[decisions.length-1]
     : null;
 
-  /* ================= AI STATUS ================= */
-
   const aiStatus = useMemo(()=>{
 
     if(!aiControl?.enabled) return "DISABLED";
@@ -284,8 +277,6 @@ export default function TradingRoom(){
     return "ACTIVE";
 
   },[aiControl]);
-
-  /* ================= UI ================= */
 
   return(
 
