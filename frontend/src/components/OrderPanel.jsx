@@ -19,8 +19,6 @@ export default function OrderPanel({ symbol="BTCUSDT", price=0 }) {
   const [loading,setLoading] = useState(false);
   const [msg,setMsg] = useState("");
 
-  /* ================= AUTH ================= */
-
   function authHeader(){
     const token = getToken();
     return token ? { Authorization:`Bearer ${token}` } : {};
@@ -30,8 +28,6 @@ export default function OrderPanel({ symbol="BTCUSDT", price=0 }) {
     const n = Number(v);
     return Number.isFinite(n) ? n : 0;
   }
-
-  /* ================= LOAD TRADING MODE ================= */
 
   useEffect(()=>{
 
@@ -45,8 +41,8 @@ export default function OrderPanel({ symbol="BTCUSDT", price=0 }) {
         );
 
         const data = await res.json();
-
         const cfg = data?.config || {};
+
         setMode(cfg.tradingMode || "paper");
 
       }catch{}
@@ -57,15 +53,11 @@ export default function OrderPanel({ symbol="BTCUSDT", price=0 }) {
 
   },[]);
 
-  /* AUTO FILL LIMIT PRICE */
-
   useEffect(()=>{
     if(orderType==="LIMIT" && price && !limitPrice){
       setLimitPrice(price.toString());
     }
   },[orderType,price]);
-
-  /* ================= SUBMIT ORDER ================= */
 
   async function submitOrder(){
 
@@ -87,7 +79,7 @@ export default function OrderPanel({ symbol="BTCUSDT", price=0 }) {
     try{
 
       const res = await fetch(
-        `${API_BASE}/api/paper/order`,   // ✅ FIXED ENDPOINT
+        `${API_BASE}/api/paper/order`,
         {
           method:"POST",
           headers:{
@@ -98,7 +90,9 @@ export default function OrderPanel({ symbol="BTCUSDT", price=0 }) {
 
             symbol,
             side,
-            qty,
+
+            /* FIXED FIELD NAME */
+            size: qty,
 
             price:
               orderType==="LIMIT"
