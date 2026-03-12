@@ -1,6 +1,6 @@
 // ============================================================
-// TRADING TERMINAL — ENTERPRISE TRADING MODULE v7
-// FULL persistent workspace (no panel resets)
+// TRADING TERMINAL — ENTERPRISE TRADING MODULE v8
+// FIXED: stable telemetry + no zero resets
 // ============================================================
 
 import React, { useEffect, useState } from "react";
@@ -19,8 +19,8 @@ export default function TradingLayout(){
   const location = useLocation();
   const token = getToken();
 
-  const [engineStatus,setEngineStatus] = useState("CONNECTED");
-  const [mode,setMode] = useState("PAPER");
+  const [engineStatus] = useState("CONNECTED");
+  const [mode] = useState("PAPER");
 
   const [uptime,setUptime] = useState(0);
   const [aiRate,setAiRate] = useState(0);
@@ -32,7 +32,11 @@ export default function TradingLayout(){
 
   useEffect(()=>{
 
+    let mounted = true;
+
     async function loadTelemetry(){
+
+      if(!token) return;
 
       try{
 
@@ -47,17 +51,30 @@ export default function TradingLayout(){
 
         const data = await res.json();
 
-        const tele = data?.snapshot?.telemetry || data?.telemetry;
+        const tele = data?.snapshot?.telemetry;
 
         if(!tele) return;
 
-        setUptime(tele.uptime || 0);
-        setAiRate(tele.decisionsPerMinute || 0);
+        if(mounted){
 
-        const mem = tele.memoryUsage || 0;
-        setMemory(Math.round(mem/1024/1024));
+          if(typeof tele.uptime === "number"){
+            setUptime(tele.uptime);
+          }
 
-      }catch{}
+          if(typeof tele.decisionsPerMinute === "number"){
+            setAiRate(tele.decisionsPerMinute);
+          }
+
+          if(typeof tele.memoryUsage === "number"){
+            const mb = Math.round(tele.memoryUsage/1024/1024);
+            setMemory(mb);
+          }
+
+        }
+
+      }catch(e){
+        // keep previous values instead of resetting
+      }
 
     }
 
@@ -65,7 +82,10 @@ export default function TradingLayout(){
 
     const interval = setInterval(loadTelemetry,4000);
 
-    return ()=>clearInterval(interval);
+    return ()=>{
+      mounted=false;
+      clearInterval(interval);
+    };
 
   },[token]);
 
@@ -153,10 +173,7 @@ export default function TradingLayout(){
             <div style={{
               padding:"4px 8px",
               borderRadius:6,
-              background:
-                engineStatus==="CONNECTED"
-                ? "rgba(34,197,94,.15)"
-                : "rgba(239,68,68,.15)"
+              background:"rgba(34,197,94,.15)"
             }}>
               {engineStatus}
             </div>
@@ -227,7 +244,7 @@ export default function TradingLayout(){
 
       </div>
 
-      {/* CONTENT — PERSISTENT PANELS */}
+      {/* CONTENT */}
 
       <div style={{
         flex:1,
