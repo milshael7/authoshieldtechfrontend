@@ -1,6 +1,5 @@
 // ============================================================
-// AI CONTROL ROOM — INSTITUTIONAL ENGINE CONTROL
-// Kill Switch • Paper/Live Mode • Risk Controls • AI Status
+// AI CONTROL ROOM — ENGINE CONTROL PANEL (FIXED HEALTH CHECK)
 // ============================================================
 
 import React, { useEffect, useState } from "react";
@@ -23,15 +22,60 @@ export default function AIControl(){
   const [saving,setSaving] = useState(false);
   const [statusMsg,setStatusMsg] = useState("");
 
-  const [engineHealth,setEngineHealth] = useState("UNKNOWN");
+  const [engineHealth,setEngineHealth] = useState("STARTING");
 
   /* ================= LOAD CONFIG ================= */
 
   useEffect(()=>{
+
     loadConfig();
-    const loop=setInterval(loadConfig,8000);
+    checkEngine();
+
+    const loop=setInterval(()=>{
+
+      loadConfig();
+      checkEngine();
+
+    },8000);
+
     return ()=>clearInterval(loop);
+
   },[]);
+
+  /* ================= ENGINE CHECK ================= */
+
+  async function checkEngine(){
+
+    try{
+
+      const res = await fetch(
+        `${API_BASE}/api/trading/ai/snapshot`,
+        {headers:authHeader()}
+      );
+
+      if(!res.ok){
+        setEngineHealth("OFFLINE");
+        return;
+      }
+
+      const data = await res.json();
+
+      if(data?.snapshot){
+        setEngineHealth("RUNNING");
+      }
+      else{
+        setEngineHealth("STARTING");
+      }
+
+    }catch{
+
+      setEngineHealth("OFFLINE");
+
+    }
+
+  }
+
+  /* ================= LOAD CONFIG ================= */
 
   async function loadConfig(){
 
@@ -42,10 +86,7 @@ export default function AIControl(){
         {headers:authHeader()}
       );
 
-      if(!res.ok){
-        setStatusMsg("API unavailable");
-        return;
-      }
+      if(!res.ok) return;
 
       const data = await res.json();
 
@@ -60,13 +101,7 @@ export default function AIControl(){
       setPositionMultiplier(Number(cfg.positionMultiplier ?? 1));
       setAggressiveness(cfg.strategyMode || "Balanced");
 
-      setEngineHealth(data.engine ?? "UNKNOWN");
-
-    }catch(err){
-
-      setStatusMsg("Unable to load config");
-
-    }
+    }catch{}
 
   }
 
@@ -104,33 +139,17 @@ export default function AIControl(){
         }
       );
 
-      let data=null;
+      const data = await res.json();
 
-      try{
-        data = await res.json();
-      }catch{}
-
-      if(!res.ok){
-
-        setStatusMsg(
-          data?.error ||
-          `Server error (${res.status})`
-        );
-
-      }
-      else if(data?.ok===false){
-
-        setStatusMsg(data.error || "Configuration rejected");
-
+      if(res.ok && data?.ok){
+        setStatusMsg("Configuration saved");
       }
       else{
-
-        setStatusMsg("Configuration saved");
-
+        setStatusMsg(data?.error || "Configuration rejected");
       }
 
     }
-    catch(err){
+    catch{
 
       setStatusMsg("Server unreachable");
 
@@ -149,7 +168,7 @@ export default function AIControl(){
     if(mode === "live"){
 
       const confirmLive = window.confirm(
-        "WARNING: You are enabling LIVE trading with real capital.\n\nContinue?"
+        "WARNING: Enable LIVE trading with real capital?"
       );
 
       if(!confirmLive) return;
@@ -199,6 +218,8 @@ export default function AIControl(){
             color:
               engineHealth==="RUNNING"
                 ? "#22c55e"
+                : engineHealth==="STARTING"
+                ? "#facc15"
                 : "#ef4444"
           }}>
             {engineHealth}
@@ -269,25 +290,9 @@ export default function AIControl(){
 
         </div>
 
-        <Control
-          label="Max Trades Per Day"
-          value={maxTrades}
-          onChange={setMaxTrades}
-        />
-
-        <Control
-          label="Risk % Per Trade"
-          value={riskPercent}
-          step="0.1"
-          onChange={setRiskPercent}
-        />
-
-        <Control
-          label="Position Multiplier"
-          value={positionMultiplier}
-          step="0.1"
-          onChange={setPositionMultiplier}
-        />
+        <Control label="Max Trades Per Day" value={maxTrades} onChange={setMaxTrades}/>
+        <Control label="Risk % Per Trade" value={riskPercent} step="0.1" onChange={setRiskPercent}/>
+        <Control label="Position Multiplier" value={positionMultiplier} step="0.1" onChange={setPositionMultiplier}/>
 
         <div style={{marginBottom:20}}>
 
