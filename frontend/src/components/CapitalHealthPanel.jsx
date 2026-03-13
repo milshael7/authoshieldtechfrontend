@@ -1,34 +1,45 @@
 import React from "react";
 
 export default function CapitalHealthPanel({
-  totalCapital,
-  peakCapital,
-  dailyPnL,
-  tradeCount,
+  totalCapital = 0,
+  peakCapital = 0,
+  dailyPnL = 0,
+  tradeCount = 0,
 }) {
+
+  const safeTotal = Number(totalCapital) || 0;
+  const safePeak = Number(peakCapital) || 0;
+  const safePnL = Number(dailyPnL) || 0;
+  const safeTrades = Number(tradeCount) || 0;
+
   const drawdownPct =
-    peakCapital > 0
-      ? ((peakCapital - totalCapital) / peakCapital) * 100
+    safePeak > 0
+      ? ((safePeak - safeTotal) / safePeak) * 100
       : 0;
 
   const healthScore = Math.max(
     0,
-    100 - drawdownPct * 2 - Math.abs(dailyPnL) * 0.01
+    100 - drawdownPct * 2 - Math.abs(safePnL) * 0.01
   );
 
   function getHealthTier() {
+
     if (healthScore >= 75) return "ok";
     if (healthScore >= 50) return "warn";
     return "bad";
+
   }
 
   const tier = getHealthTier();
 
   return (
+
     <section className="postureCard">
+
       <h3>Capital Health Monitor</h3>
 
       <div className="stats">
+
         <div>
           <b>Health Score:</b>{" "}
           <span className={`badge ${tier}`}>
@@ -41,15 +52,17 @@ export default function CapitalHealthPanel({
         </div>
 
         <div>
-          <b>Daily PnL Impact:</b> ${dailyPnL.toFixed(2)}
+          <b>Daily PnL Impact:</b> ${safePnL.toFixed(2)}
         </div>
 
         <div>
-          <b>Trades Today:</b> {tradeCount}
+          <b>Trades Today:</b> {safeTrades}
         </div>
+
       </div>
 
       <div style={{ marginTop: 14 }}>
+
         <div
           style={{
             height: 8,
@@ -58,9 +71,10 @@ export default function CapitalHealthPanel({
             overflow: "hidden",
           }}
         >
+
           <div
             style={{
-              width: `${healthScore}%`,
+              width: `${Math.min(100, healthScore)}%`,
               height: "100%",
               background:
                 tier === "ok"
@@ -71,13 +85,18 @@ export default function CapitalHealthPanel({
               transition: "width 0.4s ease",
             }}
           />
+
         </div>
+
       </div>
 
       <p className="muted" style={{ marginTop: 12 }}>
         Health score dynamically adjusts based on drawdown,
         volatility exposure, and daily performance.
       </p>
+
     </section>
+
   );
+
 }
