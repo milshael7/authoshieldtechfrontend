@@ -10,6 +10,53 @@ const SYMBOL = "BTCUSDT";
 const CANDLE_SECONDS = 60;
 const MAX_CANDLES = 500;
 
+/* ================= GLOBAL CACHE ================= */
+
+if (!window.__TRADING_CACHE__) {
+  window.__TRADING_CACHE__ = {
+    candles: [],
+    lastCandle: null
+  };
+}
+
+function storageKey(){
+  return `trading_candles_${SYMBOL}`;
+}
+
+function loadPersisted(){
+  try{
+    const raw = localStorage.getItem(storageKey());
+    if(!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  }catch{
+    return [];
+  }
+}
+
+function savePersisted(candles){
+  try{
+    localStorage.setItem(
+      storageKey(),
+      JSON.stringify(candles.slice(-MAX_CANDLES))
+    );
+  }catch{}
+}
+
+function mergeHistory(existing,incoming){
+
+  if(!existing.length) return incoming;
+
+  const map = new Map();
+
+  existing.forEach(c => map.set(c.time,c));
+  incoming.forEach(c => map.set(c.time,c));
+
+  return Array.from(map.values())
+    .sort((a,b)=>a.time-b.time)
+    .slice(-MAX_CANDLES);
+}
+
 function toNumber(v){
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
@@ -46,6 +93,23 @@ export default function TradingRoom(){
     strategyMode:"Balanced"
   });
 
+/* ================= RESTORE CANDLES ================= */
+
+  useEffect(()=>{
+
+    const cache = window.__TRADING_CACHE__;
+    const persisted = loadPersisted();
+
+    const next = cache.candles.length ? cache.candles : persisted;
+
+    const last = cache.lastCandle || next[next.length-1] || null;
+
+    lastCandleRef.current = last;
+
+    setCandles(next);
+
+  },[]);
+
 /* ================= LOAD MEMORY ================= */
 
   async function loadMemory(){
@@ -68,7 +132,7 @@ export default function TradingRoom(){
 
   }
 
-/* ================= LOAD AI CONFIG ================= */
+/* ================= LOAD CONFIG ================= */
 
   useEffect(()=>{
 
@@ -152,18 +216,29 @@ export default function TradingRoom(){
 
       if(!formatted.length) return;
 
-      setCandles(formatted);
+      setCandles(prev => {
 
-      lastCandleRef.current=
-        formatted[formatted.length-1];
+        const merged = mergeHistory(prev, formatted);
+
+        const last = merged[merged.length-1];
+
+        lastCandleRef.current = last;
+
+        window.__TRADING_CACHE__.candles = merged;
+        window.__TRADING_CACHE__.lastCandle = last;
+
+        savePersisted(merged);
+
+        return merged;
+
+      });
 
     }catch{}
-
   }
 
   useEffect(()=>{loadHistory()},[]);
 
-/* ================= CANDLE BUILDER ================= */
+/* ================= CANDLE UPDATE ================= */
 
   function updateCandles(priceNow){
 
@@ -206,6 +281,11 @@ export default function TradingRoom(){
       }
 
       lastCandleRef.current=nextLast;
+
+      window.__TRADING_CACHE__.candles = next;
+      window.__TRADING_CACHE__.lastCandle = nextLast;
+
+      savePersisted(next);
 
       return next;
 
@@ -356,7 +436,7 @@ export default function TradingRoom(){
 
   },[decisions]);
 
-/* ================= RENDER ================= */
+/* ================= UI ================= */
 
   return(
 
