@@ -335,6 +335,8 @@ export default function TradingRoom(){
 
       marketWsRef.current=null;
 
+      clearTimeout(marketReconnectRef.current);
+
       marketReconnectRef.current=setTimeout(()=>{
         connectMarket();
       },3000);
@@ -403,6 +405,8 @@ export default function TradingRoom(){
 
       paperWsRef.current=null;
 
+      clearTimeout(paperReconnectRef.current);
+
       paperReconnectRef.current=setTimeout(()=>{
         connectPaper();
       },3000);
@@ -435,6 +439,13 @@ export default function TradingRoom(){
     return total/decisions.length;
 
   },[decisions]);
+
+/* ================= ENGINE STATUS ================= */
+
+  const engineStatus =
+    engineStartRef.current
+      ? "RUNNING"
+      : "STARTING";
 
 /* ================= UI ================= */
 
@@ -479,7 +490,7 @@ export default function TradingRoom(){
 
         <h3>AI Engine</h3>
 
-        <div>Status: {aiControl.enabled ? "RUNNING" : "DISABLED"}</div>
+        <div>Status: {engineStatus}</div>
 
         <div>Engine Uptime: {engineUptime}</div>
 
