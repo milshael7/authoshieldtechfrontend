@@ -73,6 +73,8 @@ export default function TradingRoom(){
   const lastCandleRef = useRef(null);
   const engineStartRef = useRef(null);
 
+  const [engineAlive,setEngineAlive] = useState(false);
+
   const [candles,setCandles] = useState([]);
   const [price,setPrice] = useState(null);
 
@@ -331,30 +333,7 @@ export default function TradingRoom(){
 
     };
 
-    ws.onclose=()=>{
-
-      marketWsRef.current=null;
-
-      clearTimeout(marketReconnectRef.current);
-
-      marketReconnectRef.current=setTimeout(()=>{
-        connectMarket();
-      },3000);
-
-    };
-
   }
-
-  useEffect(()=>{
-
-    connectMarket();
-
-    return ()=>{
-      if(marketWsRef.current)
-        marketWsRef.current.close();
-    }
-
-  },[]);
 
 /* ================= PAPER WS ================= */
 
@@ -384,6 +363,10 @@ export default function TradingRoom(){
           engineStartRef.current=data.engineStart||Date.now();
         }
 
+        if(data.snapshot){
+          setEngineAlive(true);
+        }
+
         const snap=data.snapshot||{};
 
         setEquity(Number(snap.equity||0));
@@ -401,28 +384,12 @@ export default function TradingRoom(){
 
     };
 
-    ws.onclose=()=>{
-
-      paperWsRef.current=null;
-
-      clearTimeout(paperReconnectRef.current);
-
-      paperReconnectRef.current=setTimeout(()=>{
-        connectPaper();
-      },3000);
-
-    };
-
   }
 
   useEffect(()=>{
 
+    connectMarket();
     connectPaper();
-
-    return ()=>{
-      if(paperWsRef.current)
-        paperWsRef.current.close();
-    }
 
   },[]);
 
@@ -443,7 +410,7 @@ export default function TradingRoom(){
 /* ================= ENGINE STATUS ================= */
 
   const engineStatus =
-    engineStartRef.current
+    engineAlive || engineStartRef.current
       ? "RUNNING"
       : "STARTING";
 
