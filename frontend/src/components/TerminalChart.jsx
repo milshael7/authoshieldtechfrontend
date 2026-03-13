@@ -1,3 +1,17 @@
+// ============================================================
+// FILE: frontend/src/components/TerminalChart.jsx
+// TERMINAL CHART — INSTITUTIONAL STABLE VERSION v2
+//
+// FIXES:
+// - Prevent null candle crash
+// - Normalize candle bounds
+// - Ignore invalid market data safely
+// - Maintain layout compatibility
+//
+// NOTE:
+// This protects Lightweight Charts from invalid candle inputs.
+// ============================================================
+
 import React, { useEffect, useMemo, useRef } from "react";
 import { createChart, CrosshairMode } from "lightweight-charts";
 
@@ -28,20 +42,34 @@ export default function TerminalChart({
       .map(c => {
 
         const time = Number(c?.time);
-        const open = Number(c?.open);
-        const high = Number(c?.high);
-        const low = Number(c?.low);
-        const close = Number(c?.close);
+        let open = Number(c?.open);
+        let high = Number(c?.high);
+        let low = Number(c?.low);
+        let close = Number(c?.close);
 
-        if (
+        if(
           !Number.isFinite(time) ||
           !Number.isFinite(open) ||
           !Number.isFinite(high) ||
           !Number.isFinite(low) ||
           !Number.isFinite(close)
-        ) {
+        ){
           return null;
         }
+
+        /* ===== NORMALIZE BOUNDS ===== */
+
+        const max = Math.max(open, high, low, close);
+        const min = Math.min(open, high, low, close);
+
+        high = max;
+        low = min;
+
+        if(open > high) open = high;
+        if(open < low) open = low;
+
+        if(close > high) close = high;
+        if(close < low) close = low;
 
         return { time, open, high, low, close };
 
@@ -60,7 +88,6 @@ export default function TerminalChart({
 
     const el = wrapRef.current;
     if (!el) return;
-
     if (chartRef.current) return;
 
     const chart = createChart(el, {
@@ -202,7 +229,6 @@ export default function TerminalChart({
       if (!initializedRef.current && candleData.length > 20) {
 
         chart.timeScale().fitContent();
-
         initializedRef.current = true;
 
       }
@@ -213,7 +239,11 @@ export default function TerminalChart({
 
     if (last.time >= lastTimeRef.current) {
 
-      series.update(last);
+      try{
+        series.update(last);
+      }catch{
+        series.setData(candleData);
+      }
 
       lastTimeRef.current = last.time;
 
@@ -226,7 +256,6 @@ export default function TerminalChart({
     }
 
     series.setData(candleData);
-
     lastTimeRef.current = last.time;
 
   }, [candleData]);
@@ -238,8 +267,6 @@ export default function TerminalChart({
     if (!candleSeriesRef.current) return;
 
     const markers = [
-
-      /* ===== EXECUTED TRADES ===== */
 
       ...trades.map(t => {
 
@@ -272,8 +299,6 @@ export default function TerminalChart({
         return null;
 
       }).filter(Boolean),
-
-      /* ===== AI DECISIONS ===== */
 
       ...aiSignals.map(s => {
 
