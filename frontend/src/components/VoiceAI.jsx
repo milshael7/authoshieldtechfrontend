@@ -1,8 +1,3 @@
-// frontend/src/components/VoiceAI.jsx
-// AutoShield Voice — Step 12 FINAL (CORRECTED)
-// Persistent-brain aware • Human cadence • History-capable
-// SAFE: No internal AI state leakage
-
 import React, { useEffect, useRef, useState, useMemo } from "react";
 
 /* ================= BRAND STATES ================= */
@@ -23,15 +18,14 @@ function cleanForSpeech(text) {
     .replace(/```[\s\S]*?```/g, "")
     .replace(/\n+/g, ". ")
     .replace(/\s+/g, " ")
-    .replace(/([.!?])\s+/g, "$1 … ")
     .trim();
 }
 
 function getApiBase() {
   return String(
     import.meta.env.VITE_API_BASE ||
-      import.meta.env.VITE_BACKEND_URL ||
-      ""
+    import.meta.env.VITE_BACKEND_URL ||
+    ""
   ).trim();
 }
 
@@ -47,9 +41,12 @@ export default function VoiceAI({
   title = "AutoShield AI",
   getContext,
 }) {
+
   const API_BASE = useMemo(() => getApiBase(), []);
+
   const SpeechRecognition =
-    window.SpeechRecognition || window.webkitSpeechRecognition;
+    window.SpeechRecognition ||
+    window.webkitSpeechRecognition;
 
   const [aiState, setAiState] = useState(AI_STATE.IDLE);
   const [listening, setListening] = useState(false);
@@ -64,6 +61,7 @@ export default function VoiceAI({
   /* ================= SPEAK ================= */
 
   const speak = async (text) => {
+
     if (!("speechSynthesis" in window)) return;
 
     const say = cleanForSpeech(text);
@@ -72,12 +70,14 @@ export default function VoiceAI({
     if (listening) stopListening();
 
     try {
+
       const synth = window.speechSynthesis;
       synth.cancel();
 
       const u = new SpeechSynthesisUtterance(say);
+
       u.rate = 0.95;
-      u.pitch = 0.98;
+      u.pitch = 1.0;
       u.volume = 1.0;
 
       speakingRef.current = true;
@@ -86,35 +86,51 @@ export default function VoiceAI({
       u.onend = async () => {
         speakingRef.current = false;
         setAiState(AI_STATE.IDLE);
-        await sleep(250);
+        await sleep(200);
       };
 
       synth.speak(u);
+
     } catch {
+
       speakingRef.current = false;
       setAiState(AI_STATE.IDLE);
+
     }
+
   };
 
   /* ================= MIC ================= */
 
   const startListening = () => {
+
     if (!recRef.current || speakingRef.current) return;
+
     try {
       recRef.current.start();
     } catch {}
+
   };
 
   const stopListening = () => {
+
     try {
       recRef.current?.stop();
     } catch {}
+
   };
 
+  /* ================= INIT SPEECH ================= */
+
   useEffect(() => {
-    if (!SpeechRecognition) return;
+
+    if (!SpeechRecognition) {
+      console.warn("SpeechRecognition not supported in this browser");
+      return;
+    }
 
     const rec = new SpeechRecognition();
+
     rec.continuous = true;
     rec.interimResults = true;
     rec.lang = "en-US";
@@ -130,9 +146,11 @@ export default function VoiceAI({
     };
 
     rec.onresult = (e) => {
+
       if (speakingRef.current) return;
 
       let text = "";
+
       for (let i = e.resultIndex; i < e.results.length; i++) {
         text += e.results[i][0].transcript;
       }
@@ -140,22 +158,35 @@ export default function VoiceAI({
       setYouSaid(text);
 
       clearTimeout(silenceTimer.current);
+
       silenceTimer.current = setTimeout(() => {
         sendToAI(text);
       }, 900);
+
+    };
+
+    rec.onerror = (err) => {
+      console.warn("Speech recognition error:", err);
+      setListening(false);
+      setAiState(AI_STATE.IDLE);
     };
 
     recRef.current = rec;
+
     return () => rec.stop();
+
   }, []);
 
   /* ================= AI ================= */
 
   async function sendToAI(message) {
+
     const clean = String(message || "").trim();
+
     if (!clean || busyRef.current) return;
 
     busyRef.current = true;
+
     setAiState(AI_STATE.THINKING);
     setAiSays("");
 
@@ -171,44 +202,80 @@ export default function VoiceAI({
     };
 
     try {
-      const res = await fetch(joinUrl(API_BASE, endpoint), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(payload),
-      });
+
+      const res = await fetch(
+        joinUrl(API_BASE, endpoint),
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify(payload),
+        }
+      );
 
       const data = await res.json();
-      const reply = data?.reply || "";
+
+      const reply =
+        data?.reply ||
+        "I did not receive a response.";
 
       setAiSays(reply);
+
       await speak(data?.speakText || reply);
+
     } catch {
-      setAiSays("I’m having trouble reaching the system.");
-      await speak("I’m having trouble reaching the system.");
+
+      const msg =
+        "I’m having trouble reaching the system.";
+
+      setAiSays(msg);
+
+      await speak(msg);
+
     } finally {
+
       busyRef.current = false;
-      setAiState(AI_STATE.IDLE);
+
+      if (!speakingRef.current)
+        setAiState(AI_STATE.IDLE);
+
     }
+
   }
 
   /* ================= UI ================= */
 
   return (
+
     <div style={card}>
+
       <div style={header}>
+
         <div style={titleStyle}>
           {title}
-          <span style={{ ...dot, background: stateColor(aiState) }} />
+          <span
+            style={{
+              ...dot,
+              background: stateColor(aiState),
+            }}
+          />
         </div>
-        <div style={stateText}>{aiState}</div>
+
+        <div style={stateText}>
+          {aiState}
+        </div>
+
       </div>
 
       <button
         style={btn}
-        onClick={() => (listening ? stopListening() : startListening())}
+        onClick={() =>
+          listening ? stopListening() : startListening()
+        }
       >
-        {listening ? "Stop Listening" : "Talk to AutoShield"}
+        {listening
+          ? "Stop Listening"
+          : "Talk to AutoShield"}
       </button>
 
       <div style={box}>
@@ -222,11 +289,13 @@ export default function VoiceAI({
       </div>
 
       <div style={hint}>
-        Speak naturally. AutoShield remembers past context and explains in real
-        time.
+        Speak naturally. AutoShield remembers past context and explains in real time.
       </div>
+
     </div>
+
   );
+
 }
 
 /* ================= STYLES ================= */
@@ -286,8 +355,8 @@ const hint = {
 };
 
 function stateColor(state) {
-  if (state === AI_STATE.SPEAKING) return "#2bd576";
-  if (state === AI_STATE.THINKING) return "#ffd166";
-  if (state === AI_STATE.LISTENING) return "#7aa2ff";
+  if (state === "Speaking") return "#2bd576";
+  if (state === "Thinking") return "#ffd166";
+  if (state === "Listening") return "#7aa2ff";
   return "#666";
 }
