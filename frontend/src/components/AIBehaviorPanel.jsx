@@ -1,11 +1,16 @@
 // frontend/src/components/AIBehaviorPanel.jsx
 // ============================================================
-// AI BEHAVIOR PANEL — AI PERFORMANCE INTELLIGENCE
+// AI BEHAVIOR PANEL — AI PERFORMANCE INTELLIGENCE v2
+// FIXED: trade accuracy + WAIT detection + learning metrics
 // ============================================================
 
 import React, { useMemo } from "react";
 
-export default function AIBehaviorPanel({ trades = [], decisions = [] }) {
+export default function AIBehaviorPanel({
+  trades = [],
+  decisions = [],
+  memory = null
+}) {
 
   /* ================= DECISION DISTRIBUTION ================= */
 
@@ -13,28 +18,28 @@ export default function AIBehaviorPanel({ trades = [], decisions = [] }) {
 
     let buy = 0;
     let sell = 0;
-    let hold = 0;
+    let wait = 0;
 
     decisions.forEach(d => {
 
       if (d.action === "BUY") buy++;
       else if (d.action === "SELL") sell++;
-      else hold++;
+      else wait++;
 
     });
 
-    return { buy, sell, hold };
+    return { buy, sell, wait };
 
   }, [decisions]);
 
-  /* ================= CONFIDENCE VS WIN RATE ================= */
+  /* ================= AI ACCURACY ================= */
 
-  const confidenceAccuracy = useMemo(() => {
+  const accuracy = useMemo(() => {
 
     if (!trades.length) return 0;
 
     const wins =
-      trades.filter(t => t.profit > 0).length;
+      trades.filter(t => t.pnl > 0).length;
 
     return (wins / trades.length) * 100;
 
@@ -56,6 +61,28 @@ export default function AIBehaviorPanel({ trades = [], decisions = [] }) {
 
   }, [decisions]);
 
+  /* ================= AI LEARNING ================= */
+
+  const learning = useMemo(() => {
+
+    if (!memory) {
+
+      return {
+        signals: 0,
+        trades: trades.length,
+        market: 0
+      };
+
+    }
+
+    return {
+      signals: memory.signalsStored || 0,
+      trades: memory.tradesStored || trades.length,
+      market: memory.marketStatesStored || 0
+    };
+
+  }, [memory, trades]);
+
   return (
 
     <div style={{
@@ -65,27 +92,53 @@ export default function AIBehaviorPanel({ trades = [], decisions = [] }) {
       border:"1px solid rgba(255,255,255,.08)"
     }}>
 
-      <h3 style={{marginBottom:15}}>
+      <h3 style={{marginBottom:16}}>
         AI Behavior Intelligence
       </h3>
 
-      {/* CONFIDENCE */}
+      {/* ================= CONFIDENCE ================= */}
 
-      <div style={{marginBottom:12}}>
+      <div style={{marginBottom:10}}>
         <strong>Average AI Confidence:</strong>{" "}
         {avgConfidence.toFixed(1)}%
       </div>
 
-      {/* ACCURACY */}
+      {/* ================= ACCURACY ================= */}
 
-      <div style={{marginBottom:12}}>
+      <div style={{marginBottom:10}}>
         <strong>AI Accuracy:</strong>{" "}
-        {confidenceAccuracy.toFixed(1)}%
+        {accuracy.toFixed(1)}%
       </div>
 
-      {/* DECISION DISTRIBUTION */}
+      {/* ================= LEARNING ================= */}
 
       <div style={{marginTop:15}}>
+
+        <strong>AI Learning Memory</strong>
+
+        <div style={{
+          display:"grid",
+          gridTemplateColumns:"1fr 1fr",
+          marginTop:8,
+          gap:6
+        }}>
+
+          <span>Signals Learned:</span>
+          <span>{learning.signals}</span>
+
+          <span>Trades Learned:</span>
+          <span>{learning.trades}</span>
+
+          <span>Market States:</span>
+          <span>{learning.market}</span>
+
+        </div>
+
+      </div>
+
+      {/* ================= DECISION DISTRIBUTION ================= */}
+
+      <div style={{marginTop:18}}>
 
         <strong>Decision Distribution</strong>
 
@@ -104,7 +157,7 @@ export default function AIBehaviorPanel({ trades = [], decisions = [] }) {
           </span>
 
           <span style={{color:"#f59e0b"}}>
-            HOLD: {decisionStats.hold}
+            WAIT: {decisionStats.wait}
           </span>
 
         </div>
