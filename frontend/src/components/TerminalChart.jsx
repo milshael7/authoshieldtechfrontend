@@ -92,20 +92,14 @@ export default function TerminalChart({
       },
 
       timeScale: {
-
         borderColor: "rgba(148,163,184,.15)",
-
         timeVisible: true,
-
         barSpacing: 10,
         minBarSpacing: 6,
-
         rightBarOffset: 8,
-
         shiftVisibleRangeOnNewBar: false,
         rightBarStaysOnScroll: true,
         fixLeftEdge: false
-
       }
 
     });
@@ -245,32 +239,75 @@ export default function TerminalChart({
 
     const markers = [
 
+      /* ===== EXECUTED TRADES ===== */
+
       ...trades.map(t => {
 
         const time = Number(t?.time);
         if (!Number.isFinite(time)) return null;
 
-        return {
-          time,
-          position: t.side === "BUY" ? "belowBar" : "aboveBar",
-          color: t.side === "BUY" ? "#22c55e" : "#ef4444",
-          shape: t.side === "BUY" ? "arrowUp" : "arrowDown",
-          text: t.side
-        };
+        const side =
+          t.side || t.action || "";
+
+        if(side === "BUY"){
+          return {
+            time,
+            position:"belowBar",
+            color:"#22c55e",
+            shape:"arrowUp",
+            text:"BUY"
+          };
+        }
+
+        if(side === "SELL"){
+          return {
+            time,
+            position:"aboveBar",
+            color:"#ef4444",
+            shape:"arrowDown",
+            text:"SELL"
+          };
+        }
+
+        return null;
 
       }).filter(Boolean),
+
+      /* ===== AI DECISIONS ===== */
 
       ...aiSignals.map(s => {
 
         const time = Number(s?.time);
         if (!Number.isFinite(time)) return null;
 
+        const action = s.action || "";
+
+        if(action === "BUY"){
+          return {
+            time,
+            position:"belowBar",
+            color:"#4ade80",
+            shape:"arrowUp",
+            text:"AI BUY"
+          };
+        }
+
+        if(action === "SELL"){
+          return {
+            time,
+            position:"aboveBar",
+            color:"#f87171",
+            shape:"arrowDown",
+            text:"AI SELL"
+          };
+        }
+
         return {
           time,
-          position: "aboveBar",
-          color: "#facc15",
-          shape: "circle",
-          text: "AI"
+          position:"aboveBar",
+          color:"#facc15",
+          shape:"circle",
+          text:"AI"
         };
 
       }).filter(Boolean)
