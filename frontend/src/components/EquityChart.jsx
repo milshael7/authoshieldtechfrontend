@@ -1,3 +1,15 @@
+// ============================================================
+// FILE: frontend/src/components/EquityChart.jsx
+// EQUITY LINE CHART — ANALYTICS VERSION
+// PURPOSE:
+// Full equity curve used in analytics dashboards.
+//
+// FIXES:
+// - Handles NaN values safely
+// - Prevents single-point division errors
+// - Keeps identical visual design
+// ============================================================
+
 import React from "react";
 
 /*
@@ -7,26 +19,46 @@ import React from "react";
  */
 
 export default function EquityChart({ data = [] }) {
-  if (!data.length) return null;
+
+  if (!Array.isArray(data) || data.length === 0)
+    return null;
+
+  const cleanData = data.filter(v => Number.isFinite(v));
+  if (cleanData.length === 0) return null;
 
   const width = 500;
   const height = 200;
   const padding = 20;
 
-  const max = Math.max(...data);
-  const min = Math.min(...data);
+  const max = Math.max(...cleanData);
+  const min = Math.min(...cleanData);
 
-  const scaleX = (index) =>
-    padding +
-    (index / (data.length - 1)) * (width - padding * 2);
+  const length = cleanData.length;
 
-  const scaleY = (value) =>
-    height -
-    padding -
-    ((value - min) / (max - min || 1)) *
-      (height - padding * 2);
+  const scaleX = (index) => {
 
-  const points = data
+    if (length === 1) return width / 2;
+
+    return (
+      padding +
+      (index / (length - 1)) *
+        (width - padding * 2)
+    );
+  };
+
+  const scaleY = (value) => {
+
+    const range = max - min || 1;
+
+    return (
+      height -
+      padding -
+      ((value - min) / range) *
+        (height - padding * 2)
+    );
+  };
+
+  const points = cleanData
     .map((v, i) => `${scaleX(i)},${scaleY(v)}`)
     .join(" ");
 
@@ -44,6 +76,7 @@ export default function EquityChart({ data = [] }) {
       />
 
       {/* Peak line */}
+
       <line
         x1={padding}
         y1={scaleY(max)}
@@ -53,7 +86,8 @@ export default function EquityChart({ data = [] }) {
         strokeDasharray="4"
       />
 
-      {/* Zero padding border */}
+      {/* Chart border */}
+
       <rect
         x="0"
         y="0"
