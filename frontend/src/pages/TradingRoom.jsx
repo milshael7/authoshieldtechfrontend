@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState, useMemo } from "react";
 import TerminalChart from "../components/TerminalChart";
 import OrderPanel from "../components/OrderPanel";
+import AIBehaviorPanel from "../components/AIBehaviorPanel";
 import { getToken } from "../lib/api.js";
 
 const API_BASE = import.meta.env.VITE_API_BASE?.replace(/\/+$/, "");
@@ -19,7 +20,8 @@ export default function TradingRoom(){
   const marketWsRef = useRef(null);
   const paperWsRef = useRef(null);
 
-  const reconnectTimerRef = useRef(null);
+  const marketReconnectRef = useRef(null);
+  const paperReconnectRef = useRef(null);
 
   const lastCandleRef = useRef(null);
   const engineStartRef = useRef(null);
@@ -34,6 +36,8 @@ export default function TradingRoom(){
   const [trades,setTrades] = useState([]);
   const [decisions,setDecisions] = useState([]);
 
+  const [memory,setMemory] = useState(null);
+
   const [engineUptime,setEngineUptime] = useState("0s");
 
   const [aiControl,setAiControl] = useState({
@@ -41,6 +45,28 @@ export default function TradingRoom(){
     tradingMode:"paper",
     strategyMode:"Balanced"
   });
+
+/* ================= LOAD MEMORY ================= */
+
+  async function loadMemory(){
+
+    const token=getToken();
+    if(!token || !API_BASE) return;
+
+    try{
+
+      const res=await fetch(
+        `${API_BASE}/api/brain/snapshot`,
+        {headers:{Authorization:`Bearer ${token}`}}
+      );
+
+      const data=await res.json();
+
+      if(data) setMemory(data);
+
+    }catch{}
+
+  }
 
 /* ================= LOAD AI CONFIG ================= */
 
@@ -69,6 +95,7 @@ export default function TradingRoom(){
     }
 
     loadConfig();
+    loadMemory();
 
   },[]);
 
@@ -125,20 +152,16 @@ export default function TradingRoom(){
 
       if(!formatted.length) return;
 
-      setCandles(prev=>{
+      setCandles(formatted);
 
-        if(prev.length>0) return prev;
-
-        lastCandleRef.current=
-          formatted[formatted.length-1];
-
-        return formatted;
-
-      });
+      lastCandleRef.current=
+        formatted[formatted.length-1];
 
     }catch{}
 
   }
+
+  useEffect(()=>{loadHistory()},[]);
 
 /* ================= CANDLE BUILDER ================= */
 
@@ -190,8 +213,6 @@ export default function TradingRoom(){
 
   }
 
-  useEffect(()=>{loadHistory()},[]);
-
 /* ================= MARKET WS ================= */
 
   function connectMarket(){
@@ -234,7 +255,7 @@ export default function TradingRoom(){
 
       marketWsRef.current=null;
 
-      reconnectTimerRef.current=setTimeout(()=>{
+      marketReconnectRef.current=setTimeout(()=>{
         connectMarket();
       },3000);
 
@@ -302,7 +323,7 @@ export default function TradingRoom(){
 
       paperWsRef.current=null;
 
-      reconnectTimerRef.current=setTimeout(()=>{
+      paperReconnectRef.current=setTimeout(()=>{
         connectPaper();
       },3000);
 
@@ -335,18 +356,6 @@ export default function TradingRoom(){
 
   },[decisions]);
 
-  const lastDecision=decisions.length
-    ? decisions[decisions.length-1]
-    : null;
-
-  const aiStatus=useMemo(()=>{
-
-    if(!aiControl?.enabled) return "DISABLED";
-    if(aiControl?.tradingMode==="manual") return "HUMAN OVERRIDE";
-    return "RUNNING";
-
-  },[aiControl]);
-
 /* ================= RENDER ================= */
 
   return(
@@ -367,6 +376,14 @@ export default function TradingRoom(){
           pnlSeries={trades}
         />
 
+        <div style={{marginTop:20}}>
+          <AIBehaviorPanel
+            trades={trades}
+            decisions={decisions}
+            memory={memory}
+          />
+        </div>
+
       </div>
 
       <div style={{width:240}}>
@@ -382,7 +399,8 @@ export default function TradingRoom(){
 
         <h3>AI Engine</h3>
 
-        <div>Status: {aiStatus}</div>
+        <div>Status: {aiControl.enabled ? "RUNNING" : "DISABLED"}</div>
+
         <div>Engine Uptime: {engineUptime}</div>
 
         <div style={{marginTop:10}}>
@@ -398,21 +416,6 @@ export default function TradingRoom(){
         <div>
           AI Confidence: {(aiConfidence*100).toFixed(0)}%
         </div>
-
-        {lastDecision &&(
-
-          <div style={{marginTop:14,fontSize:12,opacity:.8}}>
-
-            <div>Last Action: {lastDecision.action}</div>
-
-            <div>
-              Confidence:
-              {(lastDecision.confidence*100).toFixed(0)}%
-            </div>
-
-          </div>
-
-        )}
 
       </div>
 
