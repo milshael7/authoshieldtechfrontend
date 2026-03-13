@@ -3,33 +3,54 @@ import React from "react";
 
 /**
  * TradingToolbar
- * - Keeps your current flow: Trading.jsx still owns the state + handlers
- * - This is just the clean “top bar” UI like exchange panels
+ * - Keeps current flow: parent owns state + handlers
+ * - Safe display wrapper for live/paper trading room top bar
+ * - No design changes
  */
 export default function TradingToolbar({
-  mode,
-  setMode,
-  symbol,
-  setSymbol,
+  mode = "Paper",
+  setMode = () => {},
+  symbol = "BTCUSDT",
+  setSymbol = () => {},
   symbols = [],
-  feedStatus,
-  lastText,
-  running,
+  feedStatus = "UNKNOWN",
+  lastText = "Loading",
+  running = false,
 
   // panel toggles
-  showMoney,
-  setShowMoney,
-  showTradeLog,
-  setShowTradeLog,
-  showHistory,
-  setShowHistory,
-  showControls,
-  setShowControls,
-  showAI,
-  setShowAI,
-  wideChart,
-  setWideChart,
+  showMoney = false,
+  setShowMoney = () => {},
+  showTradeLog = false,
+  setShowTradeLog = () => {},
+  showHistory = false,
+  setShowHistory = () => {},
+  showControls = false,
+  setShowControls = () => {},
+  showAI = false,
+  setShowAI = () => {},
+  wideChart = false,
+  setWideChart = () => {},
 }) {
+  const safeSymbols =
+    Array.isArray(symbols) && symbols.length
+      ? symbols
+      : ["BTCUSDT"];
+
+  const normalizedMode =
+    String(mode || "Paper").toLowerCase() === "live"
+      ? "Live"
+      : "Paper";
+
+  const normalizedFeedStatus =
+    String(feedStatus || "UNKNOWN").toUpperCase();
+
+  const normalizedLastText =
+    lastText === null || lastText === undefined || lastText === ""
+      ? "Loading"
+      : String(lastText);
+
+  const paperState = running ? "ON" : "OFF";
+
   const chip = {
     padding: "6px 10px",
     borderRadius: 999,
@@ -52,7 +73,9 @@ export default function TradingToolbar({
     padding: "8px 10px",
     borderRadius: 10,
     border: "1px solid rgba(255,255,255,0.18)",
-    background: active ? "rgba(122,167,255,0.22)" : "rgba(255,255,255,0.06)",
+    background: active
+      ? "rgba(122,167,255,0.22)"
+      : "rgba(255,255,255,0.06)",
     color: "white",
     cursor: "pointer",
     fontWeight: 800,
@@ -66,13 +89,15 @@ export default function TradingToolbar({
           <h2 className="tpTitle">Trading Room</h2>
 
           <span style={chip}>
-            Feed: <b style={{ marginLeft: 6 }}>{feedStatus}</b>
+            Feed: <b style={{ marginLeft: 6 }}>{normalizedFeedStatus}</b>
           </span>
+
           <span style={chip}>
-            Last: <b style={{ marginLeft: 6 }}>{lastText}</b>
+            Last: <b style={{ marginLeft: 6 }}>{normalizedLastText}</b>
           </span>
+
           <span style={chip}>
-            Paper: <b style={{ marginLeft: 6 }}>{running ? "ON" : "OFF"}</b>
+            Paper: <b style={{ marginLeft: 6 }}>{paperState}</b>
           </span>
         </div>
 
@@ -86,10 +111,19 @@ export default function TradingToolbar({
         <div style={pill}>
           <div className="tpPillLabel">Mode</div>
           <div className="tpRow">
-            <button style={btn(mode === "Live")} onClick={() => setMode("Live")} type="button">
+            <button
+              style={btn(normalizedMode === "Live")}
+              onClick={() => setMode("Live")}
+              type="button"
+            >
               Live
             </button>
-            <button style={btn(mode === "Paper")} onClick={() => setMode("Paper")} type="button">
+
+            <button
+              style={btn(normalizedMode === "Paper")}
+              onClick={() => setMode("Paper")}
+              type="button"
+            >
               Paper
             </button>
           </div>
@@ -99,11 +133,11 @@ export default function TradingToolbar({
         <div style={pill}>
           <div className="tpPillLabel">Symbol</div>
           <select
-            value={symbol}
+            value={safeSymbols.includes(symbol) ? symbol : safeSymbols[0]}
             onChange={(e) => setSymbol(e.target.value)}
             className="tpSelect"
           >
-            {symbols.map((s) => (
+            {safeSymbols.map((s) => (
               <option key={s} value={s}>
                 {s}
               </option>
@@ -115,22 +149,51 @@ export default function TradingToolbar({
         <div style={pill}>
           <div className="tpPillLabel">Panels</div>
           <div className="tpRow tpRowWrap">
-            <button style={btn(showMoney)} onClick={() => setShowMoney((v) => !v)} type="button">
+            <button
+              style={btn(showMoney)}
+              onClick={() => setShowMoney((v) => !v)}
+              type="button"
+            >
               Money
             </button>
-            <button style={btn(showTradeLog)} onClick={() => setShowTradeLog((v) => !v)} type="button">
+
+            <button
+              style={btn(showTradeLog)}
+              onClick={() => setShowTradeLog((v) => !v)}
+              type="button"
+            >
               Log
             </button>
-            <button style={btn(showHistory)} onClick={() => setShowHistory((v) => !v)} type="button">
+
+            <button
+              style={btn(showHistory)}
+              onClick={() => setShowHistory((v) => !v)}
+              type="button"
+            >
               History
             </button>
-            <button style={btn(showControls)} onClick={() => setShowControls((v) => !v)} type="button">
+
+            <button
+              style={btn(showControls)}
+              onClick={() => setShowControls((v) => !v)}
+              type="button"
+            >
               Controls
             </button>
-            <button style={btn(showAI)} onClick={() => setShowAI((v) => !v)} type="button">
+
+            <button
+              style={btn(showAI)}
+              onClick={() => setShowAI((v) => !v)}
+              type="button"
+            >
               AI
             </button>
-            <button style={btn(wideChart)} onClick={() => setWideChart((v) => !v)} type="button">
+
+            <button
+              style={btn(wideChart)}
+              onClick={() => setWideChart((v) => !v)}
+              type="button"
+            >
               Wide
             </button>
           </div>
