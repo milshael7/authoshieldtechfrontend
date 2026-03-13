@@ -3,274 +3,290 @@ import Market from "./trading/Market.jsx";
 import TradingRoom from "./trading/TradingRoom.jsx";
 import "../styles/platform.css";
 
-/**
- * Trading.jsx — DUAL ENGINE GOVERNANCE (STABLE BUILD)
- */
+const API = import.meta.env.VITE_API_BASE || "http://localhost:5000";
 
-export default function Trading() {
+export default function Trading(){
 
-  const [tab, setTab] = useState("market");
+  const [tab,setTab] = useState("market");
 
-  /* ================= EXECUTION ENGINE ================= */
+  const [mode,setMode] = useState("paper");
 
-  const [mode, setMode] = useState("paper");
-  const [dailyLimit] = useState(5);
-  const [tradesUsed, setTradesUsed] = useState(1);
+  const [snapshot,setSnapshot] = useState(null);
 
-  /* ================= HUMAN OVERRIDE CONTROL ================= */
+  const [loading,setLoading] = useState(true);
 
-  const [overrideRiskPct, setOverrideRiskPct] = useState(20);
-  const [overrideActive, setOverrideActive] = useState(false);
+  /* ================= FETCH ENGINE ================= */
 
-  /* ================= LEARNING ENGINE ================= */
+  async function loadEngine(){
 
-  const [learningStatus] = useState("active");
-  const [simulatedTrades] = useState(143);
-  const [accuracy] = useState(67.4);
+    try{
 
-  /* ================= TRADING WINDOW (AUTO REFRESH) ================= */
+      const token =
+        localStorage.getItem("as_token");
 
-  const [now, setNow] = useState(Date.now());
+      const res =
+        await fetch(`${API}/api/trading/snapshot`,{
+          headers:{
+            Authorization:`Bearer ${token}`
+          }
+        });
 
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setNow(Date.now());
-    }, 60 * 60 * 1000); // refresh hourly
-    return () => clearInterval(timer);
-  }, []);
+      const data = await res.json();
 
-  const tradingAllowed = useMemo(() => {
-    const current = new Date(now);
-    const day = current.getDay();
-    const hour = current.getHours();
+      if(data?.snapshot){
+        setSnapshot(data.snapshot);
+      }
 
-    if (day === 5 && hour >= 21) return false;
-    if (day === 6 && hour < 21) return false;
+    }catch(err){
+
+      console.log("engine error",err);
+
+    }
+
+    setLoading(false);
+
+  }
+
+  useEffect(()=>{
+
+    loadEngine();
+
+    const interval =
+      setInterval(loadEngine,2000);
+
+    return ()=>clearInterval(interval);
+
+  },[]);
+
+  /* ================= TRADING WINDOW ================= */
+
+  const tradingAllowed = useMemo(()=>{
+
+    const now = new Date();
+
+    const day = now.getDay();
+    const hour = now.getHours();
+
+    if(day===5 && hour>=21) return false;
+    if(day===6 && hour<21) return false;
 
     return true;
-  }, [now]);
 
-  /* ================= CAPITAL (STABLE OBJECT) ================= */
+  },[]);
 
-  const capital = useMemo(() => ({
-    total: 100000,
-    execution: 80000,
-    reserve: 20000,
-  }), []);
+  /* ================= CAPITAL ================= */
 
-  /* ================= SAFE OVERRIDE HANDLER ================= */
+  const capital = useMemo(()=>({
 
-  function handleRiskChange(value) {
-    const num = Number(value);
-    if (Number.isNaN(num)) return;
-    const clamped = Math.max(1, Math.min(50, num));
-    setOverrideRiskPct(clamped);
-  }
+    total: snapshot?.equity || 100000,
+    execution: (snapshot?.equity || 100000)*0.8,
+    reserve: (snapshot?.equity || 100000)*0.2
+
+  }),[snapshot]);
 
   /* ================= UI ================= */
 
+  if(loading){
+
+    return (
+      <div style={{padding:40}}>
+        Loading AI engine...
+      </div>
+    );
+
+  }
+
+  const tradesUsed =
+    snapshot?.executionStats?.trades || 0;
+
+  const dailyLimit = 5;
+
+  const decisions =
+    snapshot?.executionStats?.decisions || 0;
+
+  const uptime =
+    snapshot?.telemetry?.uptime || 0;
+
+  const aiPerMin =
+    snapshot?.telemetry?.decisionsPerMinute || 0;
+
+  const mem =
+    snapshot?.telemetry?.memoryUsage || 0;
+
   return (
+
     <div className="postureWrap">
 
-      {/* ================= HEADER ================= */}
-      <section className="postureCard" style={{ marginBottom: 20 }}>
+      {/* HEADER */}
+
+      <section className="postureCard" style={{marginBottom:20}}>
+
         <div className="postureTop">
+
           <div>
-            <h2 style={{ color: "#7ec8ff" }}>
+
+            <h2 style={{color:"#7ec8ff"}}>
               Quant Trading Oversight
             </h2>
+
             <small>
-              AI-driven execution with human override governance
+              AI-driven execution with human oversight
             </small>
+
           </div>
 
-          <span className={`badge ${mode === "live" ? "warn" : ""}`}>
+          <span className={`badge ${mode==="live"?"warn":""}`}>
             {mode.toUpperCase()}
           </span>
+
         </div>
 
-        {/* ================= STATUS GRID ================= */}
+        {/* STATUS GRID */}
+
         <div
           style={{
-            marginTop: 16,
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-            gap: 16,
+            marginTop:16,
+            display:"grid",
+            gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",
+            gap:16
           }}
         >
-          {/* EXECUTION ENGINE */}
+
+          {/* AI ENGINE */}
+
           <div>
-            <b>Execution Engine (AI)</b>
-            <div style={{ marginTop: 8 }}>
-              <span className={`badge ${tradingAllowed ? "ok" : "bad"}`}>
-                {tradingAllowed ? "Window Open" : "Trading Paused"}
+
+            <b>Execution Engine</b>
+
+            <div style={{marginTop:8}}>
+
+              <span className={`badge ${tradingAllowed?"ok":"bad"}`}>
+                {tradingAllowed?"Window Open":"Trading Paused"}
               </span>
+
             </div>
-            <div style={{ marginTop: 8 }}>
+
+            <div style={{marginTop:8}}>
               Trades: {tradesUsed} / {dailyLimit}
             </div>
-            <small>AI controls 100% of strategy logic</small>
+
+            <small>
+              AI Decisions: {decisions}
+            </small>
+
           </div>
 
-          {/* HUMAN OVERRIDE */}
+          {/* ENGINE TELEMETRY */}
+
           <div>
-            <b>Human Override</b>
-            <div style={{ marginTop: 8 }}>
-              <span className={`badge ${overrideActive ? "warn" : ""}`}>
-                {overrideActive ? "ACTIVE" : "Monitoring"}
-              </span>
+
+            <b>Engine Telemetry</b>
+
+            <div style={{marginTop:8}}>
+              Uptime: {uptime}s
             </div>
 
-            <div style={{ marginTop: 8 }}>
-              Risk Override %
-              <input
-                type="number"
-                min="1"
-                max="50"
-                value={overrideRiskPct}
-                onChange={(e) => handleRiskChange(e.target.value)}
-                style={{ width: "100%", marginTop: 6 }}
-              />
+            <div>
+              AI/min: {aiPerMin.toFixed(2)}
             </div>
 
-            <button
-              className="pill warn"
-              style={{ marginTop: 8 }}
-              onClick={() => setOverrideActive(prev => !prev)}
-            >
-              {overrideActive ? "Disable Override" : "Enable Override"}
-            </button>
-          </div>
+            <div>
+              Memory: {(mem/1024/1024).toFixed(1)} MB
+            </div>
 
-          {/* LEARNING ENGINE */}
-          <div>
-            <b>Learning Engine</b>
-            <div style={{ marginTop: 8 }}>
-              <span className="badge ok">
-                {learningStatus.toUpperCase()}
-              </span>
-            </div>
-            <div style={{ marginTop: 8 }}>
-              Simulated Trades: {simulatedTrades}
-            </div>
-            <div>Signal Accuracy: {accuracy}%</div>
-            <small>Runs 24/7 — never stops learning</small>
           </div>
 
           {/* CAPITAL */}
+
           <div>
+
             <b>Capital Governance</b>
-            <div style={{ marginTop: 8 }}>
-              Total: ${capital.total.toLocaleString()}
+
+            <div style={{marginTop:8}}>
+              Equity: ${capital.total.toLocaleString()}
             </div>
+
             <small>
-              AI Execution: ${capital.execution.toLocaleString()} <br />
-              Human Reserve: ${capital.reserve.toLocaleString()}
+
+              AI Execution:
+              ${capital.execution.toLocaleString()}
+
+              <br/>
+
+              Reserve:
+              ${capital.reserve.toLocaleString()}
+
             </small>
+
           </div>
 
-          {/* MODE CONTROL */}
+          {/* MODE */}
+
           <div>
+
             <b>Execution Mode</b>
-            <div style={{ marginTop: 8 }}>
+
+            <div style={{marginTop:8}}>
+
               <button
-                className={mode === "paper" ? "pill active" : "pill"}
-                onClick={() => setMode("paper")}
+                className={mode==="paper"?"pill active":"pill"}
+                onClick={()=>setMode("paper")}
               >
                 PAPER
               </button>
+
               <button
-                className={mode === "live" ? "pill warn active" : "pill warn"}
-                onClick={() => setMode("live")}
-                style={{ marginLeft: 8 }}
+                className={mode==="live"?"pill warn active":"pill warn"}
+                onClick={()=>setMode("live")}
+                style={{marginLeft:8}}
               >
                 LIVE
               </button>
+
             </div>
+
           </div>
+
         </div>
 
-        <p className="muted" style={{ marginTop: 16, fontSize: 13 }}>
-          AI operates independently. Human override adjusts exposure only.
-          Weekend lock enforced. Learning engine always active.
-        </p>
       </section>
 
-      {/* ================= TABS ================= */}
-      <div className="platformTabs" style={{ marginBottom: 18 }}>
+      {/* TABS */}
+
+      <div className="platformTabs" style={{marginBottom:18}}>
+
         <button
-          className={tab === "market" ? "ptab active" : "ptab"}
-          onClick={() => setTab("market")}
+          className={tab==="market"?"ptab active":"ptab"}
+          onClick={()=>setTab("market")}
         >
           Market
         </button>
+
         <button
-          className={tab === "room" ? "ptab active" : "ptab"}
-          onClick={() => setTab("room")}
+          className={tab==="room"?"ptab active":"ptab"}
+          onClick={()=>setTab("room")}
         >
           Trading Room
         </button>
-        <button
-          className={tab === "reports" ? "ptab active" : "ptab"}
-          onClick={() => setTab("reports")}
-        >
-          Reports
-        </button>
+
       </div>
 
-      {/* ================= CONTENT ================= */}
+      {/* CONTENT */}
 
-      {tab === "market" && (
+      {tab==="market" && (
         <section className="postureCard">
-          <Market
-            mode={mode}
-            dailyLimit={dailyLimit}
-            tradesUsed={tradesUsed}
-          />
+          <Market/>
         </section>
       )}
 
-      {tab === "room" && (
+      {tab==="room" && (
         <section className="postureCard">
-          <TradingRoom
-            mode={mode}
-            dailyLimit={dailyLimit}
-            overrideActive={overrideActive}
-            overrideRiskPct={overrideRiskPct}
-            setTradesUsed={setTradesUsed}
-          />
-        </section>
-      )}
-
-      {tab === "reports" && (
-        <section className="postureCard">
-          <h3>Performance Reports</h3>
-          <ul className="list">
-            <li>
-              <span className="dot ok" />
-              <div>
-                <b>P&amp;L Overview</b>
-                <small>Profit and loss tracking</small>
-              </div>
-            </li>
-            <li>
-              <span className="dot ok" />
-              <div>
-                <b>Signal Accuracy</b>
-                <small>Learning engine performance</small>
-              </div>
-            </li>
-            <li>
-              <span className="dot warn" />
-              <div>
-                <b>Risk Exposure</b>
-                <small>AI exposure vs human override ratio</small>
-              </div>
-            </li>
-          </ul>
+          <TradingRoom snapshot={snapshot}/>
         </section>
       )}
 
     </div>
+
   );
+
 }
