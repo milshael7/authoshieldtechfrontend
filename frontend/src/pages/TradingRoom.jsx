@@ -4,19 +4,27 @@
 // PURPOSE: Live market dashboard + AI paper trading interface
 //
 // MAINTENANCE NOTES:
-// - Active AI trade now passed into AIBehaviorPanel
-// - Enables live "Active Trade" display + duration timer
-// - Chart logic, websocket logic, and candle structure remain unchanged
+// - AIBehaviorPanel shows real-time AI behavior + active trade
+// - AIPerformanceHistoryPanel shows long-term AI trade history
+// - Chart system and websocket logic MUST remain unchanged
 //
-// IMPORTANT:
-// If the AIBehaviorPanel active trade stops displaying,
-// confirm the prop `position={position}` is still passed.
+// REQUIRED DATA FLOW
+// - trades → used by AI behavior + history panels
+// - decisions → AI confidence metrics
+// - position → active trade monitor
+//
+// DO NOT MODIFY:
+// - candle update logic
+// - websocket event structure
+// - chart rendering pipeline
+//
 // ==========================================================
 
 import React, { useEffect, useRef, useState, useMemo } from "react";
 import TerminalChart from "../components/TerminalChart";
 import OrderPanel from "../components/OrderPanel";
 import AIBehaviorPanel from "../components/AIBehaviorPanel";
+import AIPerformanceHistoryPanel from "../components/AIPerformanceHistoryPanel";
 import { getToken } from "../lib/api.js";
 
 const API_BASE = import.meta.env.VITE_API_BASE?.replace(/\/+$/, "");
@@ -431,7 +439,15 @@ export default function TradingRoom(){
             trades={trades}
             decisions={decisions}
             memory={memory}
-            position={position}   // ⭐ enables active trade display
+            position={position}
+          />
+        </div>
+
+        {/* ================= LONG TERM AI PERFORMANCE ================= */}
+
+        <div style={{marginTop:20}}>
+          <AIPerformanceHistoryPanel
+            trades={trades}
           />
         </div>
 
