@@ -8,18 +8,12 @@
 // PANELS
 // 1. AI Analytics (confidence, accuracy, learning)
 // 2. Active Trade Monitor
-// 3. Daily + Hourly Trade Journal
+// 3. Hourly Trade Journal
+// 4. DAILY PERFORMANCE HISTORY (NEW)
 //
 // SAFETY
 // - Handles missing trade fields
 // - Prevents UI crashes from null values
-//
-// MAINTENANCE NOTES
-// - Trades must contain:
-//   { symbol, price, entry, qty, pnl, time }
-//
-// - CLOSE trades are used for performance stats
-// - Entry time should be stored as timeOpen if available
 //
 // ============================================================
 
@@ -75,6 +69,14 @@ export default function AIBehaviorPanel({
   function formatTime(ts){
     try{
       return new Date(ts).toLocaleTimeString();
+    }catch{
+      return "-";
+    }
+  }
+
+  function formatDate(ts){
+    try{
+      return new Date(ts).toDateString();
     }catch{
       return "-";
     }
@@ -149,7 +151,7 @@ export default function AIBehaviorPanel({
 
   },[closedTrades]);
 
-  /* ================= TRADE JOURNAL GROUPING ================= */
+  /* ================= HOURLY TRADE JOURNAL ================= */
 
   const tradesByHour = useMemo(()=>{
 
@@ -179,6 +181,42 @@ export default function AIBehaviorPanel({
       }else{
         grouped[key].losses.push(t);
       }
+
+    });
+
+    return grouped;
+
+  },[closedTrades]);
+
+  /* ================= DAILY HISTORY (NEW) ================= */
+
+  const tradesByDay = useMemo(()=>{
+
+    const grouped={};
+
+    closedTrades.forEach(t=>{
+
+      if(!t.time) return;
+
+      const day = new Date(t.time).toDateString();
+
+      if(!grouped[day]){
+        grouped[day]={
+          pnl:0,
+          wins:0,
+          losses:0,
+          trades:[]
+        };
+      }
+
+      grouped[day].trades.push(t);
+
+      const pnl = Number(t.pnl||0);
+
+      grouped[day].pnl += pnl;
+
+      if(pnl>0) grouped[day].wins++;
+      if(pnl<0) grouped[day].losses++;
 
     });
 
@@ -238,7 +276,7 @@ export default function AIBehaviorPanel({
       padding:20,
       borderRadius:12,
       border:"1px solid rgba(255,255,255,.08)",
-      maxHeight:650,
+      maxHeight:700,
       overflowY:"auto"
     }}>
 
@@ -256,6 +294,8 @@ export default function AIBehaviorPanel({
         {accuracy.toFixed(1)}%
       </div>
 
+      {/* ================= TRADE PERFORMANCE ================= */}
+
       <div style={{marginTop:12}}>
 
         <strong>Trade Performance</strong>
@@ -264,30 +304,20 @@ export default function AIBehaviorPanel({
           Trades Closed: {tradeStats.total}
         </div>
 
-        <div style={{
-          color:"#22c55e",
-          background:"rgba(34,197,94,.08)",
-          padding:6,
-          borderRadius:6
-        }}>
+        <div style={{color:"#22c55e"}}>
           Wins: {tradeStats.wins}
         </div>
 
-        <div style={{
-          color:"#ef4444",
-          background:"rgba(239,68,68,.08)",
-          padding:6,
-          borderRadius:6
-        }}>
+        <div style={{color:"#ef4444"}}>
           Losses: {tradeStats.losses}
         </div>
 
         <div>
-          Total PnL:{" "}
+          Total PnL:
           <span style={{
             color:tradeStats.pnl>=0?"#22c55e":"#ef4444"
           }}>
-            ${tradeStats.pnl.toFixed(2)}
+            {" "} ${tradeStats.pnl.toFixed(2)}
           </span>
         </div>
 
@@ -310,25 +340,13 @@ export default function AIBehaviorPanel({
         </div>
 
         <div>
-          Daily PnL:{" "}
+          Daily PnL:
           <span style={{
             color:dailyStats.pnl>=0?"#22c55e":"#ef4444"
           }}>
-            ${dailyStats.pnl.toFixed(2)}
+            {" "} ${dailyStats.pnl.toFixed(2)}
           </span>
         </div>
-
-      </div>
-
-      {/* ================= LEARNING ================= */}
-
-      <div style={{marginTop:14}}>
-
-        <strong>AI Learning Memory</strong>
-
-        <div>Signals Learned: {learning.signals}</div>
-        <div>Trades Learned: {learning.trades}</div>
-        <div>Market States: {learning.market}</div>
 
       </div>
 
@@ -340,31 +358,20 @@ export default function AIBehaviorPanel({
 
           <strong>Active Trade Monitor</strong>
 
-          <div style={{marginTop:6}}>
-            Market: {position.symbol || "UNKNOWN"}
-          </div>
-
-          <div>
-            Entry Price: {position.entry}
-          </div>
-
-          <div>
-            Position Size: {position.qty}
-          </div>
-
-          <div>
-            Time Open: {formatDuration(duration)}
-          </div>
+          <div>Market: {position.symbol || "UNKNOWN"}</div>
+          <div>Entry Price: {position.entry}</div>
+          <div>Position Size: {position.qty}</div>
+          <div>Time Open: {formatDuration(duration)}</div>
 
         </div>
 
       )}
 
-      {/* ================= TRADE JOURNAL ================= */}
+      {/* ================= HOURLY JOURNAL ================= */}
 
       <div style={{marginTop:20}}>
 
-        <strong>AI Trade Journal</strong>
+        <strong>AI Trade Journal (Hourly)</strong>
 
         {Object.keys(tradesByHour).map(hour=>(
 
@@ -376,62 +383,16 @@ export default function AIBehaviorPanel({
 
             {tradesByHour[hour].wins.map((t,i)=>(
 
-              <div key={i} style={{
-                marginBottom:8,
-                background:"rgba(34,197,94,.08)",
-                padding:8,
-                borderRadius:6
-              }}>
-
-                <div>{formatTime(t.time)}</div>
-
-                <div>Market: {t.symbol || "UNKNOWN"}</div>
-
-                <div>
-                  {t.entry || t.price} → {t.price}
-                </div>
-
-                <div>Size: {t.qty}</div>
-
-                <div>
-                  Duration: {tradeDuration(t.timeOpen,t.time)}
-                </div>
-
-                <div style={{color:"#22c55e"}}>
-                  WIN +{Number(t.pnl).toFixed(2)}
-                </div>
-
+              <div key={i} style={{color:"#22c55e"}}>
+                WIN {Number(t.pnl).toFixed(2)}
               </div>
 
             ))}
 
             {tradesByHour[hour].losses.map((t,i)=>(
 
-              <div key={i} style={{
-                marginBottom:8,
-                background:"rgba(239,68,68,.08)",
-                padding:8,
-                borderRadius:6
-              }}>
-
-                <div>{formatTime(t.time)}</div>
-
-                <div>Market: {t.symbol || "UNKNOWN"}</div>
-
-                <div>
-                  {t.entry || t.price} → {t.price}
-                </div>
-
-                <div>Size: {t.qty}</div>
-
-                <div>
-                  Duration: {tradeDuration(t.timeOpen,t.time)}
-                </div>
-
-                <div style={{color:"#ef4444"}}>
-                  LOSS {Number(t.pnl).toFixed(2)}
-                </div>
-
+              <div key={i} style={{color:"#ef4444"}}>
+                LOSS {Number(t.pnl).toFixed(2)}
               </div>
 
             ))}
@@ -439,6 +400,57 @@ export default function AIBehaviorPanel({
           </div>
 
         ))}
+
+      </div>
+
+      {/* ================= DAILY HISTORY (NEW) ================= */}
+
+      <div style={{marginTop:25}}>
+
+        <strong>AI Trading History (Daily)</strong>
+
+        {Object.keys(tradesByDay).map(day=>{
+
+          const row = tradesByDay[day];
+
+          return(
+
+            <div key={day} style={{
+              marginTop:10,
+              padding:10,
+              borderRadius:6,
+              background:
+                row.pnl>=0
+                ?"rgba(34,197,94,.08)"
+                :"rgba(239,68,68,.08)"
+            }}>
+
+              <div>{day}</div>
+
+              <div>Trades: {row.trades.length}</div>
+
+              <div style={{color:"#22c55e"}}>
+                Wins: {row.wins}
+              </div>
+
+              <div style={{color:"#ef4444"}}>
+                Losses: {row.losses}
+              </div>
+
+              <div>
+                PnL:
+                <span style={{
+                  color:row.pnl>=0?"#22c55e":"#ef4444"
+                }}>
+                  {" "} ${row.pnl.toFixed(2)}
+                </span>
+              </div>
+
+            </div>
+
+          );
+
+        })}
 
       </div>
 
