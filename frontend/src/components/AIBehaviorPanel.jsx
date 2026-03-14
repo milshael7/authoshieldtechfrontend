@@ -1,16 +1,9 @@
-// frontend/src/components/AIBehaviorPanel.jsx
 // ============================================================
-// AI BEHAVIOR PANEL — AI PERFORMANCE INTELLIGENCE v7
-//
-// NEW FEATURES
-// - Active trade monitor with live timer
-// - Professional trade journal format
-// - Wins / Losses separated
-// - Duration + timestamp display
-// - Daily grouped trade history
+// FILE: frontend/src/components/AIBehaviorPanel.jsx
+// PURPOSE: AI Behavior + Professional Trade Journal
 // ============================================================
 
-import React, { useMemo, useEffect, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 
 export default function AIBehaviorPanel({
   trades = [],
@@ -19,6 +12,8 @@ export default function AIBehaviorPanel({
   position = null
 }) {
 
+  /* ================= ACTIVE TRADE TIMER ================= */
+
   const [duration,setDuration] = useState(0);
 
   useEffect(()=>{
@@ -26,10 +21,7 @@ export default function AIBehaviorPanel({
     if(!position?.time) return;
 
     const timer=setInterval(()=>{
-
-      const diff = Date.now() - position.time;
-      setDuration(diff);
-
+      setDuration(Date.now() - position.time);
     },1000);
 
     return ()=>clearInterval(timer);
@@ -38,44 +30,86 @@ export default function AIBehaviorPanel({
 
   function formatDuration(ms){
 
-    const s = Math.floor(ms/1000);
-    const m = Math.floor(s/60);
-    const sec = s % 60;
+    const s=Math.floor(ms/1000);
+    const m=Math.floor(s/60);
+    const sec=s%60;
 
     return `${m}m ${sec}s`;
 
   }
 
   function formatTime(ts){
-
-    const d = new Date(ts);
-    return d.toLocaleTimeString();
-
+    return new Date(ts).toLocaleTimeString();
   }
 
-  /* ================= CLOSED TRADES ================= */
+  /* ================= TRADE RECONSTRUCTION ================= */
 
   const closedTrades = useMemo(()=>{
-    return trades.filter(t=>t.side==="CLOSE");
+
+    const result=[];
+    let entry=null;
+
+    trades.forEach(t=>{
+
+      if(t.side==="BUY" || t.side==="SELL"){
+        entry=t;
+      }
+
+      if(t.side==="CLOSE" && entry){
+
+        result.push({
+          entryPrice:entry.price,
+          exitPrice:t.price,
+          qty:t.qty,
+          entryTime:entry.time,
+          exitTime:t.time,
+          pnl:t.pnl
+        });
+
+        entry=null;
+      }
+
+    });
+
+    return result;
+
   },[trades]);
 
-  /* ================= TRADE STATS ================= */
+  /* ================= GROUP BY DAY ================= */
 
-  const tradeStats = useMemo(()=>{
+  const tradesByDay = useMemo(()=>{
+
+    const grouped={};
+
+    closedTrades.forEach(t=>{
+
+      const day=new Date(t.exitTime).toDateString();
+
+      if(!grouped[day]){
+        grouped[day]={wins:[],losses:[]};
+      }
+
+      if(t.pnl>=0) grouped[day].wins.push(t);
+      else grouped[day].losses.push(t);
+
+    });
+
+    return grouped;
+
+  },[closedTrades]);
+
+  /* ================= STATS ================= */
+
+  const stats = useMemo(()=>{
 
     let wins=0;
     let losses=0;
     let pnl=0;
 
     closedTrades.forEach(t=>{
-
-      const p=Number(t.pnl||0);
-
-      pnl+=p;
-
-      if(p>0) wins++;
-      else if(p<0) losses++;
-
+      pnl+=t.pnl;
+      if(t.pnl>=0) wins++;
+      else losses++;
     });
 
     return{
@@ -87,124 +121,22 @@ export default function AIBehaviorPanel({
 
   },[closedTrades]);
 
-  /* ================= DAILY GROUPING ================= */
-
-  const tradesByDay = useMemo(()=>{
-
-    const grouped={};
-
-    closedTrades.forEach(t=>{
-
-      if(!t.time) return;
-
-      const day = new Date(t.time).toDateString();
-
-      if(!grouped[day]){
-        grouped[day] = {
-          wins:[],
-          losses:[]
-        };
-      }
-
-      if(Number(t.pnl)>=0)
-        grouped[day].wins.push(t);
-      else
-        grouped[day].losses.push(t);
-
-    });
-
-    return grouped;
-
-  },[closedTrades]);
-
-  /* ================= AI CONFIDENCE ================= */
+  /* ================= CONFIDENCE ================= */
 
   const avgConfidence = useMemo(()=>{
 
     if(!decisions.length) return 0;
 
-    const total =
-      decisions.reduce((sum,d)=>sum+(d.confidence||0),0);
+    const total=
+      decisions.reduce((s,d)=>s+(d.confidence||0),0);
 
     return (total/decisions.length)*100;
 
   },[decisions]);
 
-  /* ================= ACCURACY ================= */
-
-  const accuracy = useMemo(()=>{
-
-    if(!tradeStats.total) return 0;
-
-    return (tradeStats.wins/tradeStats.total)*100;
-
-  },[tradeStats]);
-
-  /* ================= AI LEARNING ================= */
-
-  const learning = useMemo(()=>{
-
-    if(!memory){
-      return{
-        signals:0,
-        trades:trades.length,
-        market:0
-      };
-    }
-
-    return{
-      signals:memory.signalsStored||0,
-      trades:memory.tradesStored||trades.length,
-      market:memory.marketStatesStored||0
-    };
-
-  },[memory,trades]);
-
-  /* ================= TRADE CARD ================= */
-
-  function TradeCard({t}){
-
-    const dur = t.exitTime && t.time
-      ? formatDuration(t.exitTime - t.time)
-      : "-";
-
-    const pnl = Number(t.pnl||0);
-
-    return(
-
-      <div style={{
-        marginBottom:10,
-        fontSize:13,
-        borderBottom:"1px solid rgba(255,255,255,.05)",
-        paddingBottom:8
-      }}>
-
-        <div>{formatTime(t.time)}</div>
-
-        <div>
-          {t.entry} → {t.price}
-        </div>
-
-        <div>
-          Size: {t.qty}
-        </div>
-
-        <div>
-          Duration: {dur}
-        </div>
-
-        <div style={{
-          color:pnl>=0?"#22c55e":"#ef4444",
-          fontWeight:600
-        }}>
-          {pnl>=0?"WIN":"LOSS"} {pnl.toFixed(2)}
-        </div>
-
-      </div>
-
-    );
-
-  }
+  const accuracy = stats.total
+    ? (stats.wins/stats.total)*100
+    : 0;
 
   /* ================= UI ================= */
 
@@ -217,136 +149,92 @@ export default function AIBehaviorPanel({
       border:"1px solid rgba(255,255,255,.08)"
     }}>
 
-      <h3 style={{marginBottom:16}}>
-        AI Behavior Intelligence
-      </h3>
+      <h3>AI Behavior Intelligence</h3>
 
-      <div>
-        <strong>Average AI Confidence:</strong>{" "}
-        {avgConfidence.toFixed(1)}%
+      <div>Average Confidence: {avgConfidence.toFixed(1)}%</div>
+      <div>Accuracy: {accuracy.toFixed(1)}%</div>
+
+      <div style={{marginTop:12}}>
+        Trades Closed: {stats.total}
+      </div>
+
+      <div style={{color:"#22c55e"}}>
+        Wins: {stats.wins}
+      </div>
+
+      <div style={{color:"#ef4444"}}>
+        Losses: {stats.losses}
       </div>
 
       <div>
-        <strong>AI Accuracy:</strong>{" "}
-        {accuracy.toFixed(1)}%
-      </div>
-
-      {/* ================= TRADE PERFORMANCE ================= */}
-
-      <div style={{marginTop:15}}>
-
-        <strong>Trade Performance</strong>
-
-        <div style={{
-          display:"grid",
-          gridTemplateColumns:"1fr 1fr",
-          marginTop:8,
-          gap:6
+        Total PnL:
+        <span style={{
+          color:stats.pnl>=0?"#22c55e":"#ef4444"
         }}>
-
-          <span>Trades Closed:</span>
-          <span>{tradeStats.total}</span>
-
-          <span>Wins:</span>
-          <span style={{color:"#22c55e"}}>
-            {tradeStats.wins}
-          </span>
-
-          <span>Losses:</span>
-          <span style={{color:"#ef4444"}}>
-            {tradeStats.losses}
-          </span>
-
-          <span>Total PnL:</span>
-          <span style={{
-            color:tradeStats.pnl>=0?"#22c55e":"#ef4444"
-          }}>
-            ${tradeStats.pnl.toFixed(2)}
-          </span>
-
-        </div>
-
+          ${stats.pnl.toFixed(2)}
+        </span>
       </div>
 
-      {/* ================= ACTIVE TRADE ================= */}
+      {/* ACTIVE TRADE */}
 
       {position && (
 
         <div style={{marginTop:20}}>
 
-          <strong>Active Trade</strong>
+          <strong>ACTIVE TRADE</strong>
 
-          <div style={{marginTop:8,fontSize:13}}>
-
-            <div>Entry: {position.entry}</div>
-
-            <div>Size: {position.qty}</div>
-
-            <div>
-              Time Open: {formatDuration(duration)}
-            </div>
-
-          </div>
+          <div>Entry: {position.entry}</div>
+          <div>Size: {position.qty}</div>
+          <div>Time Open: {formatDuration(duration)}</div>
 
         </div>
 
       )}
 
-      {/* ================= AI LEARNING ================= */}
+      {/* JOURNAL */}
 
       <div style={{marginTop:20}}>
-
-        <strong>AI Learning Memory</strong>
-
-        <div style={{
-          display:"grid",
-          gridTemplateColumns:"1fr 1fr",
-          marginTop:8,
-          gap:6
-        }}>
-
-          <span>Signals Learned:</span>
-          <span>{learning.signals}</span>
-
-          <span>Trades Learned:</span>
-          <span>{learning.trades}</span>
-
-          <span>Market States:</span>
-          <span>{learning.market}</span>
-
-        </div>
-
-      </div>
-
-      {/* ================= TRADE JOURNAL ================= */}
-
-      <div style={{marginTop:25}}>
 
         <strong>AI Trade Journal</strong>
 
         {Object.keys(tradesByDay).map(day=>(
 
-          <div key={day} style={{marginTop:16}}>
+          <div key={day} style={{marginTop:15}}>
 
-            <div style={{
-              opacity:.7,
-              marginBottom:8
-            }}>
-              {day}
-            </div>
+            <div style={{opacity:.7}}>{day}</div>
 
             {/* WINS */}
 
-            {tradesByDay[day].wins.length>0 && (
+            {tradesByDay[day].wins.length>0 &&(
 
-              <div style={{marginBottom:10}}>
+              <div>
 
                 <div style={{color:"#22c55e"}}>
                   WINNING TRADES
                 </div>
 
                 {tradesByDay[day].wins.map((t,i)=>(
-                  <TradeCard key={i} t={t}/>
+
+                  <div key={i} style={{marginBottom:10}}>
+
+                    <div>{formatTime(t.entryTime)}</div>
+
+                    <div>
+                      {t.entryPrice} → {t.exitPrice}
+                    </div>
+
+                    <div>Size: {t.qty}</div>
+
+                    <div>
+                      Duration: {formatDuration(t.exitTime - t.entryTime)}
+                    </div>
+
+                    <div style={{color:"#22c55e"}}>
+                      WIN +{t.pnl.toFixed(2)}
+                    </div>
+
+                  </div>
+
                 ))}
 
               </div>
@@ -355,7 +243,7 @@ export default function AIBehaviorPanel({
 
             {/* LOSSES */}
 
-            {tradesByDay[day].losses.length>0 && (
+            {tradesByDay[day].losses.length>0 &&(
 
               <div>
 
@@ -364,7 +252,27 @@ export default function AIBehaviorPanel({
                 </div>
 
                 {tradesByDay[day].losses.map((t,i)=>(
-                  <TradeCard key={i} t={t}/>
+
+                  <div key={i} style={{marginBottom:10}}>
+
+                    <div>{formatTime(t.entryTime)}</div>
+
+                    <div>
+                      {t.entryPrice} → {t.exitPrice}
+                    </div>
+
+                    <div>Size: {t.qty}</div>
+
+                    <div>
+                      Duration: {formatDuration(t.exitTime - t.entryTime)}
+                    </div>
+
+                    <div style={{color:"#ef4444"}}>
+                      LOSS {t.pnl.toFixed(2)}
+                    </div>
+
+                  </div>
+
                 ))}
 
               </div>
