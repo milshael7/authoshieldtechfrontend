@@ -1,24 +1,31 @@
 // ============================================================
 // FILE: frontend/src/components/AIBehaviorPanel.jsx
-// AI BEHAVIOR PANEL — INSTITUTIONAL PERFORMANCE VERSION
+// MODULE: AI Behavior Intelligence Panel
 //
 // PURPOSE
-// Provide the platform owner with AI performance intelligence.
+// Provide real-time intelligence about AI trading behavior.
 //
-// PANELS
-// 1. AI Analytics (fixed)
-// 2. Trade Performance (fixed)
-// 3. Daily Performance (fixed)
-// 4. Active Trade Monitor (fixed)
+// PANEL STRUCTURE
+// ------------------------------------------------------------
+// TOP (FIXED)
+//   - AI Analytics
+//   - Trade Performance
+//   - Daily Performance
+//   - Active Trade Monitor
 //
-// 5. TRADE JOURNAL
-//    Split into two scroll panels:
-//      LEFT  -> Winning / Running trades
-//      RIGHT -> Losing trades
+// BOTTOM (SCROLLABLE)
+//   - Winning Trades Panel
+//   - Losing Trades Panel
 //
-// MAINTENANCE NOTES
-// The top analytics section must remain fixed.
-// Only the trade journal area should scroll.
+// MAINTENANCE RULES
+// ------------------------------------------------------------
+// 1. Top analytics must NEVER scroll.
+// 2. Only the trade journal panels may scroll.
+// 3. Trade data must be protected against null values.
+// 4. Trades must be sorted newest first.
+//
+// REQUIRED TRADE STRUCTURE
+// { symbol, side, price, qty, pnl, time }
 //
 // ============================================================
 
@@ -30,6 +37,8 @@ export default function AIBehaviorPanel({
   memory = null,
   position = null
 }) {
+
+/* ================= ACTIVE TRADE TIMER ================= */
 
 const [duration,setDuration] = useState(0);
 
@@ -52,22 +61,35 @@ function formatDuration(ms){
   const sec=s%60;
 
   return `${m}m ${sec}s`;
+
 }
 
 /* ================= CLOSED TRADES ================= */
 
 const closedTrades = useMemo(()=>{
-  return trades.filter(t=>t.side==="CLOSE");
+
+  return trades
+    .filter(t=>t?.side==="CLOSE")
+    .sort((a,b)=>(b.time||0)-(a.time||0));
+
 },[trades]);
 
 /* ================= WIN / LOSS SPLIT ================= */
 
 const winningTrades = useMemo(()=>{
-  return closedTrades.filter(t=>Number(t.pnl)>=0);
+
+  return closedTrades.filter(
+    t=>Number(t?.pnl||0)>=0
+  );
+
 },[closedTrades]);
 
 const losingTrades = useMemo(()=>{
-  return closedTrades.filter(t=>Number(t.pnl)<0);
+
+  return closedTrades.filter(
+    t=>Number(t?.pnl||0)<0
+  );
+
 },[closedTrades]);
 
 /* ================= TRADE STATS ================= */
@@ -80,7 +102,7 @@ const tradeStats = useMemo(()=>{
 
   closedTrades.forEach(t=>{
 
-    const p=Number(t.pnl||0);
+    const p=Number(t?.pnl||0);
 
     pnl+=p;
 
@@ -105,8 +127,11 @@ const dailyStats = useMemo(()=>{
   const today=new Date().toDateString();
 
   const todayTrades=closedTrades.filter(t=>{
-    if(!t.time) return false;
+
+    if(!t?.time) return false;
+
     return new Date(t.time).toDateString()===today;
+
   });
 
   let wins=0;
@@ -115,7 +140,7 @@ const dailyStats = useMemo(()=>{
 
   todayTrades.forEach(t=>{
 
-    const p=Number(t.pnl||0);
+    const p=Number(t?.pnl||0);
 
     pnl+=p;
 
@@ -137,10 +162,10 @@ const dailyStats = useMemo(()=>{
 
 const avgConfidence = useMemo(()=>{
 
-  if(!decisions.length) return 0;
+  if(!decisions?.length) return 0;
 
-  const total =
-    decisions.reduce((s,d)=>s+(d.confidence||0),0);
+  const total=
+    decisions.reduce((s,d)=>s+(d?.confidence||0),0);
 
   return (total/decisions.length)*100;
 
@@ -263,7 +288,7 @@ gap:20,
 marginTop:25
 }}>
 
-{/* WINNING TRADES */}
+{/* ================= WINNING TRADES ================= */}
 
 <div style={{flex:1}}>
 
@@ -273,6 +298,10 @@ marginTop:25
 maxHeight:300,
 overflowY:"auto"
 }}>
+
+{winningTrades.length===0 && (
+<div style={{opacity:.6}}>No winning trades yet</div>
+)}
 
 {winningTrades.map((t,i)=>(
 
@@ -284,8 +313,8 @@ borderRadius:6
 }}>
 
 <div>{new Date(t.time).toLocaleString()}</div>
-<div>Market: {t.symbol}</div>
-<div>PnL: +{Number(t.pnl).toFixed(2)}</div>
+<div>Market: {t.symbol || "UNKNOWN"}</div>
+<div>PnL: +{Number(t.pnl||0).toFixed(2)}</div>
 
 </div>
 
@@ -295,7 +324,7 @@ borderRadius:6
 
 </div>
 
-{/* LOSING TRADES */}
+{/* ================= LOSING TRADES ================= */}
 
 <div style={{flex:1}}>
 
@@ -305,6 +334,10 @@ borderRadius:6
 maxHeight:300,
 overflowY:"auto"
 }}>
+
+{losingTrades.length===0 && (
+<div style={{opacity:.6}}>No losing trades</div>
+)}
 
 {losingTrades.map((t,i)=>(
 
@@ -316,8 +349,8 @@ borderRadius:6
 }}>
 
 <div>{new Date(t.time).toLocaleString()}</div>
-<div>Market: {t.symbol}</div>
-<div>PnL: {Number(t.pnl).toFixed(2)}</div>
+<div>Market: {t.symbol || "UNKNOWN"}</div>
+<div>PnL: {Number(t.pnl||0).toFixed(2)}</div>
 
 </div>
 
