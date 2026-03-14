@@ -1,15 +1,3 @@
-// ==========================================================
-// FILE: frontend/src/pages/TradingRoom.jsx
-// MODULE: Trading Room
-// PURPOSE: Live market dashboard + AI paper trading interface
-//
-// FIXES:
-// - Prevent invalid candle crash
-// - Safe candle merge
-// - Safe market WebSocket packets
-// - Chart stability protection
-// ==========================================================
-
 import React, { useEffect, useRef, useState, useMemo } from "react";
 import TerminalChart from "../components/TerminalChart";
 import OrderPanel from "../components/OrderPanel";
@@ -69,7 +57,7 @@ function mergeHistory(existing,incoming){
     .slice(-MAX_CANDLES);
 }
 
-function safeNum(v){
+function toNumber(v){
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
 }
@@ -79,10 +67,11 @@ export default function TradingRoom(){
   const marketWsRef = useRef(null);
   const paperWsRef = useRef(null);
 
+  const marketReconnectRef = useRef(null);
+  const paperReconnectRef = useRef(null);
+
   const lastCandleRef = useRef(null);
   const engineStartRef = useRef(null);
-
-  const [engineAlive,setEngineAlive] = useState(false);
 
   const [candles,setCandles] = useState([]);
   const [price,setPrice] = useState(null);
@@ -95,9 +84,16 @@ export default function TradingRoom(){
   const [decisions,setDecisions] = useState([]);
 
   const [memory,setMemory] = useState(null);
+
   const [engineUptime,setEngineUptime] = useState("0s");
 
-  /* ================= RESTORE CANDLES ================= */
+  const [aiControl,setAiControl] = useState({
+    enabled:true,
+    tradingMode:"paper",
+    strategyMode:"Balanced"
+  });
+
+/* ================= RESTORE CANDLES ================= */
 
   useEffect(()=>{
 
@@ -105,14 +101,91 @@ export default function TradingRoom(){
     const persisted = loadPersisted();
 
     const next = cache.candles.length ? cache.candles : persisted;
+
     const last = cache.lastCandle || next[next.length-1] || null;
 
     lastCandleRef.current = last;
+
     setCandles(next);
 
   },[]);
 
-  /* ================= LOAD HISTORY ================= */
+/* ================= LOAD MEMORY ================= */
+
+  async function loadMemory(){
+
+    const token=getToken();
+    if(!token || !API_BASE) return;
+
+    try{
+
+      const res=await fetch(
+        `${API_BASE}/api/brain/snapshot`,
+        {headers:{Authorization:`Bearer ${token}`}}
+      );
+
+      const data=await res.json();
+
+      if(data) setMemory(data);
+
+    }catch{}
+
+  }
+
+/* ================= LOAD CONFIG ================= */
+
+  useEffect(()=>{
+
+    async function loadConfig(){
+
+      const token=getToken();
+      if(!token || !API_BASE) return;
+
+      try{
+
+        const res=await fetch(
+          `${API_BASE}/api/ai/config`,
+          {headers:{Authorization:`Bearer ${token}`}}
+        );
+
+        const data=await res.json();
+
+        if(data?.config){
+          setAiControl(data.config);
+        }
+
+      }catch{}
+
+    }
+
+    loadConfig();
+    loadMemory();
+
+  },[]);
+
+/* ================= ENGINE UPTIME ================= */
+
+  useEffect(()=>{
+
+    const timer=setInterval(()=>{
+
+      if(!engineStartRef.current) return;
+
+      const diff=Date.now()-engineStartRef.current;
+
+      const sec=Math.floor(diff/1000)%60;
+      const min=Math.floor(diff/60000)%60;
+      const hr=Math.floor(diff/3600000);
+
+      setEngineUptime(`${hr}h ${min}m ${sec}s`);
+
+    },1000);
+
+    return ()=>clearInterval(timer);
+
+  },[]);
+
+/* ================= LOAD HISTORY ================= */
 
   async function loadHistory(){
 
@@ -131,33 +204,19 @@ export default function TradingRoom(){
       if(!data?.ok || !Array.isArray(data.candles)) return;
 
       const formatted=data.candles
-        .map(c=>{
-
-          const time=safeNum(c.time);
-          const open=safeNum(c.open);
-          const high=safeNum(c.high);
-          const low=safeNum(c.low);
-          const close=safeNum(c.close);
-
-          if(
-            time===null ||
-            open===null ||
-            high===null ||
-            low===null ||
-            close===null
-          ){
-            return null;
-          }
-
-          return {time,open,high,low,close};
-
-        })
-        .filter(Boolean)
+        .map(c=>({
+          time:Number(c.time),
+          open:Number(c.open),
+          high:Number(c.high),
+          low:Number(c.low),
+          close:Number(c.close)
+        }))
+        .filter(c=>Number.isFinite(c.time))
         .slice(-MAX_CANDLES);
 
       if(!formatted.length) return;
 
-      setCandles(prev=>{
+      setCandles(prev => {
 
         const merged = mergeHistory(prev, formatted);
 
@@ -175,12 +234,11 @@ export default function TradingRoom(){
       });
 
     }catch{}
-
   }
 
   useEffect(()=>{loadHistory()},[]);
 
-  /* ================= CANDLE UPDATE ================= */
+/* ================= CANDLE UPDATE ================= */
 
   function updateCandles(priceNow){
 
@@ -196,19 +254,7 @@ export default function TradingRoom(){
       let next;
       let nextLast;
 
-      if(!last || !Number.isFinite(last.open)){
-
-        nextLast={
-          time:candleTime,
-          open:priceNow,
-          high:priceNow,
-          low:priceNow,
-          close:priceNow
-        };
-
-        next=[...prev.slice(-MAX_CANDLES),nextLast];
-
-      }else if(last.time!==candleTime){
+      if(!last || last.time!==candleTime){
 
         nextLast={
           time:candleTime,
@@ -224,8 +270,8 @@ export default function TradingRoom(){
 
         nextLast={
           ...last,
-          high:Math.max(Number(last.high)||priceNow,priceNow),
-          low:Math.min(Number(last.low)||priceNow,priceNow),
+          high:Math.max(last.high,priceNow),
+          low:Math.min(last.low,priceNow),
           close:priceNow
         };
 
@@ -247,7 +293,7 @@ export default function TradingRoom(){
 
   }
 
-  /* ================= MARKET WS ================= */
+/* ================= MARKET WS ================= */
 
   function connectMarket(){
 
@@ -267,17 +313,18 @@ export default function TradingRoom(){
 
       try{
 
-        const packet=JSON.parse(msg.data||"{}");
+        const packet=JSON.parse(msg.data);
 
         if(packet.channel!=="market") return;
 
         const market=packet?.data?.[SYMBOL];
         if(!market) return;
 
-        const p=safeNum(market.price);
+        const p=toNumber(market.price);
         if(p===null) return;
 
         setPrice(p);
+
         updateCandles(p);
 
       }catch{}
@@ -286,7 +333,7 @@ export default function TradingRoom(){
 
   }
 
-  /* ================= PAPER WS ================= */
+/* ================= PAPER WS ================= */
 
   function connectPaper(){
 
@@ -306,16 +353,12 @@ export default function TradingRoom(){
 
       try{
 
-        const data=JSON.parse(msg.data||"{}");
+        const data=JSON.parse(msg.data);
 
         if(data.channel!=="paper") return;
 
         if(!engineStartRef.current){
           engineStartRef.current=data.engineStart||Date.now();
-        }
-
-        if(data.snapshot){
-          setEngineAlive(true);
         }
 
         const snap=data.snapshot||{};
@@ -338,22 +381,42 @@ export default function TradingRoom(){
   }
 
   useEffect(()=>{
+
     connectMarket();
     connectPaper();
+
+    return ()=>{
+      if(marketWsRef.current)
+        marketWsRef.current.close();
+
+      if(paperWsRef.current)
+        paperWsRef.current.close();
+    }
+
   },[]);
 
+/* ================= AI METRICS ================= */
+
   const aiConfidence=useMemo(()=>{
+
     if(!decisions.length) return 0.2;
+
     const total=decisions.reduce(
       (s,d)=>s+Number(d.confidence||0),0
     );
+
     return total/decisions.length;
+
   },[decisions]);
 
+/* ================= ENGINE STATUS ================= */
+
   const engineStatus =
-    engineAlive || engineStartRef.current
+    engineStartRef.current
       ? "RUNNING"
       : "STARTING";
+
+/* ================= UI ================= */
 
   return(
 
