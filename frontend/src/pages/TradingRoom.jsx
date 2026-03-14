@@ -1,3 +1,21 @@
+// frontend/src/pages/TradingRoom.jsx
+// ==========================================================
+// TRADING ROOM — SAFE CHART VERSION
+// MAINTENANCE NOTES:
+// 1. This page must NEVER send null / NaN candles into TerminalChart.
+// 2. All candle history loaded from API or localStorage must be sanitized.
+// 3. If Global JS Error shows "Value is null", first clear localStorage
+//    and inspect candle values coming from websocket / REST history.
+// 4. Engine uptime shown here is UI-side session uptime, not guaranteed
+//    backend engine lifetime. Do not use this alone for backend health.
+// 5. If changing candle structure, keep this shape only:
+//    { time, open, high, low, close }
+// 6. Before editing websocket logic, confirm market packets still arrive as:
+//    { channel:"market", data:{ BTCUSDT:{ price } } }
+// 7. Before editing paper websocket logic, confirm packets still arrive as:
+//    { channel:"paper", snapshot, decisions, engineStart? }
+// ==========================================================
+
 import React, { useEffect, useRef, useState, useMemo } from "react";
 import TerminalChart from "../components/TerminalChart";
 import OrderPanel from "../components/OrderPanel";
@@ -19,6 +37,18 @@ if (!window.__TRADING_CACHE__) {
   };
 }
 
+/* ================= VALIDATION ================= */
+
+function isValidCandle(c){
+  return (
+    Number.isFinite(c?.time) &&
+    Number.isFinite(c?.open) &&
+    Number.isFinite(c?.high) &&
+    Number.isFinite(c?.low) &&
+    Number.isFinite(c?.close)
+  );
+}
+
 function storageKey(){
   return `trading_candles_${SYMBOL}`;
 }
@@ -27,8 +57,11 @@ function loadPersisted(){
   try{
     const raw = localStorage.getItem(storageKey());
     if(!raw) return [];
+
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    if(!Array.isArray(parsed)) return [];
+
+    return parsed.filter(isValidCandle);
   }catch{
     return [];
   }
@@ -36,21 +69,26 @@ function loadPersisted(){
 
 function savePersisted(candles){
   try{
+    const clean = candles.filter(isValidCandle);
+
     localStorage.setItem(
       storageKey(),
-      JSON.stringify(candles.slice(-MAX_CANDLES))
+      JSON.stringify(clean.slice(-MAX_CANDLES))
     );
   }catch{}
 }
 
 function mergeHistory(existing,incoming){
 
-  if(!existing.length) return incoming;
-
   const map = new Map();
 
-  existing.forEach(c => map.set(c.time,c));
-  incoming.forEach(c => map.set(c.time,c));
+  existing
+    .filter(isValidCandle)
+    .forEach(c => map.set(c.time,c));
+
+  incoming
+    .filter(isValidCandle)
+    .forEach(c => map.set(c.time,c));
 
   return Array.from(map.values())
     .sort((a,b)=>a.time-b.time)
@@ -66,9 +104,6 @@ export default function TradingRoom(){
 
   const marketWsRef = useRef(null);
   const paperWsRef = useRef(null);
-
-  const marketReconnectRef = useRef(null);
-  const paperReconnectRef = useRef(null);
 
   const lastCandleRef = useRef(null);
   const engineStartRef = useRef(null);
@@ -132,37 +167,6 @@ export default function TradingRoom(){
 
   }
 
-/* ================= LOAD CONFIG ================= */
-
-  useEffect(()=>{
-
-    async function loadConfig(){
-
-      const token=getToken();
-      if(!token || !API_BASE) return;
-
-      try{
-
-        const res=await fetch(
-          `${API_BASE}/api/ai/config`,
-          {headers:{Authorization:`Bearer ${token}`}}
-        );
-
-        const data=await res.json();
-
-        if(data?.config){
-          setAiControl(data.config);
-        }
-
-      }catch{}
-
-    }
-
-    loadConfig();
-    loadMemory();
-
-  },[]);
-
 /* ================= ENGINE UPTIME ================= */
 
   useEffect(()=>{
@@ -211,7 +215,7 @@ export default function TradingRoom(){
           low:Number(c.low),
           close:Number(c.close)
         }))
-        .filter(c=>Number.isFinite(c.time))
+        .filter(isValidCandle)
         .slice(-MAX_CANDLES);
 
       if(!formatted.length) return;
@@ -242,7 +246,9 @@ export default function TradingRoom(){
 
   function updateCandles(priceNow){
 
-    if(!Number.isFinite(priceNow)) return;
+    if(!Number.isFinite(priceNow) || priceNow <= 0){
+      return;
+    }
 
     const now=Math.floor(Date.now()/1000);
     const candleTime=Math.floor(now/CANDLE_SECONDS)*CANDLE_SECONDS;
@@ -279,6 +285,8 @@ export default function TradingRoom(){
         next[next.length-1]=nextLast;
 
       }
+
+      if(!isValidCandle(nextLast)) return prev;
 
       lastCandleRef.current=nextLast;
 
@@ -399,7 +407,7 @@ export default function TradingRoom(){
 
   const aiConfidence=useMemo(()=>{
 
-    if(!decisions.length) return 0.2;
+    if(!decisions.length) return 0;
 
     const total=decisions.reduce(
       (s,d)=>s+Number(d.confidence||0),0
