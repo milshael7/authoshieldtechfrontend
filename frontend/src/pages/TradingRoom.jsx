@@ -4,12 +4,13 @@
 // PURPOSE: Live market dashboard + AI paper trading interface
 //
 // MAINTENANCE NOTES:
-// This version adds a scrollable AI Performance History panel
-// so the company can review long-term AI trading performance.
+// - Active AI trade now passed into AIBehaviorPanel
+// - Enables live "Active Trade" display + duration timer
+// - Chart logic, websocket logic, and candle structure remain unchanged
 //
 // IMPORTANT:
-// Chart logic, websocket logic, and candle structure were NOT
-// modified to avoid breaking the existing trading system.
+// If the AIBehaviorPanel active trade stops displaying,
+// confirm the prop `position={position}` is still passed.
 // ==========================================================
 
 import React, { useEffect, useRef, useState, useMemo } from "react";
@@ -118,7 +119,7 @@ export default function TradingRoom(){
 
   const [engineUptime,setEngineUptime] = useState("0s");
 
-/* ================= RESTORE CANDLES ================= */
+  /* ================= RESTORE CANDLES ================= */
 
   useEffect(()=>{
 
@@ -135,7 +136,7 @@ export default function TradingRoom(){
 
   },[]);
 
-/* ================= LOAD MEMORY ================= */
+  /* ================= LOAD MEMORY ================= */
 
   async function loadMemory(){
 
@@ -161,7 +162,7 @@ export default function TradingRoom(){
     loadMemory();
   },[]);
 
-/* ================= ENGINE UPTIME ================= */
+  /* ================= ENGINE UPTIME ================= */
 
   useEffect(()=>{
 
@@ -183,7 +184,7 @@ export default function TradingRoom(){
 
   },[]);
 
-/* ================= LOAD HISTORY ================= */
+  /* ================= LOAD HISTORY ================= */
 
   async function loadHistory(){
 
@@ -236,7 +237,7 @@ export default function TradingRoom(){
 
   useEffect(()=>{loadHistory()},[]);
 
-/* ================= CANDLE UPDATE ================= */
+  /* ================= CANDLE UPDATE ================= */
 
   function updateCandles(priceNow){
 
@@ -295,7 +296,7 @@ export default function TradingRoom(){
 
   }
 
-/* ================= MARKET WS ================= */
+  /* ================= MARKET WS ================= */
 
   function connectMarket(){
 
@@ -335,7 +336,7 @@ export default function TradingRoom(){
 
   }
 
-/* ================= PAPER WS ================= */
+  /* ================= PAPER WS ================= */
 
   function connectPaper(){
 
@@ -389,38 +390,7 @@ export default function TradingRoom(){
 
   },[]);
 
-/* ================= DAILY HISTORY ================= */
-
-const performanceHistory = useMemo(()=>{
-
-  const days={};
-
-  trades.forEach(t=>{
-
-    if(!t.time || t.side!=="CLOSE") return;
-
-    const date=new Date(t.time).toISOString().slice(0,10);
-
-    if(!days[date]){
-      days[date]={date,trades:0,wins:0,losses:0,pnl:0};
-    }
-
-    const pnl=Number(t.pnl||0);
-
-    days[date].trades++;
-    days[date].pnl+=pnl;
-
-    if(pnl>0) days[date].wins++;
-    if(pnl<0) days[date].losses++;
-
-  });
-
-  return Object.values(days)
-    .sort((a,b)=>b.date.localeCompare(a.date));
-
-},[trades]);
-
-/* ================= AI METRICS ================= */
+  /* ================= AI METRICS ================= */
 
   const aiConfidence=useMemo(()=>{
 
@@ -434,7 +404,7 @@ const performanceHistory = useMemo(()=>{
 
   },[decisions]);
 
-/* ================= UI ================= */
+  /* ================= UI ================= */
 
   return(
 
@@ -454,56 +424,15 @@ const performanceHistory = useMemo(()=>{
           pnlSeries={trades}
         />
 
+        {/* ================= AI BEHAVIOR PANEL ================= */}
+
         <div style={{marginTop:20}}>
           <AIBehaviorPanel
             trades={trades}
             decisions={decisions}
             memory={memory}
+            position={position}   // ⭐ enables active trade display
           />
-        </div>
-
-        {/* ================= PERFORMANCE HISTORY ================= */}
-
-        <div style={{
-          marginTop:20,
-          background:"#111827",
-          padding:20,
-          borderRadius:12,
-          border:"1px solid rgba(255,255,255,.08)"
-        }}>
-
-          <h3>AI Performance History</h3>
-
-          <div style={{
-            maxHeight:240,
-            overflowY:"auto",
-            marginTop:10,
-            fontSize:13
-          }}>
-
-            {performanceHistory.map((d,i)=>(
-              <div key={i}
-                style={{
-                  display:"flex",
-                  justifyContent:"space-between",
-                  borderBottom:"1px solid rgba(255,255,255,.05)",
-                  padding:"6px 0"
-                }}
-              >
-                <span>{d.date}</span>
-                <span>{d.trades} trades</span>
-                <span style={{color:"#22c55e"}}>{d.wins}W</span>
-                <span style={{color:"#ef4444"}}>{d.losses}L</span>
-                <span style={{
-                  color:d.pnl>=0?"#22c55e":"#ef4444"
-                }}>
-                  {d.pnl.toFixed(2)}
-                </span>
-              </div>
-            ))}
-
-          </div>
-
         </div>
 
       </div>
