@@ -1,114 +1,145 @@
 // frontend/src/components/AIBehaviorPanel.jsx
 // ============================================================
-// AI BEHAVIOR PANEL — AI PERFORMANCE INTELLIGENCE v5
-// ADDED:
-// - Daily performance
-// - Trade journal
-// - AI progress tracking
+// AI BEHAVIOR PANEL — AI PERFORMANCE INTELLIGENCE v6
+//
+// FEATURES
+// - Live AI statistics
+// - Active trade display (current position)
+// - Daily performance metrics
+// - AI learning memory tracking
+// - Trade journal grouped by day
+//
+// IMPORTANT MAINTENANCE NOTES
+// - Top statistics must always match journal totals
+// - Active trade uses state.position from TradingRoom
+// - Closed trades use side === "CLOSE"
+// - Journal shows entry → exit format
 // ============================================================
 
-import React, { useMemo } from "react";
+import React, { useMemo, useEffect, useState } from "react";
 
 export default function AIBehaviorPanel({
   trades = [],
   decisions = [],
-  memory = null
+  memory = null,
+  position = null
 }) {
+
+  /* ================= ACTIVE TRADE TIMER ================= */
+
+  const [duration,setDuration] = useState(0);
+
+  useEffect(()=>{
+
+    if(!position?.time) return;
+
+    const timer=setInterval(()=>{
+
+      const diff = Date.now() - position.time;
+      setDuration(diff);
+
+    },1000);
+
+    return ()=>clearInterval(timer);
+
+  },[position]);
+
+  function formatDuration(ms){
+
+    const s = Math.floor(ms/1000);
+    const m = Math.floor(s/60);
+    const sec = s % 60;
+
+    return `${m}m ${sec}s`;
+
+  }
 
   /* ================= CLOSED TRADES ================= */
 
-  const closedTrades = useMemo(() => {
+  const closedTrades = useMemo(()=>{
     return trades.filter(t => t.side === "CLOSE");
-  }, [trades]);
+  },[trades]);
 
-  /* ================= WIN / LOSS ================= */
+  /* ================= TRADE STATS ================= */
 
-  const tradeStats = useMemo(() => {
+  const tradeStats = useMemo(()=>{
 
-    let wins = 0;
-    let losses = 0;
-    let pnl = 0;
+    let wins=0;
+    let losses=0;
+    let pnl=0;
 
-    closedTrades.forEach(t => {
+    closedTrades.forEach(t=>{
 
-      const p = Number(t.pnl || 0);
+      const p = Number(t.pnl||0);
 
-      pnl += p;
+      pnl+=p;
 
-      if (p > 0) wins++;
-      else if (p < 0) losses++;
+      if(p>0) wins++;
+      else if(p<0) losses++;
 
     });
 
-    return {
+    return{
       wins,
       losses,
       pnl,
-      total: closedTrades.length
+      total:closedTrades.length
     };
 
-  }, [closedTrades]);
+  },[closedTrades]);
 
   /* ================= DAILY PERFORMANCE ================= */
 
-  const dailyStats = useMemo(() => {
+  const dailyStats = useMemo(()=>{
 
     const today = new Date().toDateString();
 
-    const todayTrades = trades.filter(t => {
-      if (!t.time) return false;
-      return new Date(t.time).toDateString() === today;
-    });
+    const todayTrades = closedTrades.filter(t=>{
 
-    const todayClosed = todayTrades.filter(t => t.side === "CLOSE");
+      if(!t.time) return false;
 
-    let wins = 0;
-    let losses = 0;
-    let pnl = 0;
-
-    todayClosed.forEach(t => {
-
-      const p = Number(t.pnl || 0);
-
-      pnl += p;
-
-      if (p > 0) wins++;
-      else if (p < 0) losses++;
+      return new Date(t.time).toDateString()===today;
 
     });
 
-    const buyTrades =
-      todayTrades.filter(t => t.side === "BUY").length;
+    let wins=0;
+    let losses=0;
+    let pnl=0;
 
-    const sellTrades =
-      todayTrades.filter(t => t.side === "SELL").length;
+    todayTrades.forEach(t=>{
 
-    return {
-      trades: todayClosed.length,
+      const p = Number(t.pnl||0);
+
+      pnl+=p;
+
+      if(p>0) wins++;
+      else if(p<0) losses++;
+
+    });
+
+    return{
+      trades:todayTrades.length,
       wins,
       losses,
-      pnl,
-      buyTrades,
-      sellTrades
+      pnl
     };
 
-  }, [trades]);
+  },[closedTrades]);
 
   /* ================= TRADE JOURNAL ================= */
 
-  const tradesByDay = useMemo(() => {
+  const tradesByDay = useMemo(()=>{
 
-    const grouped = {};
+    const grouped={};
 
-    closedTrades.forEach(t => {
+    closedTrades.forEach(t=>{
 
-      if (!t.time) return;
+      if(!t.time) return;
 
-      const day =
-        new Date(t.time).toDateString();
+      const day=new Date(t.time).toDateString();
 
-      if (!grouped[day])
-        grouped[day] = [];
+      if(!grouped[day])
+        grouped[day]=[];
 
       grouped[day].push(t);
 
@@ -116,79 +147,54 @@ export default function AIBehaviorPanel({
 
     return grouped;
 
-  }, [closedTrades]);
-
-  /* ================= ACCURACY ================= */
-
-  const accuracy = useMemo(() => {
-
-    if (!tradeStats.total) return 0;
-
-    return (tradeStats.wins / tradeStats.total) * 100;
-
-  }, [tradeStats]);
+  },[closedTrades]);
 
   /* ================= AI CONFIDENCE ================= */
 
-  const avgConfidence = useMemo(() => {
+  const avgConfidence = useMemo(()=>{
 
-    if (!decisions.length) return 0;
+    if(!decisions.length) return 0;
 
     const total =
-      decisions.reduce(
-        (sum, d) => sum + (d.confidence || 0),
-        0
-      );
+      decisions.reduce((sum,d)=>sum+(d.confidence||0),0);
 
-    return (total / decisions.length) * 100;
+    return (total/decisions.length)*100;
 
-  }, [decisions]);
+  },[decisions]);
 
-  /* ================= DECISION DISTRIBUTION ================= */
+  /* ================= ACCURACY ================= */
 
-  const decisionStats = useMemo(() => {
+  const accuracy = useMemo(()=>{
 
-    let buy = 0;
-    let sell = 0;
-    let wait = 0;
+    if(!tradeStats.total) return 0;
 
-    decisions.forEach(d => {
+    return (tradeStats.wins/tradeStats.total)*100;
 
-      if (d.action === "BUY") buy++;
-      else if (d.action === "SELL") sell++;
-      else wait++;
-
-    });
-
-    return { buy, sell, wait };
-
-  }, [decisions]);
+  },[tradeStats]);
 
   /* ================= AI LEARNING ================= */
 
-  const learning = useMemo(() => {
+  const learning = useMemo(()=>{
 
-    if (!memory) {
-
-      return {
-        signals: 0,
-        trades: trades.length,
-        market: 0
+    if(!memory){
+      return{
+        signals:0,
+        trades:trades.length,
+        market:0
       };
-
     }
 
-    return {
-      signals: memory.signalsStored || 0,
-      trades: memory.tradesStored || trades.length,
-      market: memory.marketStatesStored || 0
+    return{
+      signals:memory.signalsStored||0,
+      trades:memory.tradesStored||trades.length,
+      market:memory.marketStatesStored||0
     };
 
-  }, [memory, trades]);
+  },[memory,trades]);
 
   /* ================= UI ================= */
 
-  return (
+  return(
 
     <div style={{
       background:"#111827",
@@ -200,6 +206,8 @@ export default function AIBehaviorPanel({
       <h3 style={{marginBottom:16}}>
         AI Behavior Intelligence
       </h3>
+
+      {/* ================= CONFIDENCE ================= */}
 
       <div style={{marginBottom:10}}>
         <strong>Average AI Confidence:</strong>{" "}
@@ -239,7 +247,7 @@ export default function AIBehaviorPanel({
 
           <span>Total PnL:</span>
           <span style={{
-            color: tradeStats.pnl >= 0 ? "#22c55e" : "#ef4444"
+            color:tradeStats.pnl>=0?"#22c55e":"#ef4444"
           }}>
             ${tradeStats.pnl.toFixed(2)}
           </span>
@@ -247,6 +255,38 @@ export default function AIBehaviorPanel({
         </div>
 
       </div>
+
+      {/* ================= ACTIVE TRADE ================= */}
+
+      {position && (
+
+        <div style={{marginTop:18}}>
+
+          <strong>Active Trade</strong>
+
+          <div style={{
+            marginTop:8,
+            fontSize:13,
+            lineHeight:"18px"
+          }}>
+
+            <div>
+              Entry Price: {position.entry}
+            </div>
+
+            <div>
+              Size: {position.qty}
+            </div>
+
+            <div>
+              Duration: {formatDuration(duration)}
+            </div>
+
+          </div>
+
+        </div>
+
+      )}
 
       {/* ================= DAILY PERFORMANCE ================= */}
 
@@ -274,15 +314,9 @@ export default function AIBehaviorPanel({
             {dailyStats.losses}
           </span>
 
-          <span>BUY Trades Today:</span>
-          <span>{dailyStats.buyTrades}</span>
-
-          <span>SELL Trades Today:</span>
-          <span>{dailyStats.sellTrades}</span>
-
           <span>Daily PnL:</span>
           <span style={{
-            color: dailyStats.pnl >= 0 ? "#22c55e" : "#ef4444"
+            color:dailyStats.pnl>=0?"#22c55e":"#ef4444"
           }}>
             ${dailyStats.pnl.toFixed(2)}
           </span>
@@ -323,7 +357,7 @@ export default function AIBehaviorPanel({
 
         <strong>AI Trade Journal</strong>
 
-        {Object.keys(tradesByDay).map(day => (
+        {Object.keys(tradesByDay).map(day=>(
 
           <div key={day} style={{marginTop:10}}>
 
@@ -344,14 +378,18 @@ export default function AIBehaviorPanel({
                 }}
               >
 
-                <span>{t.side}</span>
-                <span>{t.qty}</span>
-                <span>@ {t.price}</span>
+                <span>
+                  {t.entry} → {t.price}
+                </span>
+
+                <span>
+                  {t.qty}
+                </span>
 
                 <span style={{
-                  color: t.pnl >= 0 ? "#22c55e" : "#ef4444"
+                  color:t.pnl>=0?"#22c55e":"#ef4444"
                 }}>
-                  {Number(t.pnl).toFixed(2)}
+                  {t.pnl>0?"WIN":"LOSS"} {Number(t.pnl).toFixed(2)}
                 </span>
 
               </div>
@@ -361,34 +399,6 @@ export default function AIBehaviorPanel({
           </div>
 
         ))}
-
-      </div>
-
-      {/* ================= DECISION DISTRIBUTION ================= */}
-
-      <div style={{marginTop:18}}>
-
-        <strong>Decision Distribution</strong>
-
-        <div style={{
-          display:"flex",
-          gap:20,
-          marginTop:8
-        }}>
-
-          <span style={{color:"#22c55e"}}>
-            BUY: {decisionStats.buy}
-          </span>
-
-          <span style={{color:"#ef4444"}}>
-            SELL: {decisionStats.sell}
-          </span>
-
-          <span style={{color:"#f59e0b"}}>
-            WAIT: {decisionStats.wait}
-          </span>
-
-        </div>
 
       </div>
 
