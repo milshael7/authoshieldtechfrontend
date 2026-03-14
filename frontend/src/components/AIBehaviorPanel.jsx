@@ -1,7 +1,7 @@
 // frontend/src/components/AIBehaviorPanel.jsx
 // ============================================================
-// AI BEHAVIOR PANEL — AI PERFORMANCE INTELLIGENCE v3
-// IMPROVED: win/loss tracking + total pnl + accurate analytics
+// AI BEHAVIOR PANEL — AI PERFORMANCE INTELLIGENCE v4
+// ADDED: Daily performance tracking + buy/sell trade tracking
 // ============================================================
 
 import React, { useMemo } from "react";
@@ -45,6 +45,51 @@ export default function AIBehaviorPanel({
     };
 
   }, [closedTrades]);
+
+  /* ================= DAILY PERFORMANCE ================= */
+
+  const dailyStats = useMemo(() => {
+
+    const today = new Date().toDateString();
+
+    const todayTrades = trades.filter(t => {
+      if (!t.time) return false;
+      return new Date(t.time).toDateString() === today;
+    });
+
+    const todayClosed = todayTrades.filter(t => t.side === "CLOSE");
+
+    let wins = 0;
+    let losses = 0;
+    let pnl = 0;
+
+    todayClosed.forEach(t => {
+
+      const p = Number(t.pnl || 0);
+
+      pnl += p;
+
+      if (p > 0) wins++;
+      else if (p < 0) losses++;
+
+    });
+
+    const buyTrades =
+      todayTrades.filter(t => t.side === "BUY").length;
+
+    const sellTrades =
+      todayTrades.filter(t => t.side === "SELL").length;
+
+    return {
+      trades: todayClosed.length,
+      wins,
+      losses,
+      pnl,
+      buyTrades,
+      sellTrades
+    };
+
+  }, [trades]);
 
   /* ================= ACCURACY ================= */
 
@@ -174,6 +219,49 @@ export default function AIBehaviorPanel({
             color: tradeStats.pnl >= 0 ? "#22c55e" : "#ef4444"
           }}>
             ${tradeStats.pnl.toFixed(2)}
+          </span>
+
+        </div>
+
+      </div>
+
+      {/* ================= DAILY PERFORMANCE ================= */}
+
+      <div style={{marginTop:18}}>
+
+        <strong>Daily Performance</strong>
+
+        <div style={{
+          display:"grid",
+          gridTemplateColumns:"1fr 1fr",
+          marginTop:8,
+          gap:6
+        }}>
+
+          <span>Trades Today:</span>
+          <span>{dailyStats.trades}</span>
+
+          <span>Wins Today:</span>
+          <span style={{color:"#22c55e"}}>
+            {dailyStats.wins}
+          </span>
+
+          <span>Losses Today:</span>
+          <span style={{color:"#ef4444"}}>
+            {dailyStats.losses}
+          </span>
+
+          <span>BUY Trades Today:</span>
+          <span>{dailyStats.buyTrades}</span>
+
+          <span>SELL Trades Today:</span>
+          <span>{dailyStats.sellTrades}</span>
+
+          <span>Daily PnL:</span>
+          <span style={{
+            color: dailyStats.pnl >= 0 ? "#22c55e" : "#ef4444"
+          }}>
+            ${dailyStats.pnl.toFixed(2)}
           </span>
 
         </div>
