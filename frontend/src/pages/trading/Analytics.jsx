@@ -1,15 +1,6 @@
 // ============================================================
 // FILE: frontend/src/pages/trading/Analytics.jsx
-// ANALYTICS ROOM — INSTITUTIONAL AI PERFORMANCE DASHBOARD v5
-//
-// PURPOSE
-// Real-time AI trading analytics dashboard.
-//
-// GUARANTEES
-// - Uses real backend snapshot data
-// - No fabricated statistics
-// - PnL always matches trade history
-// - Equity curve derived from engine trades
+// ANALYTICS ROOM — INSTITUTIONAL AI PERFORMANCE DASHBOARD v6
 // ============================================================
 
 import React, { useEffect, useState } from "react";
@@ -21,7 +12,14 @@ const API_BASE = import.meta.env.VITE_API_BASE?.replace(/\/+$/, "");
 
 export default function Analytics(){
 
-  const [stats,setStats] = useState({});
+  const [stats,setStats] = useState({
+    equity:0,
+    winRate:0,
+    trades:0,
+    pnl:0,
+    drawdown:0
+  });
+
   const [equityHistory,setEquityHistory] = useState([]);
   const [tradeLog,setTradeLog] = useState([]);
 
@@ -45,8 +43,6 @@ export default function Analytics(){
       if(!token) return;
 
       const headers={Authorization:`Bearer ${token}`};
-
-      /* ================= PAPER SNAPSHOT ================= */
 
       const paperRes=await fetch(
         `${API_BASE}/api/paper/status`,
@@ -85,7 +81,7 @@ export default function Analytics(){
 
       /* ================= EQUITY CURVE ================= */
 
-      let equity=Number(snap.cashBalance||0);
+      let equity=Number(snap.equity || snap.cashBalance || 0);
       let peak=equity;
       let maxDD=0;
 
@@ -126,13 +122,25 @@ export default function Analytics(){
 
       });
 
+      /* ================= ENGINE STATS ================= */
+
+      const execStats =
+        snap.executionStats || {};
+
+      setEngine({
+
+        ticks:execStats.ticks || 0,
+        decisions:execStats.decisions || 0,
+        trades:execStats.trades || 0
+
+      });
+
       /* ================= AI BRAIN ================= */
 
       if(aiData?.ok){
 
         setBrain(aiData.brain||{});
         setConfig(aiData.config||{});
-        setEngine(aiData.execution||{});
 
       }
 
@@ -167,9 +175,9 @@ export default function Analytics(){
       setRisk({
 
         exposure:exposure.toFixed(2),
-        riskPercent:config.riskPercent,
-        maxTrades:config.maxTrades,
-        mode:config.tradingMode
+        riskPercent:config.riskPercent || 0,
+        maxTrades:config.maxTrades || 0,
+        mode:config.tradingMode || "paper"
 
       });
 
@@ -193,8 +201,6 @@ export default function Analytics(){
         AI Trading Analytics
       </h2>
 
-      {/* ================= PERFORMANCE METRICS ================= */}
-
       <div style={{
         display:"flex",
         gap:20,
@@ -210,8 +216,6 @@ export default function Analytics(){
 
       </div>
 
-      {/* ================= ENGINE STATE ================= */}
-
       <Panel title="AI Engine State">
 
         <div>Mode: {risk.mode}</div>
@@ -222,8 +226,6 @@ export default function Analytics(){
         <div>Total Executions: {engine.trades}</div>
 
       </Panel>
-
-      {/* ================= AI BRAIN ================= */}
 
       <Panel title="AI Brain Intelligence" style={{marginTop:30}}>
 
@@ -242,22 +244,13 @@ export default function Analytics(){
         <div>Win Streak: {brain.winStreak}</div>
         <div>Loss Streak: {brain.lossStreak}</div>
 
-        <div>
-          Aggression Factor:
-          {(brain.aggressionFactor||1).toFixed(2)}
-        </div>
-
       </Panel>
-
-      {/* ================= EQUITY CURVE ================= */}
 
       <Panel title="Equity Curve" style={{marginTop:30}}>
 
         <EquityCurve equityHistory={equityHistory} />
 
       </Panel>
-
-      {/* ================= BEHAVIOR ================= */}
 
       <Panel title="AI Behavior Intelligence" style={{marginTop:30}}>
 
@@ -267,43 +260,9 @@ export default function Analytics(){
 
       </Panel>
 
-      {/* ================= PORTFOLIO ================= */}
-
       <Panel title="Portfolio Allocation" style={{marginTop:30}}>
 
         <PortfolioAllocation trades={tradeLog} />
-
-      </Panel>
-
-      {/* ================= RECENT TRADES ================= */}
-
-      <Panel title="Recent Trades" style={{marginTop:30}}>
-
-        {tradeLog.map((t,i)=>(
-
-          <div key={i}
-            style={{
-              display:"flex",
-              justifyContent:"space-between",
-              borderBottom:"1px solid rgba(255,255,255,.05)",
-              padding:"6px 0"
-            }}
-          >
-            <span>{t.side}</span>
-            <span>{t.qty}</span>
-            <span>@ {t.price}</span>
-
-            <span style={{
-              color:Number(t.pnl)>0
-                ? "#22c55e"
-                : "#ef4444"
-            }}>
-              {Number(t.pnl||0).toFixed(2)}
-            </span>
-
-          </div>
-
-        ))}
 
       </Panel>
 
